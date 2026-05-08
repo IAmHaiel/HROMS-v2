@@ -2,13 +2,16 @@
 {
     public class Employee
     {
-        public Guid Id { get; set; }
+        public Guid EmployeeId { get; set; }
         public string EmployeeNumber { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
         public string ContactNumber { get; set; } = string.Empty;
-        public string PasswordHash { get; set; } = string.Empty;
-        public string Role { get; set; } = string.Empty;
-        public string? RefreshToken { get; set; }
-        public DateTime? RefreshTokenExpiryTime { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+
+        // Navigation properties
+        public Account? Account { get; set; }
+        public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
     }
 }

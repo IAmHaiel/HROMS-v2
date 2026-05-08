@@ -86,29 +86,56 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 
 builder.Services.AddDbContext<OTMSDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<IAuthService, AuthService>();
 
-static async Task SeedSuperAdminAsync(OTMSDbContext context)
+// Registered Services
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAccountManagementService, AccountManagementService>();
+
+static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext context)
 {
-    // Check if SuperAdmin already exists
+    const string employeeNumber = "SPDX-SPR-01";
+
+    // Check if the system admin already exists
     var exists = await context.Employees
-        .AnyAsync(u => u.Role == "SuperAdmin");
+        .Include(e => e.Account)
+        .AnyAsync(e => e.EmployeeNumber == employeeNumber);
 
     if (exists)
         return;
 
-    var superAdmin = new Employee
+    // Create the system admin employee
+    var employee = new Employee
     {
-        EmployeeNumber = "SPDX-SPR-01",
-        EmployeeName = "Super Admin",
+        EmployeeId = Guid.NewGuid(),
+        EmployeeNumber = employeeNumber,
+        EmployeeName = "System Admin",
         ContactNumber = "0912 671 9251",
-        Role = "SuperAdmin"
+        CreatedAt = DateTime.UtcNow
     };
 
-    var passwordHasher = new PasswordHasher<Employee>();
-    superAdmin.PasswordHash = passwordHasher.HashPassword(superAdmin, "SuperAdmin123");
+    var account = new Account
+    {
+        AccountId = Guid.NewGuid(),
+        EmployeeId = employee.EmployeeId, // FK
+        Role = "SystemAdmin",
+        AccountStatus = "Active",
+        CreatedAt = DateTime.UtcNow
+    };
 
-    context.Employees.Add(superAdmin);
+    // Hash Password
+    var passwordHasher = new PasswordHasher<Account>();
+    account.PasswordHash = passwordHasher.HashPassword(
+        account,
+        "SuperAdmin123"
+        );
+
+    // Link navigation
+    employee.Account = account;
+
+    // Save
+    context.Employees.Add(employee);
+    context.Accounts.Add(account);
+
     await context.SaveChangesAsync();
 }
 
@@ -123,7 +150,7 @@ using (var scope = app.Services.CreateScope())
     // Apply migrations automatically
     context.Database.Migrate();
 
-    await SeedSuperAdminAsync(context);
+    await SeedSystemAdminAsync(context);
 }
 
 if (app.Environment.IsDevelopment())

@@ -1,9 +1,12 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.Models;
+using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,30 +20,66 @@ namespace OTMS.Service.Services
         IConfiguration configuration
     ) : IAuthService
     {
+
+        static int MaxFailedLoginAttempts = 3;
+
         public async Task<TokenResponseDTO?> LoginAsync(
             EmployeeLoginDTO request
         )
         {
+
             var employee = await context.Employees
+                .Include(e => e.Account)
                 .FirstOrDefaultAsync(
                     u => u.EmployeeNumber == request.EmployeeNumber
                 );
 
-            if (employee is null)
+            var accountStatus = employee?.Account?.AccountStatus;
+            var accountFailedAttempts = employee?.Account?.FailedLoginAttempts;
+
+            if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
             {
                 return null;
             }
 
+            if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
+            {
+                throw new UnauthorizedAccessException("Account is deactivated. Please contact the administrator.");
+            }
+
             var verificationResult =
-                new PasswordHasher<Employee>()
+                new PasswordHasher<Account>()
                     .VerifyHashedPassword(
-                        employee,
-                        employee.PasswordHash,
+                        employee.Account,
+                        employee.Account.PasswordHash,
                         request.Password
                     );
 
+            // If the Password is incorrect, return null to indicate failed login
             if (verificationResult == PasswordVerificationResult.Failed)
             {
+
+                var Account = await context.Accounts
+                    .FirstOrDefaultAsync(
+                        a => a.EmployeeId == employee.EmployeeId
+                    );
+
+                if (Account is not null && Account.Role != "SystemAdmin")
+                {
+                    Account.FailedLoginAttempts++;
+                    context.Accounts.Update(Account);
+                    await context.SaveChangesAsync();
+                    
+                    if(Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
+                    {
+                        Account.AccountStatus = "Deactivated";
+                        context.Accounts.Update(Account);
+                        await context.SaveChangesAsync();
+                    }
+
+                    return null;
+                }
+
                 return null;
             }
 
@@ -52,7 +91,7 @@ namespace OTMS.Service.Services
         )
         {
             var user = await ValidateRefreshTokenAsync(
-                request.UserId,
+                request.AccountId,
                 request.RefreshToken
             );
 
@@ -79,35 +118,50 @@ namespace OTMS.Service.Services
 
             if (exists)
             {
-                return null;
+                throw new InvalidOperationException("Employee Number already exists. Please choose a different one.");
             }
 
             var generatedPassword = GeneratePassword();
 
             var employee = new Employee
             {
+                EmployeeId = Guid.NewGuid(),
                 EmployeeNumber = request.EmployeeNumber.Trim(),
-                EmployeeName = request.EmployeeName?.Trim(),
-                ContactNumber = request.ContactNumber?.Trim(),
-                Role = request.Role?.Trim()
+                EmployeeName = request.EmployeeName.Trim(),
+                ContactNumber = request.ContactNumber.Trim(),
+                CreatedAt = DateTime.UtcNow
             };
 
-            var passwordHasher = new PasswordHasher<Employee>();
+            var account = new Account
+            {
+                AccountId = Guid.NewGuid(),
+                EmployeeId = employee.EmployeeId, // FK
+                Role = request.Role.Trim(),
+                AccountStatus = "Active",
+                CreatedAt = DateTime.UtcNow
+            };
 
-            employee.PasswordHash = passwordHasher.HashPassword(
-                employee,
-                generatedPassword
+            var passwordHasher = new PasswordHasher<Account>();
+
+            var generatedUserPassword = PasswordGenerator.Generate();
+
+            account.PasswordHash = passwordHasher.HashPassword(
+                account,
+                generatedUserPassword
             );
 
+            employee.Account = account;
+
             context.Employees.Add(employee);
+            context.Accounts.Add(account);
             await context.SaveChangesAsync();
 
             return new EmployeeRegisterResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
                 EmployeeName = employee.EmployeeName ?? string.Empty,
-                Role = employee.Role ?? string.Empty,
-                GeneratedPassword = generatedPassword
+                Role = account.Role ?? string.Empty,
+                GeneratedPassword = generatedUserPassword
             };
         }
 
@@ -115,11 +169,19 @@ namespace OTMS.Service.Services
 
         private async Task<TokenResponseDTO> CreateTokenResponse(Employee employee)
         {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
             return new TokenResponseDTO
             {
                 AccessToken = CreateToken(employee),
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
-                Role = employee.Role ?? string.Empty
+                Role = employee.Account.Role ?? string.Empty
             };
         }
 
@@ -127,10 +189,18 @@ namespace OTMS.Service.Services
             Employee employee
         )
         {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
             var refreshToken = GenerateRefreshToken();
 
-            employee.RefreshToken = refreshToken;
-            employee.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            employee.Account.RefreshToken = refreshToken;
+            employee.Account.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
 
             await context.SaveChangesAsync();
 
@@ -163,6 +233,14 @@ namespace OTMS.Service.Services
 
         private string CreateToken(Employee employee)
         {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
             var claims = new List<Claim>
             {
                 new Claim(
@@ -171,11 +249,11 @@ namespace OTMS.Service.Services
                 ),
                 new Claim(
                     ClaimTypes.NameIdentifier,
-                    employee.Id.ToString()
+                    employee.Account.AccountId.ToString()
                 ),
                 new Claim(
                     ClaimTypes.Role,
-                    employee.Role ?? string.Empty
+                    employee.Account.Role ?? string.Empty
                 )
             };
 
@@ -213,12 +291,19 @@ namespace OTMS.Service.Services
             string refreshToken
         )
         {
-            var user = await context.Employees.FindAsync(userId);
+            var user = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account != null && e.Account.AccountId == userId);
+
+            if (user is null || user.Account is null)
+            {
+                return null;
+            }
 
             if (
                 user is null ||
-                user.RefreshToken != refreshToken ||
-                user.RefreshTokenExpiryTime <= DateTime.UtcNow
+                user.Account.RefreshToken != refreshToken ||
+                user.Account.RefreshTokenExpiryTime <= DateTime.UtcNow
             )
             {
                 return null;

@@ -52,16 +52,16 @@ namespace OTMS.Controllers
             return Ok("You are admin!");
         }
 
-        // Register Account only accessible and used by SuperAdmin
+        // Register Account only accessible and used by SystemAdmin
         /// <summary>
-        /// Registers a new employee account. Only accessible to users with the "SuperAdmin" role.
+        /// Registers a new employee account. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
-        /// <response code="200">User is authorized as a "SuperAdmin".</response>
+        /// <response code="200">User is authorized as a "SystemAdmin".</response>
         /// <response code="401">User is not authorized.</response>
-        /// <response code="403">User is not the "SuperAdmin".</response>
+        /// <response code="403">User is not the "SystemAdmin".</response>
         /// <response code="500">Unexpected server error.</response>
-        [Authorize(Roles = "SuperAdmin")]
-        [HttpPost("superadmin/register")]
+        [Authorize(Roles = "SystemAdmin")]
+        [HttpPost("systemadmin/register")]
         [ProducesResponseType(typeof(EmployeeRegisterDTO), 200)]
         [ProducesResponseType(401)]
         [ProducesResponseType(403)]
