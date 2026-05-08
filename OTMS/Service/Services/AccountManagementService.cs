@@ -233,10 +233,10 @@ namespace OTMS.Service.Services
 
         }
 
-        public async Task<UpdateEmployeeResponseDTO?> UpdateEmployee(UpdateEmployeeDTO request)
+        public async Task<UpdateEmployeeResponseDTO?> UpdateEmployee(string employeeNumber, UpdateEmployeeDTO request)
         {
             var employee = await context.Employees
-                .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeNumber);
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
 
             if (employee == null) return null;
 
@@ -265,7 +265,7 @@ namespace OTMS.Service.Services
 
             return new UpdateEmployeeResponseDTO
             {
-                EmployeeNumber = employee.EmployeeNumber,
+                EmployeeNumber = request.EmployeeNumber,
                 EmployeeName = request.EmployeeName ?? employee.EmployeeName,
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Success = true

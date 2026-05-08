@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Service.Interfaces;
+using System.ComponentModel.DataAnnotations;
 
 namespace OTMS.Controllers
 {
@@ -43,9 +44,9 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Roles = "SystemAdmin")]
         [HttpPut("update-user")]
-        public async Task<IActionResult> UpdateUser([FromQuery] UpdateEmployeeDTO request)
+        public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, UpdateEmployeeDTO request)
         {
-            var result = await accountManagementService.UpdateEmployee(request);
+            var result = await accountManagementService.UpdateEmployee(employeeNumber, request);
             if(result is null)
             {
                 return NotFound(new { Message = "Employee not found." });
