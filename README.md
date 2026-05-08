@@ -13,8 +13,8 @@ A Capstone Microservice System dedicated for creating an Operations and Task Man
 | ------------- | ------------- |
 | Project Manager | Vanessa Reuteras  |
 | Business Analyst and Quality Assurance | Kenneth Yulip  |
-| Fullstack Developer | Hermione Benitez  |
-| Fullstack Developer | John Angelo Mikhail Reveche  |
+| Frontend Developer | Hermione Benitez  |
+| Backend Developer | John Angelo Mikhail Reveche  |
 
 # Guide/Wiki for OTMS Microservice
 Do you want to know how we made our Microservice and how to use it if you are part of the industry development?
