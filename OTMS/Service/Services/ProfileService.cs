@@ -17,9 +17,46 @@ namespace OTMS.Service.Services
             throw new NotImplementedException();
         }
 
-        public Task<UpdateInformationResponseDTO?> UpdateBasicInformation(UpdateInformationDTO request)
+        public async Task<UpdateInformationResponseDTO?> UpdateBasicInformation(UpdateInformationDTO request)
         {
-            throw new NotImplementedException();
+            var claimProfile = httpContextAccessor
+                .HttpContext?
+                .User
+                .FindFirst(ClaimTypes.NameIdentifier)?
+                .Value;
+
+            if (string.IsNullOrEmpty(claimProfile))
+                return null;
+
+            var profile = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account.AccountId.ToString() == claimProfile);
+
+            if (profile is null && profile.Account is null)
+                return null;
+
+            if (request.EmployeeName == "string" || String.IsNullOrEmpty(request.EmployeeName))
+                request.EmployeeName = profile.EmployeeName;
+
+            if (request.ContactNumber == "string" || String.IsNullOrEmpty(request.ContactNumber))
+                request.ContactNumber = profile.ContactNumber;
+
+            // Save the updated information to the database
+            profile.EmployeeName = request.EmployeeName;
+            profile.ContactNumber = request.ContactNumber;
+            profile.UpdatedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            return new UpdateInformationResponseDTO
+            {
+                EmployeeNumber = profile.EmployeeNumber,
+                EmployeeName = request.EmployeeName,
+                ContactNumber = request.ContactNumber,
+                UpdatedAt = profile.UpdatedAt.Value,
+                Success = true
+            };
+
         }
 
 

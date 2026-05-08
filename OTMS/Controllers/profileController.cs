@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using OTMS.Entities.DTOs.Profile;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
@@ -23,9 +24,21 @@ namespace OTMS.Controllers
             }
             return Ok(result);
         }
-        
 
-
+        /// <summary>
+        /// Updates Profile to the System. Only accessible to users that are within the scoped role and authenticated.
+        /// </summary>
+        [Authorize(Roles = "SystemAdmin,OperationAdmin,Coordinator,Encoder")]
+        [HttpPut("update-profile")]
+        public async Task<IActionResult> UpdateProfile(UpdateInformationDTO request)
+        {
+            var result = await profileService.UpdateBasicInformation(request);
+            if(result is null)
+            {
+                return NotFound(new { Message = "Employee not found." });
+            }
+            return Ok(result);
+        }
 
     }
 }
