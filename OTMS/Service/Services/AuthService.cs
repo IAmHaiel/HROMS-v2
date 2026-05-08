@@ -19,6 +19,9 @@ namespace OTMS.Service.Services
         IConfiguration configuration
     ) : IAuthService
     {
+
+        static int MaxFailedLoginAttempts = 3;
+
         public async Task<TokenResponseDTO?> LoginAsync(
             EmployeeLoginDTO request
         )
@@ -31,13 +34,14 @@ namespace OTMS.Service.Services
                 );
 
             var accountStatus = employee?.Account?.AccountStatus;
+            var accountFailedAttempts = employee?.Account?.FailedLoginAttempts;
 
             if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
             {
                 return null;
             }
 
-            if (accountStatus is null || accountStatus == "Deactivated")
+            if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
                 throw new UnauthorizedAccessException("Account is deactivated. Please contact the administrator.");
             }
@@ -50,8 +54,24 @@ namespace OTMS.Service.Services
                         request.Password
                     );
 
+            // If the Password is incorrect, return null to indicate failed login
             if (verificationResult == PasswordVerificationResult.Failed)
             {
+
+                var Account = await context.Accounts
+                    .FirstOrDefaultAsync(
+                        a => a.EmployeeId == employee.EmployeeId
+                    );
+
+                if(Account is not null)
+                {
+                    Account.FailedLoginAttempts++;
+                    context.Accounts.Add(Account);
+                    await context.SaveChangesAsync();
+
+                    return null;
+                }
+
                 return null;
             }
 
