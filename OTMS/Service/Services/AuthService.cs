@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.Models;
+using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -142,9 +143,11 @@ namespace OTMS.Service.Services
 
             var passwordHasher = new PasswordHasher<Account>();
 
+            var generatedUserPassword = PasswordGenerator.Generate();
+
             account.PasswordHash = passwordHasher.HashPassword(
                 account,
-                generatedPassword
+                generatedUserPassword
             );
 
             employee.Account = account;
@@ -158,7 +161,7 @@ namespace OTMS.Service.Services
                 EmployeeNumber = employee.EmployeeNumber,
                 EmployeeName = employee.EmployeeName ?? string.Empty,
                 Role = account.Role ?? string.Empty,
-                GeneratedPassword = generatedPassword
+                GeneratedPassword = generatedUserPassword
             };
         }
 
