@@ -14,6 +14,9 @@ namespace OTMS.Service.Services
         OTMSDbContext context
         ) : IAccountManagementService
     {
+
+        static string SystemAdminNumber = "SPDX-SPR-01";
+
         public async Task<ActivateUserResponseDTO?> ActivateUser(DeactivateUserDTO request)
         {
             var exist = context.Employees
@@ -78,9 +81,9 @@ namespace OTMS.Service.Services
                 throw new InvalidOperationException("Employee or account not found.");
             }
 
-            if (exist.Account.Role == "SystemAdmin")
+            if (exist.EmployeeNumber == SystemAdminNumber)
             {
-                throw new InvalidOperationException("Cannot modify the role of a System Admin account.");
+                throw new InvalidOperationException("Cannot modify the role of a this System Admin account.");
             }
 
             if (exist.Account.Role == request.RoleName)
