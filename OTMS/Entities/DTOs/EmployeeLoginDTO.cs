@@ -3,6 +3,7 @@
     public class EmployeeLoginDTO
     {
         public string EmployeeNumber { get; set; } = string.Empty;
+        public string EmployeeName { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
     }
 }

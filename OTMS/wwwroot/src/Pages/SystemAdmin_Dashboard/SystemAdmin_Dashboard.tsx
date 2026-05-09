@@ -584,6 +584,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
 export default function Dashboard() {
     const navigate = useNavigate();
     const employeeId = localStorage.getItem('employeeId') ?? '';
+    const employeeName = localStorage.getItem('employeeName') ?? '';
     const [showAddModal, setShowAddModal] = useState(false);
 
     const [employees, setEmployees] = useState<RecentEmployee[]>([]);
@@ -676,11 +677,11 @@ export default function Dashboard() {
                 <div className="sidebar-footer">
                     <div className="user-block">
                         <div className="avatar-circle">
-                            {employeeId ? employeeId.charAt(0).toUpperCase() : 'E'}
+                            {employeeName ? employeeName.charAt(0).toUpperCase() : 'E'}
                         </div>
                         <div className="user-text">
                             <span className="welcome-text">Welcome!</span>
-                            <strong>{employeeId || 'Employee'}</strong>
+                            <strong>{employeeName || 'Employee'}</strong>
                         </div>
                     </div>
                     <button className="logout-btn-sidebar" onClick={handleLogout}>

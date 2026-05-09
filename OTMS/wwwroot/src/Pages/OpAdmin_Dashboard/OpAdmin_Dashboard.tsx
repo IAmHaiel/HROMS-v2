@@ -1,6 +1,5 @@
 ﻿import React, { useState } from 'react';
 import {
-    Users,
     ClipboardList,
     CheckCircle2,
     AlertCircle,
@@ -12,14 +11,17 @@ import {
     Plus,
     Pencil,
     Trash2,
-    Eye,
     X,
     ChevronRight,
+    Save,
+    Loader2,
+    Users,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
+import { useNavigate } from 'react-router-dom';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
@@ -74,6 +76,18 @@ const WEEKLY_DATA = [
     { day: 'Sun', completed: 8, pending: 2 },
 ];
 
+const NAV_ITEMS = [
+    { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
+    { tab: 'tasks' as NavTab, icon: Package, label: 'Tasks' },
+    { tab: 'team' as NavTab, icon: Users, label: 'Team' },
+    { tab: 'reports' as NavTab, icon: BarChart3, label: 'Reports' },
+];
+
+const EMPTY_TASK: Omit<Task, 'id'> = {
+    name: '', description: '', deadline: '',
+    priority: 'medium', assigneeId: '', status: 'pending', progress: 0,
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const findMember = (id: string): TeamMember | undefined =>
@@ -87,15 +101,8 @@ const fmtDate = (d: string): string => {
 const isEffectivelyOverdue = (t: Task): boolean =>
     t.status !== 'completed' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
 
-const statusBadgeClass = (s: TaskStatus): string => {
-    const map: Record<TaskStatus, string> = {
-        pending: 'badge badge-blue',
-        'in-progress': 'badge badge-amber',
-        completed: 'badge badge-green',
-        overdue: 'badge badge-red',
-    };
-    return map[s] ?? 'badge badge-blue';
-};
+const statusBadgeClass = (s: TaskStatus): string =>
+    ({ pending: 'badge badge-blue', 'in-progress': 'badge badge-amber', completed: 'badge badge-green', overdue: 'badge badge-red' }[s] ?? 'badge badge-blue');
 
 const priorityDotClass = (p: Priority): string =>
     ({ high: 'prio-dot high', medium: 'prio-dot medium', low: 'prio-dot low' }[p]);
@@ -115,9 +122,7 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
 );
 
 const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`badge ${p === 'high' ? 'badge-red' : p === 'medium' ? 'badge-amber' : 'badge-green'}`}>
-        {p}
-    </span>
+    <span className={`badge ${p === 'high' ? 'badge-red' : p === 'medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
 );
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
@@ -129,7 +134,7 @@ const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
 interface TaskRowProps {
     task: Task;
     onView: (id: number) => void;
-    onEdit: (id: number) => void;
+    onEdit?: (id: number) => void;
     showEditBtn?: boolean;
 }
 const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = false }) => {
@@ -142,11 +147,8 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
                 <span className={priorityDotClass(task.priority)} />
                 <span className="task-name">{task.name}</span>
                 <span className={statusBadgeClass(effectiveStatus)}>{effectiveStatus}</span>
-                {showEditBtn && (
-                    <button
-                        className="btn btn-xs"
-                        onClick={e => { e.stopPropagation(); onEdit(task.id); }}
-                    >
+                {showEditBtn && onEdit && (
+                    <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onEdit(task.id); }}>
                         <Pencil size={11} /> Edit
                     </button>
                 )}
@@ -170,89 +172,94 @@ interface TaskModalProps {
     onClose: () => void;
 }
 
-const EMPTY_TASK: Omit<Task, 'id'> = {
-    name: '', description: '', deadline: '',
-    priority: 'medium', assigneeId: '', status: 'pending', progress: 0,
-};
-
 const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDelete, onClose }) => {
     const [form, setForm] = useState<Omit<Task, 'id'>>({ ...EMPTY_TASK, ...initial });
+    const [submitting, setSubmitting] = useState(false);
 
-    const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-        setForm(prev => ({ ...prev, [key]: e.target.value }));
+    const set = (key: keyof typeof form) =>
+        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+            setForm(prev => ({ ...prev, [key]: e.target.value }));
 
     const handleSave = () => {
         if (!form.name.trim()) { alert('Task name is required'); return; }
+        setSubmitting(true);
         onSave({ ...form, ...(initial?.id !== undefined ? { id: initial.id } : {}) });
+        setSubmitting(false);
     };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h3>{mode === 'new' ? 'Create New Task (FR-011)' : 'Edit Task (FR-013)'}</h3>
+                    <div>
+                        <h3>{mode === 'new' ? 'Create New Task' : 'Edit Task'}</h3>
+                        <p className="modal-subtitle">
+                            {mode === 'new' ? 'Fill in the details to create a new task.' : 'Update the task details below.'}
+                        </p>
+                    </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
 
-                <div className="field">
-                    <label>Task Name</label>
-                    <input value={form.name} onChange={set('name')} placeholder="e.g. Route planning update" />
+                <div className="modal-form">
+                    <div className="field">
+                        <label>Task Name</label>
+                        <input value={form.name} onChange={set('name')} placeholder="e.g. Route planning update" />
+                    </div>
+                    <div className="field">
+                        <label>Description</label>
+                        <textarea value={form.description} onChange={set('description')} placeholder="Describe the task in detail..." rows={3} />
+                    </div>
+                    <div className="field-row">
+                        <div className="field">
+                            <label>Deadline</label>
+                            <input type="date" value={form.deadline} onChange={set('deadline')} />
+                        </div>
+                        <div className="field">
+                            <label>Priority</label>
+                            <select value={form.priority} onChange={set('priority')}>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="field-row">
+                        <div className="field">
+                            <label>Assign To</label>
+                            <select value={form.assigneeId} onChange={set('assigneeId')}>
+                                <option value="">Unassigned</option>
+                                {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="field">
+                            <label>Status</label>
+                            <select value={form.status} onChange={set('status')}>
+                                <option value="pending">Pending</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="overdue">Overdue</option>
+                            </select>
+                        </div>
+                    </div>
+                    {mode === 'edit' && (
+                        <div className="field">
+                            <label>Progress %</label>
+                            <input
+                                type="number" min={0} max={100}
+                                value={form.progress}
+                                onChange={e => setForm(prev => ({ ...prev, progress: Number(e.target.value) }))}
+                            />
+                        </div>
+                    )}
                 </div>
-                <div className="field">
-                    <label>Description</label>
-                    <textarea value={form.description} onChange={set('description')} placeholder="Describe the task in detail..." rows={3} />
-                </div>
-                <div className="field-row">
-                    <div className="field">
-                        <label>Deadline</label>
-                        <input type="date" value={form.deadline} onChange={set('deadline')} />
-                    </div>
-                    <div className="field">
-                        <label>Priority</label>
-                        <select value={form.priority} onChange={set('priority')}>
-                            <option value="high">High</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-                </div>
-                <div className="field-row">
-                    <div className="field">
-                        <label>Assign To (FR-012)</label>
-                        <select value={form.assigneeId} onChange={set('assigneeId')}>
-                            <option value="">Unassigned</option>
-                            {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Status</label>
-                        <select value={form.status} onChange={set('status')}>
-                            <option value="pending">Pending</option>
-                            <option value="in-progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="overdue">Overdue</option>
-                        </select>
-                    </div>
-                </div>
-                {mode === 'edit' && (
-                    <div className="field">
-                        <label>Progress %</label>
-                        <input
-                            type="number" min={0} max={100}
-                            value={form.progress}
-                            onChange={e => setForm(prev => ({ ...prev, progress: Number(e.target.value) }))}
-                        />
-                    </div>
-                )}
 
                 <div className="modal-actions">
-                    {mode === 'edit' && onDelete && (
-                        <button className="btn btn-danger" onClick={onDelete}><Trash2 size={13} /> Delete</button>
-                    )}
-                    <div style={{ flex: 1 }} />
-                    <button className="btn" onClick={onClose}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSave}>
-                        {mode === 'new' ? 'Create Task' : 'Save Changes'}
+                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+                        {submitting
+                            ? <><Loader2 size={13} className="spin" /> Saving…</>
+                            : <><Save size={13} /> {mode === 'new' ? 'Create Task' : 'Save Changes'}</>
+                        }
                     </button>
                 </div>
             </div>
@@ -265,15 +272,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDel
 interface ViewModalProps {
     task: Task;
     onEdit: () => void;
+    onDelete: () => void;
     onClose: () => void;
 }
-const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onClose }) => {
+const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onDelete, onClose }) => {
     const member = findMember(task.assigneeId);
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h3>{task.name}</h3>
+                    <div>
+                        <h3>{task.name}</h3>
+                        <p className="modal-subtitle">Viewing task details</p>
+                    </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
                 <table className="view-table">
@@ -295,6 +306,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onClose }) => {
                     </tbody>
                 </table>
                 <div className="modal-actions">
+                    <button className="btn btn-danger" onClick={onDelete}><Trash2 size={13} /> Delete</button>
                     <div style={{ flex: 1 }} />
                     <button className="btn" onClick={onClose}>Close</button>
                     <button className="btn btn-primary" onClick={onEdit}><Pencil size={13} /> Edit Task</button>
@@ -304,9 +316,9 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onClose }) => {
     );
 };
 
-// ─── Tabs ──────────────────────────────────────────────────────────────────────
+// ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNewTask: () => void; }> =
+const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNewTask: () => void }> =
     ({ tasks, onView, onNewTask }) => {
         const total = tasks.length;
         const inProg = tasks.filter(t => t.status === 'in-progress').length;
@@ -318,54 +330,37 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
         const pct = total ? Math.round(done / total * 100) : 0;
 
         return (
-            <div className="tab-content">
-                {/* Stats */}
+            <div className="dashboard-content">
+                {/* Stat Cards */}
                 <div className="stats-row">
                     {[
-                        { label: 'Total Tasks', value: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All active tasks' },
-                        { label: 'In Progress', value: inProg, icon: <Truck size={18} />, cls: 'bg-warning', sub: 'Assigned & running' },
-                        { label: 'Completed', value: done, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
-                        { label: 'Overdue', value: overdue, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Past deadline' },
+                        { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All active tasks' },
+                        { label: 'IN PROGRESS', value: inProg, icon: <Truck size={18} />, cls: 'bg-warning', sub: 'Assigned & running' },
+                        { label: 'COMPLETED', value: done, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
+                        { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Past deadline' },
                     ].map(s => (
-                        <div key={s.label} className="card stat-card">
+                        <div key={s.label} className="stat-card">
                             <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                            <div>
-                                <p>{s.label}</p>
-                                <h3>{s.value}</h3>
+                            <div className="stat-text">
+                                <p className="stat-label">{s.label}</p>
+                                <h3 className="stat-value">{s.value}</h3>
                                 <small>{s.sub}</small>
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Main Grid */}
+                {/* Middle Grid */}
                 <div className="dashboard-grid">
+                    {/* Recent Tasks */}
                     <div className="card">
                         <div className="card-header">
                             <h3>Recent Tasks</h3>
                             <span className="view-all-link">View all <ChevronRight size={12} /></span>
                         </div>
                         {tasks.slice(-5).reverse().map(t => (
-                            <TaskRow key={t.id} task={t} onView={onView} onEdit={() => { }} />
+                            <TaskRow key={t.id} task={t} onView={onView} />
                         ))}
-                    </div>
-                </div>
-
-                {/* Bottom Row */}
-                <div className="dashboard-bottom-row">
-                    {/* Quick Actions */}
-                    <div className="card">
-                        <h3>Quick Actions</h3>
-                        <div className="quick-actions-grid">
-                            <button className="quick-action-btn primary" onClick={onNewTask}>
-                                <div className="quick-action-icon"><Users size={20} /></div>
-                                <span>Add Task</span>
-                            </button>
-                            <button className="quick-action-btn">
-                                <div className="quick-action-icon warning"><ClipboardList size={20} /></div>
-                                <span>View Reports</span>
-                            </button>
-                        </div>
                     </div>
 
                     {/* Priority Breakdown */}
@@ -374,7 +369,11 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
                             <h3>Priority Breakdown</h3>
                         </div>
                         <div className="perf-bars">
-                            {[{ label: 'High', val: hi, cls: 'fill-red' }, { label: 'Medium', val: md, cls: 'fill-amber' }, { label: 'Low', val: lo, cls: 'fill-green' }].map(p => (
+                            {[
+                                { label: 'High', val: hi, cls: 'fill-red' },
+                                { label: 'Medium', val: md, cls: 'fill-amber' },
+                                { label: 'Low', val: lo, cls: 'fill-green' },
+                            ].map(p => (
                                 <div key={p.label} className="perf-item">
                                     <span className="perf-label">{p.label}</span>
                                     <div className="perf-track">
@@ -384,7 +383,7 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
                                 </div>
                             ))}
                         </div>
-                        <div style={{ marginTop: 12 }}>
+                        <div style={{ marginTop: 16 }}>
                             <div style={{ textAlign: 'center' }}>
                                 <span style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>{pct}%</span>
                                 <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '2px 0 6px' }}>completion rate</p>
@@ -392,19 +391,22 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
                             <ProgressBar pct={pct} cls="green" />
                         </div>
                     </div>
+                </div>
 
-                    {/* Delivery Chart */}
-                    <div className="card">
+                {/* Bottom Row */}
+                <div className="dashboard-bottom-row">
+                    {/* Delivery Performance Chart */}
+                    <div className="card" style={{ flex: 2 }}>
                         <div className="card-header">
                             <h3>Delivery Performance</h3>
-                            <span className="system-all-operational alt">This Week</span>
+                            <span className="badge-week">This Week</span>
                         </div>
-                        <div style={{ width: '100%', height: 180, marginTop: 12 }}>
-                            <ResponsiveContainer>
-                                <BarChart data={WEEKLY_DATA}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
-                                    <Tooltip />
+                        <div className="chart-wrap">
+                            <ResponsiveContainer width="100%" height={180}>
+                                <BarChart data={WEEKLY_DATA} barGap={4}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a3aed0' }} />
+                                    <Tooltip contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} />
                                     <Bar dataKey="completed" fill="#4318ff" radius={[4, 4, 0, 0]} />
                                     <Bar dataKey="pending" fill="#ffb547" radius={[4, 4, 0, 0]} />
                                 </BarChart>
@@ -418,7 +420,7 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
 
-const TasksTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onEdit: (id: number) => void; }> =
+const TasksTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onEdit: (id: number) => void }> =
     ({ tasks, onView, onEdit }) => {
         const [filterStatus, setFilterStatus] = useState('');
         const [filterPriority, setFilterPriority] = useState('');
@@ -431,7 +433,7 @@ const TasksTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onEdit: 
         );
 
         return (
-            <div className="tab-content">
+            <div className="dashboard-content">
                 <div className="filter-bar">
                     <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                         <option value="">All Statuses</option>
@@ -463,12 +465,12 @@ const TasksTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onEdit: 
 
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
-const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; }> = ({ tasks, onView }) => {
+const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void }> = ({ tasks, onView }) => {
     const [selectedMemberId, setSelectedMemberId] = useState(TEAM_MEMBERS[0].id);
     const maxLoad = Math.max(...TEAM_MEMBERS.map(m => tasks.filter(t => t.assigneeId === m.id).length), 1);
 
     return (
-        <div className="tab-content">
+        <div className="dashboard-content">
             <div className="dashboard-grid">
                 <div className="card">
                     <div className="card-header"><h3>Team Members</h3></div>
@@ -512,15 +514,14 @@ const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; }> = ({ t
                 </div>
             </div>
 
-            {/* Member Task Detail */}
             <div className="card">
                 <div className="card-header">
-                    <h3>{findMember(selectedMemberId)?.name}'s Tasks (FR-014)</h3>
+                    <h3>{findMember(selectedMemberId)?.name}'s Tasks</h3>
                 </div>
                 {tasks.filter(t => t.assigneeId === selectedMemberId).length === 0
                     ? <div className="empty-state"><Package size={20} /><p>No tasks assigned</p></div>
                     : tasks.filter(t => t.assigneeId === selectedMemberId).map(t =>
-                        <TaskRow key={t.id} task={t} onView={onView} onEdit={() => { }} />
+                        <TaskRow key={t.id} task={t} onView={onView} />
                     )
                 }
             </div>
@@ -546,17 +547,21 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     };
 
     return (
-        <div className="tab-content">
+        <div className="dashboard-content">
             <div className="stats-row">
                 {[
-                    { label: 'Completion Rate', value: `${rate}%`, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'Tasks finished on time' },
-                    { label: 'High Priority Done', value: hiDone, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Critical tasks resolved' },
-                    { label: 'Avg Tasks / Member', value: avg, icon: <Users size={18} />, cls: 'bg-primary', sub: 'Workload balance' },
-                    { label: 'On-time Rate', value: `${ontimeRate}%`, icon: <BarChart3 size={18} />, cls: 'bg-warning', sub: 'Completed before deadline' },
+                    { label: 'COMPLETION RATE', value: `${rate}%`, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'Tasks finished on time' },
+                    { label: 'HIGH PRIORITY DONE', value: hiDone, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Critical tasks resolved' },
+                    { label: 'AVG TASKS / MEMBER', value: avg, icon: <Users size={18} />, cls: 'bg-primary', sub: 'Workload balance' },
+                    { label: 'ON-TIME RATE', value: `${ontimeRate}%`, icon: <BarChart3 size={18} />, cls: 'bg-warning', sub: 'Completed before deadline' },
                 ].map(s => (
-                    <div key={s.label} className="card stat-card">
+                    <div key={s.label} className="stat-card">
                         <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div><p>{s.label}</p><h3>{s.value}</h3><small>{s.sub}</small></div>
+                        <div className="stat-text">
+                            <p className="stat-label">{s.label}</p>
+                            <h3 className="stat-value">{s.value}</h3>
+                            <small>{s.sub}</small>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -600,9 +605,8 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                 </div>
             </div>
 
-            {/* Full Report Table */}
             <div className="card">
-                <div className="card-header"><h3>Full Task Report (FR-015)</h3></div>
+                <div className="card-header"><h3>Full Task Report</h3></div>
                 <div style={{ overflowX: 'auto' }}>
                     <table className="data-table">
                         <thead>
@@ -640,6 +644,10 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function OpsAdminDashboard() {
+    const navigate = useNavigate();
+    const employeeId = localStorage.getItem('employeeId') ?? 'Admin';
+    const employeeName = localStorage.getItem('employeeName') ?? '';
+
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
     const [nextId, setNextId] = useState(INITIAL_TASKS.length + 1);
@@ -649,11 +657,8 @@ export default function OpsAdminDashboard() {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [viewingTask, setViewingTask] = useState<Task | null>(null);
 
-    const employeeId = typeof window !== 'undefined' ? localStorage.getItem('employeeId') ?? 'Admin' : 'Admin';
-
     const handleNewTask = (data: Omit<Task, 'id'> & { id?: number }) => {
-        const task: Task = { ...data, id: nextId } as Task;
-        setTasks(prev => [...prev, task]);
+        setTasks(prev => [...prev, { ...data, id: nextId } as Task]);
         setNextId(n => n + 1);
         setShowNew(false);
     };
@@ -663,19 +668,17 @@ export default function OpsAdminDashboard() {
         setEditingTask(null);
     };
 
-    const handleDeleteTask = () => {
-        if (!editingTask) return;
-        if (!window.confirm('Delete this task?')) return;
-        setTasks(ts => ts.filter(t => t.id !== editingTask.id));
+    const handleDeleteTask = (taskToDelete: Task) => {
+        if (!window.confirm(`Delete "${taskToDelete.name}"? This cannot be undone.`)) return;
+        setTasks(ts => ts.filter(t => t.id !== taskToDelete.id));
+        setViewingTask(null);
         setEditingTask(null);
     };
 
-    const navItems = [
-        { tab: 'dashboard' as NavTab, label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-        { tab: 'tasks' as NavTab, label: 'Tasks', icon: <Package size={20} /> },
-        { tab: 'team' as NavTab, label: 'Team', icon: <Users size={20} /> },
-        { tab: 'reports' as NavTab, label: 'Reports', icon: <BarChart3 size={20} /> },
-    ];
+    const handleLogout = () => {
+        ['employeeId', 'refreshToken', 'authToken'].forEach(k => localStorage.removeItem(k));
+        navigate('/');
+    };
 
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Board Overview',
@@ -686,55 +689,59 @@ export default function OpsAdminDashboard() {
 
     return (
         <div className="dashboard-container">
-            {/* Sidebar */}
+            {/* ── Sidebar ── */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <div className="logo-box" />
+                    <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="sidebar-logo-img" />
                 </div>
                 <nav className="sidebar-nav">
-                    {navItems.map(n => (
+                    {NAV_ITEMS.map(({ tab, icon: Icon, label }) => (
                         <div
-                            key={n.tab}
-                            className={`nav-item${activeTab === n.tab ? ' active' : ''}`}
-                            onClick={() => setActiveTab(n.tab)}
+                            key={tab}
+                            className={`nav-item${activeTab === tab ? ' active' : ''}`}
+                            onClick={() => setActiveTab(tab)}
                         >
-                            {n.icon}
-                            <span>{n.label}</span>
+                            <Icon size={22} />
+                            <span>{label}</span>
                         </div>
                     ))}
-                    <div className="nav-item"><Truck size={20} /><span>Delivery</span></div>
-                    <div className="nav-item"><UserCircle2 size={20} /><span>Profile</span></div>
+                    <div className="nav-item"><Truck size={22} /><span>Delivery</span></div>
+                    <div className="nav-item"><UserCircle2 size={22} /><span>Profile</span></div>
                 </nav>
+
+                <div className="sidebar-footer">
+                    <div className="user-block">
+                        <div className="avatar-circle">
+                            {employeeName ? employeeName.charAt(0).toUpperCase() : 'E'}
+                        </div>
+                        <div className="user-text">
+                            <span className="welcome-text">Welcome!</span>
+                            <strong>{employeeName || 'Employee'}</strong>
+                        </div>
+                    </div>
+                    <button className="logout-btn-sidebar" onClick={handleLogout}>
+                        Logout
+                    </button>
+                </div>
             </aside>
 
-            {/* Main */}
+            {/* ── Main ── */}
             <main className="main-viewport">
                 {/* Header */}
                 <div className="dashboard-header">
-                    <div>
+                    <div className="header-title">
                         <h2>{pageTitles[activeTab]}</h2>
                         <p>
-                            Dashboard —{' '}
-                            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            Operations Admin —{' '}
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                            })}
                         </p>
                     </div>
-                    <div className="header-user">
-                        <div className="user-block">
-                            <div className="avatar-circle">{employeeId.charAt(0).toUpperCase()}</div>
-                            <div className="user-text">
-                                <span className="welcome-text">Welcome back</span>
-                                <strong>{employeeId}</strong>
-                            </div>
-                        </div>
-                        <button className="btn btn-primary" onClick={() => setShowNew(true)}>
-                            <Plus size={14} /> New Task
-                        </button>
-                        <button className="logout-btn" onClick={() => {
-                            localStorage.removeItem('employeeId');
-                            localStorage.removeItem('authToken');
-                            window.location.href = '/';
-                        }}>
-                            Logout
+                    <div className="header-actions">
+                        <button className="quick-action-btn-header" onClick={() => setShowNew(true)}>
+                            <Plus size={18} />
+                            New Task
                         </button>
                     </div>
                 </div>
@@ -755,19 +762,27 @@ export default function OpsAdminDashboard() {
                     />
                 )}
                 {activeTab === 'team' && (
-                    <TeamTab tasks={tasks} onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)} />
+                    <TeamTab
+                        tasks={tasks}
+                        onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)}
+                    />
                 )}
                 {activeTab === 'reports' && <ReportsTab tasks={tasks} />}
             </main>
 
-            {/* Modals */}
-            {showNew && <TaskModal mode="new" onSave={handleNewTask} onClose={() => setShowNew(false)} />}
+            {/* ── Modals ── */}
+            {showNew && (
+                <TaskModal
+                    mode="new"
+                    onSave={handleNewTask}
+                    onClose={() => setShowNew(false)}
+                />
+            )}
             {editingTask && (
                 <TaskModal
                     mode="edit"
                     initial={editingTask}
                     onSave={handleEditTask}
-                    onDelete={handleDeleteTask}
                     onClose={() => setEditingTask(null)}
                 />
             )}
@@ -775,6 +790,7 @@ export default function OpsAdminDashboard() {
                 <ViewModal
                     task={viewingTask}
                     onEdit={() => { setEditingTask(viewingTask); setViewingTask(null); }}
+                    onDelete={() => handleDeleteTask(viewingTask)}
                     onClose={() => setViewingTask(null)}
                 />
             )}

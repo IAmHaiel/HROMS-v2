@@ -15,6 +15,7 @@ type UserRole =
 interface LoginResponse {
     accessToken: string;
     role: UserRole;
+    employeeName: string;
     message?: string;
 }
 
@@ -104,6 +105,7 @@ export default function Login() {
             localStorage.setItem('authToken', data.accessToken);
             localStorage.setItem('userRole', normalizedRole);
             localStorage.setItem('employeeId', employeeId.trim());
+            localStorage.setItem('employeeName', data.employeeName);
 
             updateStatus('Login successful. Redirecting...', 'success');
 
