@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState } from 'react';
 import {
     Users,
     ClipboardList,
@@ -44,12 +44,6 @@ interface Task {
     progress: number;
 }
 
-interface ActivityEntry {
-    text: string;
-    time: string;
-    color: string;
-}
-
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
 const TEAM_MEMBERS: TeamMember[] = [
@@ -68,13 +62,6 @@ const INITIAL_TASKS: Task[] = [
     { id: 5, name: 'Customer complaint follow-up', description: 'Resolve 12 pending customer complaints from the support queue.', deadline: '2026-04-29', priority: 'high', assigneeId: 'm5', status: 'in-progress', progress: 50 },
     { id: 6, name: 'SLA report for April', description: 'Generate and submit the monthly SLA compliance report.', deadline: '2026-05-01', priority: 'medium', assigneeId: 'm1', status: 'pending', progress: 0 },
     { id: 7, name: 'Warehouse zone labeling', description: 'Re-label warehouse zones C and D per new layout.', deadline: '2026-04-24', priority: 'medium', assigneeId: 'm3', status: 'completed', progress: 100 },
-];
-
-const INITIAL_ACTIVITY: ActivityEntry[] = [
-    { text: 'Task "Fleet maintenance log review" marked completed', time: '2h ago', color: '#05cd99' },
-    { text: 'Task "Warehouse zone labeling" marked completed', time: '4h ago', color: '#05cd99' },
-    { text: 'New task "SLA report for April" created', time: '5h ago', color: '#4318ff' },
-    { text: '"Driver briefing documentation" changed to overdue', time: '1d ago', color: '#ee5d50' },
 ];
 
 const WEEKLY_DATA = [
@@ -319,8 +306,8 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onClose }) => {
 
 // ─── Tabs ──────────────────────────────────────────────────────────────────────
 
-const DashboardTab: React.FC<{ tasks: Task[]; activity: ActivityEntry[]; onView: (id: number) => void; onNewTask: () => void; }> =
-    ({ tasks, activity, onView, onNewTask }) => {
+const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNewTask: () => void; }> =
+    ({ tasks, onView, onNewTask }) => {
         const total = tasks.length;
         const inProg = tasks.filter(t => t.status === 'in-progress').length;
         const done = tasks.filter(t => t.status === 'completed').length;
@@ -361,21 +348,6 @@ const DashboardTab: React.FC<{ tasks: Task[]; activity: ActivityEntry[]; onView:
                         {tasks.slice(-5).reverse().map(t => (
                             <TaskRow key={t.id} task={t} onView={onView} onEdit={() => { }} />
                         ))}
-                    </div>
-                    <div className="card">
-                        <div className="card-header">
-                            <h3>Recent Activity</h3>
-                            <span className="view-all-link">View All <ChevronRight size={12} /></span>
-                        </div>
-                        <div className="activity-feed-list">
-                            {activity.slice(0, 6).map((a, i) => (
-                                <div key={i} className="activity-item">
-                                    <span className="act-dot" style={{ background: a.color }} />
-                                    <span className="act-text">{a.text}</span>
-                                    <span className="act-time">{a.time}</span>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 </div>
 
@@ -670,7 +642,6 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
 export default function OpsAdminDashboard() {
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-    const [activity, setActivity] = useState<ActivityEntry[]>(INITIAL_ACTIVITY);
     const [nextId, setNextId] = useState(INITIAL_TASKS.length + 1);
 
     // Modal state
@@ -680,31 +651,21 @@ export default function OpsAdminDashboard() {
 
     const employeeId = typeof window !== 'undefined' ? localStorage.getItem('employeeId') ?? 'Admin' : 'Admin';
 
-    const addActivity = (text: string, color: string) =>
-        setActivity(prev => [{ text, time: 'just now', color }, ...prev]);
-
     const handleNewTask = (data: Omit<Task, 'id'> & { id?: number }) => {
         const task: Task = { ...data, id: nextId } as Task;
         setTasks(prev => [...prev, task]);
         setNextId(n => n + 1);
-        const m = findMember(task.assigneeId);
-        addActivity(`New task "${task.name}" created${m ? ' → ' + m.name : ''}`, '#4318ff');
         setShowNew(false);
     };
 
     const handleEditTask = (data: Omit<Task, 'id'> & { id?: number }) => {
-        const prev = tasks.find(t => t.id === data.id);
         setTasks(ts => ts.map(t => t.id === data.id ? { ...data, id: data.id! } as Task : t));
-        if (prev && prev.status !== data.status) {
-            addActivity(`"${data.name}" status → ${data.status}`, data.status === 'completed' ? '#05cd99' : data.status === 'overdue' ? '#ee5d50' : '#ffb547');
-        }
         setEditingTask(null);
     };
 
     const handleDeleteTask = () => {
         if (!editingTask) return;
         if (!window.confirm('Delete this task?')) return;
-        addActivity(`Task "${editingTask.name}" was deleted`, '#ee5d50');
         setTasks(ts => ts.filter(t => t.id !== editingTask.id));
         setEditingTask(null);
     };
@@ -781,7 +742,7 @@ export default function OpsAdminDashboard() {
                 {/* Tab Content */}
                 {activeTab === 'dashboard' && (
                     <DashboardTab
-                        tasks={tasks} activity={activity}
+                        tasks={tasks}
                         onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)}
                         onNewTask={() => setShowNew(true)}
                     />

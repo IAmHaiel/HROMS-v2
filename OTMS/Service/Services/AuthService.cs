@@ -44,7 +44,7 @@ namespace OTMS.Service.Services
 
             if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
-                throw new UnauthorizedAccessException("Account is deactivated. Please contact the administrator.");
+                return null;
             }
 
             var verificationResult =

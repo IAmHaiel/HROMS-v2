@@ -7,6 +7,7 @@ import SystemAdmin_Dashboard from './Pages/SystemAdmin_Dashboard/SystemAdmin_Das
 import ForgotPasswordPage from './Pages/forgotpassword_page/forgotpassword_page';
 import OpAdmin_Dashboard from './Pages/OpAdmin_Dashboard/OpAdmin_Dashboard';
 import OpEmployee_Dashboard from './Pages/OpEmployee_Dashboard/OpEmployee_Dashboard';
+import AccountLocked from './Pages/account_locked/account_locked';
 import PrivateRoute from './components/Auth/PrivateRoute';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -17,13 +18,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
                 <Route path="/forgotpassword_page" element={<ForgotPasswordPage />} />
 
+                <Route path="/account_locked" element={<AccountLocked />} />
+
                 <Route path="/SystemAdmin_Dashboard" element={
                     <PrivateRoute allowedRoles={['System Admin', 'SuperAdmin']}>
                         <SystemAdmin_Dashboard />
-                    </PrivateRoute> 
+                    </PrivateRoute>
                 } />
                 <Route path="/OpAdmin_Dashboard" element={
-                    <PrivateRoute allowedRoles={['Operation Admin']}>
+                    <PrivateRoute allowedRoles={['Operation Admin', 'OpAdmin']}>
                         <OpAdmin_Dashboard />
                     </PrivateRoute>
                 } />
