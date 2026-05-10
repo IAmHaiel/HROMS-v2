@@ -118,6 +118,9 @@ function validate(form: FormState): FieldError {
     return errs;
 }
 
+const toBackendRole = (role: string) => role.replace(/\s+/g, '');
+const toDisplayRole = (role: string) => role.replace(/([a-z])([A-Z])/g, '$1 $2');
+
 // ─── Add Employee Modal ───────────────────────────────────────────────────────
 
 interface AddEmployeeModalProps {
@@ -158,7 +161,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 employeeNumber: form.employeeNumber.trim(),
                 employeeName: form.employeeName.trim(),
                 contactNumber: form.contactNumber.trim(),
-                role: form.role,
+                role: toBackendRole(form.role),
             };
 
             const res = await fetch('/api/authorization/systemadmin/register', {
@@ -307,7 +310,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
     const [form, setForm] = useState({
         employeeName: employee.employeeName,
         contactNumber: employee.contactNumber,
-        role: employee.role,
+        role: toDisplayRole(employee.role),
         accountStatus: employee.accountStatus, // ✅ use accountStatus
     });
     const [submitting, setSubmitting] = useState(false);
@@ -349,7 +352,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
             }
 
             // 2. Update role if changed
-            if (form.role !== employee.role) {
+            if (toBackendRole(form.role) !== employee.role) {
                 const roleRes = await fetch('/api/systemadmin/assign-role', {
                     method: 'PATCH',
                     headers: {
@@ -358,7 +361,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     },
                     body: JSON.stringify({
                         employeeNumber: employee.employeeNumber,
-                        roleName: form.role,
+                        roleName: toBackendRole(form.role),
                     }),
                 });
 
@@ -393,7 +396,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                 ...employee,
                 employeeName: form.employeeName,
                 contactNumber: form.contactNumber,
-                role: form.role,
+                role: toBackendRole(form.role),
                 accountStatus: form.accountStatus, // ✅
             };
 
@@ -795,7 +798,7 @@ export default function Dashboard() {
                                                     </div>
                                                 </td>
                                                 <td>{emp.employeeNumber}</td>
-                                                <td>{emp.role || <span className="no-role">—</span>}</td>
+                                                <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
                                                 <td>
                                                     {/* ✅ uses accountStatus from backend */}
                                                     <span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>

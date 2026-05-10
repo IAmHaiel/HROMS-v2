@@ -107,6 +107,7 @@ export default function Login() {
             localStorage.setItem('userRole', normalizedRole);
             localStorage.setItem('employeeId', employeeId.trim());
             localStorage.setItem('employeeName', data.employeeName);
+            localStorage.setItem('isPasswordChanged', data.isPasswordChanged.toString());
 
             updateStatus('Login successful. Redirecting...', 'success');
 

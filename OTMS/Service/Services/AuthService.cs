@@ -183,7 +183,8 @@ namespace OTMS.Service.Services
                 AccessToken = CreateToken(employee),
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
                 Role = employee.Account.Role ?? string.Empty,
-                EmployeeName = employee.EmployeeName ?? string.Empty
+                EmployeeName = employee.EmployeeName ?? string.Empty,
+                IsPasswordChanged = employee.Account.IsPasswordChanged
             };
         }
 

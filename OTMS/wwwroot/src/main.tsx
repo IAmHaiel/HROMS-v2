@@ -10,32 +10,45 @@ import OpEmployee_Dashboard from './Pages/OpEmployee_Dashboard/OpEmployee_Dashbo
 import AccountLocked from './Pages/account_locked/account_locked';
 import PrivateRoute from './components/Auth/PrivateRoute';
 import ChangePassword from './Pages/change_password/change_password';
+function PasswordChangedGuard({ children }: { children: React.ReactNode }) {
+    const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
+    if (!isPasswordChanged) {
+        return <Navigate to="/change-password" replace />;
+    }
+    return <>{children}</>;
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<LoginPage />} />
-
-                <Route path="/change-password" element={<ChangePassword />} />
-
                 <Route path="/forgotpassword_page" element={<ForgotPasswordPage />} />
-
                 <Route path="/account_locked" element={<AccountLocked />} />
 
+                {/* Only accessible if password has NOT been changed yet */}
+                <Route path="/change-password" element={<ChangePassword />} />
+
+                {/* Protected dashboard routes — require auth AND password changed */}
                 <Route path="/SystemAdmin_Dashboard" element={
                     <PrivateRoute allowedRoles={['System Admin', 'SuperAdmin']}>
-                        <SystemAdmin_Dashboard />
+                        <PasswordChangedGuard>
+                            <SystemAdmin_Dashboard />
+                        </PasswordChangedGuard>
                     </PrivateRoute>
                 } />
                 <Route path="/OpAdmin_Dashboard" element={
                     <PrivateRoute allowedRoles={['Operation Admin', 'OpAdmin']}>
-                        <OpAdmin_Dashboard />
+                        <PasswordChangedGuard>
+                            <OpAdmin_Dashboard />
+                        </PasswordChangedGuard>
                     </PrivateRoute>
                 } />
                 <Route path="/OpEmployee_Dashboard" element={
                     <PrivateRoute allowedRoles={['Employee']}>
-                        <OpEmployee_Dashboard />
+                        <PasswordChangedGuard>
+                            <OpEmployee_Dashboard />
+                        </PasswordChangedGuard>
                     </PrivateRoute>
                 } />
             </Routes>

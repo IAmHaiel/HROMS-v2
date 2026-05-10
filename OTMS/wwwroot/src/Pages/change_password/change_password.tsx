@@ -1,18 +1,25 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import './change_password.css';
 
 export default function ChangePassword() {
     const navigate = useNavigate();
+    const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
-        if (!newPassword.trim() || !confirmPassword.trim()) {
+        if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
             setError('Please fill in all fields.');
             return;
         }
@@ -28,26 +35,22 @@ export default function ChangePassword() {
         setIsLoading(true);
         try {
             const token = localStorage.getItem('authToken');
-            const employeeId = localStorage.getItem('employeeId');
 
-            const res = await fetch('/api/authorization/change-password', {
+            const res = await fetch('/api/profile/change-password', {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({
-                    employeeNumber: employeeId,
-                    newPassword,
-                }),
+                body: JSON.stringify({ currentPassword, newPassword }),
             });
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.message || 'Password change failed.');
             }
+            localStorage.setItem('isPasswordChanged', 'true'); 
 
-            // Redirect to the correct dashboard after success
             const role = localStorage.getItem('userRole') ?? '';
             const routes: Record<string, string> = {
                 'SuperAdmin': '/SystemAdmin_Dashboard',
@@ -66,56 +69,96 @@ export default function ChangePassword() {
     };
 
     return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f6fb' }}>
-            <div style={{ background: '#fff', borderRadius: 16, padding: 40, width: 400, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-                <h2 style={{ marginBottom: 8 }}>Change Your Password</h2>
-                <p style={{ color: '#888', fontSize: 14, marginBottom: 24 }}>
-                    You must change your password before continuing.
-                </p>
+        <div className={`change-password-page${mounted ? ' mounted' : ''}`}>
+            <div className="cp-card">
 
+                {/* Header */}
+                <div className="card-header">
+                    <span className="header-badge">Security</span>
+                    <h2 className="card-title">Change Password</h2>
+                    <p className="card-subtitle">You must change your password before continuing.</p>
+                </div>
+
+                {/* Error */}
                 {error && (
-                    <div style={{ background: '#fff0f0', color: '#e53e3e', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 14 }}>
-                        {error}
-                    </div>
+                    <div className="status-bar error">{error}</div>
                 )}
 
-                <form onSubmit={handleSubmit}>
-                    <div style={{ marginBottom: 16 }}>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                            New Password
-                        </label>
-                        <input
-                            type="password"
-                            value={newPassword}
-                            onChange={e => setNewPassword(e.target.value)}
-                            placeholder="Enter new password"
-                            disabled={isLoading}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, boxSizing: 'border-box' }}
-                        />
+                {/* Form */}
+                <form className="cp-form" onSubmit={handleSubmit}>
+
+                    <div className="field-group">
+                        <label className="field-label">Current Password</label>
+                        <div className="field-wrapper">
+                            <span className="field-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                            </span>
+                            <input
+                                className="field-input"
+                                type="password"
+                                value={currentPassword}
+                                onChange={e => setCurrentPassword(e.target.value)}
+                                placeholder="Enter current password"
+                                disabled={isLoading}
+                            />
+                        </div>
                     </div>
 
-                    <div style={{ marginBottom: 24 }}>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                            Confirm Password
-                        </label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={e => setConfirmPassword(e.target.value)}
-                            placeholder="Confirm new password"
-                            disabled={isLoading}
-                            style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, boxSizing: 'border-box' }}
-                        />
+                    <div className="field-group">
+                        <label className="field-label">New Password</label>
+                        <div className="field-wrapper">
+                            <span className="field-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                </svg>
+                            </span>
+                            <input
+                                className="field-input"
+                                type="password"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                placeholder="Enter new password"
+                                disabled={isLoading}
+                            />
+                        </div>
+                        <span className="field-hint">Must be at least 8 characters.</span>
+                    </div>
+
+                    <div className="field-group">
+                        <label className="field-label">Confirm Password</label>
+                        <div className="field-wrapper">
+                            <span className="field-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                </svg>
+                            </span>
+                            <input
+                                className="field-input"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={e => setConfirmPassword(e.target.value)}
+                                placeholder="Confirm new password"
+                                disabled={isLoading}
+                            />
+                        </div>
                     </div>
 
                     <button
                         type="submit"
+                        className={`submit-btn${isLoading ? ' loading' : ''}`}
                         disabled={isLoading}
-                        style={{ width: '100%', padding: '12px', background: '#4318ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer' }}
                     >
-                        {isLoading ? 'Saving…' : 'Set New Password'}
+                        {isLoading
+                            ? <><span className="btn-spinner" /> Saving…</>
+                            : 'Set New Password'
+                        }
                     </button>
                 </form>
+
+                <p className="card-footer">Your session is protected. Changes take effect immediately.</p>
             </div>
         </div>
     );
