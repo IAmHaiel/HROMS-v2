@@ -112,6 +112,9 @@ namespace OTMS.Service.Services
                 return null;
             }
 
+            // Normalize the Employee Number to ensure consistent checks (e.g., uppercase and trim)
+            request.EmployeeNumber = request.EmployeeNumber.ToUpper().Trim();
+
             var exists = await context.Employees.AnyAsync(
                 u => u.EmployeeNumber == request.EmployeeNumber
             );
