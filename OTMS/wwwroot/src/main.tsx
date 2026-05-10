@@ -10,6 +10,7 @@ import OpEmployee_Dashboard from './Pages/OpEmployee_Dashboard/OpEmployee_Dashbo
 import AccountLocked from './Pages/account_locked/account_locked';
 import PrivateRoute from './components/Auth/PrivateRoute';
 import ChangePassword from './Pages/change_password/change_password';
+import EmployeeDetail from './Pages/employee_details/employee_detail';
 function PasswordChangedGuard({ children }: { children: React.ReactNode }) {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
     if (!isPasswordChanged) {
@@ -37,6 +38,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                         </PasswordChangedGuard>
                     </PrivateRoute>
                 } />
+
+                <Route path="/employees/:employeeNumber" element={
+                    <PrivateRoute allowedRoles={['System Admin', 'SuperAdmin']}>
+                        <PasswordChangedGuard>
+                            <EmployeeDetail />
+                        </PasswordChangedGuard>
+                    </PrivateRoute>
+                } />
+
                 <Route path="/OpAdmin_Dashboard" element={
                     <PrivateRoute allowedRoles={['Operation Admin', 'OpAdmin']}>
                         <PasswordChangedGuard>

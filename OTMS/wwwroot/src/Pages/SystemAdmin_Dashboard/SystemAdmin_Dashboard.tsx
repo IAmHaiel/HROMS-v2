@@ -437,6 +437,7 @@ interface DashboardTabProps {
 }
 
 function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee }: DashboardTabProps) {
+
     return (
         <div className="dashboard-content">
             {/* Stat Cards */}
@@ -869,7 +870,6 @@ export default function Dashboard() {
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState<RecentEmployee | null>(null);
 
     const [employees, setEmployees] = useState<RecentEmployee[]>([]);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -913,15 +913,8 @@ export default function Dashboard() {
         navigate('/');
     };
 
-    const handleEmployeeUpdated = (updated: RecentEmployee) => {
-        if (updated.employeeNumber === '__deleted__') {
-            const id = selectedEmployee?.employeeNumber;
-            setEmployees(prev => prev.filter(e => e.employeeNumber !== id));
-            setRecentEmployees(prev => prev.filter(e => e.employeeNumber !== id));
-        } else {
-            setEmployees(prev => prev.map(e => e.employeeNumber === updated.employeeNumber ? updated : e));
-            setRecentEmployees(prev => prev.map(e => e.employeeNumber === updated.employeeNumber ? updated : e));
-        }
+    const handleSelectEmployee = (emp: RecentEmployee) => {
+        navigate(`/employees/${encodeURIComponent(emp.employeeNumber)}`);
     };
 
     const pageTitles: Record<NavTab, string> = {
@@ -994,14 +987,14 @@ export default function Dashboard() {
                         recentEmployees={recentEmployees}
                         activityLogs={activityLogs}
                         loading={loading}
-                        onSelectEmployee={setSelectedEmployee}
+                        onSelectEmployee={handleSelectEmployee}
                     />
                 )}
                 {activeTab === 'employees' && (
                     <ManageEmployeesTab
                         employees={employees}
                         loading={loading}
-                        onSelectEmployee={setSelectedEmployee}
+                        onSelectEmployee={handleSelectEmployee}
                         onAddEmployee={() => setShowAddModal(true)}
                     />
                 )}
@@ -1036,13 +1029,6 @@ export default function Dashboard() {
                         setEmployees(prev => [newEmp, ...prev]);
                         setRecentEmployees(prev => [newEmp, ...prev]);
                     }}
-                />
-            )}
-            {selectedEmployee && (
-                <EmployeeDetailModal
-                    employee={selectedEmployee}
-                    onClose={() => setSelectedEmployee(null)}
-                    onUpdated={handleEmployeeUpdated}
                 />
             )}
         </div>
