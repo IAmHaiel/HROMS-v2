@@ -1,4 +1,6 @@
-﻿namespace OTMS.Entities.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace OTMS.Entities.DTOs
 {
     public class EmployeeRegisterDTO
     {
