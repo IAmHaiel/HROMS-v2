@@ -17,6 +17,7 @@ interface LoginResponse {
     role: UserRole;
     employeeName: string;
     message?: string;
+    isPasswordChanged: boolean;
 }
 
 /* ── Role helpers ── */
@@ -108,6 +109,12 @@ export default function Login() {
             localStorage.setItem('employeeName', data.employeeName);
 
             updateStatus('Login successful. Redirecting...', 'success');
+
+            if (!data.isPasswordChanged) {
+                updateStatus('Please change your password to continue.', 'info');
+                setTimeout(() => navigate('/change-password'), 800);
+                return;
+            }
 
             setTimeout(() => {
                 navigate(dashboardRoutes[normalizedRole]);

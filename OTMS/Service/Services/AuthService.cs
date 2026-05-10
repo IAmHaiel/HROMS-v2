@@ -138,7 +138,8 @@ namespace OTMS.Service.Services
                 EmployeeId = employee.EmployeeId, // FK
                 Role = request.Role.Trim(),
                 AccountStatus = "Active",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                IsPasswordChanged = false
             };
 
             var passwordHasher = new PasswordHasher<Account>();

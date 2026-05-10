@@ -71,6 +71,7 @@ namespace OTMS.Controllers
             var result = await authService.RegisterAsync(request);
 
             if (result == null)
+
                 return BadRequest("Registration failed");
 
             return Ok(result);
