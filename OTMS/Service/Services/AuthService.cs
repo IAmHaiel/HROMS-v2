@@ -115,6 +115,9 @@ namespace OTMS.Service.Services
             // Normalize the Employee Number to ensure consistent checks (e.g., uppercase and trim)
             request.EmployeeNumber = request.EmployeeNumber.ToUpper().Trim();
 
+            // Check if the Contact Number is valid and format it
+            request.ContactNumber = ContactNumberFormatter(request.ContactNumber);
+
             var exists = await context.Employees.AnyAsync(
                 u => u.EmployeeNumber == request.EmployeeNumber
             );
@@ -167,6 +170,7 @@ namespace OTMS.Service.Services
             {
                 EmployeeNumber = employee.EmployeeNumber,
                 EmployeeName = employee.EmployeeName ?? string.Empty,
+                ContactNumber = employee.ContactNumber ?? string.Empty,
                 Role = account.Role ?? string.Empty,
                 ContactNumber = employee.ContactNumber ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
@@ -177,7 +181,11 @@ namespace OTMS.Service.Services
 
         private static string ContactNumberFormatter(string contactNumber)
         {
+<<<<<<< HEAD
             if (string.IsNullOrEmpty(contactNumber))
+=======
+            if(string.IsNullOrEmpty(contactNumber))
+>>>>>>> sprint-2
             {
                 return contactNumber;
             }
@@ -194,6 +202,10 @@ namespace OTMS.Service.Services
             // Philippines Contact Number Format: 09XX XXX XXXX
             return $"{contactNumber[..4]} {contactNumber.Substring(4, 3)} {contactNumber.Substring(7, 4)}";
         }
+<<<<<<< HEAD
+=======
+
+>>>>>>> sprint-2
         private async Task<TokenResponseDTO> CreateTokenResponse(Employee employee)
         {
 
