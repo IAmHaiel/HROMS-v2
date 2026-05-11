@@ -44,7 +44,7 @@ namespace OTMS.Service.Services
 
             if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
-                throw new UnauthorizedAccessException("Account is deactivated. Please contact the administrator.");
+                return null;
             }
 
             var verificationResult =
@@ -122,6 +122,9 @@ namespace OTMS.Service.Services
                 u => u.EmployeeNumber == request.EmployeeNumber
             );
 
+            // Check if the Contact Number is valid and format it
+            request.ContactNumber = ContactNumberFormatter(request.ContactNumber);
+
             if (exists)
             {
                 throw new InvalidOperationException("Employee Number already exists. Please choose a different one.");
@@ -144,7 +147,8 @@ namespace OTMS.Service.Services
                 EmployeeId = employee.EmployeeId, // FK
                 Role = request.Role.Trim(),
                 AccountStatus = "Active",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                IsPasswordChanged = false
             };
 
             var passwordHasher = new PasswordHasher<Account>();
@@ -168,6 +172,7 @@ namespace OTMS.Service.Services
                 EmployeeName = employee.EmployeeName ?? string.Empty,
                 ContactNumber = employee.ContactNumber ?? string.Empty,
                 Role = account.Role ?? string.Empty,
+                ContactNumber = employee.ContactNumber ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
             };
         }
@@ -176,7 +181,11 @@ namespace OTMS.Service.Services
 
         private static string ContactNumberFormatter(string contactNumber)
         {
+<<<<<<< HEAD
+            if (string.IsNullOrEmpty(contactNumber))
+=======
             if(string.IsNullOrEmpty(contactNumber))
+>>>>>>> sprint-2
             {
                 return contactNumber;
             }
@@ -193,7 +202,10 @@ namespace OTMS.Service.Services
             // Philippines Contact Number Format: 09XX XXX XXXX
             return $"{contactNumber[..4]} {contactNumber.Substring(4, 3)} {contactNumber.Substring(7, 4)}";
         }
+<<<<<<< HEAD
+=======
 
+>>>>>>> sprint-2
         private async Task<TokenResponseDTO> CreateTokenResponse(Employee employee)
         {
 
@@ -208,7 +220,9 @@ namespace OTMS.Service.Services
             {
                 AccessToken = CreateToken(employee),
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
-                Role = employee.Account.Role ?? string.Empty
+                Role = employee.Account.Role ?? string.Empty,
+                EmployeeName = employee.EmployeeName ?? string.Empty,
+                IsPasswordChanged = employee.Account.IsPasswordChanged
             };
         }
 

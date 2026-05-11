@@ -22,18 +22,16 @@ namespace OTMS.Controllers
         /// <response code="400">Invalid request payload or missing fields.</response>
         /// <response code="500">Unexpected server error.</response>
         [HttpPost("login")]
-        [ProducesResponseType(typeof(EmployeeLoginDTO), 200)]
-        [ProducesResponseType(typeof(EmployeeLoginDTO), 400)]
+        [ProducesResponseType(typeof(TokenResponseDTO), 200)]
+        [ProducesResponseType(401)]
         [ProducesResponseType(500)]
         public async Task<ActionResult<TokenResponseDTO>> Login(EmployeeLoginDTO request)
         {
             var result = await authService.LoginAsync(request);
-
             if (result is null)
             {
-                return BadRequest("Invalid Employee Number or password");
+                return Unauthorized(new { message = "Invalid Employee ID or password." });
             }
-
             return Ok(result);
         }
 

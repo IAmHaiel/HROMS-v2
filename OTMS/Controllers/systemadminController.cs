@@ -6,6 +6,8 @@ using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Service.Interfaces;
 using System.ComponentModel.DataAnnotations;
+using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.AccountManagement.Responses;
 
 namespace OTMS.Controllers
 {
@@ -17,7 +19,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Get the Recent Employees from the System. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
-        [Authorize(Roles = "SystemAdmin")]
+        [Authorize(Roles = "SystemAdmin, System Admin")]
         [HttpGet("recent-employees")]
         public async Task<IActionResult> GetRecentEmployees()
         {
@@ -29,7 +31,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Searches for the User Account. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
-        [Authorize(Roles = "SystemAdmin")]
+        [Authorize(Roles = "SystemAdmin, System Admin")]
         [HttpGet("search-user")]
         public async Task<IActionResult> SearchUser([FromQuery] SearchUserDTO employeeNumber)
         {

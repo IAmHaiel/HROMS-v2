@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     ClipboardList,
@@ -14,10 +15,10 @@ import {
     Pencil,
     Lock,
     User,
-    Mail,
     Phone,
-    MapPin,
     Loader2,
+    Hash,
+    Shield,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 
@@ -41,28 +42,12 @@ interface Task {
 interface UserProfile {
     employeeId: string;
     fullName: string;
-    email: string;
     phone: string;
-    address: string;
-    role: string;
-    department: string;
-    joinDate: string;
-    avatarInitials: string;
+    role: string;          // from Account table
+    accountStatus: string; // from Account table
 }
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-
-const CURRENT_USER: UserProfile = {
-    employeeId: 'EMP-2047',
-    fullName: 'Alex Rivera',
-    email: 'alex.rivera@opsco.com',
-    phone: '+63 917 234 5678',
-    address: 'Caloocan, Metro Manila, PH',
-    role: 'Field Operations',
-    department: 'Operational Team',
-    joinDate: '2024-03-15',
-    avatarInitials: 'AR',
-};
+// ─── Seed Tasks (unchanged) ───────────────────────────────────────────────────
 
 const MY_TASKS: Task[] = [
     { id: 1, name: 'Update delivery route maps', description: 'Review and update all Q2 delivery routes based on new zone assignments for Metro Manila.', deadline: '2026-04-28', priority: 'high', status: 'in-progress', progress: 65, assignedBy: 'Ops Admin' },
@@ -86,6 +71,8 @@ const isEffectivelyOverdue = (t: Task): boolean =>
 const effectiveStatus = (t: Task): TaskStatus =>
     isEffectivelyOverdue(t) ? 'overdue' : t.status;
 
+const toDisplayRole = (role: string) => role.replace(/([a-z])([A-Z])/g, '$1 $2');
+
 const statusMeta: Record<TaskStatus, { label: string; cls: string; icon: React.ReactNode }> = {
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
@@ -99,7 +86,7 @@ const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
     low: { cls: 'prio-low', bar: 'bar-green' },
 };
 
-// ─── Progress Update Modal (FR-017) ──────────────────────────────────────────
+// ─── Progress Update Modal ────────────────────────────────────────────────────
 
 interface ProgressModalProps {
     task: Task;
@@ -127,8 +114,6 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
-
-                {/* Progress Slider */}
                 <div className="field">
                     <label>Progress — <strong>{progress}%</strong></label>
                     <div className="slider-wrap">
@@ -143,8 +128,6 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     </div>
                     <div className="slider-labels"><span>0%</span><span>50%</span><span>100%</span></div>
                 </div>
-
-                {/* Status Select */}
                 <div className="field">
                     <label>Status</label>
                     <div className="status-chips">
@@ -160,18 +143,12 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         ))}
                     </div>
                 </div>
-
-                {/* Visual feedback */}
                 <div className="progress-preview">
                     <div className="pp-bar">
-                        <div
-                            className={`pp-fill ${priorityMeta[task.priority].bar}`}
-                            style={{ width: `${progress}%` }}
-                        />
+                        <div className={`pp-fill ${priorityMeta[task.priority].bar}`} style={{ width: `${progress}%` }} />
                     </div>
                     <span className="pp-pct">{progress}%</span>
                 </div>
-
                 <div className="modal-actions">
                     <button className="btn" onClick={onClose}>Cancel</button>
                     <button className="btn btn-primary" onClick={() => onSave(task.id, status, progress)}>
@@ -209,9 +186,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
-
                 <p className="detail-desc">{task.description}</p>
-
                 <div className="detail-meta-grid">
                     <div className="detail-meta-item">
                         <span className="dmi-label">Deadline</span>
@@ -230,16 +205,11 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                         <span className={`badge ${sm.cls}`}>{sm.label}</span>
                     </div>
                 </div>
-
                 <div className="detail-progress">
                     <div className="dp-bar">
-                        <div
-                            className={`dp-fill ${pm.bar}`}
-                            style={{ width: `${task.progress}%` }}
-                        />
+                        <div className={`dp-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
                     </div>
                 </div>
-
                 <div className="modal-actions">
                     <button className="btn" onClick={onClose}>Close</button>
                     {task.status !== 'completed' && (
@@ -279,9 +249,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
                     <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
                 </div>
             </div>
-
             <p className="tc-desc">{task.description}</p>
-
             <div className="tc-meta">
                 <span className={`tc-deadline${od ? ' overdue-text' : daysLeft !== null && daysLeft <= 2 ? ' warning-text' : ''}`}>
                     {od ? '⚠ Overdue' : daysLeft !== null
@@ -292,14 +260,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
                 </span>
                 <span className="tc-date">{fmtDate(task.deadline)}</span>
             </div>
-
             <div className="tc-progress-row">
                 <div className="tc-bar">
                     <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
                 </div>
                 <span className="tc-pct">{task.progress}%</span>
             </div>
-
             <div className="tc-actions">
                 <button className="btn btn-sm btn-ghost" onClick={() => onView(task.id)}>
                     <Eye size={13} /> View
@@ -335,15 +301,21 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     const pct = total ? Math.round(done / total * 100) : 0;
     const urgent = tasks.filter(t => t.priority === 'high' && t.status !== 'completed');
 
+    // Use first name from fullName for the greeting
+    const firstName = user.fullName ? user.fullName.split(' ')[0] : 'Employee';
+    const initials = user.fullName
+        ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+        : 'OP';
+
     return (
         <div className="tab-content">
             {/* Welcome Banner */}
             <div className="welcome-banner">
                 <div className="wb-left">
-                    <div className="wb-avatar">{user.avatarInitials}</div>
+                    <div className="wb-avatar">{initials}</div>
                     <div>
-                        <h2 className="wb-name">Good day, {user.fullName.split(' ')[0]} 👋</h2>
-                        <p className="wb-sub">{user.role} · {user.department}</p>
+                        <h2 className="wb-name">Good day, {firstName} 👋</h2>
+                        <p className="wb-sub">{toDisplayRole(user.role)}</p>
                     </div>
                 </div>
                 <div className="wb-right">
@@ -453,7 +425,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     );
 };
 
-// ─── My Tasks Tab (FR-016) ────────────────────────────────────────────────────
+// ─── My Tasks Tab ─────────────────────────────────────────────────────────────
 
 interface MyTasksTabProps {
     tasks: Task[];
@@ -480,7 +452,6 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
 
     return (
         <div className="tab-content">
-            {/* Filter Pills */}
             <div className="filter-pills">
                 {filters.map(f => (
                     <button
@@ -493,8 +464,6 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
                     </button>
                 ))}
             </div>
-
-            {/* Task Grid */}
             {filtered.length === 0
                 ? <div className="card"><div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div></div>
                 : <div className="task-grid">
@@ -507,73 +476,139 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
     );
 };
 
-// ─── Profile Tab (FR-018) ─────────────────────────────────────────────────────
+// ─── Profile Tab ──────────────────────────────────────────────────────────────
 
-interface ProfileTabProps { user: UserProfile; onUpdateUser: (u: UserProfile) => void; }
+interface ProfileTabProps {
+    user: UserProfile;
+    onUpdateUser: (u: UserProfile) => void;
+}
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const [editMode, setEditMode] = useState(false);
     const [pwdMode, setPwdMode] = useState(false);
-    const [form, setForm] = useState({ fullName: user.fullName, email: user.email, phone: user.phone, address: user.address });
-    const [pwd, setPwd] = useState({ current: '', newPwd: '', confirm: '' });
-    const [showPwd, setShowPwd] = useState({ current: false, newPwd: false, confirm: false });
+
+    // Profile form mirrors editable fields
+    const [form, setForm] = useState({
+        employeeName: user.fullName,
+        contactNumber: user.phone,
+    });
+
+    // Keep form in sync if parent user object changes (e.g. after fetch)
+    useEffect(() => {
+        setForm({ employeeName: user.fullName, contactNumber: user.phone });
+    }, [user.fullName, user.phone]);
+
+    const [profileError, setProfileError] = useState('');
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileSuccess, setProfileSuccess] = useState(false);
+
+    const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
+    const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
     const [pwdError, setPwdError] = useState('');
-    const [saved, setSaved] = useState(false);
+    const [pwdSaving, setPwdSaving] = useState(false);
 
-    const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm(prev => ({ ...prev, [k]: e.target.value }));
-
-    const handleSaveInfo = () => {
-        onUpdateUser({ ...user, ...form });
-        setEditMode(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
+        setProfileError('');
     };
 
-    const handleChangePwd = () => {
+    // ── Save profile — mirrors SystemAdmin_Dashboard handleProfileSave ──
+    const handleSaveInfo = async () => {
+        if (!form.employeeName.trim()) { setProfileError('Full name is required.'); return; }
+        if (form.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
+            setProfileError('Enter a valid contact number.'); return;
+        }
+        setProfileSaving(true);
+        setProfileError('');
+        try {
+            const token = localStorage.getItem('authToken');
+            const employeeId = localStorage.getItem('employeeId') ?? '';
+            const res = await fetch('/api/profile/update-profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({
+                    employeeNumber: employeeId,
+                    employeeName: form.employeeName.trim(),
+                    contactNumber: form.contactNumber.trim(),
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Profile update failed.');
+            }
+            // Persist to localStorage so sidebar/header reflects the change immediately
+            localStorage.setItem('employeeName', form.employeeName.trim());
+            localStorage.setItem('contactNumber', form.contactNumber.trim());
+            onUpdateUser({ ...user, fullName: form.employeeName.trim(), phone: form.contactNumber.trim() });
+            setProfileSuccess(true);
+            setEditMode(false);
+            setTimeout(() => setProfileSuccess(false), 2500);
+        } catch (err: any) {
+            setProfileError(err.message ?? 'Something went wrong.');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
+
+    // ── Change password — mirrors SystemAdmin_Dashboard handlePwSave ──
+    const handleChangePwd = async () => {
         setPwdError('');
-        if (!pwd.current) return setPwdError('Current password is required.');
-        if (pwd.newPwd.length < 8) return setPwdError('New password must be at least 8 characters.');
-        if (pwd.newPwd !== pwd.confirm) return setPwdError('Passwords do not match.');
-        setPwdMode(false);
-        setPwd({ current: '', newPwd: '', confirm: '' });
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
+        if (!pwd.current) { setPwdError('Current password is required.'); return; }
+        if (pwd.next.length < 6) { setPwdError('New password must be at least 6 characters.'); return; }
+        if (pwd.next !== pwd.confirm) { setPwdError('Passwords do not match.'); return; }
+        setPwdSaving(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/profile/change-password', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Password update failed.');
+            }
+            alert('Password changed successfully!');
+            setPwdMode(false);
+            setPwd({ current: '', next: '', confirm: '' });
+        } catch (err: any) {
+            setPwdError(err.message ?? 'Something went wrong.');
+        } finally {
+            setPwdSaving(false);
+        }
     };
 
     const toggleShow = (k: keyof typeof showPwd) =>
         setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
 
-    const infoFields: { key: keyof typeof form; label: string; icon: React.ReactNode; type?: string }[] = [
-        { key: 'fullName', label: 'Full Name', icon: <User size={15} /> },
-        { key: 'email', label: 'Email Address', icon: <Mail size={15} />, type: 'email' },
-        { key: 'phone', label: 'Phone Number', icon: <Phone size={15} />, type: 'tel' },
-        { key: 'address', label: 'Address', icon: <MapPin size={15} /> },
-    ];
+    const initials = user.fullName
+        ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+        : 'OP';
 
     return (
         <div className="tab-content">
-            {saved && (
+            {profileSuccess && (
                 <div className="toast-success">
-                    <CheckCircle2 size={16} /> Changes saved successfully
+                    <CheckCircle2 size={16} /> Profile updated successfully
                 </div>
             )}
 
             {/* Profile Hero */}
             <div className="profile-hero card">
-                <div className="ph-avatar">{user.avatarInitials}</div>
+                <div className="ph-avatar">{initials}</div>
                 <div className="ph-info">
-                    <h2 className="ph-name">{user.fullName}</h2>
-                    <p className="ph-role">{user.role} · {user.department}</p>
+                    <h2 className="ph-name">{user.fullName || '—'}</h2>
+                    <p className="ph-role">{toDisplayRole(user.role)}</p>
                     <div className="ph-badges">
                         <span className="badge badge-blue">{user.employeeId}</span>
-                        <span className="badge badge-green">Active</span>
-                        <span className="badge badge-amber">Since {fmtDate(user.joinDate)}</span>
+                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>
+                            {user.accountStatus}
+                        </span>
                     </div>
                 </div>
                 <button
                     className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
-                    onClick={() => { setEditMode(e => !e); setPwdMode(false); }}
+                    onClick={() => { setEditMode(e => !e); setPwdMode(false); setProfileError(''); }}
                 >
                     {editMode ? <><X size={13} /> Cancel</> : <><Pencil size={13} /> Edit Profile</>}
                 </button>
@@ -585,64 +620,96 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                     <div className="card-header">
                         <h3>Basic Information</h3>
                         {editMode && (
-                            <button className="btn btn-primary" onClick={handleSaveInfo}>
-                                <Save size={13} /> Save
+                            <button className="btn btn-primary" onClick={handleSaveInfo} disabled={profileSaving}>
+                                {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save</>}
                             </button>
                         )}
                     </div>
+
+                    {profileError && (
+                        <div className="form-api-error" style={{ marginBottom: 10 }}>
+                            <AlertCircle size={14} /><span>{profileError}</span>
+                        </div>
+                    )}
+
                     <div className="info-fields">
-                        {infoFields.map(f => (
-                            <div key={f.key} className="info-field">
-                                <label>{f.label}</label>
-                                {editMode ? (
-                                    <div className="if-input-wrap">
-                                        <span className="if-icon">{f.icon}</span>
-                                        <input
-                                            type={f.type ?? 'text'}
-                                            value={form[f.key]}
-                                            onChange={setF(f.key)}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="if-value">
-                                        <span className="if-icon">{f.icon}</span>
-                                        <span>{user[f.key as keyof UserProfile] as string}</span>
-                                    </div>
-                                )}
+                        {/* Employee ID — always read-only */}
+                        <div className="info-field">
+                            <label>Employee ID</label>
+                            <div className="if-value">
+                                <span className="if-icon"><Hash size={15} /></span>
+                                <span className="read-only-val">{user.employeeId || '—'}</span>
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Full Name */}
+                        <div className="info-field">
+                            <label>Full Name</label>
+                            {editMode ? (
+                                <div className="if-input-wrap">
+                                    <span className="if-icon"><User size={15} /></span>
+                                    <input
+                                        type="text"
+                                        value={form.employeeName}
+                                        onChange={setF('employeeName')}
+                                        placeholder="Enter full name"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="if-value">
+                                    <span className="if-icon"><User size={15} /></span>
+                                    <span>{user.fullName || '—'}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Contact Number */}
+                        <div className="info-field">
+                            <label>Contact Number</label>
+                            {editMode ? (
+                                <div className="if-input-wrap">
+                                    <span className="if-icon"><Phone size={15} /></span>
+                                    <input
+                                        type="tel"
+                                        value={form.contactNumber}
+                                        onChange={setF('contactNumber')}
+                                        placeholder="e.g. +63 917 000 0000"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="if-value">
+                                    <span className="if-icon"><Phone size={15} /></span>
+                                    <span>{user.phone || '—'}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Account & Password */}
+                {/* Account & Security */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Account & Security</h3>
                     </div>
                     <div className="account-info">
                         <div className="info-field">
-                            <label>Employee ID</label>
+                            <label>Role</label>
                             <div className="if-value">
-                                <span className="if-icon"><User size={15} /></span>
-                                <span className="read-only-val">{user.employeeId}</span>
+                                <span className="if-icon"><Shield size={15} /></span>
+                                <span className="read-only-val">{toDisplayRole(user.role) || '—'}</span>
                             </div>
                         </div>
                         <div className="info-field">
-                            <label>Department</label>
+                            <label>Account Status</label>
                             <div className="if-value">
-                                <span className="if-icon"><ClipboardList size={15} /></span>
-                                <span className="read-only-val">{user.department}</span>
-                            </div>
-                        </div>
-                        <div className="info-field">
-                            <label>Join Date</label>
-                            <div className="if-value">
-                                <span className="if-icon"><Clock size={15} /></span>
-                                <span className="read-only-val">{fmtDate(user.joinDate)}</span>
+                                <span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>
+                                    {user.accountStatus ?? 'Active'}
+                                </span>
                             </div>
                         </div>
                     </div>
 
+                    {/* Change Password */}
                     <div className="pwd-section">
                         <div className="pwd-header">
                             <div className="pwd-title">
@@ -659,28 +726,92 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
                         {pwdMode && (
                             <div className="pwd-form">
-                                {(['current', 'newPwd', 'confirm'] as const).map(k => {
-                                    const labels = { current: 'Current Password', newPwd: 'New Password', confirm: 'Confirm New Password' };
-                                    return (
-                                        <div key={k} className="field">
-                                            <label>{labels[k]}</label>
-                                            <div className="pwd-input-wrap">
-                                                <input
-                                                    type={showPwd[k] ? 'text' : 'password'}
-                                                    value={pwd[k]}
-                                                    onChange={e => setPwd(p => ({ ...p, [k]: e.target.value }))}
-                                                    placeholder="••••••••"
-                                                />
-                                                <button className="pwd-toggle" onClick={() => toggleShow(k)}>
-                                                    {showPwd[k] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                </button>
+                                {pwdError && (
+                                    <div className="form-api-error" style={{ marginBottom: 8 }}>
+                                        <AlertCircle size={14} /><span>{pwdError}</span>
+                                    </div>
+                                )}
+
+                                {/* Current Password */}
+                                <div className="field">
+                                    <label>Current Password</label>
+                                    <div className="pwd-input-wrap">
+                                        <input
+                                            type={showPwd.current ? 'text' : 'password'}
+                                            value={pwd.current}
+                                            onChange={e => setPwd(p => ({ ...p, current: e.target.value }))}
+                                            placeholder="Enter current password"
+                                        />
+                                        <button className="pwd-toggle" onClick={() => toggleShow('current')} tabIndex={-1}>
+                                            {showPwd.current ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* New Password */}
+                                <div className="field">
+                                    <label>New Password</label>
+                                    <div className="pwd-input-wrap">
+                                        <input
+                                            type={showPwd.next ? 'text' : 'password'}
+                                            value={pwd.next}
+                                            onChange={e => setPwd(p => ({ ...p, next: e.target.value }))}
+                                            placeholder="At least 6 characters"
+                                        />
+                                        <button className="pwd-toggle" onClick={() => toggleShow('next')} tabIndex={-1}>
+                                            {showPwd.next ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
+                                    {/* Strength indicator */}
+                                    {pwd.next.length > 0 && (
+                                        <div style={{ marginTop: 6 }}>
+                                            <div style={{ display: 'flex', gap: 4 }}>
+                                                {[1, 2, 3].map(level => (
+                                                    <div key={level} style={{
+                                                        flex: 1, height: 4, borderRadius: 2,
+                                                        background: pwd.next.length >= level * 4
+                                                            ? level === 1 ? '#ee5d50' : level === 2 ? '#ffb547' : '#05cd99'
+                                                            : '#e9edf7',
+                                                        transition: 'background 0.2s',
+                                                    }} />
+                                                ))}
                                             </div>
+                                            <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                                {pwd.next.length < 4 ? 'Weak' : pwd.next.length < 8 ? 'Fair' : 'Strong'}
+                                            </span>
                                         </div>
-                                    );
-                                })}
-                                {pwdError && <p className="pwd-error">{pwdError}</p>}
-                                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleChangePwd}>
-                                    <Lock size={13} /> Update Password
+                                    )}
+                                </div>
+
+                                {/* Confirm Password */}
+                                <div className="field">
+                                    <label>Confirm New Password</label>
+                                    <div className="pwd-input-wrap">
+                                        <input
+                                            type={showPwd.confirm ? 'text' : 'password'}
+                                            value={pwd.confirm}
+                                            onChange={e => setPwd(p => ({ ...p, confirm: e.target.value }))}
+                                            placeholder="Re-enter new password"
+                                        />
+                                        <button className="pwd-toggle" onClick={() => toggleShow('confirm')} tabIndex={-1}>
+                                            {showPwd.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
+                                        </button>
+                                    </div>
+                                    {pwd.confirm.length > 0 && pwd.next !== pwd.confirm && (
+                                        <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>
+                                    )}
+                                    {pwd.confirm.length > 0 && pwd.next === pwd.confirm && (
+                                        <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Passwords match</span>
+                                    )}
+                                </div>
+
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ width: '100%', justifyContent: 'center' }}
+                                    onClick={handleChangePwd}
+                                    disabled={pwdSaving}
+                                >
+                                    {pwdSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Lock size={13} /> Update Password</>}
                                 </button>
                             </div>
                         )}
@@ -696,9 +827,57 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 export default function EmployeeDashboard() {
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>(MY_TASKS);
-    const [user, setUser] = useState<UserProfile>(CURRENT_USER);
     const [viewingId, setViewingId] = useState<number | null>(null);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+    // ── User state — populated from API, seeded from localStorage ──
+    const [user, setUser] = useState<UserProfile>({
+        employeeId: localStorage.getItem('employeeId') ?? '',
+        fullName: localStorage.getItem('employeeName') ?? '',
+        phone: localStorage.getItem('contactNumber') ?? '',
+        role: localStorage.getItem('role') ?? '',
+        accountStatus: 'Active',
+    });
+    const [loadingUser, setLoadingUser] = useState(true);
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'contactNumber', 'role'].forEach(k => localStorage.removeItem(k));
+        navigate('/');
+    };
+
+    // ── Fetch current employee profile on mount ──
+    // GET /api/profile/view-profile returns the joined Employee + Account data
+    // for the currently authenticated user — role & accountStatus come from
+    // the Account table; employeeName & contactNumber come from Employee.
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        const employeeId = localStorage.getItem('employeeId');
+        if (!token || !employeeId) { setLoadingUser(false); return; }
+
+        fetch('/api/profile/view-profile', {
+            headers: { 'Authorization': `Bearer ${token}` },
+        })
+            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+            .then((data: any) => {
+                const fetched: UserProfile = {
+                    employeeId: data.employeeNumber ?? employeeId,
+                    fullName: data.employeeName ?? localStorage.getItem('employeeName') ?? '',
+                    phone: data.contactNumber ?? localStorage.getItem('contactNumber') ?? '',
+                    role: data.role ?? localStorage.getItem('role') ?? '',
+                    accountStatus: data.accountStatus ?? 'Active',
+                };
+                setUser(fetched);
+                localStorage.setItem('employeeName', fetched.fullName);
+                localStorage.setItem('contactNumber', fetched.phone);
+                localStorage.setItem('role', fetched.role);
+            })
+            .catch(err => {
+                console.warn('Could not fetch profile:', err);
+                // Silently fall back to localStorage values already in state
+            })
+            .finally(() => setLoadingUser(false));
+    }, []);
 
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
@@ -725,12 +904,16 @@ export default function EmployeeDashboard() {
 
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
+    const initials = user.fullName
+        ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+        : 'OP';
+
     return (
         <div className="dashboard-container">
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <div className="logo-box" />
+                    <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="sidebar-logo-img" />
                 </div>
                 <nav className="sidebar-nav">
                     {navItems.map(n => (
@@ -746,47 +929,32 @@ export default function EmployeeDashboard() {
                 </nav>
                 {/* Sidebar footer */}
                 <div className="sidebar-footer">
-                    <div className="sf-avatar">{user.avatarInitials}</div>
-                    <div className="sf-info">
-                        <div className="sf-name">{user.fullName}</div>
-                        <div className="sf-role">{user.role}</div>
+                    <div className="user-block">
+                        <div className="avatar-circle">
+                            {loadingUser ? <Loader2 size={16} className="spin" /> : initials}
+                        </div>
+                        <div className="user-text">
+                            <span className="welcome-text">Welcome!</span>
+                            <strong>{user.fullName || 'Employee'}</strong>
+                        </div>
                     </div>
+                    <button className="logout-btn-sidebar" onClick={handleLogout}>Logout</button>
                 </div>
             </aside>
 
             {/* Main */}
             <main className="main-viewport">
-                {/* Header */}
                 <div className="dashboard-header">
                     <div>
                         <h2>{pageTitles[activeTab]}</h2>
                         <p>Dashboard — {today}</p>
                     </div>
-                    <div className="header-user">
-                        <div className="user-block">
-                            <div className="avatar-circle">{user.avatarInitials}</div>
-                            <div className="user-text">
-                                <span className="welcome-text">Welcome back</span>
-                                <strong>{user.fullName}</strong>
-                            </div>
-                        </div>
-                        <button
-                            className="logout-btn"
-                            onClick={() => {
-                                localStorage.removeItem('employeeId');
-                                localStorage.removeItem('authToken');
-                                window.location.href = '/';
-                            }}
-                        >
-                            Logout
-                        </button>
-                    </div>
                 </div>
 
-                {/* Tabs */}
                 {activeTab === 'dashboard' && (
                     <DashboardTab
-                        tasks={tasks} user={user}
+                        tasks={tasks}
+                        user={user}
                         onView={setViewingId}
                         onUpdate={setUpdatingId}
                         onGoTasks={() => setActiveTab('my-tasks')}
@@ -819,4 +987,4 @@ export default function EmployeeDashboard() {
             )}
         </div>
     );
-} 
+}

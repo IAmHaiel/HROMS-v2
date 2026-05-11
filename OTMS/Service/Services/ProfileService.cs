@@ -70,6 +70,7 @@ namespace OTMS.Service.Services
                 );
             profile.UpdatedAt = DateTime.UtcNow;
             profile.Account.UpdatedAt = DateTime.UtcNow;
+            profile.Account.IsPasswordChanged = true;
 
             await context.SaveChangesAsync();
             

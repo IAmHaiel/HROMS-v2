@@ -953,6 +953,30 @@
     }
 }
 
+.header-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    color: var(--text-secondary);
+}
+
+    .header-search input {
+        border: none;
+        outline: none;
+        font-size: 13px;
+        color: var(--text-primary);
+        background: transparent;
+        width: 200px;
+    }
+
+        .header-search input::placeholder {
+            color: var(--text-secondary);
+        }
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
     .stats-row {
