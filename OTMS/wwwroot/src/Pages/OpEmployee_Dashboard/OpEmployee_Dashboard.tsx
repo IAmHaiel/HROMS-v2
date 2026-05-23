@@ -19,6 +19,21 @@ import {
     Loader2,
     Hash,
     Shield,
+    CalendarDays,
+    Send,
+    Palmtree,
+    HeartPulse,
+    AlertTriangle,
+    Baby,
+    MoreHorizontal,
+    CalendarCheck,
+    CalendarX,
+    CalendarClock,
+    FileText,
+    Plus,
+    ChevronDown,
+    ChevronUp,
+    ChevronLeft,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 
@@ -26,7 +41,9 @@ import './OpEmployee_Dashboard.css';
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
-type NavTab = 'dashboard' | 'my-tasks' | 'profile';
+type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile';
+type LeaveType = 'vacation' | 'sick' | 'emergency' | 'personal' | 'maternity' | 'other';
+type LeaveStatus = 'pending' | 'approved' | 'declined';
 
 interface Task {
     id: number;
@@ -43,11 +60,23 @@ interface UserProfile {
     employeeId: string;
     fullName: string;
     phone: string;
-    role: string;          // from Account table
-    accountStatus: string; // from Account table
+    role: string;
+    accountStatus: string;
 }
 
-// ─── Seed Tasks (unchanged) ───────────────────────────────────────────────────
+interface LeaveRecord {
+    id: number;
+    leaveType: LeaveType;
+    startDate: string;
+    endDate: string;
+    reason: string;
+    status: LeaveStatus;
+    submittedAt: string;
+    reviewedBy?: string;
+    reviewNote?: string;
+}
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
 
 const MY_TASKS: Task[] = [
     { id: 1, name: 'Update delivery route maps', description: 'Review and update all Q2 delivery routes based on new zone assignments for Metro Manila.', deadline: '2026-04-28', priority: 'high', status: 'in-progress', progress: 65, assignedBy: 'Ops Admin' },
@@ -56,6 +85,13 @@ const MY_TASKS: Task[] = [
     { id: 4, name: 'Coordinate morning dispatch', description: 'Oversee and log the morning dispatch schedule for the north sector team.', deadline: '2026-04-27', priority: 'medium', status: 'in-progress', progress: 80, assignedBy: 'Ops Admin' },
     { id: 5, name: 'Warehouse zone audit — Sec A', description: 'Conduct physical count and audit for warehouse section A, rows 1–12.', deadline: '2026-04-24', priority: 'low', status: 'completed', progress: 100, assignedBy: 'Ops Admin' },
     { id: 6, name: 'Driver briefing deck', description: 'Prepare orientation briefing materials for three new drivers onboarding next Monday.', deadline: '2026-04-25', priority: 'high', status: 'overdue', progress: 35, assignedBy: 'Ops Admin' },
+];
+
+const SEED_LEAVE_RECORDS: LeaveRecord[] = [
+    { id: 1, leaveType: 'vacation', startDate: '2026-03-10', endDate: '2026-03-14', reason: 'Family vacation to Cebu.', status: 'approved', submittedAt: '2026-03-01', reviewedBy: 'Ops Admin', reviewNote: 'Approved. Enjoy your trip!' },
+    { id: 2, leaveType: 'sick', startDate: '2026-04-02', endDate: '2026-04-03', reason: 'Fever and flu symptoms.', status: 'approved', submittedAt: '2026-04-02', reviewedBy: 'Ops Admin' },
+    { id: 3, leaveType: 'personal', startDate: '2026-04-20', endDate: '2026-04-20', reason: 'Personal errand that cannot be rescheduled.', status: 'declined', submittedAt: '2026-04-15', reviewedBy: 'Ops Admin', reviewNote: 'Critical operations that week — please coordinate with the team.' },
+    { id: 4, leaveType: 'emergency', startDate: '2026-05-28', endDate: '2026-05-30', reason: 'Family emergency — hospitalization of parent.', status: 'pending', submittedAt: '2026-05-24' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +109,9 @@ const effectiveStatus = (t: Task): TaskStatus =>
 
 const toDisplayRole = (role: string) => role.replace(/([a-z])([A-Z])/g, '$1 $2');
 
+const calcDays = (start: string, end: string): number =>
+    Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1;
+
 const statusMeta: Record<TaskStatus, { label: string; cls: string; icon: React.ReactNode }> = {
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
@@ -85,6 +124,24 @@ const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
     medium: { cls: 'prio-medium', bar: 'bar-amber' },
     low: { cls: 'prio-low', bar: 'bar-green' },
 };
+
+const leaveStatusMeta: Record<LeaveStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+    pending: { label: 'Pending', cls: 'badge-amber', icon: <CalendarClock size={12} /> },
+    approved: { label: 'Approved', cls: 'badge-green', icon: <CalendarCheck size={12} /> },
+    declined: { label: 'Declined', cls: 'badge-red', icon: <CalendarX size={12} /> },
+};
+
+const LEAVE_TYPES: { key: LeaveType; label: string; icon: React.ReactNode }[] = [
+    { key: 'vacation', label: 'Vacation', icon: <Palmtree size={16} /> },
+    { key: 'sick', label: 'Sick Leave', icon: <HeartPulse size={16} /> },
+    { key: 'emergency', label: 'Emergency', icon: <AlertTriangle size={16} /> },
+    { key: 'personal', label: 'Personal', icon: <User size={16} /> },
+    { key: 'maternity', label: 'Maternity/Paternity', icon: <Baby size={16} /> },
+    { key: 'other', label: 'Other', icon: <MoreHorizontal size={16} /> },
+];
+
+const leaveTypeLabel = (key: LeaveType) =>
+    LEAVE_TYPES.find(lt => lt.key === key)?.label ?? key;
 
 // ─── Progress Update Modal ────────────────────────────────────────────────────
 
@@ -162,11 +219,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
 
 // ─── Task Detail Drawer ───────────────────────────────────────────────────────
 
-interface TaskDetailProps {
-    task: Task;
-    onUpdate: () => void;
-    onClose: () => void;
-}
+interface TaskDetailProps { task: Task; onUpdate: () => void; onClose: () => void; }
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     const es = effectiveStatus(task);
@@ -225,11 +278,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
-interface TaskCardProps {
-    task: Task;
-    onView: (id: number) => void;
-    onUpdate: (id: number) => void;
-}
+interface TaskCardProps { task: Task; onView: (id: number) => void; onUpdate: (id: number) => void; }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
     const es = effectiveStatus(task);
@@ -300,8 +349,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     const overdue = tasks.filter(t => effectiveStatus(t) === 'overdue').length;
     const pct = total ? Math.round(done / total * 100) : 0;
     const urgent = tasks.filter(t => t.priority === 'high' && t.status !== 'completed');
-
-    // Use first name from fullName for the greeting
     const firstName = user.fullName ? user.fullName.split(' ')[0] : 'Employee';
     const initials = user.fullName
         ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -309,7 +356,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
 
     return (
         <div className="tab-content">
-            {/* Welcome Banner */}
             <div className="welcome-banner">
                 <div className="wb-left">
                     <div className="wb-avatar">{initials}</div>
@@ -322,9 +368,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                     <div className="wb-ring-wrap">
                         <svg viewBox="0 0 60 60" className="wb-ring">
                             <circle cx="30" cy="30" r="24" className="ring-bg" />
-                            <circle
-                                cx="30" cy="30" r="24"
-                                className="ring-fill"
+                            <circle cx="30" cy="30" r="24" className="ring-fill"
                                 strokeDasharray={`${2 * Math.PI * 24}`}
                                 strokeDashoffset={`${2 * Math.PI * 24 * (1 - pct / 100)}`}
                             />
@@ -343,7 +387,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                 </div>
             </div>
 
-            {/* Stats Row */}
             <div className="stats-row">
                 {[
                     { label: 'My Tasks', val: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'Assigned to me' },
@@ -353,23 +396,16 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                 ].map(s => (
                     <div key={s.label} className="card stat-card">
                         <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div>
-                            <p>{s.label}</p>
-                            <h3>{s.val}</h3>
-                            <small>{s.sub}</small>
-                        </div>
+                        <div><p>{s.label}</p><h3>{s.val}</h3><small>{s.sub}</small></div>
                     </div>
                 ))}
             </div>
 
             <div className="dashboard-grid">
-                {/* Urgent Tasks */}
                 <div className="card">
                     <div className="card-header">
                         <h3>High Priority Tasks</h3>
-                        <button className="link-btn" onClick={onGoTasks}>
-                            All tasks <ChevronRight size={13} />
-                        </button>
+                        <button className="link-btn" onClick={onGoTasks}>All tasks <ChevronRight size={13} /></button>
                     </div>
                     {urgent.length === 0
                         ? <div className="empty-state"><CheckCircle2 size={22} /><p>No urgent tasks — great work!</p></div>
@@ -383,16 +419,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                                     </div>
                                 </div>
                                 <div className="dtr-right">
-                                    <span className={`badge ${statusMeta[effectiveStatus(t)].cls}`}>
-                                        {statusMeta[effectiveStatus(t)].label}
-                                    </span>
+                                    <span className={`badge ${statusMeta[effectiveStatus(t)].cls}`}>{statusMeta[effectiveStatus(t)].label}</span>
                                     {t.status !== 'completed' && (
-                                        <button
-                                            className="btn btn-xs btn-primary"
-                                            onClick={e => { e.stopPropagation(); onUpdate(t.id); }}
-                                        >
-                                            Update
-                                        </button>
+                                        <button className="btn btn-xs btn-primary" onClick={e => { e.stopPropagation(); onUpdate(t.id); }}>Update</button>
                                     )}
                                 </div>
                             </div>
@@ -400,7 +429,6 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                     }
                 </div>
 
-                {/* Progress Summary */}
                 <div className="card">
                     <div className="card-header"><h3>My Progress</h3></div>
                     <div className="progress-summary">
@@ -411,10 +439,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                                     <span className="ps-pct">{t.progress}%</span>
                                 </div>
                                 <div className="ps-bar">
-                                    <div
-                                        className={`ps-fill ${priorityMeta[t.priority].bar}`}
-                                        style={{ width: `${t.progress}%` }}
-                                    />
+                                    <div className={`ps-fill ${priorityMeta[t.priority].bar}`} style={{ width: `${t.progress}%` }} />
                                 </div>
                             </div>
                         ))}
@@ -427,11 +452,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
 
 // ─── My Tasks Tab ─────────────────────────────────────────────────────────────
 
-interface MyTasksTabProps {
-    tasks: Task[];
-    onView: (id: number) => void;
-    onUpdate: (id: number) => void;
-}
+interface MyTasksTabProps { tasks: Task[]; onView: (id: number) => void; onUpdate: (id: number) => void; }
 
 const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
     const [filter, setFilter] = useState<'all' | TaskStatus>('all');
@@ -444,113 +465,451 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
         { key: 'overdue', label: 'Overdue', count: tasks.filter(t => effectiveStatus(t) === 'overdue').length },
     ];
 
-    const filtered = filter === 'all'
-        ? tasks
-        : filter === 'overdue'
-            ? tasks.filter(t => effectiveStatus(t) === 'overdue')
+    const filtered = filter === 'all' ? tasks
+        : filter === 'overdue' ? tasks.filter(t => effectiveStatus(t) === 'overdue')
             : tasks.filter(t => t.status === filter);
 
     return (
         <div className="tab-content">
             <div className="filter-pills">
                 {filters.map(f => (
-                    <button
-                        key={f.key}
-                        className={`filter-pill${filter === f.key ? ' active' : ''}`}
-                        onClick={() => setFilter(f.key)}
-                    >
-                        {f.label}
-                        <span className="fp-count">{f.count}</span>
+                    <button key={f.key} className={`filter-pill${filter === f.key ? ' active' : ''}`} onClick={() => setFilter(f.key)}>
+                        {f.label}<span className="fp-count">{f.count}</span>
                     </button>
                 ))}
             </div>
             {filtered.length === 0
                 ? <div className="card"><div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div></div>
-                : <div className="task-grid">
-                    {filtered.map(t => (
-                        <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />
+                : <div className="task-grid">{filtered.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}</div>
+            }
+        </div>
+    );
+};
+
+// ─── Leave Request Card ───────────────────────────────────────────────────────
+
+const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
+    const [expanded, setExpanded] = useState(false);
+    const sm = leaveStatusMeta[record.status];
+    const days = calcDays(record.startDate, record.endDate);
+
+    return (
+        <div className={`leave-record-card leave-record-${record.status}`}>
+            <div className="lrc-main" onClick={() => setExpanded(e => !e)}>
+                <div className="lrc-left">
+                    <div className="lrc-type-icon">
+                        {LEAVE_TYPES.find(lt => lt.key === record.leaveType)?.icon}
+                    </div>
+                    <div className="lrc-info">
+                        <div className="lrc-title">{leaveTypeLabel(record.leaveType)}</div>
+                        <div className="lrc-dates">
+                            {fmtDate(record.startDate)}
+                            {record.startDate !== record.endDate && <> — {fmtDate(record.endDate)}</>}
+                            <span className="lrc-days">· {days} {days === 1 ? 'day' : 'days'}</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="lrc-right">
+                    <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
+                    <button className="icon-btn lrc-expand-btn" onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}>
+                        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                </div>
+            </div>
+
+            {expanded && (
+                <div className="lrc-detail">
+                    <div className="lrc-detail-row">
+                        <span className="lrc-dl">Submitted</span>
+                        <span className="lrc-dv">{fmtDate(record.submittedAt)}</span>
+                    </div>
+                    <div className="lrc-detail-row">
+                        <span className="lrc-dl">Reason</span>
+                        <span className="lrc-dv">{record.reason}</span>
+                    </div>
+                    {record.reviewedBy && (
+                        <div className="lrc-detail-row">
+                            <span className="lrc-dl">Reviewed by</span>
+                            <span className="lrc-dv">{record.reviewedBy}</span>
+                        </div>
+                    )}
+                    {record.reviewNote && (
+                        <div className={`lrc-review-note lrc-note-${record.status}`}>
+                            <FileText size={12} />
+                            <span>{record.reviewNote}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Leave Request Modal ──────────────────────────────────────────────────────
+
+interface LeaveRequestModalProps {
+    onClose: () => void;
+    onSubmit: (record: LeaveRecord) => void;
+}
+
+const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit }) => {
+    const today = new Date().toISOString().split('T')[0];
+
+    const [leaveType, setLeaveType] = useState<LeaveType>('vacation');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [reason, setReason] = useState('');
+    const [error, setError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    const dayCount = startDate && endDate && endDate >= startDate
+        ? calcDays(startDate, endDate) : null;
+
+    const handleSubmit = async () => {
+        setError('');
+        if (!startDate || !endDate) { setError('Please select start and end dates.'); return; }
+        if (endDate < startDate) { setError('End date cannot be before start date.'); return; }
+        if (!reason.trim()) { setError('Please provide a reason for your leave.'); return; }
+
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/leave/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ leaveType, startDate, endDate, reason: reason.trim() }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to submit leave request.');
+            }
+            onSubmit({
+                id: Date.now(),
+                leaveType, startDate, endDate,
+                reason: reason.trim(),
+                status: 'pending',
+                submittedAt: today,
+            });
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Something went wrong.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card leave-request-modal" onClick={e => e.stopPropagation()}>
+
+                {/* ── Header ── */}
+                <div className="modal-head">
+                    <div className="leave-modal-title-block">
+                        <div className="leave-modal-icon">
+                            <CalendarDays size={18} />
+                        </div>
+                        <div>
+                            <h3>Request Leave</h3>
+                            <p className="modal-sub">Fill in the details below — your manager will review it.</p>
+                        </div>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {/* ── Error ── */}
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 14 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                {/* ── Leave Type ── */}
+                <div className="field">
+                    <label>Leave type</label>
+                    <div className="leave-type-grid">
+                        {LEAVE_TYPES.map(lt => (
+                            <button
+                                key={lt.key}
+                                className={`leave-type-chip${leaveType === lt.key ? ' active' : ''}`}
+                                onClick={() => setLeaveType(lt.key)}
+                            >
+                                {lt.icon}
+                                <span>{lt.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── Date Range ── */}
+                <div className="leave-date-row">
+                    <div className="field">
+                        <label>Start date</label>
+                        <input
+                            type="date"
+                            className="leave-date-input"
+                            min={today}
+                            value={startDate}
+                            onChange={e => {
+                                setStartDate(e.target.value);
+                                if (endDate && endDate < e.target.value) setEndDate('');
+                                setError('');
+                            }}
+                        />
+                    </div>
+                    <div className="field">
+                        <label>End date</label>
+                        <input
+                            type="date"
+                            className="leave-date-input"
+                            min={startDate || today}
+                            value={endDate}
+                            onChange={e => { setEndDate(e.target.value); setError(''); }}
+                        />
+                    </div>
+                </div>
+
+                {/* ── Duration Pill ── */}
+                {dayCount !== null && (
+                    <div className="leave-duration-pill" style={{ marginBottom: 4 }}>
+                        <Clock size={13} />
+                        {dayCount === 1 ? '1 day' : `${dayCount} days`}
+                    </div>
+                )}
+
+                {/* ── Reason ── */}
+                <div className="field">
+                    <label>Reason</label>
+                    <textarea
+                        className="leave-reason-textarea"
+                        maxLength={300}
+                        rows={3}
+                        placeholder="Briefly describe your reason for leave…"
+                        value={reason}
+                        onChange={e => { setReason(e.target.value); setError(''); }}
+                    />
+                    <div className="leave-char-count">{reason.length} / 300</div>
+                </div>
+
+                {/* ── Footer ── */}
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                    <span className="leave-footer-note">
+                        <AlertCircle size={12} /> Requires manager approval
+                    </span>
+                    <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                        <button className="btn" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                            {submitting
+                                ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                                : <><Send size={13} /> Submit Request</>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Leave Tab ────────────────────────────────────────────────────────────────
+
+interface LeaveTabProps {
+    records: LeaveRecord[];
+    onNewRecord: (r: LeaveRecord) => void;
+}
+
+const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
+    const [showModal, setShowModal] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [histFilter, setHistFilter] = useState<'all' | LeaveStatus>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const PAGE_SIZE = 5;
+
+    const pendingCount = records.filter(r => r.status === 'pending').length;
+    const approvedCount = records.filter(r => r.status === 'approved').length;
+    const declinedCount = records.filter(r => r.status === 'declined').length;
+
+    const filteredRecords = histFilter === 'all' ? records : records.filter(r => r.status === histFilter);
+    const sortedRecords = [...filteredRecords].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+
+    const totalPages = Math.max(1, Math.ceil(sortedRecords.length / PAGE_SIZE));
+    const paginatedRecords = sortedRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    // Reset to page 1 when filter changes
+    const handleFilterChange = (f: 'all' | LeaveStatus) => {
+        setHistFilter(f);
+        setCurrentPage(1);
+    };
+
+    const handleSubmit = (record: LeaveRecord) => {
+        onNewRecord(record);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3500);
+    };
+
+    return (
+        <div className="tab-content">
+            {/* ── Top Row: Title + Button ── */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h2 style={{ margin: 0 }}>Leave Requests</h2>
+                <button className="btn btn-sm btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={13} /> Request Leave
+                </button>
+            </div>
+
+            {/* ── Summary Stats ── */}
+            <div className="leave-stats-row">
+                <div className="leave-stat-card leave-stat-pending">
+                    <div className="lst-icon"><CalendarClock size={20} /></div>
+                    <div><span className="lst-val">{pendingCount}</span><span className="lst-label">Pending</span></div>
+                </div>
+                <div className="leave-stat-card leave-stat-approved">
+                    <div className="lst-icon"><CalendarCheck size={20} /></div>
+                    <div><span className="lst-val">{approvedCount}</span><span className="lst-label">Approved</span></div>
+                </div>
+                <div className="leave-stat-card leave-stat-declined">
+                    <div className="lst-icon"><CalendarX size={20} /></div>
+                    <div><span className="lst-val">{declinedCount}</span><span className="lst-label">Declined</span></div>
+                </div>
+            </div>
+
+            {/* ── Success Toast ── */}
+            {success && (
+                <div className="toast-success">
+                    <CheckCircle2 size={15} /> Request submitted — your manager will review it shortly.
+                </div>
+            )}
+
+            {/* ── History Card ── */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card-header" style={{ padding: '16px 18px 14px' }}>
+                    <h3>My Leave History</h3>
+                </div>
+
+                {/* ── Filter Pills ── */}
+                <div className="leave-hist-filter" style={{ padding: '0 18px 12px' }}>
+                    {(['all', 'pending', 'approved', 'declined'] as const).map(f => (
+                        <button
+                            key={f}
+                            className={`filter-pill${histFilter === f ? ' active' : ''}`}
+                            onClick={() => handleFilterChange(f)}
+                            style={{ fontSize: 12, padding: '4px 11px' }}
+                        >
+                            {f === 'all' ? 'All' : leaveStatusMeta[f].label}
+                            <span className="fp-count">
+                                {f === 'all' ? records.length : records.filter(r => r.status === f).length}
+                            </span>
+                        </button>
                     ))}
                 </div>
-            }
+
+                {/* ── Records List ── */}
+                <div className="leave-records-list">
+                    {paginatedRecords.length === 0
+                        ? (
+                            <div className="empty-state" style={{ padding: '32px 20px' }}>
+                                <CalendarDays size={22} />
+                                <p>No leave requests in this category</p>
+                            </div>
+                        )
+                        : paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)
+                    }
+                </div>
+
+                {/* ── Pagination ── */}
+                {sortedRecords.length > PAGE_SIZE && (
+                    <div className="leave-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderTop: '1px solid var(--border)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
+                        </span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                            <button
+                                className="btn btn-sm"
+                                onClick={() => setCurrentPage(p => p - 1)}
+                                disabled={currentPage === 1}
+                            >
+                                <ChevronLeft size={14} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <button
+                                    key={page}
+                                    className={`btn btn-sm${currentPage === page ? ' btn-primary' : ''}`}
+                                    onClick={() => setCurrentPage(page)}
+                                    style={{ minWidth: 30 }}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                            <button
+                                className="btn btn-sm"
+                                onClick={() => setCurrentPage(p => p + 1)}
+                                disabled={currentPage === totalPages}
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ── Leave Request Modal ── */}
+            {showModal && (
+                <LeaveRequestModal
+                    onClose={() => setShowModal(false)}
+                    onSubmit={handleSubmit}
+                />
+            )}
         </div>
     );
 };
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
-interface ProfileTabProps {
-    user: UserProfile;
-    onUpdateUser: (u: UserProfile) => void;
-}
+interface ProfileTabProps { user: UserProfile; onUpdateUser: (u: UserProfile) => void; }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const [editMode, setEditMode] = useState(false);
     const [pwdMode, setPwdMode] = useState(false);
 
-    // Profile form mirrors editable fields
-    const [form, setForm] = useState({
-        employeeName: user.fullName,
-        contactNumber: user.phone,
-    });
-
-    // Keep form in sync if parent user object changes (e.g. after fetch)
-    useEffect(() => {
-        setForm({ employeeName: user.fullName, contactNumber: user.phone });
-    }, [user.fullName, user.phone]);
+    const [form, setForm] = useState({ employeeName: user.fullName, contactNumber: user.phone });
+    useEffect(() => { setForm({ employeeName: user.fullName, contactNumber: user.phone }); }, [user.fullName, user.phone]);
 
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
-
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
     const [pwdError, setPwdError] = useState('');
     const [pwdSaving, setPwdSaving] = useState(false);
 
     const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm(prev => ({ ...prev, [k]: e.target.value }));
-        setProfileError('');
+        setForm(prev => ({ ...prev, [k]: e.target.value })); setProfileError('');
     };
 
-    // ── Save profile — mirrors SystemAdmin_Dashboard handleProfileSave ──
     const handleSaveInfo = async () => {
         if (!form.employeeName.trim()) { setProfileError('Full name is required.'); return; }
         if (form.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
             setProfileError('Enter a valid contact number.'); return;
         }
-        setProfileSaving(true);
-        setProfileError('');
+        setProfileSaving(true); setProfileError('');
         try {
             const token = localStorage.getItem('authToken');
             const employeeId = localStorage.getItem('employeeId') ?? '';
             const res = await fetch('/api/profile/update-profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    employeeNumber: employeeId,
-                    employeeName: form.employeeName.trim(),
-                    contactNumber: form.contactNumber.trim(),
-                }),
+                body: JSON.stringify({ employeeNumber: employeeId, employeeName: form.employeeName.trim(), contactNumber: form.contactNumber.trim() }),
             });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Profile update failed.');
-            }
-            // Persist to localStorage so sidebar/header reflects the change immediately
+            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Profile update failed.'); }
             localStorage.setItem('employeeName', form.employeeName.trim());
             localStorage.setItem('contactNumber', form.contactNumber.trim());
             onUpdateUser({ ...user, fullName: form.employeeName.trim(), phone: form.contactNumber.trim() });
-            setProfileSuccess(true);
-            setEditMode(false);
+            setProfileSuccess(true); setEditMode(false);
             setTimeout(() => setProfileSuccess(false), 2500);
-        } catch (err: any) {
-            setProfileError(err.message ?? 'Something went wrong.');
-        } finally {
-            setProfileSaving(false);
-        }
+        } catch (err: any) { setProfileError(err.message ?? 'Something went wrong.'); }
+        finally { setProfileSaving(false); }
     };
 
-    // ── Change password — mirrors SystemAdmin_Dashboard handlePwSave ──
     const handleChangePwd = async () => {
         setPwdError('');
         if (!pwd.current) { setPwdError('Current password is required.'); return; }
@@ -564,36 +923,20 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
             });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Password update failed.');
-            }
+            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Password update failed.'); }
             alert('Password changed successfully!');
-            setPwdMode(false);
-            setPwd({ current: '', next: '', confirm: '' });
-        } catch (err: any) {
-            setPwdError(err.message ?? 'Something went wrong.');
-        } finally {
-            setPwdSaving(false);
-        }
+            setPwdMode(false); setPwd({ current: '', next: '', confirm: '' });
+        } catch (err: any) { setPwdError(err.message ?? 'Something went wrong.'); }
+        finally { setPwdSaving(false); }
     };
 
-    const toggleShow = (k: keyof typeof showPwd) =>
-        setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
-
-    const initials = user.fullName
-        ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-        : 'OP';
+    const toggleShow = (k: keyof typeof showPwd) => setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
+    const initials = user.fullName ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'OP';
 
     return (
         <div className="tab-content">
-            {profileSuccess && (
-                <div className="toast-success">
-                    <CheckCircle2 size={16} /> Profile updated successfully
-                </div>
-            )}
+            {profileSuccess && <div className="toast-success"><CheckCircle2 size={16} /> Profile updated successfully</div>}
 
-            {/* Profile Hero */}
             <div className="profile-hero card">
                 <div className="ph-avatar">{initials}</div>
                 <div className="ph-info">
@@ -601,9 +944,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                     <p className="ph-role">{toDisplayRole(user.role)}</p>
                     <div className="ph-badges">
                         <span className="badge badge-blue">{user.employeeId}</span>
-                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>
-                            {user.accountStatus}
-                        </span>
+                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>{user.accountStatus}</span>
                     </div>
                 </div>
                 <button
@@ -615,7 +956,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
             </div>
 
             <div className="profile-grid">
-                {/* Basic Information */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Basic Information</h3>
@@ -625,192 +965,83 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             </button>
                         )}
                     </div>
-
-                    {profileError && (
-                        <div className="form-api-error" style={{ marginBottom: 10 }}>
-                            <AlertCircle size={14} /><span>{profileError}</span>
-                        </div>
-                    )}
-
+                    {profileError && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{profileError}</span></div>}
                     <div className="info-fields">
-                        {/* Employee ID — always read-only */}
                         <div className="info-field">
                             <label>Employee ID</label>
-                            <div className="if-value">
-                                <span className="if-icon"><Hash size={15} /></span>
-                                <span className="read-only-val">{user.employeeId || '—'}</span>
-                            </div>
+                            <div className="if-value"><span className="if-icon"><Hash size={15} /></span><span className="read-only-val">{user.employeeId || '—'}</span></div>
                         </div>
-
-                        {/* Full Name */}
                         <div className="info-field">
                             <label>Full Name</label>
-                            {editMode ? (
-                                <div className="if-input-wrap">
-                                    <span className="if-icon"><User size={15} /></span>
-                                    <input
-                                        type="text"
-                                        value={form.employeeName}
-                                        onChange={setF('employeeName')}
-                                        placeholder="Enter full name"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="if-value">
-                                    <span className="if-icon"><User size={15} /></span>
-                                    <span>{user.fullName || '—'}</span>
-                                </div>
-                            )}
+                            {editMode
+                                ? <div className="if-input-wrap"><span className="if-icon"><User size={15} /></span><input type="text" value={form.employeeName} onChange={setF('employeeName')} placeholder="Enter full name" /></div>
+                                : <div className="if-value"><span className="if-icon"><User size={15} /></span><span>{user.fullName || '—'}</span></div>
+                            }
                         </div>
-
-                        {/* Contact Number */}
                         <div className="info-field">
                             <label>Contact Number</label>
-                            {editMode ? (
-                                <div className="if-input-wrap">
-                                    <span className="if-icon"><Phone size={15} /></span>
-                                    <input
-                                        type="tel"
-                                        value={form.contactNumber}
-                                        onChange={setF('contactNumber')}
-                                        placeholder="e.g. +63 917 000 0000"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="if-value">
-                                    <span className="if-icon"><Phone size={15} /></span>
-                                    <span>{user.phone || '—'}</span>
-                                </div>
-                            )}
+                            {editMode
+                                ? <div className="if-input-wrap"><span className="if-icon"><Phone size={15} /></span><input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. +63 917 000 0000" /></div>
+                                : <div className="if-value"><span className="if-icon"><Phone size={15} /></span><span>{user.phone || '—'}</span></div>
+                            }
                         </div>
                     </div>
                 </div>
 
-                {/* Account & Security */}
                 <div className="card">
-                    <div className="card-header">
-                        <h3>Account & Security</h3>
-                    </div>
+                    <div className="card-header"><h3>Account & Security</h3></div>
                     <div className="account-info">
                         <div className="info-field">
                             <label>Role</label>
-                            <div className="if-value">
-                                <span className="if-icon"><Shield size={15} /></span>
-                                <span className="read-only-val">{toDisplayRole(user.role) || '—'}</span>
-                            </div>
+                            <div className="if-value"><span className="if-icon"><Shield size={15} /></span><span className="read-only-val">{toDisplayRole(user.role) || '—'}</span></div>
                         </div>
                         <div className="info-field">
                             <label>Account Status</label>
-                            <div className="if-value">
-                                <span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>
-                                    {user.accountStatus ?? 'Active'}
-                                </span>
-                            </div>
+                            <div className="if-value"><span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>{user.accountStatus ?? 'Active'}</span></div>
                         </div>
                     </div>
-
-                    {/* Change Password */}
                     <div className="pwd-section">
                         <div className="pwd-header">
-                            <div className="pwd-title">
-                                <Lock size={15} />
-                                <span>Change Password</span>
-                            </div>
-                            <button
-                                className={`btn ${pwdMode ? '' : 'btn-primary'} btn-sm`}
-                                onClick={() => { setPwdMode(m => !m); setPwdError(''); setEditMode(false); }}
-                            >
+                            <div className="pwd-title"><Lock size={15} /><span>Change Password</span></div>
+                            <button className={`btn ${pwdMode ? '' : 'btn-primary'} btn-sm`} onClick={() => { setPwdMode(m => !m); setPwdError(''); setEditMode(false); }}>
                                 {pwdMode ? 'Cancel' : 'Change'}
                             </button>
                         </div>
-
                         {pwdMode && (
                             <div className="pwd-form">
-                                {pwdError && (
-                                    <div className="form-api-error" style={{ marginBottom: 8 }}>
-                                        <AlertCircle size={14} /><span>{pwdError}</span>
-                                    </div>
-                                )}
-
-                                {/* Current Password */}
-                                <div className="field">
-                                    <label>Current Password</label>
-                                    <div className="pwd-input-wrap">
-                                        <input
-                                            type={showPwd.current ? 'text' : 'password'}
-                                            value={pwd.current}
-                                            onChange={e => setPwd(p => ({ ...p, current: e.target.value }))}
-                                            placeholder="Enter current password"
-                                        />
-                                        <button className="pwd-toggle" onClick={() => toggleShow('current')} tabIndex={-1}>
-                                            {showPwd.current ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* New Password */}
-                                <div className="field">
-                                    <label>New Password</label>
-                                    <div className="pwd-input-wrap">
-                                        <input
-                                            type={showPwd.next ? 'text' : 'password'}
-                                            value={pwd.next}
-                                            onChange={e => setPwd(p => ({ ...p, next: e.target.value }))}
-                                            placeholder="At least 6 characters"
-                                        />
-                                        <button className="pwd-toggle" onClick={() => toggleShow('next')} tabIndex={-1}>
-                                            {showPwd.next ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
-                                    </div>
-                                    {/* Strength indicator */}
-                                    {pwd.next.length > 0 && (
-                                        <div style={{ marginTop: 6 }}>
-                                            <div style={{ display: 'flex', gap: 4 }}>
-                                                {[1, 2, 3].map(level => (
-                                                    <div key={level} style={{
-                                                        flex: 1, height: 4, borderRadius: 2,
-                                                        background: pwd.next.length >= level * 4
-                                                            ? level === 1 ? '#ee5d50' : level === 2 ? '#ffb547' : '#05cd99'
-                                                            : '#e9edf7',
-                                                        transition: 'background 0.2s',
-                                                    }} />
-                                                ))}
-                                            </div>
-                                            <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
-                                                {pwd.next.length < 4 ? 'Weak' : pwd.next.length < 8 ? 'Fair' : 'Strong'}
-                                            </span>
+                                {pwdError && <div className="form-api-error" style={{ marginBottom: 8 }}><AlertCircle size={14} /><span>{pwdError}</span></div>}
+                                {(['current', 'next', 'confirm'] as const).map((k, i) => (
+                                    <div className="field" key={k}>
+                                        <label>{i === 0 ? 'Current Password' : i === 1 ? 'New Password' : 'Confirm New Password'}</label>
+                                        <div className="pwd-input-wrap">
+                                            <input
+                                                type={showPwd[k] ? 'text' : 'password'}
+                                                value={pwd[k]}
+                                                onChange={e => setPwd(p => ({ ...p, [k]: e.target.value }))}
+                                                placeholder={i === 0 ? 'Enter current password' : i === 1 ? 'At least 6 characters' : 'Re-enter new password'}
+                                            />
+                                            <button className="pwd-toggle" onClick={() => toggleShow(k)} tabIndex={-1}>
+                                                {showPwd[k] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            </button>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Confirm Password */}
-                                <div className="field">
-                                    <label>Confirm New Password</label>
-                                    <div className="pwd-input-wrap">
-                                        <input
-                                            type={showPwd.confirm ? 'text' : 'password'}
-                                            value={pwd.confirm}
-                                            onChange={e => setPwd(p => ({ ...p, confirm: e.target.value }))}
-                                            placeholder="Re-enter new password"
-                                        />
-                                        <button className="pwd-toggle" onClick={() => toggleShow('confirm')} tabIndex={-1}>
-                                            {showPwd.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
-                                        </button>
+                                        {k === 'next' && pwd.next.length > 0 && (
+                                            <div style={{ marginTop: 6 }}>
+                                                <div style={{ display: 'flex', gap: 4 }}>
+                                                    {[1, 2, 3].map(lv => <div key={lv} style={{ flex: 1, height: 4, borderRadius: 2, background: pwd.next.length >= lv * 4 ? lv === 1 ? '#ee5d50' : lv === 2 ? '#ffb547' : '#05cd99' : '#e9edf7', transition: 'background 0.2s' }} />)}
+                                                </div>
+                                                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                                    {pwd.next.length < 4 ? 'Weak' : pwd.next.length < 8 ? 'Fair' : 'Strong'}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {k === 'confirm' && pwd.confirm.length > 0 && (
+                                            <span style={{ fontSize: 11, color: pwd.next === pwd.confirm ? '#05cd99' : 'var(--danger)', marginTop: 3, display: 'block' }}>
+                                                {pwd.next === pwd.confirm ? '✓ Passwords match' : 'Passwords do not match'}
+                                            </span>
+                                        )}
                                     </div>
-                                    {pwd.confirm.length > 0 && pwd.next !== pwd.confirm && (
-                                        <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>
-                                    )}
-                                    {pwd.confirm.length > 0 && pwd.next === pwd.confirm && (
-                                        <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Passwords match</span>
-                                    )}
-                                </div>
-
-                                <button
-                                    className="btn btn-primary"
-                                    style={{ width: '100%', justifyContent: 'center' }}
-                                    onClick={handleChangePwd}
-                                    disabled={pwdSaving}
-                                >
+                                ))}
+                                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleChangePwd} disabled={pwdSaving}>
                                     {pwdSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Lock size={13} /> Update Password</>}
                                 </button>
                             </div>
@@ -829,8 +1060,8 @@ export default function EmployeeDashboard() {
     const [tasks, setTasks] = useState<Task[]>(MY_TASKS);
     const [viewingId, setViewingId] = useState<number | null>(null);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
+    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>(SEED_LEAVE_RECORDS);
 
-    // ── User state — populated from API, seeded from localStorage ──
     const [user, setUser] = useState<UserProfile>({
         employeeId: localStorage.getItem('employeeId') ?? '',
         fullName: localStorage.getItem('employeeName') ?? '',
@@ -846,18 +1077,12 @@ export default function EmployeeDashboard() {
         navigate('/');
     };
 
-    // ── Fetch current employee profile on mount ──
-    // GET /api/profile/view-profile returns the joined Employee + Account data
-    // for the currently authenticated user — role & accountStatus come from
-    // the Account table; employeeName & contactNumber come from Employee.
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         const employeeId = localStorage.getItem('employeeId');
         if (!token || !employeeId) { setLoadingUser(false); return; }
 
-        fetch('/api/profile/view-profile', {
-            headers: { 'Authorization': `Bearer ${token}` },
-        })
+        fetch('/api/profile/view-profile', { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
             .then((data: any) => {
                 const fetched: UserProfile = {
@@ -872,10 +1097,7 @@ export default function EmployeeDashboard() {
                 localStorage.setItem('contactNumber', fetched.phone);
                 localStorage.setItem('role', fetched.role);
             })
-            .catch(err => {
-                console.warn('Could not fetch profile:', err);
-                // Silently fall back to localStorage values already in state
-            })
+            .catch(err => console.warn('Could not fetch profile:', err))
             .finally(() => setLoadingUser(false));
     }, []);
 
@@ -883,30 +1105,28 @@ export default function EmployeeDashboard() {
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
 
     const handleSaveProgress = (id: number, status: TaskStatus, progress: number) => {
-        setTasks(ts => ts.map(t => t.id === id
-            ? { ...t, status, progress: status === 'completed' ? 100 : progress }
-            : t
-        ));
+        setTasks(ts => ts.map(t => t.id === id ? { ...t, status, progress: status === 'completed' ? 100 : progress } : t));
         setUpdatingId(null);
     };
 
-    const navItems = [
-        { tab: 'dashboard' as NavTab, label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-        { tab: 'my-tasks' as NavTab, label: 'My Tasks', icon: <ClipboardList size={20} /> },
-        { tab: 'profile' as NavTab, label: 'Profile', icon: <UserCircle2 size={20} /> },
+    const pendingLeaveCount = leaveRecords.filter(r => r.status === 'pending').length;
+
+    const navItems: { tab: NavTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+        { tab: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+        { tab: 'my-tasks', label: 'My Tasks', icon: <ClipboardList size={20} /> },
+        { tab: 'leave', label: 'Leave', icon: <CalendarDays size={20} />, badge: pendingLeaveCount },
+        { tab: 'profile', label: 'Profile', icon: <UserCircle2 size={20} /> },
     ];
 
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'My Dashboard',
         'my-tasks': 'My Tasks',
+        leave: 'Leave Requests',
         profile: 'My Profile',
     };
 
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const initials = user.fullName
-        ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-        : 'OP';
+    const initials = user.fullName ? user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'OP';
 
     return (
         <div className="dashboard-container">
@@ -924,10 +1144,12 @@ export default function EmployeeDashboard() {
                         >
                             {n.icon}
                             <span>{n.label}</span>
+                            {n.badge !== undefined && n.badge > 0 && (
+                                <span className="nav-badge">{n.badge}</span>
+                            )}
                         </div>
                     ))}
                 </nav>
-                {/* Sidebar footer */}
                 <div className="sidebar-footer">
                     <div className="user-block">
                         <div className="avatar-circle">
@@ -952,16 +1174,16 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {activeTab === 'dashboard' && (
-                    <DashboardTab
-                        tasks={tasks}
-                        user={user}
-                        onView={setViewingId}
-                        onUpdate={setUpdatingId}
-                        onGoTasks={() => setActiveTab('my-tasks')}
-                    />
+                    <DashboardTab tasks={tasks} user={user} onView={setViewingId} onUpdate={setUpdatingId} onGoTasks={() => setActiveTab('my-tasks')} />
                 )}
                 {activeTab === 'my-tasks' && (
                     <MyTasksTab tasks={tasks} onView={setViewingId} onUpdate={setUpdatingId} />
+                )}
+                {activeTab === 'leave' && (
+                    <LeaveTab
+                        records={leaveRecords}
+                        onNewRecord={r => setLeaveRecords(prev => [r, ...prev])}
+                    />
                 )}
                 {activeTab === 'profile' && (
                     <ProfileTab user={user} onUpdateUser={setUser} />

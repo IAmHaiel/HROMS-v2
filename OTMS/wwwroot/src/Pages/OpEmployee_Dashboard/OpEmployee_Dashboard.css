@@ -56,20 +56,6 @@ body {
     gap: 10px;
 }
 
-.logo-box {
-    width: 36px;
-    height: 36px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-}
-
-.logo-text {
-    color: #fff;
-    font-weight: 700;
-    font-size: 0.95rem;
-    opacity: 0.9;
-}
-
 .sidebar-nav {
     display: flex;
     flex-direction: column;
@@ -111,6 +97,18 @@ body {
             left: 13px;
         }
 
+.nav-badge {
+    margin-left: auto;
+    background: var(--status-failed);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    min-width: 18px;
+    text-align: center;
+}
+
 .sidebar-footer {
     padding: 14px 16px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -121,43 +119,6 @@ body {
     min-width: 0;
 }
 
-.sf-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.78rem;
-    flex-shrink: 0;
-}
-
-.sf-info {
-    min-width: 0;
-    flex: 1;
-}
-
-.sf-name {
-    color: #fff;
-    font-size: 0.82rem;
-    font-weight: 600;
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.sf-role {
-    color: #a3aed0;
-    font-size: 0.7rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* ─── Main Viewport ──────────────────────────────────────────────────────── */
 .main {
     flex: 1;
@@ -166,79 +127,29 @@ body {
     min-width: 0;
 }
 
-/* ─── Header ─────────────────────────────────────────────────────────────── */
-.header {
-    padding: 20px 28px;
+/* ─── Dashboard Header ───────────────────────────────────────────────────── */
+.dashboard-header {
     display: flex;
+    align-items: flex-start;
     justify-content: space-between;
-    align-items: center;
-    background: var(--bg-main);
+    padding: 20px 28px 0;
 }
 
-.header-left h2 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.header-left p {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    margin-top: 2px;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.h-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-}
-
-.h-welcome {
-    font-size: 0.68rem;
-    color: var(--text-muted);
-}
-
-.h-name {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.logout-btn {
-    padding: 5px 14px;
-    font-size: 0.75rem;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-family: inherit;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-    .logout-btn:hover {
-        background: var(--status-failed-bg);
-        color: var(--status-failed);
-        border-color: var(--status-failed);
+    .dashboard-header h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
     }
 
-/* ─── Tab Body ───────────────────────────────────────────────────────────── */
-.tab-body {
-    padding: 0 28px 28px;
+    .dashboard-header p {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+
+/* ─── Tab Content ────────────────────────────────────────────────────────── */
+.tab-content {
+    padding: 20px 28px 28px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -258,12 +169,15 @@ body {
     align-items: center;
     justify-content: space-between;
     margin-bottom: 16px;
+    flex-wrap: nowrap;
+    gap: 12px;
 }
 
     .card-header h3 {
         font-size: 0.95rem;
         font-weight: 600;
         color: var(--text-primary);
+        flex-shrink: 0;
     }
 
 .link-btn {
@@ -299,6 +213,8 @@ body {
     font-family: inherit;
     transition: background 0.15s, border-color 0.15s, opacity 0.15s;
     white-space: nowrap;
+    width: fit-content; /* ← add this */
+    flex-shrink: 0; /* ← add this */
 }
 
     .btn:hover {
@@ -318,8 +234,11 @@ body {
     }
 
 .btn-sm {
-    padding: 4px 10px;
-    font-size: 0.73rem;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    gap: 4px;
+    flex-shrink: 0;
+    align-self: center;
 }
 
 .btn-ghost {
@@ -413,6 +332,32 @@ body {
     background: var(--status-active-bg);
 }
 
+/* ─── Progress Bar Colors ────────────────────────────────────────────────── */
+.bar-red {
+    background: var(--status-failed);
+}
+
+.bar-amber {
+    background: var(--status-pending);
+}
+
+.bar-green {
+    background: var(--status-active);
+}
+
+.bar-blue {
+    background: var(--primary);
+}
+
+/* ─── Text Color Helpers ─────────────────────────────────────────────────── */
+.overdue-text {
+    color: var(--status-failed) !important;
+}
+
+.warning-text {
+    color: var(--status-pending) !important;
+}
+
 /* ─── Stat Cards ─────────────────────────────────────────────────────────── */
 .stats-row {
     display: grid;
@@ -434,7 +379,6 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 1.1rem;
 }
 
 .bg-primary {
@@ -455,25 +399,6 @@ body {
 .bg-danger {
     background: var(--status-failed-bg);
     color: var(--status-failed);
-}
-
-.stat-label {
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--text-secondary);
-    letter-spacing: 0.04em;
-}
-
-.stat-val {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 2px 0;
-}
-
-.stat-sub {
-    font-size: 0.68rem;
-    color: var(--text-muted);
 }
 
 /* ─── Welcome Banner ─────────────────────────────────────────────────────── */
@@ -609,7 +534,7 @@ body {
 }
 
 /* ─── Dashboard Grid ─────────────────────────────────────────────────────── */
-.dash-grid {
+.dashboard-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
     gap: 18px;
@@ -929,32 +854,6 @@ body {
     background: var(--status-active-bg);
     padding: 3px 9px;
     border-radius: var(--radius-full);
-}
-
-/* ─── Progress Bar Colors ────────────────────────────────────────────────── */
-.bar-red {
-    background: var(--status-failed);
-}
-
-.bar-amber {
-    background: var(--status-pending);
-}
-
-.bar-green {
-    background: var(--status-active);
-}
-
-.bar-blue {
-    background: var(--primary);
-}
-
-/* ─── Text Color Helpers ─────────────────────────────────────────────────── */
-.overdue-text {
-    color: var(--status-failed) !important;
-}
-
-.warning-text {
-    color: var(--status-pending) !important;
 }
 
 /* ─── Empty State ────────────────────────────────────────────────────────── */
@@ -1375,14 +1274,6 @@ body {
         color: var(--text-primary);
     }
 
-.pwd-error {
-    font-size: 0.75rem;
-    color: var(--status-failed);
-    background: var(--status-failed-bg);
-    padding: 7px 10px;
-    border-radius: 6px;
-}
-
 /* ─── Toast ──────────────────────────────────────────────────────────────── */
 .toast-success {
     display: flex;
@@ -1397,13 +1288,410 @@ body {
     border: 1px solid rgba(5, 205, 153, 0.25);
 }
 
+/* ─── Form Error ─────────────────────────────────────────────────────────── */
+.form-api-error {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(238, 93, 80, 0.2);
+}
+
+/* ─── Spin Animation ─────────────────────────────────────────────────────── */
+.spin {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── Leave Tab — Stats Row ──────────────────────────────────────────────── */
+.leave-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.leave-stat-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.lst-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.leave-stat-pending .lst-icon {
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
+}
+
+.leave-stat-approved .lst-icon {
+    background: var(--status-active-bg);
+    color: var(--status-active);
+}
+
+.leave-stat-declined .lst-icon {
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
+}
+
+.lst-val {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.lst-label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    letter-spacing: 0.03em;
+}
+
+/* ─── Leave Request Modal ────────────────────────────────────────────────── */
+.leave-request-modal {
+    width: 480px;
+}
+
+.leave-modal-title-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.leave-modal-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: var(--status-transit-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+/* ─── Leave Type Grid ────────────────────────────────────────────────────── */
+.leave-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+    margin-bottom: 4px;
+}
+
+.leave-type-chip {
+    padding: 9px 6px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 500;
+    background: var(--bg-main);
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    font-family: inherit;
+    line-height: 1.3;
+}
+
+    .leave-type-chip:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--status-transit-bg);
+    }
+
+    .leave-type-chip.active {
+        border-color: var(--primary);
+        background: var(--status-transit-bg);
+        color: var(--primary);
+        font-weight: 700;
+    }
+
+/* ─── Leave Date Row ─────────────────────────────────────────────────────── */
+.leave-date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.leave-date-input {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+    .leave-date-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+    }
+
+/* ─── Leave Duration Pill ────────────────────────────────────────────────── */
+.leave-duration-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    background: var(--status-transit-bg);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+/* ─── Leave Reason Textarea ──────────────────────────────────────────────── */
+.leave-reason-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    resize: vertical;
+    min-height: 90px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    line-height: 1.55;
+}
+
+    .leave-reason-textarea:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.08);
+    }
+
+.leave-char-count {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 3px;
+}
+
+/* ─── Leave Footer Note ──────────────────────────────────────────────────── */
+.leave-footer-note {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ─── Leave History Filter ───────────────────────────────────────────────── */
+.leave-hist-filter {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* ─── Leave Records List ─────────────────────────────────────────────────── */
+.leave-records-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── Leave Record Card ──────────────────────────────────────────────────── */
+.leave-record-card {
+    border-top: 1px solid var(--border);
+    transition: background 0.15s;
+}
+
+    .leave-record-card:first-child {
+        border-top: none;
+    }
+
+.leave-record-pending {
+    border-left: 3px solid var(--status-pending);
+}
+
+.leave-record-approved {
+    border-left: 3px solid var(--status-active);
+}
+
+.leave-record-declined {
+    border-left: 3px solid var(--status-failed);
+}
+
+.lrc-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+    .lrc-main:hover {
+        background: var(--bg-main);
+    }
+
+.lrc-left {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    flex: 1;
+    min-width: 0;
+}
+
+.lrc-type-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--bg-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.lrc-info {
+    min-width: 0;
+}
+
+.lrc-title {
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lrc-dates {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lrc-days {
+    color: var(--text-muted);
+}
+
+.lrc-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.lrc-expand-btn {
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+    .lrc-expand-btn:hover {
+        opacity: 1;
+    }
+
+/* ─── Leave Record Detail (expanded) ────────────────────────────────────── */
+.lrc-detail {
+    padding: 0 18px 14px 65px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    animation: fadeSlideIn 0.15s ease;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.lrc-detail-row {
+    display: flex;
+    gap: 10px;
+    font-size: 0.78rem;
+}
+
+.lrc-dl {
+    min-width: 80px;
+    color: var(--text-muted);
+    font-weight: 600;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+}
+
+.lrc-dv {
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.lrc-review-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    margin-top: 2px;
+}
+
+.lrc-note-approved {
+    background: var(--status-active-bg);
+    color: #047d5b;
+}
+
+.lrc-note-declined {
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
     .stats-row {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .dash-grid {
+    .dashboard-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -1419,6 +1707,24 @@ body {
 
     .stats-row {
         grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    .leave-stats-row {
+        grid-template-columns: 1fr;
+    }
+
+    .leave-type-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .leave-date-row {
+        grid-template-columns: 1fr;
+    }
+
+    .leave-request-modal {
+        width: calc(100vw - 32px);
     }
 }
 
@@ -1442,10 +1748,14 @@ body {
         grid-template-columns: 1fr 1fr;
     }
 
-    .header {
+    .dashboard-header {
+        padding: 16px 16px 0;
         flex-direction: column;
-        align-items: flex-start;
         gap: 12px;
+    }
+
+    .tab-content {
+        padding: 16px 16px 24px;
     }
 }
 
