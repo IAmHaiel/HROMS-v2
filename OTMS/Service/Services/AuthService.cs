@@ -35,6 +35,8 @@ namespace OTMS.Service.Services
             var accountStatus = employee?.Account?.AccountStatus;
             var accountFailedAttempts = employee?.Account?.FailedLoginAttempts;
 
+            
+
             if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
             {
                 return null;
@@ -43,6 +45,11 @@ namespace OTMS.Service.Services
             if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
                 return null;
+            }
+
+            if (accountStatus == "On Leave")
+            {
+                throw new Exception("Your account is currently on leave. Please contact your administrator for more information.");
             }
 
             var verificationResult =
