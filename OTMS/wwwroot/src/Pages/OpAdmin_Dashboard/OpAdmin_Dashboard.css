@@ -834,9 +834,12 @@
     border-radius: var(--radius-md);
     padding: 24px;
     width: 420px;
-    max-height: 90vh;
-    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    /* ✅ Remove max-height and overflow-y — these clip the dropdown */
+}
+
+.modal-form {
+    overflow: visible;
 }
 
 .modal-header {
@@ -976,6 +979,193 @@
         .header-search input::placeholder {
             color: var(--text-secondary);
         }
+
+/* ─── Custom Assignee Select ─────────────────────────────────────────────── */
+.assignee-select {
+    position: relative;
+    width: 100%;
+    overflow: visible;
+}
+
+.assignee-trigger {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.15s;
+    user-select: none;
+}
+
+    .assignee-trigger:hover {
+        border-color: var(--primary);
+        background: var(--bg-card);
+    }
+
+.assignee-trigger-placeholder {
+    color: var(--text-muted);
+}
+
+.assignee-trigger-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.assignee-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    z-index: 9999; 
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.assignee-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+}
+
+    .assignee-option:last-child {
+        border-bottom: none;
+    }
+
+    .assignee-option:hover {
+        background: var(--bg-main);
+    }
+
+    .assignee-option.selected {
+        background: rgba(67, 24, 255, 0.08);
+    }
+
+.placeholder-opt {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.assignee-opt-name {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.assignee-option.selected .assignee-opt-name {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.assignee-opt-role {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+}
+
+.assignee-option.selected .assignee-opt-role {
+    background: rgba(67, 24, 255, 0.12);
+    color: var(--primary);
+}
+
+/* ─── View Modal Redesign ────────────────────────────────────────────────── */
+.view-modal-card {
+    width: 380px;
+    padding: 28px 24px 20px;
+}
+
+.view-modal-header {
+    margin-bottom: 16px;
+}
+
+.view-modal-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.view-modal-subtitle {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.view-modal-section {
+    margin-bottom: 14px;
+}
+
+.view-modal-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.view-modal-desc-box {
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 12px;
+    font-size: 0.83rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-main);
+    color: var(--text-primary);
+}
+
+.view-modal-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    margin-bottom: 14px;
+}
+
+.view-modal-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.view-modal-meta-value {
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.view-modal-assignee-box {
+    width: 100%;
+    padding: 9px 12px;
+    font-size: 0.83rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-main);
+    color: var(--text-primary);
+}
+
+.view-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {

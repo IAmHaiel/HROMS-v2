@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using OTMS.Data;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace OTMS.Controllers
 {
@@ -138,5 +140,43 @@ namespace OTMS.Controllers
                 });
             }
         }
+
+        /// <summary>
+        /// Gets all tasks. Only accessible to OperationAdmin.
+        /// </summary>
+        [Authorize(Roles = "OperationAdmin")]
+        [HttpGet("all-tasks")]
+        public async Task<ActionResult<List<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context)
+        {
+            try
+            {
+                var tasks = await context.Tasks
+                    .Include(t => t.Assignee)
+                        .ThenInclude(a => a.Employee)
+                    .Include(t => t.Creator)
+                        .ThenInclude(a => a.Employee)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Select(t => new TaskResponseDTO
+                    {
+                        TaskId = t.TaskId,
+                        TaskTitle = t.TaskTitle,
+                        TaskDescription = t.TaskDescription,
+                        Priority = t.Priority,
+                        DueAt = t.DueAt,
+                        TaskStatus = t.TaskStatus,
+                        AssignedEmployee = t.Assignee.Employee.EmployeeName,
+                        CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                        CreatedAt = t.CreatedAt
+                    })
+                    .ToListAsync();
+
+                return Ok(tasks);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
     }
 }

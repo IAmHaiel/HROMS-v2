@@ -62,6 +62,34 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
+        /// Allows the Operation Admin to view the list of employees that can be assigned to tasks.
+        /// </summary>
+        [Authorize(Roles = "OperationAdmin")]
+        [HttpGet("assignable-employees")]
+        public async Task<ActionResult> GetAssignableEmployees([FromServices] OTMSDbContext context)
+        {
+            try
+            {
+                var employees = await context.Accounts
+                    .Include(a => a.Employee)
+                    .Where(a => a.Role == "Encoder" || a.Role == "Coordinator")
+                    .Select(a => new
+                    {
+                        accountId = a.AccountId,
+                        employeeName = a.Employee.EmployeeName,
+                        role = a.Role
+                    })
+                    .ToListAsync();
+
+                return Ok(employees);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Updates the User Account. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
         [Authorize(Roles = "SystemAdmin")]
@@ -148,6 +176,7 @@ namespace OTMS.Controllers
 
             return Ok(result);
         }
+
 
     }
 }

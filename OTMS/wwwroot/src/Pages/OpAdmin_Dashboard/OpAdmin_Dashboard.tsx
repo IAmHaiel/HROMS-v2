@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
     ClipboardList,
     CheckCircle2,
@@ -10,7 +10,6 @@ import {
     UserCircle2,
     Plus,
     Pencil,
-    Trash2,
     X,
     Hash,
     Eye,
@@ -23,56 +22,59 @@ import {
     Loader2,
     Users,
     Search,
+    Trash2,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
+import TaskView, { TaskViewTask } from '../../components/TaskView/TaskView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Priority = 'high' | 'medium' | 'low';
-type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
+type Priority = 'High' | 'Medium' | 'Low';  // match backend casing
+type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 type NavTab = 'dashboard' | 'tasks' | 'team' | 'reports' | 'profile';
 
 interface TeamMember {
-    id: string;
-    name: string;
-    initials: string;
+    accountId: string;      // use accountId (Guid) from backend
+    employeeName: string;
     role: string;
-    avatarClass: string;
 }
 
 interface Task {
-    id: number;
-    name: string;
-    description: string;
-    deadline: string;
+    taskId: string;          // Guid from backend
+    taskTitle: string;
+    taskDescription: string;
     priority: Priority;
-    assigneeId: string;
-    status: TaskStatus;
-    progress: number;
+    dueAt: string | null;
+    taskStatus: TaskStatus;
+    taskRemarks?: string;
+    assignedEmployee: string;
+    createdByEmployee: string;
+    assignedTo: string;      // accountId Guid
+    createdAt: string;
+}
+
+// DTOs matching backend
+interface CreateTaskDTO {
+    taskTitle: string;
+    taskDescription: string;
+    priority: Priority;
+    dueAt: string | null;
+    assignedTo: string;      // accountId Guid
+}
+
+interface UpdateTaskDTO {
+    taskTitle: string;
+    taskDescription: string;
+    priority: Priority;
+    dueAt: string | null;
+    assignedTo: string;
+    taskRemarks?: string;
 }
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
-
-const TEAM_MEMBERS: TeamMember[] = [
-    { id: 'm1', name: 'Alex Rivera', initials: 'AR', role: 'Field Ops', avatarClass: 'av-blue' },
-    { id: 'm2', name: 'Sam Chen', initials: 'SC', role: 'Logistics', avatarClass: 'av-purple' },
-    { id: 'm3', name: 'Priya Nair', initials: 'PN', role: 'Dispatch', avatarClass: 'av-green' },
-    { id: 'm4', name: 'Jordan Wu', initials: 'JW', role: 'Coordination', avatarClass: 'av-amber' },
-    { id: 'm5', name: 'Maya Torres', initials: 'MT', role: 'Support Ops', avatarClass: 'av-red' },
-];
-
-const INITIAL_TASKS: Task[] = [
-    { id: 1, name: 'Update delivery route maps', description: 'Review and update all Q2 delivery routes based on new zone assignments.', deadline: '2026-04-28', priority: 'high', assigneeId: 'm1', status: 'in-progress', progress: 65 },
-    { id: 2, name: 'Inventory reconciliation', description: 'Cross-check warehouse inventory against system records.', deadline: '2026-04-30', priority: 'medium', assigneeId: 'm2', status: 'pending', progress: 0 },
-    { id: 3, name: 'Driver briefing documentation', description: 'Prepare briefing materials for new drivers joining next week.', deadline: '2026-04-25', priority: 'high', assigneeId: 'm3', status: 'overdue', progress: 30 },
-    { id: 4, name: 'Fleet maintenance log review', description: 'Audit the last 30 days of fleet maintenance logs.', deadline: '2026-05-05', priority: 'low', assigneeId: 'm4', status: 'completed', progress: 100 },
-    { id: 5, name: 'Customer complaint follow-up', description: 'Resolve 12 pending customer complaints from the support queue.', deadline: '2026-04-29', priority: 'high', assigneeId: 'm5', status: 'in-progress', progress: 50 },
-    { id: 6, name: 'SLA report for April', description: 'Generate and submit the monthly SLA compliance report.', deadline: '2026-05-01', priority: 'medium', assigneeId: 'm1', status: 'pending', progress: 0 },
-    { id: 7, name: 'Warehouse zone labeling', description: 'Re-label warehouse zones C and D per new layout.', deadline: '2026-04-24', priority: 'medium', assigneeId: 'm3', status: 'completed', progress: 100 },
-];
 
 const WEEKLY_DATA = [
     { day: 'Mon', completed: 12, pending: 5 },
@@ -92,46 +94,36 @@ const NAV_ITEMS = [
     { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
 ];
 
-const EMPTY_TASK: Omit<Task, 'id'> = {
-    name: '', description: '', deadline: '',
-    priority: 'medium', assigneeId: '', status: 'pending', progress: 0,
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const isEffectivelyOverdue = (t: Task): boolean =>
+    t.taskStatus !== 'Completed' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
-const findMember = (id: string): TeamMember | undefined =>
-    TEAM_MEMBERS.find(m => m.id === id);
+const statusBadgeClass = (s: string): string =>
+({
+    'Pending': 'badge badge-blue',
+    'In Progress': 'badge badge-amber',
+    'Completed': 'badge badge-green',
+    'Overdue': 'badge badge-red'
+}[s] ?? 'badge badge-blue');
+
+const priorityDotClass = (p: Priority): string =>
+    ({ High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
 
 const fmtDate = (d: string): string => {
     if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-const isEffectivelyOverdue = (t: Task): boolean =>
-    t.status !== 'completed' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
-
-const statusBadgeClass = (s: TaskStatus): string =>
-    ({ pending: 'badge badge-blue', 'in-progress': 'badge badge-amber', completed: 'badge badge-green', overdue: 'badge badge-red' }[s] ?? 'badge badge-blue');
-
-const priorityDotClass = (p: Priority): string =>
-    ({ high: 'prio-dot high', medium: 'prio-dot medium', low: 'prio-dot low' }[p]);
-
-const progressFillClass = (t: Task): string => {
-    if (t.status === 'completed') return 'progress-fill green';
-    if (t.status === 'overdue' || isEffectivelyOverdue(t)) return 'progress-fill red';
-    return 'progress-fill blue';
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, size = 'sm' }) => (
-    <div className={`avatar-chip ${member.avatarClass} ${size === 'md' ? 'avatar-md' : ''}`}>
-        {member.initials}
+    <div className={`avatar-chip av-blue ${size === 'md' ? 'avatar-md' : ''}`}>
+        {member.employeeName.charAt(0).toUpperCase()}
     </div>
 );
 
 const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`badge ${p === 'high' ? 'badge-red' : p === 'medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
+    <span className={`badge ${p === 'High' ? 'badge-red' : p === 'Medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
 );
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
@@ -142,31 +134,30 @@ const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
 
 interface TaskRowProps {
     task: Task;
-    onView: (id: number) => void;
-    onEdit?: (id: number) => void;
+    onView: (id: string) => void;   // string not number
+    onEdit?: (id: string) => void;
     showEditBtn?: boolean;
 }
+
 const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = false }) => {
-    const member = findMember(task.assigneeId);
-    const od = isEffectivelyOverdue(task) && task.status !== 'completed';
-    const effectiveStatus: TaskStatus = od ? 'overdue' : task.status;
+    const od = isEffectivelyOverdue(task);
+    const effectiveStatus = od ? 'Overdue' : task.taskStatus;
     return (
-        <div className="task-item" onClick={() => onView(task.id)}>
+        <div className="task-item" onClick={() => onView(task.taskId)}>
             <div className="task-row-top">
                 <span className={priorityDotClass(task.priority)} />
-                <span className="task-name">{task.name}</span>
+                <span className="task-name">{task.taskTitle}</span>
                 <span className={statusBadgeClass(effectiveStatus)}>{effectiveStatus}</span>
                 {showEditBtn && onEdit && (
-                    <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onEdit(task.id); }}>
+                    <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onEdit(task.taskId); }}>
                         <Pencil size={11} /> Edit
                     </button>
                 )}
             </div>
             <div className="task-row-bottom">
-                <span className="task-assignee">{member?.name ?? 'Unassigned'}</span>
-                <span className={`task-due${od ? ' overdue' : ''}`}>{fmtDate(task.deadline)}</span>
+                <span className="task-assignee">{task.assignedEmployee || 'Unassigned'}</span>
+                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
             </div>
-            <ProgressBar pct={task.progress} cls={progressFillClass(task)} />
         </div>
     );
 };
@@ -176,13 +167,35 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
 interface TaskModalProps {
     mode: 'new' | 'edit';
     initial?: Partial<Task>;
-    onSave: (data: Omit<Task, 'id'> & { id?: number }) => void;
-    onDelete?: () => void;
+    teamMembers: TeamMember[];
+    onSave: (data: CreateTaskDTO | UpdateTaskDTO) => void;
     onClose: () => void;
+    onDelete?: () => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDelete, onClose }) => {
-    const [form, setForm] = useState<Omit<Task, 'id'>>({ ...EMPTY_TASK, ...initial });
+const EMPTY_FORM = {
+    taskTitle: '',
+    taskDescription: '',
+    dueAt: '',
+    priority: 'Medium' as Priority,
+    assignedTo: '',
+    taskRemarks: '',
+};
+
+const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, onSave, onClose, onDelete }) => {
+    const resolvedAssignedTo =
+        initial.assignedTo ||
+        teamMembers.find(m => m.employeeName === initial.assignedEmployee)?.accountId ||
+        '';
+
+    const [form, setForm] = useState({
+        taskTitle: initial.taskTitle ?? '',
+        taskDescription: initial.taskDescription ?? '',
+        dueAt: initial.dueAt ? initial.dueAt.split('T')[0] : '',
+        priority: initial.priority ?? 'Medium' as Priority,
+        assignedTo: resolvedAssignedTo,
+        taskRemarks: initial.taskRemarks ?? '',
+    });
     const [submitting, setSubmitting] = useState(false);
 
     const set = (key: keyof typeof form) =>
@@ -190,9 +203,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDel
             setForm(prev => ({ ...prev, [key]: e.target.value }));
 
     const handleSave = () => {
-        if (!form.name.trim()) { alert('Task name is required'); return; }
+        if (!form.taskTitle.trim()) { alert('Task title is required'); return; }
+        if (!form.assignedTo) { alert('Please assign the task to someone'); return; }
         setSubmitting(true);
-        onSave({ ...form, ...(initial?.id !== undefined ? { id: initial.id } : {}) });
+        onSave({
+            taskTitle: form.taskTitle.trim(),
+            taskDescription: form.taskDescription.trim(),
+            priority: form.priority,
+            dueAt: form.dueAt || null,
+            assignedTo: form.assignedTo,
+            taskRemarks: form.taskRemarks.trim() || undefined,
+        });
         setSubmitting(false);
     };
 
@@ -208,68 +229,114 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDel
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
-
                 <div className="modal-form">
                     <div className="field">
-                        <label>Task Name</label>
-                        <input value={form.name} onChange={set('name')} placeholder="e.g. Route planning update" />
+                        <label>Task Title</label>
+                        <input value={form.taskTitle} onChange={set('taskTitle')} placeholder="e.g. Route planning update" />
                     </div>
                     <div className="field">
                         <label>Description</label>
-                        <textarea value={form.description} onChange={set('description')} placeholder="Describe the task in detail..." rows={3} />
+                        <textarea value={form.taskDescription} onChange={set('taskDescription')} placeholder="Describe the task..." rows={3} />
                     </div>
                     <div className="field-row">
                         <div className="field">
-                            <label>Deadline</label>
-                            <input type="date" value={form.deadline} onChange={set('deadline')} />
+                            <label>Due Date</label>
+                            <input type="date" value={form.dueAt} onChange={set('dueAt')} />
                         </div>
                         <div className="field">
                             <label>Priority</label>
                             <select value={form.priority} onChange={set('priority')}>
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                                <option value="low">Low</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
                             </select>
                         </div>
                     </div>
-                    <div className="field-row">
-                        <div className="field">
-                            <label>Assign To</label>
-                            <select value={form.assigneeId} onChange={set('assigneeId')}>
-                                <option value="">Unassigned</option>
-                                {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                        </div>
-                        <div className="field">
-                            <label>Status</label>
-                            <select value={form.status} onChange={set('status')}>
-                                <option value="pending">Pending</option>
-                                <option value="in-progress">In Progress</option>
-                                <option value="completed">Completed</option>
-                                <option value="overdue">Overdue</option>
-                            </select>
+                    {/* Replace Assign To field in TaskModal */}
+                    <div className="field">
+                        <label>Assign To</label>
+                        <div className="assignee-select" tabIndex={0}
+                            onBlur={e => {
+                                if (!e.currentTarget.contains(e.relatedTarget))
+                                    e.currentTarget.querySelector<HTMLElement>('.assignee-options')?.style.setProperty('display', 'none');
+                            }}
+                        >
+                            {/* Trigger — looks like a select */}
+                            <div
+                                className="assignee-trigger"
+                                onClick={e => {
+                                    const opts = e.currentTarget.nextElementSibling as HTMLElement;
+                                    opts.style.display = opts.style.display === 'block' ? 'none' : 'block';
+                                }}
+                            >
+                                <span className={form.assignedTo ? 'assignee-trigger-value' : 'assignee-trigger-placeholder'}>
+                                    {form.assignedTo
+                                        ? teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName ?? 'Select employee'
+                                        : 'Select employee'}
+                                </span>
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                            </div>
+
+                            {/* Options dropdown */}
+                            <div className="assignee-options" style={{ display: 'none' }}>
+                                <div
+                                    className="assignee-option placeholder-opt"
+                                    onClick={e => {
+                                        setForm(prev => ({ ...prev, assignedTo: '' }));
+                                        (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
+                                    }}
+                                >
+                                    Select employee
+                                </div>
+                                {teamMembers.map(m => (
+                                    <div
+                                        key={m.accountId}
+                                        className={`assignee-option${form.assignedTo === m.accountId ? ' selected' : ''}`}
+                                        onClick={e => {
+                                            setForm(prev => ({ ...prev, assignedTo: m.accountId }));
+                                            (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
+                                        }}
+                                    >
+                                        <span className="assignee-opt-name">{m.employeeName}</span>
+                                        <span className="assignee-opt-role">{m.role}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                     {mode === 'edit' && (
                         <div className="field">
-                            <label>Progress %</label>
-                            <input
-                                type="number" min={0} max={100}
-                                value={form.progress}
-                                onChange={e => setForm(prev => ({ ...prev, progress: Number(e.target.value) }))}
-                            />
+                            <label>Remarks</label>
+                            <input value={form.taskRemarks} onChange={set('taskRemarks')} placeholder="Optional remarks..." />
                         </div>
                     )}
                 </div>
-
                 <div className="modal-actions">
-                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
-                        {submitting
-                            ? <><Loader2 size={13} className="spin" /> Saving…</>
-                            : <><Save size={13} /> {mode === 'new' ? 'Create Task' : 'Save Changes'}</>
-                        }
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flex: 1 }}>
+                        {mode === 'edit' && onDelete && (
+                            <button
+                                className="btn btn-danger"
+                                onClick={() => {
+                                    if (window.confirm('Delete this task? This cannot be undone.')) {
+                                        onDelete();
+                                    }
+                                }}
+                                disabled={submitting}
+                            >
+                                <Trash2 size={13} /> Delete Task
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+                            {submitting
+                                ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                : <><Save size={13} /> Save Changes</>}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,47 +345,80 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, onSave, onDel
 
 // ─── Modal: View Task ─────────────────────────────────────────────────────────
 
+
 interface ViewModalProps {
     task: Task;
     onEdit: () => void;
-    onDelete: () => void;
+    onReopen: () => void;
     onClose: () => void;
+    onViewMore?: () => void;
 }
-const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onDelete, onClose }) => {
-    const member = findMember(task.assigneeId);
+
+const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onClose, onViewMore }) => {
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
+            <div className="modal-card view-modal-card" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="view-modal-header">
                     <div>
-                        <h3>{task.name}</h3>
-                        <p className="modal-subtitle">Viewing task details</p>
+                        <h3 className="view-modal-title">{task.taskTitle}</h3>
+                        <p className="view-modal-subtitle">Created by: {task.createdByEmployee}</p>
                     </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
-                <table className="view-table">
-                    <tbody>
-                        <tr><td className="vl">Description</td><td className="vv">{task.description || '—'}</td></tr>
-                        <tr><td className="vl">Assignee</td><td className="vv">{member?.name ?? 'Unassigned'}</td></tr>
-                        <tr><td className="vl">Deadline</td><td className="vv">{fmtDate(task.deadline)}</td></tr>
-                        <tr><td className="vl">Priority</td><td className="vv"><PrioBadge p={task.priority} /></td></tr>
-                        <tr><td className="vl">Status</td><td className="vv"><span className={statusBadgeClass(task.status)}>{task.status}</span></td></tr>
-                        <tr>
-                            <td className="vl">Progress</td>
-                            <td className="vv">
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span>{task.progress}%</span>
-                                    <div style={{ flex: 1 }}><ProgressBar pct={task.progress} cls={progressFillClass(task)} /></div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div className="modal-actions">
-                    <button className="btn btn-danger" onClick={onDelete}><Trash2 size={13} /> Delete</button>
-                    <div style={{ flex: 1 }} />
+
+                {/* Meta row */}
+                <div className="view-modal-meta">
+                    <div className="view-modal-meta-item">
+                        <span className="view-modal-label">Due Date</span>
+                        <span className="view-modal-meta-value">{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
+                    </div>
+                    <div className="view-modal-meta-item">
+                        <span className="view-modal-label">Priority</span>
+                        <PrioBadge p={task.priority} />
+                    </div>
+                    <div className="view-modal-meta-item">
+                        <span className="view-modal-label">Status</span>
+                        <span className={statusBadgeClass(task.taskStatus)}>{task.taskStatus}</span>
+                    </div>
+                </div>
+
+                {/* Description */}
+                <div className="view-modal-section">
+                    <label className="view-modal-label">Description</label>
+                    <div className="view-modal-desc-box">
+                        {task.taskDescription || ''}
+                    </div>
+                </div>
+
+                {/* Assigned To */}
+                <div className="view-modal-section">
+                    <label className="view-modal-label">Assigned To:</label>
+                    <div className="view-modal-assignee-box">
+                        {task.assignedEmployee || '—'}
+                    </div>
+                </div>
+
+                {/* Remarks if any */}
+                {task.taskRemarks && (
+                    <div className="view-modal-section">
+                        <label className="view-modal-label">Remarks</label>
+                        <div className="view-modal-desc-box">{task.taskRemarks}</div>
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="view-modal-actions">
+                    <button className="btn btn-danger" onClick={onReopen}
+                        style={{ visibility: task.taskStatus === 'Completed' ? 'visible' : 'hidden' }}>
+                        Reopen
+                    </button>
+                    <button className="btn btn-primary" onClick={onViewMore}>
+                        View More
+                    </button>
+                    <button className="btn btn-primary" onClick={onEdit}>
+                        <Pencil size={13} /> Edit Task
+                    </button>
                     <button className="btn" onClick={onClose}>Close</button>
-                    <button className="btn btn-primary" onClick={onEdit}><Pencil size={13} /> Edit Task</button>
                 </div>
             </div>
         </div>
@@ -327,15 +427,15 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onDelete, onClose }
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNewTask: () => void }> =
-    ({ tasks, onView, onNewTask }) => {
+const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: string) => void; onNewTask: () => void }> =
+    ({ tasks, loading, onView, onNewTask }) => {
         const total = tasks.length;
-        const inProg = tasks.filter(t => t.status === 'in-progress').length;
-        const done = tasks.filter(t => t.status === 'completed').length;
-        const overdue = tasks.filter(t => t.status === 'overdue' || isEffectivelyOverdue(t)).length;
-        const hi = tasks.filter(t => t.priority === 'high').length;
-        const md = tasks.filter(t => t.priority === 'medium').length;
-        const lo = tasks.filter(t => t.priority === 'low').length;
+        const inProg = tasks.filter(t => t.taskStatus === 'In Progress').length;
+        const done = tasks.filter(t => t.taskStatus === 'Completed').length;
+        const overdue = tasks.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length;
+        const hi = tasks.filter(t => t.priority === 'High').length;
+        const md = tasks.filter(t => t.priority === 'Medium').length;
+        const lo = tasks.filter(t => t.priority === 'Low').length;
         const pct = total ? Math.round(done / total * 100) : 0;
 
         return (
@@ -367,8 +467,10 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
                             <h3>Recent Tasks</h3>
                             <span className="view-all-link">View all <ChevronRight size={12} /></span>
                         </div>
-                        {tasks.slice(-5).reverse().map(t => (
-                            <TaskRow key={t.id} task={t} onView={onView} />
+                        {loading ? (
+                            <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
+                        ) : tasks.slice(-5).reverse().map(t => (
+                            <TaskRow key={t.taskId} task={t} onView={onView} />
                         ))}
                     </div>
 
@@ -430,19 +532,18 @@ const DashboardTab: React.FC<{ tasks: Task[]; onView: (id: number) => void; onNe
 
 const TasksTab: React.FC<{
     tasks: Task[];
+    loading: boolean;
     searchQuery: string;
-    onView: (id: number) => void;
-    onEdit: (id: number) => void;
-}> = ({ tasks, searchQuery, onView, onEdit }) => {
+    onView: (id: string) => void;
+    onEdit: (id: string) => void;
+}> = ({ tasks, loading, searchQuery, onView, onEdit }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
-    const [filterAssignee, setFilterAssignee] = useState('');
 
     const filtered = tasks.filter(t =>
-        (!filterStatus || t.status === filterStatus) &&
+        (!filterStatus || t.taskStatus === filterStatus) &&
         (!filterPriority || t.priority === filterPriority) &&
-        (!filterAssignee || t.assigneeId === filterAssignee) &&
-        (!searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        (!searchQuery || t.taskTitle.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
@@ -450,55 +551,60 @@ const TasksTab: React.FC<{
             <div className="filter-bar">
                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                     <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="overdue">Overdue</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Overdue">Overdue</option>
                 </select>
                 <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
                     <option value="">All Priorities</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
-                <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
-                    <option value="">All Assignees</option>
-                    {TEAM_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
                 </select>
             </div>
             <div className="card">
-                {filtered.length === 0
-                    ? <div className="empty-state"><Package size={20} /><p>No tasks match filters</p></div>
-                    : filtered.map(t => <TaskRow key={t.id} task={t} onView={onView} onEdit={onEdit} showEditBtn />)
-                }
+                {loading ? (
+                    <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
+                ) : filtered.length === 0 ? (
+                    <div className="empty-state"><Package size={20} /><p>No tasks match filters</p></div>
+                ) : filtered.map(t => (
+                    <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
+                ))}
             </div>
         </div>
     );
 };
-
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
-const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void }> = ({ tasks, onView }) => {
-    const [selectedMemberId, setSelectedMemberId] = useState(TEAM_MEMBERS[0].id);
-    const maxLoad = Math.max(...TEAM_MEMBERS.map(m => tasks.filter(t => t.assigneeId === m.id).length), 1);
+const TeamTab: React.FC<{
+    tasks: Task[];
+    teamMembers: TeamMember[];
+    onView: (id: string) => void;
+}> = ({ tasks, teamMembers, onView }) => {
+    const [selectedMemberId, setSelectedMemberId] = useState(teamMembers[0]?.accountId ?? '');
+    const maxLoad = Math.max(...teamMembers.map(m =>
+        tasks.filter(t => t.assignedEmployee === m.employeeName).length), 1);
 
     return (
         <div className="dashboard-content">
             <div className="dashboard-grid">
                 <div className="card">
                     <div className="card-header"><h3>Team Members</h3></div>
-                    {TEAM_MEMBERS.map(m => {
-                        const mt = tasks.filter(t => t.assigneeId === m.id);
-                        const mc = mt.filter(t => t.status === 'completed').length;
+                    {teamMembers.length === 0 ? (
+                        <div className="empty-state"><Users size={20} /><p>No team members found</p></div>
+                    ) : teamMembers.map(m => {
+                        const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
+                        const mc = mt.filter(t => t.taskStatus === 'Completed').length;
                         return (
                             <div
-                                key={m.id}
-                                className={`member-row${selectedMemberId === m.id ? ' selected' : ''}`}
-                                onClick={() => setSelectedMemberId(m.id)}
+                                key={m.accountId}
+                                className={`member-row${selectedMemberId === m.accountId ? ' selected' : ''}`}
+                                onClick={() => setSelectedMemberId(m.accountId)}
                             >
                                 <Avatar member={m} />
                                 <div style={{ flex: 1 }}>
-                                    <div className="member-name">{m.name}</div>
+                                    <div className="member-name">{m.employeeName}</div>
                                     <div className="member-role">{m.role}</div>
                                 </div>
                                 <span className="badge badge-blue">{mt.length} tasks</span>
@@ -507,15 +613,14 @@ const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void }> = ({ ta
                         );
                     })}
                 </div>
-
                 <div className="card">
                     <div className="card-header"><h3>Workload Distribution</h3></div>
                     <div className="perf-bars">
-                        {TEAM_MEMBERS.map(m => {
-                            const cnt = tasks.filter(t => t.assigneeId === m.id).length;
+                        {teamMembers.map(m => {
+                            const cnt = tasks.filter(t => t.assignedEmployee === m.employeeName).length;
                             return (
-                                <div key={m.id} className="perf-item">
-                                    <span className="perf-label">{m.name.split(' ')[0]}</span>
+                                <div key={m.accountId} className="perf-item">
+                                    <span className="perf-label">{m.employeeName.split(' ')[0]}</span>
                                     <div className="perf-track">
                                         <div className="perf-fill fill-primary" style={{ width: `${Math.round(cnt / maxLoad * 100)}%` }} />
                                     </div>
@@ -526,16 +631,15 @@ const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void }> = ({ ta
                     </div>
                 </div>
             </div>
-
             <div className="card">
                 <div className="card-header">
-                    <h3>{findMember(selectedMemberId)?.name}'s Tasks</h3>
+                    <h3>{teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName}'s Tasks</h3>
                 </div>
-                {tasks.filter(t => t.assigneeId === selectedMemberId).length === 0
+                {tasks.filter(t => t.assignedEmployee === teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName).length === 0
                     ? <div className="empty-state"><Package size={20} /><p>No tasks assigned</p></div>
-                    : tasks.filter(t => t.assigneeId === selectedMemberId).map(t =>
-                        <TaskRow key={t.id} task={t} onView={onView} />
-                    )
+                    : tasks
+                        .filter(t => t.assignedEmployee === teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName)
+                        .map(t => <TaskRow key={t.taskId} task={t} onView={onView} />)
                 }
             </div>
         </div>
@@ -544,19 +648,24 @@ const TeamTab: React.FC<{ tasks: Task[]; onView: (id: number) => void }> = ({ ta
 
 // ─── Reports Tab ──────────────────────────────────────────────────────────────
 
-const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
+const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ tasks, teamMembers }) => {
     const total = tasks.length || 1;
-    const done = tasks.filter(t => t.status === 'completed').length;
-    const hiDone = tasks.filter(t => t.status === 'completed' && t.priority === 'high').length;
-    const avg = (tasks.length / TEAM_MEMBERS.length).toFixed(1);
+    const done = tasks.filter(t => t.taskStatus === 'Completed').length;
+    const hiDone = tasks.filter(t => t.taskStatus === 'Completed' && t.priority === 'High').length;
+    const avg = teamMembers.length ? (tasks.length / teamMembers.length).toFixed(1) : '0';
     const rate = Math.round(done / total * 100);
-    const ontime = tasks.filter(t => t.status === 'completed' && (!t.deadline || new Date(t.deadline + 'T00:00:00') >= new Date())).length;
+    const ontime = tasks.filter(t =>
+        t.taskStatus === 'Completed' && (!t.dueAt || new Date(t.dueAt) >= new Date())
+    ).length;
     const ontimeRate = Math.round(ontime / total * 100);
 
-    const statuses: TaskStatus[] = ['pending', 'in-progress', 'completed', 'overdue'];
-    const maxStat = Math.max(...statuses.map(s => tasks.filter(t => t.status === s).length), 1);
-    const statusColors: Record<TaskStatus, string> = {
-        pending: 'fill-primary', 'in-progress': 'fill-amber', completed: 'fill-green', overdue: 'fill-red',
+    const statuses: TaskStatus[] = ['Pending', 'In Progress', 'Completed', 'Overdue'];
+    const maxStat = Math.max(...statuses.map(s => tasks.filter(t => t.taskStatus === s).length), 1);
+    const statusColors: Record<string, string> = {
+        'Pending': 'fill-primary',
+        'In Progress': 'fill-amber',
+        'Completed': 'fill-green',
+        'Overdue': 'fill-red',
     };
 
     return (
@@ -584,7 +693,7 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                     <div className="card-header"><h3>Task Status Distribution</h3></div>
                     <div className="perf-bars" style={{ marginTop: 8 }}>
                         {statuses.map(s => {
-                            const cnt = tasks.filter(t => t.status === s).length;
+                            const cnt = tasks.filter(t => t.taskStatus === s).length;
                             return (
                                 <div key={s} className="perf-item">
                                     <span className="perf-label" style={{ textTransform: 'capitalize' }}>{s}</span>
@@ -600,13 +709,13 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                 <div className="card">
                     <div className="card-header"><h3>Team Performance</h3></div>
                     <div className="perf-bars" style={{ marginTop: 8 }}>
-                        {TEAM_MEMBERS.map(m => {
-                            const mt = tasks.filter(t => t.assigneeId === m.id);
-                            const mc = mt.filter(t => t.status === 'completed').length;
+                        {teamMembers.map(m => {
+                            const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
+                            const mc = mt.filter(t => t.taskStatus === 'Completed').length;
                             const r = mt.length ? Math.round(mc / mt.length * 100) : 0;
                             return (
-                                <div key={m.id} className="perf-item">
-                                    <span className="perf-label">{m.name.split(' ')[0]}</span>
+                                <div key={m.accountId} className="perf-item">
+                                    <span className="perf-label">{m.employeeName.split(' ')[0]}</span>
                                     <div className="perf-track">
                                         <div className="perf-fill fill-primary" style={{ width: `${r}%` }} />
                                     </div>
@@ -633,19 +742,15 @@ const ReportsTab: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {tasks.map(t => {
-                                const m = findMember(t.assigneeId);
-                                return (
-                                    <tr key={t.id}>
-                                        <td>{t.name}</td>
-                                        <td>{m?.name ?? '—'}</td>
-                                        <td><PrioBadge p={t.priority} /></td>
-                                        <td>{fmtDate(t.deadline)}</td>
-                                        <td><span className={statusBadgeClass(t.status)}>{t.status}</span></td>
-                                        <td style={{ minWidth: 100 }}><ProgressBar pct={t.progress} cls={progressFillClass(t)} /></td>
-                                    </tr>
-                                );
-                            })}
+                            {tasks.map(t => (
+                                <tr key={t.taskId}>
+                                    <td>{t.taskTitle}</td>
+                                    <td>{t.assignedEmployee || '—'}</td>
+                                    <td><PrioBadge p={t.priority} /></td>
+                                    <td>{t.dueAt ? fmtDate(t.dueAt) : '—'}</td>
+                                    <td><span className={statusBadgeClass(t.taskStatus)}>{t.taskStatus}</span></td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
@@ -1054,35 +1159,142 @@ function ProfileTab() {
 
 export default function OpsAdminDashboard() {
     const navigate = useNavigate();
-    const employeeId = localStorage.getItem('employeeId') ?? 'Admin';
+    const employeeId = localStorage.getItem('employeeId') ?? '';
     const employeeName = localStorage.getItem('employeeName') ?? '';
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-    const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-    const [nextId, setNextId] = useState(INITIAL_TASKS.length + 1);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Modal state
     const [showNew, setShowNew] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [viewingTask, setViewingTask] = useState<Task | null>(null);
+    const [detailTask, setDetailTask] = useState<TaskViewTask | null>(null);
 
-    const handleNewTask = (data: Omit<Task, 'id'> & { id?: number }) => {
-        setTasks(prev => [...prev, { ...data, id: nextId } as Task]);
-        setNextId(n => n + 1);
-        setShowNew(false);
+    const token = () => localStorage.getItem('authToken');
+
+    // ── Fetch Tasks ──
+    const fetchTasks = async () => {
+        setLoadingTasks(true);
+        try {
+            const res = await fetch('/api/task/all-tasks', {
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) throw new Error();
+            const data: Task[] = await res.json();
+            setTasks(data);
+        } catch {
+            setTasks([]);
+        } finally {
+            setLoadingTasks(false);
+        }
     };
 
-    const handleEditTask = (data: Omit<Task, 'id'> & { id?: number }) => {
-        setTasks(ts => ts.map(t => t.id === data.id ? { ...data, id: data.id! } as Task : t));
-        setEditingTask(null);
+    // ── Fetch Team Members (for assignee dropdown) ──
+    const fetchTeamMembers = async () => {
+        try {
+            const res = await fetch('/api/systemadmin/assignable-employees', {
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) throw new Error();
+            const data: any[] = await res.json();
+
+            console.log('Team members raw:', data); // ← ADD THIS to inspect shape
+
+            setTeamMembers(data.map(e => ({
+                accountId: e.accountId ?? e.AccountId ?? e.id,       // try variants
+                employeeName: e.employeeName ?? e.EmployeeName ?? e.name,
+                role: e.role ?? e.Role ?? '',
+            })));
+        } catch {
+            setTeamMembers([]);
+        }
     };
 
-    const handleDeleteTask = (taskToDelete: Task) => {
-        if (!window.confirm(`Delete "${taskToDelete.name}"? This cannot be undone.`)) return;
-        setTasks(ts => ts.filter(t => t.id !== taskToDelete.id));
-        setViewingTask(null);
-        setEditingTask(null);
+    useEffect(() => {
+        fetchTasks();
+        fetchTeamMembers();
+    }, []);
+
+    // ── Create Task ──
+    const handleNewTask = async (data: CreateTaskDTO) => {
+        try {
+            const res = await fetch('/api/task/create-task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to create task.');
+            }
+            await fetchTasks();
+            setShowNew(false);
+        } catch (err: any) {
+            alert(err.message ?? 'Something went wrong.');
+        }
+    };
+
+    // ── Update Task ──
+    const handleEditTask = async (taskId: string, data: UpdateTaskDTO) => {
+        try {
+            const res = await fetch(`/api/task/update-task/${taskId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to update task.');
+            }
+            await fetchTasks();
+            setEditingTask(null);
+        } catch (err: any) {
+            alert(err.message ?? 'Something went wrong.');
+        }
+    };
+
+    // ── Reopen Task ──
+    const handleReopenTask = async (taskId: string) => {
+        try {
+            const res = await fetch(`/api/task/${taskId}/reopen`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to reopen task.');
+            }
+            await fetchTasks();
+            setViewingTask(null);
+        } catch (err: any) {
+            alert(err.message ?? 'Something went wrong.');
+        }
+    };
+
+    const handleDeleteTask = async (taskId: string) => {
+        try {
+            const res = await fetch(`/api/task/delete-task/${taskId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to delete task.');
+            }
+            await fetchTasks();
+            setEditingTask(null);
+        } catch (err: any) {
+            alert(err.message ?? 'Something went wrong.');
+        }
     };
 
     const handleLogout = () => {
@@ -1117,7 +1329,6 @@ export default function OpsAdminDashboard() {
                         </div>
                     ))}
                 </nav>
-
                 <div className="sidebar-footer">
                     <div className="user-block">
                         <div className="avatar-circle">
@@ -1128,24 +1339,16 @@ export default function OpsAdminDashboard() {
                             <strong>{employeeName || 'Employee'}</strong>
                         </div>
                     </div>
-                    <button className="logout-btn-sidebar" onClick={handleLogout}>
-                        Logout
-                    </button>
+                    <button className="logout-btn-sidebar" onClick={handleLogout}>Logout</button>
                 </div>
             </aside>
 
             {/* ── Main ── */}
             <main className="main-viewport">
-                {/* Header */}
                 <div className="dashboard-header">
                     <div className="header-title">
                         <h2>{pageTitles[activeTab]}</h2>
-                        <p>
-                            Operations Admin —{' '}
-                            {new Date().toLocaleDateString('en-US', {
-                                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                            })}
-                        </p>
+                        <p>Operations Admin — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     </div>
                     {activeTab !== 'profile' && (
                         <div className="header-actions">
@@ -1159,37 +1362,38 @@ export default function OpsAdminDashboard() {
                                 />
                             </div>
                             <button className="quick-action-btn-header" onClick={() => setShowNew(true)}>
-                                <Plus size={18} />
-                                New Task
+                                <Plus size={18} /> New Task
                             </button>
-                            <NotificationBell apiEndpoint="/api/notifications" />
+                            <NotificationBell apiEndpoint="/api/notification/my-notifications" />
                         </div>
                     )}
                 </div>
 
-                {/* Tab Content */}
                 {activeTab === 'dashboard' && (
                     <DashboardTab
                         tasks={tasks}
-                        onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)}
+                        loading={loadingTasks}
+                        onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
                         onNewTask={() => setShowNew(true)}
                     />
                 )}
                 {activeTab === 'tasks' && (
                     <TasksTab
                         tasks={tasks}
+                        loading={loadingTasks}
                         searchQuery={searchQuery}
-                        onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)}
-                        onEdit={id => setEditingTask(tasks.find(t => t.id === id) ?? null)}
+                        onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
+                        onEdit={id => setEditingTask(tasks.find(t => t.taskId === id) ?? null)}
                     />
                 )}
                 {activeTab === 'team' && (
                     <TeamTab
                         tasks={tasks}
-                        onView={id => setViewingTask(tasks.find(t => t.id === id) ?? null)}
+                        teamMembers={teamMembers}
+                        onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
                     />
                 )}
-                {activeTab === 'reports' && <ReportsTab tasks={tasks} />}
+                {activeTab === 'reports' && <ReportsTab tasks={tasks} teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
             </main>
 
@@ -1197,7 +1401,8 @@ export default function OpsAdminDashboard() {
             {showNew && (
                 <TaskModal
                     mode="new"
-                    onSave={handleNewTask}
+                    teamMembers={teamMembers}
+                    onSave={data => handleNewTask(data as CreateTaskDTO)}
                     onClose={() => setShowNew(false)}
                 />
             )}
@@ -1205,16 +1410,27 @@ export default function OpsAdminDashboard() {
                 <TaskModal
                     mode="edit"
                     initial={editingTask}
-                    onSave={handleEditTask}
+                    teamMembers={teamMembers}
+                    onSave={data => handleEditTask(editingTask.taskId, data as UpdateTaskDTO)}
                     onClose={() => setEditingTask(null)}
+                    onDelete={() => handleDeleteTask(editingTask.taskId)}
                 />
             )}
             {viewingTask && (
                 <ViewModal
                     task={viewingTask}
                     onEdit={() => { setEditingTask(viewingTask); setViewingTask(null); }}
-                    onDelete={() => handleDeleteTask(viewingTask)}
+                    onReopen={() => handleReopenTask(viewingTask.taskId)}
                     onClose={() => setViewingTask(null)}
+                    onViewMore={() => { setDetailTask(viewingTask); setViewingTask(null); }}
+                />
+            )}
+            {detailTask && (
+                <TaskView
+                    task={detailTask}
+                    onEdit={() => { setEditingTask(detailTask); setDetailTask(null); }}
+                    onReopen={() => handleReopenTask(detailTask.taskId)}
+                    onClose={() => setDetailTask(null)}
                 />
             )}
         </div>

@@ -306,7 +306,7 @@ namespace OTMS.Service.Services
                 ),
                 new Claim(
                     ClaimTypes.Role,
-                    employee.Account.Role ?? string.Empty
+                    (employee.Account.Role ?? string.Empty).Replace(" ", "")
                 )
             };
 
