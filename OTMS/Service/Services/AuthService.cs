@@ -17,7 +17,7 @@ using System.Text;
 
 namespace OTMS.Service.Services
 {
-    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context) : IAuthService
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
 
@@ -94,6 +94,9 @@ namespace OTMS.Service.Services
                 ActivityTypes.Login,
                 $"{employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
                 );
+
+            // Check Task Deadlines
+            await notificationService.CheckTaskDeadlinesAsync();
 
             employee.Account.FailedLoginAttempts = 0;
             await context.SaveChangesAsync();
