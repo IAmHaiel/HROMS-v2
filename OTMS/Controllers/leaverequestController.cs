@@ -16,7 +16,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Roles = "SystemAdmin,OperationAdmin,Coordinator,Encoder")]
         [HttpPost("create-leave-request")]
-        public async Task<IActionResult> CreateLeaveRequest(CreateLeaveRequestDTO request)
+        public async Task<IActionResult> CreateLeaveRequest([FromBody] CreateLeaveRequestDTO request)
         {
             try
             {
