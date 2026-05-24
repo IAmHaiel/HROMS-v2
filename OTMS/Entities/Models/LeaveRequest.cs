@@ -3,7 +3,8 @@
     public class LeaveRequest
     {
         public Guid LeaveId { get; set; }
-        public Guid? Approved_By { get; set; }
+        public Guid AccountId { get; set; } // Employee who submitted the leave request
+        public Guid Approved_By { get; set; } // Employee who approved the leave request
 
         public DateTime Start_Date { get; set; }
         public DateTime End_Date { get; set; }

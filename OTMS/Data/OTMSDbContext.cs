@@ -66,6 +66,12 @@ namespace OTMS.Data
                 .HasOne(a => a.Account)
                 .WithMany()
                 .HasForeignKey(a => a.AccountId);
+
+            // Leave Request Relationships
+            modelBuilder.Entity<LeaveRequest>()
+                .HasOne(lr => lr.Account)
+                .WithMany(a => a.SubmittedLeaveRequests)
+                .HasForeignKey(lr => lr.AccountId)
         }
     }
 }
