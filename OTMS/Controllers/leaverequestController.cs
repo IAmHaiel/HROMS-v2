@@ -29,5 +29,13 @@ namespace OTMS.Controllers
             }
         }
 
+        [Authorize(Roles = "OperationAdmin")]
+        [HttpGet("get-all-leave-requests")]
+        public async Task<IActionResult> GetAllLeaveRequests()
+        {
+            var result = await leaveRequest.GetAllLeaveRequestsAsync();
+            return Ok(result);
+        }
+
     }
 }
