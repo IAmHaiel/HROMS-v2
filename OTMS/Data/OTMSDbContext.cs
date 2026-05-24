@@ -72,6 +72,13 @@ namespace OTMS.Data
                 .HasOne(lr => lr.Account)
                 .WithMany(a => a.SubmittedLeaveRequests)
                 .HasForeignKey(lr => lr.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LeaveRequest>()
+                .HasOne(lr => lr.ApprovedByAccount)
+                .WithMany(a => a.ApprovedLeaveRequests)
+                .HasForeignKey(lr => lr.Approved_By)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }
