@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.DTOs.ActivityLogs
+﻿namespace OTMS.Entities.DTOs.ActivityLogs.Responses
 {
     public class ActivityLogResponseDTO
     {
