@@ -7,7 +7,7 @@ using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
-    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService) : ITaskService
+    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService) : ITaskService
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
@@ -45,6 +45,28 @@ namespace OTMS.Service.Services
                 throw new Exception("Creator account not found.");
             }
 
+            // Check for duplicates or similar tasks
+            bool exactDuplicateExists = await context.Tasks
+                .AnyAsync(t => t.TaskTitle.ToLower() == request.TaskTitle.ToLower()
+                    && t.TaskDescription!.ToLower() == request.TaskDescription!.ToLower());
+            
+            bool similarTaskExists = await context.Tasks
+                .AnyAsync(t => t.TaskTitle.ToLower().Contains(request.TaskTitle.ToLower())
+                    || request.TaskTitle.ToLower().Contains(t.TaskTitle.ToLower()));
+
+            if (exactDuplicateExists)
+            {
+                throw new Exception(
+                    "A task with the same title and description already exists.");
+            }
+
+            if (similarTaskExists)
+            {
+                throw new Exception(
+                    "A similar task already exists.");
+            }
+
+
             // Create Task
             var task = new OTMS.Entities.Models.Task
             {
@@ -64,6 +86,10 @@ namespace OTMS.Service.Services
 
             await context.Tasks.AddAsync(task);
             await context.SaveChangesAsync();
+
+            // Integrate Notification
+            await notificationService
+                .CreateTaskAssignedNotificationAsync(task);
 
             return new TaskResponseDTO
             {

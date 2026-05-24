@@ -17,7 +17,7 @@ using System.Text;
 
 namespace OTMS.Service.Services
 {
-    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context) : IAuthService
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
 
@@ -97,6 +97,9 @@ namespace OTMS.Service.Services
 
             employee.Account.FailedLoginAttempts = 0;
             await context.SaveChangesAsync();
+
+            // Check Task Deadlines
+            await notificationService.CheckTaskDeadlinesAsync();
 
             return await CreateTokenResponse(employee);
         }

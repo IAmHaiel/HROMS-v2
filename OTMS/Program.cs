@@ -95,6 +95,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<ILeaveRequest, LeaveRequestService>();
 builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext context)
 {
