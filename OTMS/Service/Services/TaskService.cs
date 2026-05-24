@@ -7,7 +7,7 @@ using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
-    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService) : ITaskService
+    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService) : ITaskService
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
@@ -86,6 +86,10 @@ namespace OTMS.Service.Services
 
             await context.Tasks.AddAsync(task);
             await context.SaveChangesAsync();
+
+            // Integrate Notification
+            await notificationService
+                .CreateTaskAssignedNotificationAsync(task);
 
             return new TaskResponseDTO
             {
