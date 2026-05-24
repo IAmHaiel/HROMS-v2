@@ -8,6 +8,8 @@ using OTMS.Service.Interfaces;
 using System.ComponentModel.DataAnnotations;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace OTMS.Controllers
 {
