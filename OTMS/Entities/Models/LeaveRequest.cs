@@ -1,7 +1,10 @@
-﻿namespace OTMS.Entities.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace OTMS.Entities.Models
 {
     public class LeaveRequest
     {
+        [Key]
         public Guid LeaveId { get; set; }
         public Guid AccountId { get; set; } // Employee who submitted the leave request
         public Guid Approved_By { get; set; } // Employee who approved the leave request
