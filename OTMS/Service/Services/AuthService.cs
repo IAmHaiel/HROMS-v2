@@ -95,11 +95,11 @@ namespace OTMS.Service.Services
                 $"{employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
                 );
 
-            // Check Task Deadlines
-            await notificationService.CheckTaskDeadlinesAsync();
-
             employee.Account.FailedLoginAttempts = 0;
             await context.SaveChangesAsync();
+
+            // Check Task Deadlines
+            await notificationService.CheckTaskDeadlinesAsync();
 
             return await CreateTokenResponse(employee);
         }
