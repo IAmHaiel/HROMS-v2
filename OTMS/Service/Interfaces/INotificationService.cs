@@ -1,8 +1,10 @@
-﻿namespace OTMS.Service.Interfaces
+﻿using OTMS.Entities.Models;
+
+namespace OTMS.Service.Interfaces
 {
     public interface INotificationService
     {
-        Task CreateTaskAssignedNotificationAsync(Task task);
-        Task CreateDeadlineNotificationAsync(Task task);
+        System.Threading.Tasks.Task CreateTaskAssignedNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task);
     }
 }
