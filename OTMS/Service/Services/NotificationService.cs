@@ -1,12 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Data;
+using OTMS.Entities.DTOs.Notification.Responses;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
+using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
-    public class NotificationService(OTMSDbContext context) : INotificationService
+    public class NotificationService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor) : INotificationService
     {
         public async System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task)
         {
@@ -76,6 +79,57 @@ namespace OTMS.Service.Services
                     await CreateDeadlineNotificationAsync(task);
                 }
             }
+        }
+
+        public async System.Threading.Tasks.Task<List<NotificationResponseDTO>> GetMyNotificationsAsync()
+        {
+            var accountIdClaim = httpContextAccessor
+                .HttpContext?
+                .User
+                .FindFirst(ClaimTypes.NameIdentifier)?
+                .Value;
+
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException(
+                    "Invalid user session.");
+            }
+
+            var accountId = Guid.Parse(accountIdClaim);
+
+            var notifications = await context.Notifications
+                .Where(n => n.EmployeeId == accountId) // EmployeeId = accountId
+                .OrderByDescending(n => n.CreatedAt)
+                .ToListAsync();
+
+            return notifications.Select(n =>
+                new NotificationResponseDTO
+                {
+                    NotificationId = n.NotificationId,
+                    TaskId = n.TaskId,
+                    NotificationType = n.NotificationType,
+                    Message = n.Message,
+                    IsRead = n.IsRead,
+                    CreatedAt = n.CreatedAt
+                }).ToList();
+        }
+
+        public async System.Threading.Tasks.Task<bool> MarkNotificationAsReadAsync(Guid notificationId)
+        {
+            var notification = await context.Notifications
+                .FirstOrDefaultAsync(n =>
+                    n.NotificationId == notificationId);
+
+            if (notification == null)
+            {
+                return false;
+            }
+
+            notification.IsRead = true;
+
+            await context.SaveChangesAsync();
+
+            return true;
         }
     }
 }
