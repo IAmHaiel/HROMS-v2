@@ -4,13 +4,28 @@ using OTMS.Entities.DTOs.EmergencyOverrideRequest;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
+using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
     public class EmergencyOverrideService(IHttpContextAccessor httpContextAccessor, OTMSDbContext context) : IEmergencyOverrideService
     {
-        public async Task<EmergencyOverrideResponseDTO> ApproveOverrideAsync(Guid adminId, ApproveEmergencyOverrideDTO request)
+        public async Task<EmergencyOverrideResponseDTO> ApproveOverrideAsync(ApproveEmergencyOverrideDTO request)
         {
+            var accountIdClaim = httpContextAccessor
+                .HttpContext?
+                .User
+                .FindFirst(ClaimTypes.NameIdentifier)?
+                .Value;
+
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException(
+                    "Invalid user session.");
+            }
+
+            var adminId = Guid.Parse(accountIdClaim);
+
             var emergencyOverride = await context.EmergencyOverrideRequests
                 .FirstOrDefaultAsync(e =>
                     e.EmergencyOverrideId == request.EmergencyOverrideId);
@@ -40,8 +55,22 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<EmergencyOverrideResponseDTO> RequestOverrideAsync(Guid accountId, CreateEmergencyOverrideRequestDTO request)
+        public async Task<EmergencyOverrideResponseDTO> RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
         {
+            var accountIdClaim = httpContextAccessor
+                .HttpContext?
+                .User
+                .FindFirst(ClaimTypes.NameIdentifier)?
+                .Value;
+
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException(
+                    "Invalid user session.");
+            }
+
+            var accountId = Guid.Parse(accountIdClaim);
+
             var leaveRequest = await context.LeaveRequests
                 .FirstOrDefaultAsync(lr =>
                     lr.LeaveId == request.LeaveId &&
