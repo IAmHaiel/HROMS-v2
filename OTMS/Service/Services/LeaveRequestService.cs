@@ -43,6 +43,7 @@ namespace OTMS.Service.Services
             var leaveRequest = new LeaveRequest
             {
                 AccountId = profile.Account.AccountId,
+                Leave_Type = request.Leave_Type,
                 Start_Date = request.Start_Date,
                 End_Date = request.End_Date,
                 Reason = request.Reason,
@@ -58,6 +59,7 @@ namespace OTMS.Service.Services
                 AccountId = leaveRequest.AccountId,
                 Start_Date = leaveRequest.Start_Date,
                 End_Date = leaveRequest.End_Date,
+                Leave_Type = leaveRequest.Leave_Type,
                 Reason = leaveRequest.Reason,
                 Approval_Status = leaveRequest.Approval_Status
             };
@@ -126,6 +128,7 @@ namespace OTMS.Service.Services
 
             leaveRequest.Approved_By = profile.Account.AccountId;
             leaveRequest.Approval_Status = request.Approval_Status;
+            leaveRequest.LeaveRequestNote = request.LeaveRequestNote;
             await context.SaveChangesAsync();
 
             return true;
