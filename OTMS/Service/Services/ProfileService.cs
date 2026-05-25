@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs.Profile;
 using OTMS.Entities.DTOs.Profile.Responses;
@@ -32,6 +33,15 @@ namespace OTMS.Service.Services
 
             if (profile is null || profile.Account is null)
                 return null;
+
+            if (request.NewPassword.Length < PasswordLength.MinimumLength || request.NewPassword.Length > PasswordLength.MaximumLength)
+            {
+                return new ChangePasswordResponseDTO
+                {
+                    EmployeeNumber = profile.EmployeeNumber,
+                    Success = false
+                };
+            }
 
             // Change Password
             var passwordHasher = new PasswordHasher<Account>();

@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using OTMS.Common.Constraints;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace OTMS.Service.Helper
@@ -29,9 +30,9 @@ namespace OTMS.Service.Helper
             "silver"
         };
 
-        public static string Generate(int minimumLength = 15)
+        public static string Generate(int minimumLength = PasswordLength.MinimumLength)
         {
-            if (minimumLength < 15)
+            if (minimumLength < PasswordLength.MinimumLength)
             {
                 throw new ArgumentException(
                     "Passphrase must be at least 15 characters long."
