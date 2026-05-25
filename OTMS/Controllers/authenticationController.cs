@@ -13,7 +13,7 @@ namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class authenticationController(OTMSDbContext context, IAuthService authService, ILeaveRequest lrService, IActivityLogService activitylogService) : ControllerBase
+    public class authenticationController(OTMSDbContext context, IAuthService authService, ILeaveRequest lrService, IActivityLogService activitylogService, IEmployeeService employeeService) : ControllerBase
     {
 
         // Authentication APIs
@@ -31,7 +31,14 @@ namespace OTMS.Controllers
         [ProducesResponseType(500)]
         public async Task<ActionResult<TokenResponseDTO>> Login(EmployeeLoginDTO request)
         {
-            var employee = await 
+            var employee = await employeeService.GetEmployeeByEmployeeNumberAsync(request.EmployeeNumber);
+
+            if(employee is null || employee.Account is null)
+            {
+                return Unauthorized(new { message = "Invalid Employee ID or password." });
+            }
+
+            await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
 
             var result = await authService.LoginAsync(request);
             if (result is null)
