@@ -175,6 +175,11 @@ namespace OTMS.Service.Services
 
             var generatedUserPassword = PasswordGenerator.Generate();
 
+            if (generatedPassword.Length < 15 || generatedPassword.Length > 64)
+            {
+                throw new InvalidOperationException("Generated password must be between 15 and 20 characters long.");
+            }
+
             account.PasswordHash = passwordHasher.HashPassword(
                 account,
                 generatedUserPassword
