@@ -34,6 +34,7 @@ import {
     ChevronDown,
     ChevronUp,
     ChevronLeft,
+    RefreshCw,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -47,7 +48,7 @@ type LeaveType = 'vacation' | 'sick' | 'emergency' | 'personal' | 'maternity' | 
 type LeaveStatus = 'pending' | 'approved' | 'declined';
 
 interface Task {
-    id: number;
+    id: string;
     name: string;
     description: string;
     deadline: string;
@@ -55,6 +56,19 @@ interface Task {
     status: TaskStatus;
     progress: number;
     assignedBy: string;
+    remarks?: string;
+}
+
+interface TaskResponseDTO {
+    taskId: string;
+    taskTitle: string;
+    taskDescription?: string;
+    priority: string;
+    dueAt: string;
+    taskStatus: string;
+    assignedEmployee: string;
+    createdByEmployee: string;
+    createdAt: string;
 }
 
 interface UserProfile {
@@ -79,21 +93,72 @@ interface LeaveRecord {
 
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
-const MY_TASKS: Task[] = [
-    { id: 1, name: 'Update delivery route maps', description: 'Review and update all Q2 delivery routes based on new zone assignments for Metro Manila.', deadline: '2026-04-28', priority: 'high', status: 'in-progress', progress: 65, assignedBy: 'Ops Admin' },
-    { id: 2, name: 'SLA report for April', description: 'Generate and submit the monthly SLA compliance report to the operations manager.', deadline: '2026-05-01', priority: 'medium', status: 'pending', progress: 0, assignedBy: 'Ops Admin' },
-    { id: 3, name: 'Fleet inspection checklist', description: 'Complete vehicle inspection for units V-001 through V-008 and log findings.', deadline: '2026-04-29', priority: 'high', status: 'pending', progress: 0, assignedBy: 'Ops Admin' },
-    { id: 4, name: 'Coordinate morning dispatch', description: 'Oversee and log the morning dispatch schedule for the north sector team.', deadline: '2026-04-27', priority: 'medium', status: 'in-progress', progress: 80, assignedBy: 'Ops Admin' },
-    { id: 5, name: 'Warehouse zone audit — Sec A', description: 'Conduct physical count and audit for warehouse section A, rows 1–12.', deadline: '2026-04-24', priority: 'low', status: 'completed', progress: 100, assignedBy: 'Ops Admin' },
-    { id: 6, name: 'Driver briefing deck', description: 'Prepare orientation briefing materials for three new drivers onboarding next Monday.', deadline: '2026-04-25', priority: 'high', status: 'overdue', progress: 35, assignedBy: 'Ops Admin' },
-];
-
 const SEED_LEAVE_RECORDS: LeaveRecord[] = [
     { id: 1, leaveType: 'vacation', startDate: '2026-03-10', endDate: '2026-03-14', reason: 'Family vacation to Cebu.', status: 'approved', submittedAt: '2026-03-01', reviewedBy: 'Ops Admin', reviewNote: 'Approved. Enjoy your trip!' },
     { id: 2, leaveType: 'sick', startDate: '2026-04-02', endDate: '2026-04-03', reason: 'Fever and flu symptoms.', status: 'approved', submittedAt: '2026-04-02', reviewedBy: 'Ops Admin' },
     { id: 3, leaveType: 'personal', startDate: '2026-04-20', endDate: '2026-04-20', reason: 'Personal errand that cannot be rescheduled.', status: 'declined', submittedAt: '2026-04-15', reviewedBy: 'Ops Admin', reviewNote: 'Critical operations that week — please coordinate with the team.' },
     { id: 4, leaveType: 'emergency', startDate: '2026-05-28', endDate: '2026-05-30', reason: 'Family emergency — hospitalization of parent.', status: 'pending', submittedAt: '2026-05-24' },
 ];
+
+// ─── API Helpers ──────────────────────────────────────────────────────────────
+
+const authHeader = (): HeadersInit => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
+});
+
+// Map backend LeaveRequestResponseDTO → frontend LeaveRecord
+const dtoToLeaveRecord = (dto: any): LeaveRecord => {
+    const statusMap: Record<string, LeaveStatus> = {
+        Pending: 'pending',
+        Approved: 'approved',
+        Declined: 'declined',
+        Rejected: 'declined',
+    };
+    return {
+        id: dto.leaveId ?? dto.LeaveId ?? Date.now(),
+        leaveType: 'other',        
+        startDate: (dto.start_Date ?? dto.Start_Date ?? '').split('T')[0],
+        endDate: (dto.end_Date ?? dto.End_Date ?? '').split('T')[0],
+        reason: dto.reason ?? dto.Reason ?? '',
+        status: statusMap[dto.approval_Status ?? dto.Approval_Status] ?? 'pending',
+        submittedAt: (dto.submittedAt ?? dto.start_Date ?? new Date().toISOString()).split('T')[0],
+        reviewedBy: dto.approvedBy ?? dto.Approved_By ?? undefined,
+    };
+};
+
+const dtoToTask = (dto: TaskResponseDTO): Task => {
+    const priorityMap: Record<string, Priority> = {
+        High: 'high',
+        Medium: 'medium',
+        Low: 'low',
+    };
+    const statusMap: Record<string, TaskStatus> = {
+        Pending: 'pending',
+        'In Progress': 'in-progress',
+        Completed: 'completed',
+    };
+
+    const status: TaskStatus = statusMap[dto.taskStatus] ?? 'pending';
+
+    const defaultProgress: Record<TaskStatus, number> = {
+        pending: 0,
+        'in-progress': 50,
+        completed: 100,
+        overdue: 0,
+    };
+
+    return {
+        id: dto.taskId,
+        name: dto.taskTitle,
+        description: dto.taskDescription ?? '',
+        deadline: dto.dueAt ? dto.dueAt.split('T')[0] : '',
+        priority: priorityMap[dto.priority] ?? 'medium',
+        status,
+        progress: defaultProgress[status],
+        assignedBy: dto.createdByEmployee,
+    };
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,83 +209,13 @@ const LEAVE_TYPES: { key: LeaveType; label: string; icon: React.ReactNode }[] = 
 const leaveTypeLabel = (key: LeaveType) =>
     LEAVE_TYPES.find(lt => lt.key === key)?.label ?? key;
 
-// ─── Progress Update Modal ────────────────────────────────────────────────────
+// ─── Task Detail Modal ────────────────────────────────────────────────────────
 
-interface ProgressModalProps {
+interface TaskDetailProps {
     task: Task;
-    onSave: (id: number, status: TaskStatus, progress: number) => void;
+    onUpdate: () => void;
     onClose: () => void;
 }
-
-const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
-    const [status, setStatus] = useState<TaskStatus>(task.status);
-    const [progress, setProgress] = useState(task.progress);
-
-    const handleStatusChange = (s: TaskStatus) => {
-        setStatus(s);
-        if (s === 'completed') setProgress(100);
-        if (s === 'pending') setProgress(0);
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div>
-                        <h3>Update Progress</h3>
-                        <p className="modal-sub">FR-017 · {task.name}</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-                <div className="field">
-                    <label>Progress — <strong>{progress}%</strong></label>
-                    <div className="slider-wrap">
-                        <input
-                            type="range" min={0} max={100} step={5}
-                            value={progress}
-                            disabled={status === 'completed'}
-                            onChange={e => setProgress(Number(e.target.value))}
-                            className="progress-slider"
-                        />
-                        <div className="slider-track-fill" style={{ width: `${progress}%` }} />
-                    </div>
-                    <div className="slider-labels"><span>0%</span><span>50%</span><span>100%</span></div>
-                </div>
-                <div className="field">
-                    <label>Status</label>
-                    <div className="status-chips">
-                        {(['pending', 'in-progress', 'completed'] as TaskStatus[]).map(s => (
-                            <button
-                                key={s}
-                                className={`status-chip${status === s ? ' active' : ''} chip-${s}`}
-                                onClick={() => handleStatusChange(s)}
-                            >
-                                {statusMeta[s].icon}
-                                {statusMeta[s].label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                <div className="progress-preview">
-                    <div className="pp-bar">
-                        <div className={`pp-fill ${priorityMeta[task.priority].bar}`} style={{ width: `${progress}%` }} />
-                    </div>
-                    <span className="pp-pct">{progress}%</span>
-                </div>
-                <div className="modal-actions">
-                    <button className="btn" onClick={onClose}>Cancel</button>
-                    <button className="btn btn-primary" onClick={() => onSave(task.id, status, progress)}>
-                        <Save size={13} /> Save Progress
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ─── Task Detail Drawer ───────────────────────────────────────────────────────
-
-interface TaskDetailProps { task: Task; onUpdate: () => void; onClose: () => void; }
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     const es = effectiveStatus(task);
@@ -229,42 +224,57 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card detail-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-head">
-                    <div>
-                        <div className="detail-badges">
-                            <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
-                            <span className={`prio-pill ${pm.cls}`}>{task.priority} priority</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span className={`prio-strip ${pm.cls}`} style={{ width: 6, height: 36, borderRadius: 3, display: 'inline-block' }} />
+                        <div>
+                            <h3 style={{ margin: 0 }}>{task.name}</h3>
+                            <span className={`badge ${sm.cls}`} style={{ marginTop: 4 }}>{sm.icon}{sm.label}</span>
                         </div>
-                        <h3 style={{ marginTop: 8 }}>{task.name}</h3>
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
-                <p className="detail-desc">{task.description}</p>
-                <div className="detail-meta-grid">
-                    <div className="detail-meta-item">
-                        <span className="dmi-label">Deadline</span>
-                        <span className={`dmi-value${es === 'overdue' ? ' overdue-text' : ''}`}>{fmtDate(task.deadline)}</span>
+
+                <div style={{ padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {task.description && (
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
+                        </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Deadline</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{fmtDate(task.deadline)}</p>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Priority</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14, textTransform: 'capitalize' }}>{task.priority}</p>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Assigned by</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.assignedBy}</p>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Progress</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.progress}%</p>
+                        </div>
                     </div>
-                    <div className="detail-meta-item">
-                        <span className="dmi-label">Assigned By</span>
-                        <span className="dmi-value">{task.assignedBy}</span>
+                    <div>
+                        <div className="tc-bar" style={{ height: 8 }}>
+                            <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
+                        </div>
                     </div>
-                    <div className="detail-meta-item">
-                        <span className="dmi-label">Current Progress</span>
-                        <span className="dmi-value">{task.progress}%</span>
-                    </div>
-                    <div className="detail-meta-item">
-                        <span className="dmi-label">Status</span>
-                        <span className={`badge ${sm.cls}`}>{sm.label}</span>
-                    </div>
+                    {task.remarks && (
+                        <div>
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
+                        </div>
+                    )}
                 </div>
-                <div className="detail-progress">
-                    <div className="dp-bar">
-                        <div className={`dp-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
-                    </div>
-                </div>
-                <div className="modal-actions">
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
                     <button className="btn" onClick={onClose}>Close</button>
                     {task.status !== 'completed' && (
                         <button className="btn btn-primary" onClick={onUpdate}>
@@ -277,9 +287,134 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     );
 };
 
+// ─── Progress Update Modal ────────────────────────────────────────────────────
+
+interface ProgressModalProps {
+    task: Task;
+    onSave: (id: string, status: TaskStatus, progress: number, remarks: string) => Promise<void>;
+    onClose: () => void;
+}
+
+const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
+    const [status, setStatus] = useState<TaskStatus>(
+        task.status === 'overdue' ? 'in-progress' : task.status
+    );
+    const [progress, setProgress] = useState(task.progress);
+    const [remarks, setRemarks] = useState(task.remarks ?? '');
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleStatusChange = (s: TaskStatus) => {
+        setStatus(s);
+        if (s === 'completed') setProgress(100);
+        if (s === 'pending') setProgress(0);
+    };
+
+    const handleSave = async () => {
+        setError('');
+        setSaving(true);
+        try {
+            await onSave(task.id, status, progress, remarks);
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to save. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const statusOptions: { value: TaskStatus; label: string }[] = [
+        { value: 'pending', label: 'Pending' },
+        { value: 'in-progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+    ];
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                    <div>
+                        <h3>Update Progress</h3>
+                        <p className="modal-sub">{task.name}</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 14 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                <div className="field">
+                    <label>Status</label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {statusOptions.map(opt => (
+                            <button
+                                key={opt.value}
+                                className={`filter-pill${status === opt.value ? ' active' : ''}`}
+                                onClick={() => handleStatusChange(opt.value)}
+                            >
+                                {statusMeta[opt.value].icon} {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Progress — {progress}%</label>
+                    <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={progress}
+                        disabled={status === 'completed'}
+                        onChange={e => setProgress(Number(e.target.value))}
+                        style={{ width: '100%', accentColor: 'var(--primary)' }}
+                    />
+                    <div className="tc-bar" style={{ marginTop: 6, height: 8 }}>
+                        <div
+                            className={`tc-fill ${priorityMeta[task.priority].bar}`}
+                            style={{ width: `${progress}%`, transition: 'width 0.2s' }}
+                        />
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                    <textarea
+                        className="leave-reason-textarea"
+                        rows={3}
+                        maxLength={300}
+                        placeholder="Add any notes about your progress…"
+                        value={remarks}
+                        onChange={e => setRemarks(e.target.value)}
+                    />
+                    <div className="leave-char-count">{remarks.length} / 300</div>
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                    <button className="btn" onClick={onClose}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Saving…</>
+                            : <><Save size={13} /> Save Progress</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
-interface TaskCardProps { task: Task; onView: (id: number) => void; onUpdate: (id: number) => void; }
+interface TaskCardProps {
+    task: Task;
+    onView: (id: string) => void;
+    onUpdate: (id: string) => void;
+}
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
     const es = effectiveStatus(task);
@@ -291,7 +426,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
         : null;
 
     return (
-        <div className={`task-card${od ? ' task-card-overdue' : ''}`}>
+        <div
+            className={`task-card task-card-clickable${od ? ' task-card-overdue' : ''}`}
+            onClick={() => onView(task.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => e.key === 'Enter' && onView(task.id)}
+        >
             <div className="tc-top">
                 <span className={`prio-strip ${pm.cls}`} />
                 <div className="tc-header">
@@ -317,14 +458,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
                 <span className="tc-pct">{task.progress}%</span>
             </div>
             <div className="tc-actions">
-                <button className="btn btn-sm btn-ghost" onClick={() => onView(task.id)}>
-                    <Eye size={13} /> View
-                </button>
-                {task.status !== 'completed' && (
-                    <button className="btn btn-sm btn-primary" onClick={() => onUpdate(task.id)}>
-                        <Pencil size={13} /> Update
-                    </button>
-                )}
                 {task.status === 'completed' && (
                     <span className="completed-pill"><CheckCircle2 size={12} /> Done</span>
                 )}
@@ -338,8 +471,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
 interface DashboardTabProps {
     tasks: Task[];
     user: UserProfile;
-    onView: (id: number) => void;
-    onUpdate: (id: number) => void;
+    onView: (id: string) => void;
+    onUpdate: (id: string) => void;
     onGoTasks: () => void;
 }
 
@@ -453,9 +586,16 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
 
 // ─── My Tasks Tab ─────────────────────────────────────────────────────────────
 
-interface MyTasksTabProps { tasks: Task[]; onView: (id: number) => void; onUpdate: (id: number) => void; }
+interface MyTasksTabProps {
+    tasks: Task[];
+    loading: boolean;
+    error: string;
+    onView: (id: string) => void;
+    onUpdate: (id: string) => void;
+    onRetry: () => void;
+}
 
-const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
+const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, onUpdate, onRetry }) => {
     const [filter, setFilter] = useState<'all' | TaskStatus>('all');
 
     const filters: { key: 'all' | TaskStatus; label: string; count: number }[] = [
@@ -469,6 +609,35 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
     const filtered = filter === 'all' ? tasks
         : filter === 'overdue' ? tasks.filter(t => effectiveStatus(t) === 'overdue')
             : tasks.filter(t => t.status === filter);
+
+    if (loading) {
+        return (
+            <div className="tab-content">
+                <div className="card">
+                    <div className="empty-state">
+                        <Loader2 size={22} className="spin" />
+                        <p>Loading your tasks…</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="tab-content">
+                <div className="card">
+                    <div className="empty-state">
+                        <AlertCircle size={22} style={{ color: 'var(--danger)' }} />
+                        <p>{error}</p>
+                        <button className="btn btn-primary" onClick={onRetry} style={{ marginTop: 8 }}>
+                            <RefreshCw size={13} /> Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="tab-content">
@@ -487,7 +656,7 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, onView, onUpdate }) => {
     );
 };
 
-// ─── Leave Request Card ───────────────────────────────────────────────────────
+// ─── Leave Record Card ────────────────────────────────────────────────────────
 
 const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     const [expanded, setExpanded] = useState(false);
@@ -574,19 +743,28 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
 
         setSubmitting(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/leave/request', {
+            const res = await fetch('/api/leaverequest/create-leave-request', {   // ← fixed endpoint
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ leaveType, startDate, endDate, reason: reason.trim() }),
+                headers: authHeader(),
+                body: JSON.stringify({
+                    Start_Date: startDate,   // ← matches CreateLeaveRequestDTO
+                    End_Date: endDate,
+                    Reason: reason.trim(),
+                }),
             });
+
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error((err as any).message || 'Failed to submit leave request.');
+                throw new Error((err as any).message || (err as any).Message || 'Failed to submit leave request.');
             }
+
+            const data = await res.json();
+
             onSubmit({
-                id: Date.now(),
-                leaveType, startDate, endDate,
+                id: data.leaveId ?? data.LeaveId ?? Date.now(),
+                leaveType,                  // kept locally — backend doesn't store this field yet
+                startDate,
+                endDate,
                 reason: reason.trim(),
                 status: 'pending',
                 submittedAt: today,
@@ -602,8 +780,6 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card leave-request-modal" onClick={e => e.stopPropagation()}>
-
-                {/* ── Header ── */}
                 <div className="modal-head">
                     <div className="leave-modal-title-block">
                         <div className="leave-modal-icon">
@@ -617,14 +793,12 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
 
-                {/* ── Error ── */}
                 {error && (
                     <div className="form-api-error" style={{ marginBottom: 14 }}>
                         <AlertCircle size={14} /><span>{error}</span>
                     </div>
                 )}
 
-                {/* ── Leave Type ── */}
                 <div className="field">
                     <label>Leave type</label>
                     <div className="leave-type-grid">
@@ -641,7 +815,6 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                     </div>
                 </div>
 
-                {/* ── Date Range ── */}
                 <div className="leave-date-row">
                     <div className="field">
                         <label>Start date</label>
@@ -669,7 +842,6 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                     </div>
                 </div>
 
-                {/* ── Duration Pill ── */}
                 {dayCount !== null && (
                     <div className="leave-duration-pill" style={{ marginBottom: 4 }}>
                         <Clock size={13} />
@@ -677,7 +849,6 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                     </div>
                 )}
 
-                {/* ── Reason ── */}
                 <div className="field">
                     <label>Reason</label>
                     <textarea
@@ -691,7 +862,6 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                     <div className="leave-char-count">{reason.length} / 300</div>
                 </div>
 
-                {/* ── Footer ── */}
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
                     <span className="leave-footer-note">
                         <AlertCircle size={12} /> Requires manager approval
@@ -736,7 +906,6 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
     const totalPages = Math.max(1, Math.ceil(sortedRecords.length / PAGE_SIZE));
     const paginatedRecords = sortedRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-    // Reset to page 1 when filter changes
     const handleFilterChange = (f: 'all' | LeaveStatus) => {
         setHistFilter(f);
         setCurrentPage(1);
@@ -750,7 +919,6 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
 
     return (
         <div className="tab-content">
-            {/* ── Top Row: Title + Button ── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h2 style={{ margin: 0 }}>Leave Requests</h2>
                 <button className="btn btn-sm btn-primary" onClick={() => setShowModal(true)}>
@@ -758,7 +926,6 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                 </button>
             </div>
 
-            {/* ── Summary Stats ── */}
             <div className="leave-stats-row">
                 <div className="leave-stat-card leave-stat-pending">
                     <div className="lst-icon"><CalendarClock size={20} /></div>
@@ -774,20 +941,17 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                 </div>
             </div>
 
-            {/* ── Success Toast ── */}
             {success && (
                 <div className="toast-success">
                     <CheckCircle2 size={15} /> Request submitted — your manager will review it shortly.
                 </div>
             )}
 
-            {/* ── History Card ── */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="card-header" style={{ padding: '16px 18px 14px' }}>
                     <h3>My Leave History</h3>
                 </div>
 
-                {/* ── Filter Pills ── */}
                 <div className="leave-hist-filter" style={{ padding: '0 18px 12px' }}>
                     {(['all', 'pending', 'approved', 'declined'] as const).map(f => (
                         <button
@@ -804,7 +968,6 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                     ))}
                 </div>
 
-                {/* ── Records List ── */}
                 <div className="leave-records-list">
                     {paginatedRecords.length === 0
                         ? (
@@ -817,18 +980,13 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                     }
                 </div>
 
-                {/* ── Pagination ── */}
                 {sortedRecords.length > PAGE_SIZE && (
                     <div className="leave-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderTop: '1px solid var(--border)' }}>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                             Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
                         </span>
                         <div style={{ display: 'flex', gap: 4 }}>
-                            <button
-                                className="btn btn-sm"
-                                onClick={() => setCurrentPage(p => p - 1)}
-                                disabled={currentPage === 1}
-                            >
+                            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
                                 <ChevronLeft size={14} />
                             </button>
                             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
@@ -841,11 +999,7 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                                     {page}
                                 </button>
                             ))}
-                            <button
-                                className="btn btn-sm"
-                                onClick={() => setCurrentPage(p => p + 1)}
-                                disabled={currentPage === totalPages}
-                            >
+                            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
                                 <ChevronRight size={14} />
                             </button>
                         </div>
@@ -853,7 +1007,6 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
                 )}
             </div>
 
-            {/* ── Leave Request Modal ── */}
             {showModal && (
                 <LeaveRequestModal
                     onClose={() => setShowModal(false)}
@@ -894,11 +1047,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         }
         setProfileSaving(true); setProfileError('');
         try {
-            const token = localStorage.getItem('authToken');
             const employeeId = localStorage.getItem('employeeId') ?? '';
             const res = await fetch('/api/profile/update-profile', {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: authHeader(),
                 body: JSON.stringify({ employeeNumber: employeeId, employeeName: form.employeeName.trim(), contactNumber: form.contactNumber.trim() }),
             });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Profile update failed.'); }
@@ -918,10 +1070,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         if (pwd.next !== pwd.confirm) { setPwdError('Passwords do not match.'); return; }
         setPwdSaving(true);
         try {
-            const token = localStorage.getItem('authToken');
             const res = await fetch('/api/profile/change-password', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: authHeader(),
                 body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
             });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Password update failed.'); }
@@ -1058,10 +1209,39 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
 export default function EmployeeDashboard() {
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-    const [tasks, setTasks] = useState<Task[]>(MY_TASKS);
-    const [viewingId, setViewingId] = useState<number | null>(null);
-    const [updatingId, setUpdatingId] = useState<number | null>(null);
-    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>(SEED_LEAVE_RECORDS);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [tasksLoading, setTasksLoading] = useState(true);
+    const [tasksError, setTasksError] = useState('');
+
+    const [viewingId, setViewingId] = useState<string | null>(null);
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
+    const [leaveLoading, setLeaveLoading] = useState(false);
+
+    const fetchLeaveRecords = async () => {
+        setLeaveLoading(true);
+        try {
+            // Uses the "get all" endpoint — swap for a "my requests" endpoint if/when it's added
+            const res = await fetch('/api/leaverequest/get-all-leave-requests', {
+                headers: authHeader(),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data: any[] = await res.json();
+
+            // Filter to only this employee's records using stored employeeId
+            const myAccountId = localStorage.getItem('employeeId') ?? '';
+            const mine = data.filter(d =>
+                String(d.accountId ?? d.AccountId) === myAccountId
+            );
+            setLeaveRecords(mine.map(dtoToLeaveRecord));
+        } catch (err) {
+            // Non-fatal: leave history simply stays empty; user can still submit new requests
+            console.warn('Could not load leave records:', err);
+            setLeaveRecords([]);
+        } finally {
+            setLeaveLoading(false);
+        }
+    };
 
     const [user, setUser] = useState<UserProfile>({
         employeeId: localStorage.getItem('employeeId') ?? '',
@@ -1078,12 +1258,13 @@ export default function EmployeeDashboard() {
         navigate('/');
     };
 
+    // ── Fetch profile ──────────────────────────────────────────────────────────
     useEffect(() => {
         const token = localStorage.getItem('authToken');
         const employeeId = localStorage.getItem('employeeId');
         if (!token || !employeeId) { setLoadingUser(false); return; }
 
-        fetch('/api/profile/view-profile', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('/api/profile/view-profile', { headers: authHeader() })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
             .then((data: any) => {
                 const fetched: UserProfile = {
@@ -1102,14 +1283,81 @@ export default function EmployeeDashboard() {
             .finally(() => setLoadingUser(false));
     }, []);
 
-    const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
-    const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
-
-    const handleSaveProgress = (id: number, status: TaskStatus, progress: number) => {
-        setTasks(ts => ts.map(t => t.id === id ? { ...t, status, progress: status === 'completed' ? 100 : progress } : t));
-        setUpdatingId(null);
+    // ── Fetch tasks ────────────────────────────────────────────────────────────
+    const fetchTasks = async () => {
+        setTasksLoading(true);
+        setTasksError('');
+        try {
+            const res = await fetch('/api/task/my-tasks', { headers: authHeader() });
+            if (res.status === 401) { handleLogout(); return; }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || `Failed to load tasks (${res.status}).`);
+            }
+            const data: TaskResponseDTO[] = await res.json();
+            setTasks(data.map(dtoToTask));
+        } catch (err: any) {
+            setTasksError(err.message ?? 'Unable to load tasks. Check your connection and try again.');
+        } finally {
+            setTasksLoading(false);
+        }
     };
 
+    useEffect(() => {
+        fetchTasks();
+        fetchLeaveRecords();    // ← moved here, runs once on mount alongside fetchTasks
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── Save progress ──────────────────────────────────────────────────────────
+    const toBackendStatus = (status: TaskStatus): string => {
+        const map: Record<TaskStatus, string> = {
+            pending: 'Pending',
+            'in-progress': 'In Progress',
+            completed: 'Completed',
+            overdue: 'In Progress',
+        };
+        return map[status];
+    };
+
+    const handleSaveProgress = async (
+        id: string,
+        status: TaskStatus,
+        progress: number,
+        remarks: string
+    ): Promise<void> => {
+        const res = await fetch(`/api/task/${id}/progress`, {
+            method: 'PATCH',
+            headers: authHeader(),
+            body: JSON.stringify({
+                TaskStatus: toBackendStatus(status),
+                TaskRemarks: remarks.trim() || undefined,
+            }),
+        });
+
+        if (res.status === 401) { handleLogout(); return; }
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as any).message || 'Failed to update task progress.');
+        }
+
+        setTasks(ts =>
+            ts.map(t =>
+                t.id === id
+                    ? {
+                        ...t,
+                        status: status === 'overdue' ? 'in-progress' : status,
+                        progress: status === 'completed' ? 100 : progress,
+                        remarks: remarks.trim() || t.remarks,
+                    }
+                    : t
+            )
+        );
+    };
+
+    const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
+    const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
     const pendingLeaveCount = leaveRecords.filter(r => r.status === 'pending').length;
 
     const navItems: { tab: NavTab; label: string; icon: React.ReactNode; badge?: number }[] = [
@@ -1176,10 +1424,23 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {activeTab === 'dashboard' && (
-                    <DashboardTab tasks={tasks} user={user} onView={setViewingId} onUpdate={setUpdatingId} onGoTasks={() => setActiveTab('my-tasks')} />
+                    <DashboardTab
+                        tasks={tasks}
+                        user={user}
+                        onView={setViewingId}
+                        onUpdate={setUpdatingId}
+                        onGoTasks={() => setActiveTab('my-tasks')}
+                    />
                 )}
                 {activeTab === 'my-tasks' && (
-                    <MyTasksTab tasks={tasks} onView={setViewingId} onUpdate={setUpdatingId} />
+                    <MyTasksTab
+                        tasks={tasks}
+                        loading={tasksLoading}
+                        error={tasksError}
+                        onView={setViewingId}
+                        onUpdate={setUpdatingId}
+                        onRetry={fetchTasks}
+                    />
                 )}
                 {activeTab === 'leave' && (
                     <LeaveTab
