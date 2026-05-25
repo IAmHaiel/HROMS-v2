@@ -35,10 +35,10 @@ namespace OTMS.Service.Services
                 throw new Exception("Emergency Override request not found");
             }
 
-            emergencyOverride.Status = "Approved";
+            emergencyOverride.Status = request.Status;
             emergencyOverride.ApprovedById = adminId;
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
-            emergencyOverride.OverrideUntil = DateTime.UtcNow.AddDays(1);
+            emergencyOverride.OverrideUntil = request.OverrideUntil;
 
             await context.SaveChangesAsync();
 
