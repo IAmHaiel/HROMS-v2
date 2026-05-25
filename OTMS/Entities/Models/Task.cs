@@ -13,6 +13,7 @@
         public string? TaskDescription { get; set; }
         public string Priority { get; set; } = "Normal";
         public DateTime? DueAt { get; set; }
+        public bool Deleted { get; set; } = false;
 
         public string? TaskRemarks { get; set; }
         public string TaskStatus { get; set; } = "Pending";
