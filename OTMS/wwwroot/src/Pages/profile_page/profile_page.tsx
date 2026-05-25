@@ -1,5 +1,4 @@
-﻿namespace OTMS.wwwroot.simport React, { useState } from 'react';
-import './profile.css';
+﻿import './profile.css';
 import { User, Save, Pencil } from 'lucide-react';
 
 export default function Profile() {

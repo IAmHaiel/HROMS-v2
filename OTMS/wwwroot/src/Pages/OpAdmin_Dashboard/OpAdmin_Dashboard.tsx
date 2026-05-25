@@ -29,6 +29,7 @@ import './OpAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import TaskView, { TaskViewTask } from '../../components/TaskView/TaskView';
+import { useToast } from '../../components/Toast/Toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,15 +174,6 @@ interface TaskModalProps {
     onDelete?: () => void;
 }
 
-const EMPTY_FORM = {
-    taskTitle: '',
-    taskDescription: '',
-    dueAt: '',
-    priority: 'Medium' as Priority,
-    assignedTo: '',
-    taskRemarks: '',
-};
-
 const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, onSave, onClose, onDelete }) => {
     const resolvedAssignedTo =
         initial.assignedTo ||
@@ -202,9 +194,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
             setForm(prev => ({ ...prev, [key]: e.target.value }));
 
+    const [formError, setFormError] = useState('');
+
     const handleSave = () => {
-        if (!form.taskTitle.trim()) { alert('Task title is required'); return; }
-        if (!form.assignedTo) { alert('Please assign the task to someone'); return; }
+        if (!form.taskTitle.trim()) { setFormError('Task title is required.'); return; }
+        if (!form.assignedTo) { setFormError('Please assign the task to someone.'); return; }
+        setFormError('');
         setSubmitting(true);
         onSave({
             taskTitle: form.taskTitle.trim(),
@@ -229,6 +224,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
+
                 <div className="modal-form">
                     <div className="field">
                         <label>Task Title</label>
@@ -313,16 +309,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                     )}
                 </div>
+
+                {formError && (
+                    <div className="form-api-error" style={{ marginBottom: 8 }}>
+                        <AlertCircle size={14} /><span>{formError}</span>
+                    </div>
+                )}
+
                 <div className="modal-actions">
                     <div style={{ display: 'flex', gap: 8, flex: 1 }}>
                         {mode === 'edit' && onDelete && (
                             <button
                                 className="btn btn-danger"
-                                onClick={() => {
-                                    if (window.confirm('Delete this task? This cannot be undone.')) {
-                                        onDelete();
-                                    }
-                                }}
+                                onClick={() => onDelete()}
                                 disabled={submitting}
                             >
                                 <Trash2 size={13} /> Delete Task
@@ -763,6 +762,7 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
 
 function ProfileTab() {
     const employeeId = localStorage.getItem('employeeId') ?? '';
+    const { success, error } = useToast();
     const employeeName = localStorage.getItem('employeeName') ?? '';
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
 
@@ -848,7 +848,7 @@ function ProfileTab() {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Password update failed.');
             }
-            alert('Password changed successfully!');
+            success('Password changed successfully!');
             setEditingPassword(false);
             setPwForm({ current: '', next: '', confirm: '' });
         } catch (err: any) {
@@ -1161,6 +1161,7 @@ export default function OpsAdminDashboard() {
     const navigate = useNavigate();
     const employeeId = localStorage.getItem('employeeId') ?? '';
     const employeeName = localStorage.getItem('employeeName') ?? '';
+    const { success, error, confirm } = useToast();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -1235,8 +1236,9 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             setShowNew(false);
+            success('Task created successfully.');
         } catch (err: any) {
-            alert(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Failed to create task.');
         }
     };
 
@@ -1257,8 +1259,9 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             setEditingTask(null);
+            success('Task updated successfully.');
         } catch (err: any) {
-            alert(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Failed to update task.');
         }
     };
 
@@ -1275,12 +1278,19 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             setViewingTask(null);
+            success('Task reopened.');
         } catch (err: any) {
-            alert(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Failed to reopen task.');
         }
     };
 
     const handleDeleteTask = async (taskId: string) => {
+        const ok = await confirm('Delete this task? This cannot be undone.', {
+            confirmLabel: 'Delete',
+            cancelLabel: 'Keep',
+        });
+        if (!ok) return;
+
         try {
             const res = await fetch(`/api/task/delete-task/${taskId}`, {
                 method: 'DELETE',
@@ -1292,8 +1302,9 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             setEditingTask(null);
+            success('Task deleted successfully.');
         } catch (err: any) {
-            alert(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Something went wrong.');
         }
     };
 
