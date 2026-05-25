@@ -39,4 +39,5 @@ namespace OTMS.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+    }
 }

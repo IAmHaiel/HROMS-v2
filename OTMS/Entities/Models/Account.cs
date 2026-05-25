@@ -19,6 +19,7 @@
 
         // Navigation properties
         public Employee Employee { get; set; } = null!;
+        public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
         public ICollection<Task> AssignedTasks { get; set; } = new List<Task>();
         public ICollection<Task> CreatedTasks { get; set; } = new List<Task>();
         public ICollection<Notification> Notifications { get; set; } = new List<Notification>();

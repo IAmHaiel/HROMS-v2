@@ -68,6 +68,11 @@ namespace OTMS.Data
                 .HasOne(a => a.Account)
                 .WithMany()
                 .HasForeignKey(a => a.AccountId);
+            modelBuilder.Entity<ActivityLog>()
+                .HasOne(al => al.Account)
+                .WithMany(a => a.ActivityLogs)
+                .HasForeignKey(al => al.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Leave Request Relationships
             modelBuilder.Entity<LeaveRequest>()
