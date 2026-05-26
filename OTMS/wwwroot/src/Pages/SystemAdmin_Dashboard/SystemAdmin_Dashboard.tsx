@@ -28,11 +28,13 @@ import {
     CalendarRange,
     CalendarDays,
     Filter,
+    Copy,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './SystemAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
+import { useToast } from '../../components/Toast/Toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,6 +178,9 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
 
+    const [successData, setSuccessData] = useState<{ employeeNumber: string; generatedPassword: string } | null>(null);
+    const { success } = useToast();
+
     const handleChange =
         (key: keyof FormState) =>
             (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -208,9 +213,11 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 throw new Error(errorData.message || `Error ${res.status}: Registration failed`);
             }
             const data = await res.json();
-            alert(
-                `Employee account created successfully!\n\nEmployee Number: ${data.employeeNumber}\nGenerated Password: ${data.generatedPassword}\n\nSave this password. It will not be shown again.`
-            );
+            setSuccessData({
+                employeeNumber: data.employeeNumber,
+                generatedPassword: data.generatedPassword,
+            });
+            success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber,
                 employeeName: data.employeeName,
@@ -218,7 +225,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 role: data.role,
                 accountStatus: 'Active',
             });
-            onClose();
         } catch (err: any) {
             setApiError(err.message ?? 'Something went wrong. Please try again.');
         } finally {
@@ -273,6 +279,59 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                     </button>
                 </div>
             </div>
+
+            {successData && (
+                <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: '8px 0 20px' }}>
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(5,205,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircle2 size={28} color="#05cd99" />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0 }}>Employee registered</h3>
+                                <p className="modal-subtitle">Account has been created successfully.</p>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Employee number</span>
+                                <strong>{successData.employeeNumber}</strong>
+                            </div>
+                            <div style={{ height: 1, background: 'var(--border)' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Generated password</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{successData.generatedPassword}</code>
+                                    <button
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(successData?.generatedPassword ?? '');
+                                            success('Password copied!');
+                                        }}
+                                        title="Copy password"
+                                    >
+                                        <Copy size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,181,71,0.1)', border: '1px solid rgba(255,181,71,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#c05c00' }}>
+                            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                            Save this password now. It will not be shown again.
+                        </div>
+
+                        <button
+                            className="btn btn-primary"
+                            style={{ width: '100%' }}
+                            onClick={() => { setSuccessData(null); onClose(); }}
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

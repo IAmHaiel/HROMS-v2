@@ -35,7 +35,7 @@ namespace OTMS.Service.Services
             var accountStatus = employee?.Account?.AccountStatus;
             var accountFailedAttempts = employee?.Account?.FailedLoginAttempts;
 
-            
+
 
             if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
             {
@@ -55,13 +55,13 @@ namespace OTMS.Service.Services
                         e.Status == "Approved" &&
                         e.OverrideUntil > DateTime.UtcNow);
 
-               if (!hasEmergencyOverride)
+                if (!hasEmergencyOverride)
                 {
                     throw new Exception("Your account is currently on leave.");
                 }
 
-               employee.Account.AccountStatus = "Emergency Overriden";
-               await context.SaveChangesAsync();
+                employee.Account.AccountStatus = "Emergency Overriden";
+                await context.SaveChangesAsync();
             }
 
             var verificationResult =
@@ -75,28 +75,16 @@ namespace OTMS.Service.Services
             // If the Password is incorrect, return null to indicate failed login
             if (verificationResult == PasswordVerificationResult.Failed)
             {
-
-                var Account = await context.Accounts
-                    .FirstOrDefaultAsync(
-                        a => a.EmployeeId == employee.EmployeeId
-                    );
-
-                if (Account is not null && Account.Role != "SystemAdmin")
+                if (employee.Account.Role != "SystemAdmin")
                 {
-                    Account.FailedLoginAttempts++;
-                    context.Accounts.Update(Account);
+                    employee.Account.FailedLoginAttempts++;
+
+                    if (employee.Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
+                        employee.Account.AccountStatus = "Deactivated";
+
+                    context.Accounts.Update(employee.Account);
                     await context.SaveChangesAsync();
-                    
-                    if(Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
-                    {
-                        Account.AccountStatus = "Deactivated";
-                        context.Accounts.Update(Account);
-                        await context.SaveChangesAsync();
-                    }
-
-                    return null;
                 }
-
                 return null;
             }
 
@@ -135,39 +123,28 @@ namespace OTMS.Service.Services
             return await CreateTokenResponse(user);
         }
 
-        public async Task<EmployeeRegisterResponseDTO?> RegisterAsync(
-            EmployeeRegisterDTO request
-        )
+        public async Task<EmployeeRegisterResponseDTO?> RegisterAsync(EmployeeRegisterDTO request)
         {
             if (string.IsNullOrWhiteSpace(request.EmployeeNumber))
-            {
                 return null;
-            }
 
-            // Normalize the Employee Number to ensure consistent checks (e.g., uppercase and trim)
             request.EmployeeNumber = request.EmployeeNumber.ToUpper().Trim();
+            request.ContactNumber = ContactNumberFormatter(request.ContactNumber); // only once
 
-            // Check if the Contact Number is valid and format it
-            request.ContactNumber = ContactNumberFormatter(request.ContactNumber);
-
-            var exists = await context.Employees.AnyAsync(
-                u => u.EmployeeNumber == request.EmployeeNumber
-            );
-
-            // Check if the Contact Number is valid and format it
-            request.ContactNumber = ContactNumberFormatter(request.ContactNumber);
-
+            var exists = await context.Employees.AnyAsync(u => u.EmployeeNumber == request.EmployeeNumber);
             if (exists)
-            {
-                throw new InvalidOperationException("Employee Number already exists. Please choose a different one.");
-            }
+                throw new InvalidOperationException("Employee Number already exists.");
 
-            var generatedPassword = GeneratePassword();
+            var generatedUserPassword = PasswordGenerator.Generate(); // one password only
+
+            if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
+                generatedUserPassword.Length > PasswordLength.MaximumLength)
+                throw new InvalidOperationException("Generated password must be at least 15 characters long.");
 
             var employee = new Employee
             {
                 EmployeeId = Guid.NewGuid(),
-                EmployeeNumber = request.EmployeeNumber.Trim(),
+                EmployeeNumber = request.EmployeeNumber,
                 EmployeeName = request.EmployeeName.Trim(),
                 ContactNumber = request.ContactNumber.Trim(),
                 CreatedAt = DateTime.UtcNow
@@ -176,27 +153,14 @@ namespace OTMS.Service.Services
             var account = new Account
             {
                 AccountId = Guid.NewGuid(),
-                EmployeeId = employee.EmployeeId, // FK
+                EmployeeId = employee.EmployeeId,
                 Role = request.Role.Trim(),
                 AccountStatus = "Active",
                 CreatedAt = DateTime.UtcNow,
                 IsPasswordChanged = false
             };
 
-            var passwordHasher = new PasswordHasher<Account>();
-
-            var generatedUserPassword = PasswordGenerator.Generate();
-
-            if (generatedPassword.Length < PasswordLength.MinimumLength || generatedPassword.Length > PasswordLength.MaximumLength)
-            {
-                throw new InvalidOperationException("Generated password must be atleast 15 characters long.");
-            }
-
-            account.PasswordHash = passwordHasher.HashPassword(
-                account,
-                generatedUserPassword
-            );
-
+            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, generatedUserPassword);
             employee.Account = account;
 
             context.Employees.Add(employee);
@@ -217,7 +181,7 @@ namespace OTMS.Service.Services
 
         private static string ContactNumberFormatter(string contactNumber)
         {
-            if(string.IsNullOrEmpty(contactNumber))
+            if (string.IsNullOrEmpty(contactNumber))
             {
                 return contactNumber;
             }
