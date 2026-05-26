@@ -68,14 +68,43 @@ namespace OTMS.Service.Services
         public async Task<List<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync()
         {
             return await context.LeaveRequests
+                .Include(lr => lr.Account)
+                    .ThenInclude(a => a.Employee)
+                .OrderByDescending(lr => lr.Start_Date)
                 .Select(lr => new LeaveRequestResponseDTO
                 {
                     LeaveId = lr.LeaveId,
                     AccountId = lr.AccountId,
+                    EmployeeNumber = lr.Account.Employee.EmployeeNumber,
+                    EmployeeName = lr.Account.Employee.EmployeeName,
+                    Role = lr.Account.Role,
                     Start_Date = lr.Start_Date,
                     End_Date = lr.End_Date,
+                    Leave_Type = lr.Leave_Type,
                     Reason = lr.Reason,
-                    Approval_Status = lr.Approval_Status
+                    Approval_Status = lr.Approval_Status,
+                    LeaveRequestNote = lr.LeaveRequestNote,
+                    SubmittedAt = lr.Start_Date         
+                })
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<object>> GetMyLeaveRequestsAsync(Guid accountId)
+        {
+            return await context.LeaveRequests
+                .Where(l => l.AccountId == accountId && l.Deleted == false)
+                .OrderByDescending(l => l.Start_Date)
+                .Select(l => new
+                {
+                    l.LeaveId,
+                    l.AccountId,
+                    l.Leave_Type,
+                    l.Start_Date,
+                    l.End_Date,
+                    l.Reason,
+                    l.Approval_Status,
+                    l.LeaveRequestNote,
+                    l.Approved_By,
                 })
                 .ToListAsync();
         }

@@ -7,6 +7,7 @@ namespace OTMS.Service.Interfaces
     {
         Task<LeaveRequestResponseDTO> CreateLeaveRequestAsync(CreateLeaveRequestDTO request);
         Task<List<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync();
+        Task<IEnumerable<object>> GetMyLeaveRequestsAsync(Guid accountId);
         Task<bool> UpdateLeaveStatusAsync(Guid leaveId, UpdateLeaveStatusDTO request);
         Task UpdateEmployeeAvailabilityStatusesAsync(Guid accountId);
     }

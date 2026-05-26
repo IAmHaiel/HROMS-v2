@@ -544,18 +544,24 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
         setSubmitting(true);
         try {
             const token = localStorage.getItem('authToken');
-            const endpoint = isApprove
-                ? '/api/leave/approve'
-                : '/api/leave/decline';
-            const res = await fetch(endpoint, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ leaveId: request.id, reviewNote: note.trim() }),
+
+            const res = await fetch(`/api/leaverequest/${request.id}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    approval_Status: isApprove ? 'Approved' : 'Declined',
+                    leaveRequestNote: note.trim(),
+                }),
             });
+
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error((err as any).message || `Failed to ${action} leave request.`);
             }
+
             onConfirm(request.id, action, note.trim());
             onClose();
         } catch (err: any) {
@@ -783,38 +789,27 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
     // Fetch leave requests once
     useEffect(() => {
         const token = localStorage.getItem('authToken');
-        fetch('/api/leave/all', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('/api/leaverequest/get-all-leave-requests', {
+            headers: { 'Authorization': `Bearer ${token}` },
+        })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
             .then((data: any[]) => {
                 setLeaveRequests(Array.isArray(data) ? data.map(r => ({
-                    id: r.id,
-                    employeeNumber: r.employeeNumber,
-                    employeeName: r.employeeName,
+                    id: r.leaveId,                                                             
+                    employeeNumber: r.employeeNumber ?? '',
+                    employeeName: r.employeeName ?? '',
                     role: r.role ?? '',
-                    leaveType: r.leaveType,
-                    startDate: r.startDate,
-                    endDate: r.endDate,
-                    reason: r.reason,
-                    status: r.status,
-                    submittedAt: r.submittedAt,
-                    reviewedBy: r.reviewedBy,
-                    reviewNote: r.reviewNote,
+                    leaveType: ((r.leave_Type ?? r.leaveType ?? 'other') as string).toLowerCase() as LeaveType,
+                    startDate: (r.start_Date ?? r.startDate ?? '').split('T')[0],               
+                    endDate: (r.end_Date ?? r.endDate ?? '').split('T')[0],
+                    reason: r.reason ?? '',
+                    status: ((r.approval_Status ?? r.approvalStatus ?? 'pending') as string).toLowerCase() as LeaveStatus,
+                    submittedAt: (r.submittedAt ?? r.start_Date ?? '').split('T')[0],
+                    reviewedBy: r.reviewedBy ?? undefined,
+                    reviewNote: r.leaveRequestNote ?? r.reviewNote ?? undefined,                
                 })) : []);
             })
-            .catch(() => setLeaveRequests([
-                {
-                    id: 1,
-                    employeeNumber: 'EMP-0001',
-                    employeeName: 'Juan dela Cruz',
-                    role: 'OperationTeam',
-                    leaveType: 'vacation',
-                    startDate: '2026-05-28',
-                    endDate: '2026-05-30',
-                    reason: 'Family vacation to Cebu.',
-                    status: 'pending',
-                    submittedAt: '2026-05-24',
-                }
-            ]))
+            .catch(() => setLeaveRequests([]))                                                  
             .finally(() => setLeaveLoading(false));
     }, []);
 

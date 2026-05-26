@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Entities.DTOs.LeaveRequest;
 using OTMS.Service.Interfaces;
+using System.Security.Claims;
 
 namespace OTMS.Controllers
 {
@@ -30,9 +32,24 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
+        /// The system shall allow Operational Team members to view their own leave requests.
+        /// </summary>
+        [HttpGet("my-leave-requests")]
+        [Authorize(Policy = "ManagementAccess")]
+        public async Task<IActionResult> GetMyLeaveRequests()
+        {
+            var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
+                return Unauthorized();
+
+            var result = await leaveRequest.GetMyLeaveRequestsAsync(accountId);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Gets a list of all leave requests in the system. This endpoint is restricted to users with the "OperationAdmin" role, ensuring that only authorized personnel can access this sensitive information.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "SystemAdminAccess")]
         [HttpGet("get-all-leave-requests")]
         public async Task<IActionResult> GetAllLeaveRequests()
         {
@@ -43,7 +60,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Update Leave Status of the leave request. This endpoint is restricted to users with the "OperationAdmin" role, ensuring that only authorized personnel can update the status of leave requests.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "SystemAdminAccess")]
         [HttpPut("{leaveId}/status")]
         public async Task<IActionResult> UpdateLeaveStatus(Guid leaveId, [FromBody] UpdateLeaveStatusDTO request)
         {

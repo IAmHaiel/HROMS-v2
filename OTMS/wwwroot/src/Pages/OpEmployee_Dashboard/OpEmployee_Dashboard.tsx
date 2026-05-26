@@ -80,7 +80,7 @@ interface UserProfile {
 }
 
 interface LeaveRecord {
-    id: number;
+    id: string;
     leaveType: LeaveType;
     startDate: string;
     endDate: string;
@@ -90,15 +90,6 @@ interface LeaveRecord {
     reviewedBy?: string;
     reviewNote?: string;
 }
-
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-
-const SEED_LEAVE_RECORDS: LeaveRecord[] = [
-    { id: 1, leaveType: 'vacation', startDate: '2026-03-10', endDate: '2026-03-14', reason: 'Family vacation to Cebu.', status: 'approved', submittedAt: '2026-03-01', reviewedBy: 'Ops Admin', reviewNote: 'Approved. Enjoy your trip!' },
-    { id: 2, leaveType: 'sick', startDate: '2026-04-02', endDate: '2026-04-03', reason: 'Fever and flu symptoms.', status: 'approved', submittedAt: '2026-04-02', reviewedBy: 'Ops Admin' },
-    { id: 3, leaveType: 'personal', startDate: '2026-04-20', endDate: '2026-04-20', reason: 'Personal errand that cannot be rescheduled.', status: 'declined', submittedAt: '2026-04-15', reviewedBy: 'Ops Admin', reviewNote: 'Critical operations that week — please coordinate with the team.' },
-    { id: 4, leaveType: 'emergency', startDate: '2026-05-28', endDate: '2026-05-30', reason: 'Family emergency — hospitalization of parent.', status: 'pending', submittedAt: '2026-05-24' },
-];
 
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
@@ -111,19 +102,41 @@ const authHeader = (): HeadersInit => ({
 const dtoToLeaveRecord = (dto: any): LeaveRecord => {
     const statusMap: Record<string, LeaveStatus> = {
         Pending: 'pending',
+        pending: 'pending',
         Approved: 'approved',
+        approved: 'approved',
         Declined: 'declined',
+        declined: 'declined',
         Rejected: 'declined',
+        rejected: 'declined',
     };
+
+    const leaveTypeMap: Record<string, LeaveType> = {
+        vacation: 'vacation',
+        sick: 'sick',
+        'sick leave': 'sick',
+        emergency: 'emergency',
+        personal: 'personal',
+        maternity: 'maternity',
+        paternity: 'maternity',
+        other: 'other',
+    };
+
+    const rawLeaveType = (dto.leave_Type ?? dto.Leave_Type ?? dto.leaveType ?? '').toLowerCase();
+    const rawStatus = dto.approval_Status ?? dto.Approval_Status ?? dto.approvalStatus ?? '';
+    const rawStart = dto.start_Date ?? dto.Start_Date ?? dto.startDate ?? '';
+    const rawEnd = dto.end_Date ?? dto.End_Date ?? dto.endDate ?? '';
+
     return {
-        id: dto.leaveId ?? dto.LeaveId ?? Date.now(),
-        leaveType: 'other',        
-        startDate: (dto.start_Date ?? dto.Start_Date ?? '').split('T')[0],
-        endDate: (dto.end_Date ?? dto.End_Date ?? '').split('T')[0],
+        id: dto.leaveId ?? dto.LeaveId ?? String(Date.now()), 
+        leaveType: leaveTypeMap[rawLeaveType] ?? 'other',
+        startDate: rawStart.split('T')[0],
+        endDate: rawEnd.split('T')[0],
         reason: dto.reason ?? dto.Reason ?? '',
-        status: statusMap[dto.approval_Status ?? dto.Approval_Status] ?? 'pending',
-        submittedAt: (dto.submittedAt ?? dto.start_Date ?? new Date().toISOString()).split('T')[0],
+        status: statusMap[rawStatus] ?? 'pending',
+        submittedAt: rawStart.split('T')[0],
         reviewedBy: dto.approvedBy ?? dto.Approved_By ?? undefined,
+        reviewNote: dto.leaveRequestNote ?? dto.LeaveRequestNote ?? undefined,
     };
 };
 
@@ -747,9 +760,10 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
                 method: 'POST',
                 headers: authHeader(),
                 body: JSON.stringify({
-                    Start_Date: startDate,   // ← matches CreateLeaveRequestDTO
+                    Start_Date: startDate,  
                     End_Date: endDate,
                     Reason: reason.trim(),
+                    Leave_Type: leaveType,
                 }),
             });
 
@@ -761,8 +775,8 @@ const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit
             const data = await res.json();
 
             onSubmit({
-                id: data.leaveId ?? data.LeaveId ?? Date.now(),
-                leaveType,                  // kept locally — backend doesn't store this field yet
+                id: String(data.leaveId ?? data.LeaveId ?? Date.now()),
+                leaveType,                  
                 startDate,
                 endDate,
                 reason: reason.trim(),
@@ -1221,21 +1235,14 @@ export default function EmployeeDashboard() {
     const fetchLeaveRecords = async () => {
         setLeaveLoading(true);
         try {
-            // Uses the "get all" endpoint — swap for a "my requests" endpoint if/when it's added
-            const res = await fetch('/api/leaverequest/get-all-leave-requests', {
+            const res = await fetch('/api/leaverequest/my-leave-requests', {
                 headers: authHeader(),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data: any[] = await res.json();
 
-            // Filter to only this employee's records using stored employeeId
-            const myAccountId = localStorage.getItem('employeeId') ?? '';
-            const mine = data.filter(d =>
-                String(d.accountId ?? d.AccountId) === myAccountId
-            );
-            setLeaveRecords(mine.map(dtoToLeaveRecord));
+            setLeaveRecords(data.map(dtoToLeaveRecord));
         } catch (err) {
-            // Non-fatal: leave history simply stays empty; user can still submit new requests
             console.warn('Could not load leave records:', err);
             setLeaveRecords([]);
         } finally {
