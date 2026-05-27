@@ -55,6 +55,35 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<EmergencyOverrideResponseDTO> DeclineOverrideAsync(DeclineEmergencyOverrideDTO request)
+        {
+            var overrideRequest = await context.EmergencyOverrideRequests
+                .FirstOrDefaultAsync(e => e.EmergencyOverrideId == request.EmergencyOverrideId);
+
+            if (overrideRequest == null)
+                throw new Exception("Emergency override request not found.");
+
+            if (overrideRequest.Status != "Pending")
+                throw new Exception("Only pending requests can be declined.");
+
+            overrideRequest.Status = "Declined";
+            overrideRequest.ApprovedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            return new EmergencyOverrideResponseDTO
+            {
+                EmergencyOverrideId = overrideRequest.EmergencyOverrideId,
+                RequestedById = overrideRequest.RequestedById,
+                LeaveId = overrideRequest.LeaveId,
+                Status = overrideRequest.Status,
+                Reason = overrideRequest.Reason,
+                RequestedAt = overrideRequest.RequestedAt,
+                ApprovedAt = overrideRequest.ApprovedAt,
+                OverrideUntil = overrideRequest.OverrideUntil
+            };
+        }
+
         public async Task<EmergencyOverrideResponseDTO> RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
         {
             var tokenType = httpContextAccessor

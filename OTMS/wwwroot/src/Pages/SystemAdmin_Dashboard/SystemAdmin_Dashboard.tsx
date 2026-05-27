@@ -1939,7 +1939,7 @@ function EmergencyOverridesTab() {
 
     useEffect(() => {
         const token = localStorage.getItem('authToken');
-        fetch('/api/emergency_override_controls/all', {
+        fetch('/api/emergency_override_controls/all-requests', {
             headers: { 'Authorization': `Bearer ${token}` },
         })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
@@ -1989,19 +1989,33 @@ function EmergencyOverridesTab() {
         setActionError('');
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/emergency_override_controls/approve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
+
+            const isApprove = actionModal.action === 'Approved';
+            const endpoint = isApprove
+                ? '/api/emergency_override_controls/approve'
+                : '/api/emergency_override_controls/decline';
+
+            const body = isApprove
+                ? {
                     emergencyOverrideId: actionModal.override.emergencyOverrideId,
                     status: actionModal.action,
-                    overrideUntil: actionModal.action === 'Approved' ? new Date(overrideUntil).toISOString() : null,
-                }),
+                    overrideUntil: new Date(overrideUntil).toISOString(),
+                }
+                : {
+                    emergencyOverrideId: actionModal.override.emergencyOverrideId,
+                };
+
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body),
             });
+
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Action failed.');
             }
+
             setOverrides(prev => prev.map(o =>
                 o.emergencyOverrideId === actionModal.override.emergencyOverrideId
                     ? { ...o, status: actionModal.action, overrideUntil: overrideUntil || undefined }
