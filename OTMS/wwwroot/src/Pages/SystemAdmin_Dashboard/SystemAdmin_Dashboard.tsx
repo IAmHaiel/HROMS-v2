@@ -107,13 +107,28 @@ const EMPTY_FORM: FormState = {
     role: '',
 };
 
-const NAV_ITEMS: { tab: NavTab; icon: any; label: string }[] = [
-    { tab: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { tab: 'employees', icon: Package, label: 'Manage Employees' },
-    { tab: 'delivery', icon: Truck, label: 'Delivery' },
-    { tab: 'analytics', icon: BarChart3, label: 'Analytics' },
-    { tab: 'profile', icon: UserCircle2, label: 'Profile' },
-    { tab: 'emergency', icon: ShieldAlert, label: 'Emergency Overrides' },
+const NAV_GROUPS = [
+    {
+        label: 'MAIN MENU',
+        items: [
+            { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
+            { tab: 'employees' as NavTab, icon: Package, label: 'Manage Employees' },
+        ],
+    },
+    {
+        label: 'INTEGRATION',
+        items: [
+            { tab: 'delivery' as NavTab, icon: Truck, label: 'Delivery' },
+            { tab: 'analytics' as NavTab, icon: BarChart3, label: 'Analytics' },
+        ],
+    },
+    {
+        label: 'SYSTEM',
+        items: [
+            { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
+            { tab: 'emergency' as NavTab, icon: ShieldAlert, label: 'Emergency Overrides' },
+        ],
+    },
 ];
 
 const STAT_CARDS = [
@@ -662,87 +677,242 @@ interface DashboardTabProps {
     onSelectEmployee: (emp: RecentEmployee) => void;
 }
 
-function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee }: DashboardTabProps) {
+function DashboardTab({
+    employees,
+    recentEmployees,
+    activityLogs,
+    loading,
+    onSelectEmployee
+}: DashboardTabProps) {
 
-    const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
-    const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
+    const activeCount =
+        employees.filter(e => e.accountStatus === 'Active').length;
+
+    const deactivatedCount =
+        employees.filter(e => e.accountStatus === 'Deactivated').length;
+
     return (
         <div className="dashboard-content">
+
+            {/* ── STATS ROW ───────────────────────────────────── */}
             <div className="stats-row">
                 {[
-                    { icon: Users, bg: 'bg-primary', label: 'TOTAL EMPLOYEES', value: employees.length, sub: 'All registered staff' },
-                    { icon: CheckCircle2, bg: 'bg-success', label: 'ACTIVE', value: activeCount, sub: 'Currently active accounts' },
-                    { icon: AlertCircle, bg: 'bg-danger', label: 'DEACTIVATED', value: deactivatedCount, sub: 'Accounts needing review' },
-                    { icon: Shield, bg: 'bg-warning', label: 'ROLES', value: ROLES.length, sub: 'Available role types' },
-                ].map(({ icon: Icon, bg, label, value, sub }) => (
-                    <div key={label} className="stat-card">
-                        <div className={`stat-icon ${bg}`}><Icon size={18} /></div>
-                        <div className="stat-text">
-                            <p className="stat-label">{label}</p>
-                            <h3 className="stat-value">{value}</h3>
-                            <small>{sub}</small>
+                    {
+                        icon: Users,
+                        bg: 'bg-primary',
+                        accent: 'accent-primary',
+                        label: 'TOTAL EMPLOYEES',
+                        value: employees.length,
+                        sub: 'All registered staff',
+                    },
+                    {
+                        icon: CheckCircle2,
+                        bg: 'bg-success',
+                        accent: 'accent-success',
+                        label: 'ACTIVE',
+                        value: activeCount,
+                        sub: 'Currently active accounts',
+                    },
+                    {
+                        icon: AlertCircle,
+                        bg: 'bg-danger',
+                        accent: 'accent-danger',
+                        label: 'DEACTIVATED',
+                        value: deactivatedCount,
+                        sub: 'Accounts needing review',
+                    },
+                    {
+                        icon: Shield,
+                        bg: 'bg-warning',
+                        accent: 'accent-warning',
+                        label: 'ROLES',
+                        value: ROLES.length,
+                        sub: 'Available role types',
+                    },
+                ].map(({ icon: Icon, bg, accent, label, value, sub }) => (
+                    <div key={label} className={`stat-card ${accent}`}>
+
+                        <div className="stat-card-top">
+                            <div className={`stat-icon ${bg}`}>
+                                <Icon size={20} strokeWidth={2.3} />
+                            </div>
+
+                            <div className="stat-text">
+                                <span className="stat-label">
+                                    {label}
+                                </span>
+                            </div>
+                        </div>
+
+                        <h3 className="stat-value">
+                            {value}
+                        </h3>
+
+                        <div className="stat-subtext">
+                            {sub}
                         </div>
                     </div>
                 ))}
             </div>
 
+            {/* ── MAIN GRID ──────────────────────────────────── */}
             <div className="dashboard-grid">
+
+                {/* ── RECENT EMPLOYEES ───────────────────────── */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Recent Employees</h3>
-                        <a href="/employees" className="view-all-link">View all →</a>
+
+                        <a
+                            href="/employees"
+                            className="view-all-link"
+                        >
+                            View all →
+                        </a>
                     </div>
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>NAME</th><th>ID</th><th>ROLE</th><th>STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan={4}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading...</p></div></td></tr>
-                            ) : recentEmployees.length === 0 ? (
-                                <tr><td colSpan={4}><div className="empty-state"><Package size={20} /><p>No data available</p></div></td></tr>
-                            ) : (
-                                recentEmployees.slice(0, 7).map(emp => (
-                                    <tr key={emp.employeeNumber} onClick={() => onSelectEmployee(emp)} className="clickable-row">
-                                        <td>
-                                            <div className="emp-name-cell">
-                                                <div className="emp-avatar">{emp.employeeName.charAt(0).toUpperCase()}</div>
-                                                {emp.employeeName}
+
+                    <div className="data-table-wrap">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>NAME</th>
+                                    <th>ID</th>
+                                    <th>ROLE</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={4}>
+                                            <div className="empty-state">
+                                                <Loader2
+                                                    size={22}
+                                                    className="spin"
+                                                />
+                                                <p>Loading...</p>
                                             </div>
                                         </td>
-                                        <td>{emp.employeeNumber}</td>
-                                        <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                        <td>
-                                            <span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>
-                                                {emp.accountStatus ?? 'Active'}
-                                            </span>
+                                    </tr>
+                                ) : recentEmployees.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={4}>
+                                            <div className="empty-state">
+                                                <Package size={22} />
+                                                <p>No data available</p>
+                                            </div>
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    recentEmployees
+                                        .slice(0, 7)
+                                        .map(emp => (
+                                            <tr
+                                                key={emp.employeeNumber}
+                                                onClick={() => onSelectEmployee(emp)}
+                                                className="clickable-row"
+                                            >
+                                                <td>
+                                                    <div className="emp-name-cell">
+
+                                                        <div className="emp-avatar">
+                                                            {emp.employeeName
+                                                                .charAt(0)
+                                                                .toUpperCase()}
+                                                        </div>
+
+                                                        <span className="cell-name">
+                                                            {emp.employeeName}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                <td className="cell-id">
+                                                    {emp.employeeNumber}
+                                                </td>
+
+                                                <td>
+                                                    {emp.role
+                                                        ? toDisplayRole(emp.role)
+                                                        : (
+                                                            <span className="no-role">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                </td>
+
+                                                <td>
+                                                    <span
+                                                        className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}
+                                                    >
+                                                        {emp.accountStatus ?? 'Active'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <div className="card">
+                {/* ── RECENT ACTIVITY ────────────────────────── */}
+                <div className="card activity-card">
+
                     <div className="card-header">
                         <h3>Recent Activity</h3>
-                        <a href="/activity-logs" className="view-all-link">View all →</a>
+
+                        <a
+                            href="/activity-logs"
+                            className="view-all-link"
+                        >
+                            View all →
+                        </a>
                     </div>
+
                     <div className="activity-feed-list">
+
                         {loading ? (
-                            <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading...</p></div>
+                            <div className="empty-state">
+                                <Loader2
+                                    size={22}
+                                    className="spin"
+                                />
+                                <p>Loading...</p>
+                            </div>
+
                         ) : activityLogs.length === 0 ? (
-                            <div className="empty-state"><ClipboardList size={20} /><p>No recent activity</p></div>
+
+                            <div className="empty-state">
+                                <ClipboardList size={22} />
+                                <p>No recent activity</p>
+                            </div>
+
                         ) : (
-                            activityLogs.map(log => (
-                                <div key={log.id} className="activity-feed-item">
-                                    <span className="activity-desc">{log.description}</span>
-                                    <span className="activity-timestamp">{new Date(log.timestamp).toLocaleString()}</span>
+
+                            activityLogs.slice(0, 8).map(log => (
+                                <div
+                                    key={log.id}
+                                    className="activity-feed-item"
+                                >
+
+                                    <div className="activity-feed-dot bg-primary" />
+
+                                    <div className="activity-feed-content">
+
+                                        <span className="activity-feed-text">
+                                            {log.description}
+                                        </span>
+
+                                        <span className="activity-feed-time">
+                                            {new Date(log.timestamp).toLocaleString()}
+                                        </span>
+
+                                    </div>
                                 </div>
                             ))
+
                         )}
                     </div>
                 </div>
@@ -751,9 +921,8 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
     );
 }
 
-// ─── Manage Employees Tab (with pagination) ───────────────────────────────────
 
-// ─── Manage Employees Tab (with Leave subtab) ─────────────────────────────────
+// ─── Manage Employees Tab (with pagination) ───────────────────────────────────
 
 type EmployeeSubTab = 'employees' | 'leave';
 
@@ -2374,15 +2543,21 @@ export default function Dashboard() {
                 <div className="sidebar-logo">
                     <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="sidebar-logo-img" />
                 </div>
+                <div className="sidebar-role-pill">SYSTEM ADMIN</div>
                 <nav className="sidebar-nav">
-                    {NAV_ITEMS.map(({ tab, icon: Icon, label }) => (
-                        <div
-                            key={tab}
-                            className={`nav-item${activeTab === tab ? ' active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            <Icon size={22} />
-                            <span>{label}</span>
+                    {NAV_GROUPS.map(group => (
+                        <div key={group.label}>
+                            <div className="nav-section-label">{group.label}</div>
+                            {group.items.map(({ tab, icon: Icon, label }) => (
+                                <div
+                                    key={tab}
+                                    className={`nav-item${activeTab === tab ? ' active' : ''}`}
+                                    onClick={() => setActiveTab(tab)}
+                                >
+                                    <Icon size={18} />
+                                    <span>{label}</span>
+                                </div>
+                            ))}
                         </div>
                     ))}
                 </nav>
@@ -2413,6 +2588,14 @@ export default function Dashboard() {
                         </p>
                     </div>
                     <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="header-search-wrap">
+                            <Search size={14} className="header-search-icon" />
+                            <input
+                                type="text"
+                                className="header-search-input"
+                                placeholder="Search employee, task…"
+                            />
+                        </div>
                     {(activeTab === 'dashboard' || activeTab === 'employees') && (
                         <div className="header-actions">
                             <button className="quick-action-btn-header" onClick={() => setShowAddModal(true)}>
