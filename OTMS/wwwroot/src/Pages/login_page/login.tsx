@@ -216,8 +216,10 @@ export default function Login() {
                     {/* Card header — stacks vertically via CSS */}
                     <div className="card-header">
                         <span className="header-badge">LOGIN PORTAL</span>
-                        <h2 className="card-title">Welcome!</h2>
-                        <p className="card-subtitle">Sign in to continue to your workspace.</p>
+                        <h1 className="card-title">Welcome!</h1>
+                        <p className="card-subtitle">
+                            Sign in to continue to your workspace.
+                        </p>
                     </div>
 
                     {/* Status message */}
