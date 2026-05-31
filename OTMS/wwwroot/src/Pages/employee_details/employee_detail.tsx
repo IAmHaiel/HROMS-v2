@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     User,
@@ -256,6 +256,35 @@ function EditProfileModal({
                 }
             }
 
+            if (form.accountStatus !== profile.accountStatus) {
+                const statusEndpoint =
+                    form.accountStatus === 'Active'
+                        ? '/api/systemadmin/activate-user'
+                        : '/api/systemadmin/deactivate-user';
+
+                const statusRes = await fetch(
+                    statusEndpoint,
+                    {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type':
+                                'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            employeeNumber:
+                                profile.employeeNumber,
+                        }),
+                    }
+                );
+
+                if (!statusRes.ok) {
+                    throw new Error(
+                        `Status update failed`
+                    );
+                }
+            }
+
             onSaved({
                 ...profile,
                 employeeName: form.employeeName,
@@ -373,6 +402,18 @@ function EditProfileModal({
                                 <option value="Deactivated">
                                     Deactivated
                                 </option>
+
+                                {profile.accountStatus === 'On Leave' && (
+                                    <option value="On Leave">
+                                        On Leave
+                                    </option>
+                                )}
+
+                                {profile.accountStatus === 'Emergency Overriden' && (
+                                    <option value="Emergency Overriden">
+                                        Emergency Overriden
+                                    </option>
+                                )}
                             </select>
                         </div>
                     </div>
@@ -759,11 +800,8 @@ export default function EmployeeDetail() {
     const handleToggleStatus = async () => {
         if (!profile) return;
 
-        const next =
-            profile.accountStatus ===
-                'Active'
-                ? 'Deactivated'
-                : 'Active';
+        const isActive = ['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus);
+        const next = isActive ? 'Deactivated' : 'Active';
 
         const endpoint =
             next === 'Active'
@@ -962,10 +1000,10 @@ export default function EmployeeDetail() {
                     <div className="ed-topbar">
                         <div className="ed-topbar-actions">
                             <button
-                                className={`ed-btn ed-btn-ghost${profile.accountStatus === 'Active' ? ' deactivate' : ' activate'}`}
+                                className={`ed-btn ed-btn-ghost${['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus) ? ' deactivate' : ' activate'}`}
                                 onClick={handleToggleStatus}
                             >
-                                {profile.accountStatus === 'Active'
+                                {['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus)
                                     ? <><ToggleLeft size={15} /> Deactivate</>
                                     : <><ToggleRight size={15} /> Activate</>}
                             </button>

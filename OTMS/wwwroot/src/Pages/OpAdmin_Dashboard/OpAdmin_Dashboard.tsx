@@ -18,6 +18,7 @@ import {
     Phone,
     Lock,
     ChevronRight,
+    LogOut,
     Save,
     Loader2,
     Users,
@@ -87,17 +88,39 @@ const WEEKLY_DATA = [
     { day: 'Sun', completed: 8, pending: 2 },
 ];
 
-const NAV_ITEMS = [
-    { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
-    { tab: 'tasks' as NavTab, icon: Package, label: 'Tasks' },
-    { tab: 'team' as NavTab, icon: Users, label: 'Team' },
-    { tab: 'reports' as NavTab, icon: BarChart3, label: 'Reports' },
-    { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
+const NAV_GROUPS = [
+    {
+        label: 'MAIN MENU',
+        items: [
+            { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
+            { tab: 'tasks' as NavTab, icon: Package, label: 'Tasks' },
+            { tab: 'team' as NavTab, icon: Users, label: 'Team' },
+        ],
+    },
+    {
+        label: 'REPORTS',
+        items: [
+            { tab: 'reports' as NavTab, icon: BarChart3, label: 'Reports' },
+        ],
+    },
+    {
+        label: 'ACCOUNT',
+        items: [
+            { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
+        ],
+    },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isEffectivelyOverdue = (t: Task): boolean =>
     t.taskStatus !== 'Completed' && !!t.dueAt && new Date(t.dueAt) < new Date();
+
+const getInitials = (name: string): string => {
+    if (!name) return 'OA';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+};
 
 const statusBadgeClass = (s: string): string =>
 ({
@@ -1336,34 +1359,52 @@ export default function OpsAdminDashboard() {
 
     return (
         <div className="dashboard-container">
-            {/* ── Sidebar ── */}
             <aside className="sidebar">
                 <div className="sidebar-logo">
-                    <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="sidebar-logo-img" />
+                    <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="logo-image" />
                 </div>
+
+                <div className="sidebar-role-section">
+                    <div className="sidebar-role-badge super-admin">
+                        <div className="role-dot-inner" />
+                        OPERATION ADMIN
+                    </div>
+                </div>
+
                 <nav className="sidebar-nav">
-                    {NAV_ITEMS.map(({ tab, icon: Icon, label }) => (
-                        <div
-                            key={tab}
-                            className={`nav-item${activeTab === tab ? ' active' : ''}`}
-                            onClick={() => setActiveTab(tab)}
-                        >
-                            <Icon size={22} />
-                            <span>{label}</span>
+                    {NAV_GROUPS.map(group => (
+                        <div key={group.label} className="nav-section">
+                            <div className="nav-section-title">{group.label}</div>
+                            {group.items.map(({ tab, icon: Icon, label }) => {
+                                const isActive = activeTab === tab;
+                                return (
+                                    <div
+                                        key={tab}
+                                        className={`nav-item${isActive ? ' nav-item-active' : ''}`}
+                                        onClick={() => setActiveTab(tab)}
+                                    >
+                                        <Icon size={18} />
+                                        <span className="nav-item-label">{label}</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     ))}
                 </nav>
-                <div className="sidebar-footer">
-                    <div className="user-block">
-                        <div className="avatar-circle">
-                            {employeeName ? employeeName.charAt(0).toUpperCase() : 'E'}
+
+                <div className="sidebar-footer-profile">
+                    <div className="profile-card">
+                        <div className="profile-avatar">
+                            {getInitials(employeeName || 'Operation Admin')}
                         </div>
-                        <div className="user-text">
-                            <span className="welcome-text">Welcome!</span>
-                            <strong>{employeeName || 'Employee'}</strong>
+                        <div className="profile-info">
+                            <span className="profile-name">{employeeName || 'Op Admin'}</span>
+                            <span className="profile-role">OPERATION ADMIN</span>
                         </div>
+                        <button className="profile-logout" onClick={handleLogout} title="Logout" aria-label="Logout">
+                            <LogOut size={18} />
+                        </button>
                     </div>
-                    <button className="logout-btn-sidebar" onClick={handleLogout}>Logout</button>
                 </div>
             </aside>
 

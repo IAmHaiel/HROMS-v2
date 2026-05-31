@@ -1,4 +1,4 @@
-﻿/* ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────
    employee_detail.css
    Sidebar mirrors Dashboard layout exactly.
 ───────────────────────────────────────────── */
@@ -227,13 +227,14 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: var(--bg-main, #f0f3fa);
 }
 
-/* ── Top bar (actions only, no back button) ── */
+/* ── Top bar (actions and optional back button) ── */
 .ed-topbar {
     display: flex;
     align-items: center;
-    justify-content: flex-end; /* push actions to the right */
+    justify-content: space-between; /* push back button to left, actions to right */
     padding: 14px 28px;
     background: #fff;
     border-bottom: 1px solid #e8ecf1;
