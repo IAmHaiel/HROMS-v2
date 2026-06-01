@@ -78,10 +78,7 @@ namespace OTMS.Controllers
                     leaveId = ex.LeaveId,              
                 });
             }
-            catch (Exception)
-            {
-                return StatusCode(500, new { message = "An unexpected error occurred." });
-            }
+            
         }
 
         /// <summary>
@@ -147,6 +144,8 @@ namespace OTMS.Controllers
         [HttpGet("verify-email")]
         public async Task<IActionResult> VerifyEmail(string token)
         {
+            Console.WriteLine($"Received: [{token}]");
+
             var account = await context.Employees
                 .FirstOrDefaultAsync
                     (e => e.EmailVerificationToken == token);
@@ -188,8 +187,8 @@ namespace OTMS.Controllers
             await context.SaveChangesAsync();
 
             var verificationLink =
-                $"{configuration["ApiBaseUrl"]}/verify-email" +
-                $"?token={Uri.EscapeDataString(employee.EmailVerificationToken)}";
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
 
             await emailService.SendAsync(
                         employee.Email,

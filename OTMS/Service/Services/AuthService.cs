@@ -46,7 +46,7 @@ namespace OTMS.Service.Services
 
             if (!employee.IsEmailVerified)
             {
-                throw new Exception(
+                throw new ArgumentException(
                     "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support."
                 );
             }
@@ -201,8 +201,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             var verificationLink =
-                $"{configuration["ApiBaseUrl"]}/verify-email" + 
-                $"?token={Uri.EscapeDataString(employee.EmailVerificationToken!)}";
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
 
             // Sending email verification notification
             await emailService.SendAsync(
