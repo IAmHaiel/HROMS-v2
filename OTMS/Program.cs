@@ -165,7 +165,9 @@ static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext cont
         EmployeeNumber = employeeNumber,
         EmployeeName = "System Admin",
         ContactNumber = "0912 671 9251",
-        CreatedAt = DateTime.UtcNow
+        CreatedAt = DateTime.UtcNow,
+        Email = "test@gmail.com",
+        IsEmailVerified = true
     };
 
     var account = new Account
