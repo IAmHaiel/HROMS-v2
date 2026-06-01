@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NETCore.MailKit.Core;
 using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -9,12 +10,13 @@ using OTMS.Entities.DTOs;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class authenticationController(OTMSDbContext context, IAuthService authService, ILeaveRequest lrService, IActivityLogService activitylogService, IEmployeeService employeeService) : ControllerBase
+    public class authenticationController(OTMSDbContext context, IAuthService authService, ILeaveRequest lrService, IActivityLogService activitylogService, IEmployeeService employeeService, IConfiguration configuration, IEmailService emailService) : ControllerBase
     {
 
         // Authentication APIs
@@ -76,10 +78,7 @@ namespace OTMS.Controllers
                     leaveId = ex.LeaveId,              
                 });
             }
-            catch (Exception)
-            {
-                return StatusCode(500, new { message = "An unexpected error occurred." });
-            }
+            
         }
 
         /// <summary>
@@ -140,6 +139,64 @@ namespace OTMS.Controllers
             }
 
             return Ok(result);
+        }
+
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail(string token)
+        {
+            Console.WriteLine($"Received: [{token}]");
+
+            var account = await context.Employees
+                .FirstOrDefaultAsync
+                    (e => e.EmailVerificationToken == token);
+
+            if (account == null)
+            {
+                return BadRequest("Invalid token.");
+            }
+
+            if (account.EmailVerificationTokenExpiry < DateTime.UtcNow)
+            {
+                return BadRequest("Token expired.");
+            }
+
+            account.IsEmailVerified = true;
+            account.EmailVerificationToken = null;
+            account.EmailVerificationTokenExpiry = null;
+
+            await context.SaveChangesAsync();
+
+            return Ok("Email verified successfully.");
+        }
+
+        [HttpPost("resend-verification")]
+        public async Task<IActionResult> ResendVerification(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
+            if (employee == null)
+            {
+                return NotFound();
+            }
+
+            employee.EmailVerificationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            employee.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
+
+            await context.SaveChangesAsync();
+
+            var verificationLink =
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
+
+            await emailService.SendAsync(
+                        employee.Email,
+                        "Verify your Operational Management System Account",
+                        $"Click the link below to verify your account:\n\n{verificationLink}"
+                );
+
+            return Ok();
         }
 
     }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NETCore.MailKit.Core;
 using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -18,7 +19,7 @@ using System.Text;
 
 namespace OTMS.Service.Services
 {
-    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService) : IAuthService
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
 
@@ -41,6 +42,13 @@ namespace OTMS.Service.Services
             if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
             {
                 return null;
+            }
+
+            if (!employee.IsEmailVerified)
+            {
+                throw new ArgumentException(
+                    "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support."
+                );
             }
 
             if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
@@ -166,7 +174,13 @@ namespace OTMS.Service.Services
                 EmployeeNumber = request.EmployeeNumber,
                 EmployeeName = request.EmployeeName.Trim(),
                 ContactNumber = request.ContactNumber.Trim(),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+
+                Email = request.Email.Trim(),
+                IsEmailVerified = false,
+
+                EmailVerificationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
             };
 
             var account = new Account
@@ -185,6 +199,17 @@ namespace OTMS.Service.Services
             context.Employees.Add(employee);
             context.Accounts.Add(account);
             await context.SaveChangesAsync();
+
+            var verificationLink =
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
+
+            // Sending email verification notification
+            await emailService.SendAsync(
+                        employee.Email,
+                        "Verify your Operational Management System Account",
+                        $"Click the link below to verify your account:\n\n{verificationLink}"
+                );
 
             return new EmployeeRegisterResponseDTO
             {

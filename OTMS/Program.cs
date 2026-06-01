@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using NETCore.MailKit.Extensions;
+using NETCore.MailKit.Infrastructure.Internal;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.Models;
@@ -146,6 +148,20 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IEmergencyOverrideService, EmergencyOverrideService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 
+builder.Services.AddMailKit(config =>
+{
+    config.UseMailKit(new MailKitOptions()
+    {
+        Server = "smtp.gmail.com",
+        Port = 587,
+        SenderName = "Operational Management System",
+        SenderEmail = "mikhjnelo@gmail.com",
+        Account = "mikhjnelo@gmail.com",
+        Password = "yzqn vcvw kwcd cdij",
+        Security = true
+    });
+});
+
 static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext context)
 {
     const string employeeNumber = "SPDX-SPR-01";
@@ -165,7 +181,9 @@ static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext cont
         EmployeeNumber = employeeNumber,
         EmployeeName = "System Admin",
         ContactNumber = "0912 671 9251",
-        CreatedAt = DateTime.UtcNow
+        CreatedAt = DateTime.UtcNow,
+        Email = "test@gmail.com",
+        IsEmailVerified = true
     };
 
     var account = new Account
