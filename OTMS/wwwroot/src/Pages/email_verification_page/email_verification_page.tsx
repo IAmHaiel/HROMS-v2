@@ -86,7 +86,7 @@ function VerifyEmail() {
                             {state === "error" && "Verification Failed"}
                         </h2>
                         <p className="ev-header-sub">
-                            {state === "verifying" && "Please wait while we confirm your address…"}
+                            {state === "verifying" && "Please wait while we confirm your addressâ€¦"}
                             {state === "success" && "Your account is now fully activated."}
                             {state === "error" && "We couldn't verify your email address."}
                         </p>
@@ -99,7 +99,7 @@ function VerifyEmail() {
                             <div className="ev-state ev-state--verifying">
                                 <div className="ev-loading-row">
                                     <span className="ev-pulse-dot" />
-                                    <span className="ev-loading-text">Validating token…</span>
+                                    <span className="ev-loading-text">Validating tokenâ€¦</span>
                                 </div>
                             </div>
                         )}

@@ -22,6 +22,7 @@ namespace OTMS.Service.Services
     public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
+        static string? GeneratedPassword = String.Empty;
 
         public async Task<TokenResponseDTO?> LoginAsync(
             EmployeeLoginDTO request
@@ -168,6 +169,8 @@ namespace OTMS.Service.Services
                 generatedUserPassword.Length > PasswordLength.MaximumLength)
                 throw new InvalidOperationException("Generated password must be at least 15 characters long.");
 
+            GeneratedPassword = generatedUserPassword; // assign to static variable for email use
+
             var employee = new Employee
             {
                 EmployeeId = Guid.NewGuid(),
@@ -215,8 +218,21 @@ namespace OTMS.Service.Services
             // Sending email verification notification
             await emailService.SendAsync(
                         employee.Email,
-                        "Verify your Operational Management System Account",
-                        $"Click the link below to verify your account:\n\n{verificationLink}"
+                            "Verify your Operational Management System Account",
+                            $"""
+                            Welcome to the Operational Management System.
+
+                            Your login credentials are:
+
+                            Employee Number: {employee.EmployeeNumber}
+                            Password: {GeneratedPassword}
+
+                            Please verify your account by clicking the link below:
+
+                            {verificationLink}
+
+                            After verifying your account, we recommend changing your password immediately after logging in.
+                            """
                 );
 
             return new EmployeeRegisterResponseDTO
@@ -227,6 +243,49 @@ namespace OTMS.Service.Services
                 Role = account.Role ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
             };
+        }
+
+        public async System.Threading.Tasks.Task ResendVerificationAsync(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
+            if (employee == null)
+            {
+                throw new KeyNotFoundException("Employee not found.");
+            }
+
+            employee.EmailVerificationToken =
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+            employee.EmailVerificationTokenExpiry =
+                DateTime.UtcNow.AddHours(1);
+
+            await context.SaveChangesAsync();
+
+            var verificationLink =
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
+
+            await emailService.SendAsync(
+                employee.Email,
+                    "Verify your Operational Management System Account",
+                    $"""
+                    Welcome to the Operational Management System.
+
+                    Your login credentials are:
+
+                    Employee Number: {employee.EmployeeNumber}
+                    Password: {GeneratedPassword}
+
+                    Please verify your account by clicking the link below:
+
+                    {verificationLink}
+
+                    After verifying your account, we recommend changing your password immediately after logging in.
+                    """
+            );
         }
 
         // ─── Helper Methods ────────────────────────────────────────────────
@@ -420,5 +479,7 @@ namespace OTMS.Service.Services
 
             return user;
         }
+
+        
     }
 }

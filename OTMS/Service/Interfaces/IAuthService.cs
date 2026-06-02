@@ -8,5 +8,6 @@ namespace OTMS.Service.Interfaces
         Task<EmployeeRegisterResponseDTO?> RegisterAsync(EmployeeRegisterDTO request);
         Task<TokenResponseDTO?> LoginAsync(EmployeeLoginDTO request);
         Task<TokenResponseDTO?> RefreshTokensAsync(RefreshTokenRequestDTO request);
+        System.Threading.Tasks.Task ResendVerificationAsync(string employeeNumber);
     }
 }
