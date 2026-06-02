@@ -172,31 +172,15 @@ namespace OTMS.Controllers
         [HttpPost("resend-verification")]
         public async Task<IActionResult> ResendVerification(string employeeNumber)
         {
-            var employee = await context.Employees
-                .Include(e => e.Account)
-                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
-
-            if (employee == null)
+            try
             {
-                return NotFound();
+                await authService.ResendVerificationAsync(employeeNumber);
+                return Ok("Verification email resent successfully.");
             }
-
-            employee.EmailVerificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-            employee.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1);
-
-            await context.SaveChangesAsync();
-
-            var verificationLink =
-                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
-                $"?token={employee.EmailVerificationToken}";
-
-            await emailService.SendAsync(
-                        employee.Email,
-                        "Verify your Operational Management System Account",
-                        $"Click the link below to verify your account:\n\n{verificationLink}"
-                );
-
-            return Ok();
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
     }
