@@ -181,7 +181,7 @@ namespace OTMS.Service.Services
 
                 // Based on OWASP "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/09-Testing_for_Weak_Password_Change_or_Reset_Functionalities"
                 /*
-                    1. Cryptographically Secure Pseudo-Random Number Generator (CSPRNG) is included in .NET's RandomNumberGenerator class, which provides a secure way to generate random data.
+                    1. The RandomNumberGenerator class also offers static methods for creating or filling buffers with cryptographic random data. These methods always use the system's cryptographically secure pseudorandom number generator (CSPRNG). Refer to: https://learn.microsoft.com/en-us/dotnet/standard/security/cryptography-model
 
                     2. 16 Bytes = 32 hex digits/characters long.
 
