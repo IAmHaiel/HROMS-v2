@@ -179,8 +179,16 @@ namespace OTMS.Service.Services
                 Email = request.Email.Trim(),
                 IsEmailVerified = false,
 
-                EmailVerificationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
-                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24)
+                // Based on OWASP "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/09-Testing_for_Weak_Password_Change_or_Reset_Functionalities"
+                /*
+                    1. Cryptographically Secure Pseudo-Random Number Generator (CSPRNG) is included in .NET's RandomNumberGenerator class, which provides a secure way to generate random data.
+
+                    2. 16 Bytes = 32 hex digits/characters long.
+
+                    3. 1 hour is recommended to minimize the window of opportunity for attackers while still giving users enough time to verify their email.
+                 */
+                EmailVerificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1)
             };
 
             var account = new Account
