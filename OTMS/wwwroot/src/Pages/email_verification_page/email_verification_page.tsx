@@ -40,7 +40,7 @@ function VerifyEmail() {
                             <circle cx="12" cy="12" r="10" fill="#00A99D" opacity="0.2" />
                             <path d="M8 12l3 3 5-5" stroke="#00A99D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span>OTMS</span>
+                        <span>Speedex</span>
                     </div>
                 </div>
 
