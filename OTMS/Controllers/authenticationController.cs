@@ -181,8 +181,8 @@ namespace OTMS.Controllers
                 return NotFound();
             }
 
-            employee.EmailVerificationToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-            employee.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(24);
+            employee.EmailVerificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+            employee.EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1);
 
             await context.SaveChangesAsync();
 
