@@ -40,7 +40,7 @@ function VerifyEmail() {
                             <circle cx="12" cy="12" r="10" fill="#00A99D" opacity="0.2" />
                             <path d="M8 12l3 3 5-5" stroke="#00A99D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span>OTMS</span>
+                        <span>Speedex</span>
                     </div>
                 </div>
 
@@ -86,7 +86,7 @@ function VerifyEmail() {
                             {state === "error" && "Verification Failed"}
                         </h2>
                         <p className="ev-header-sub">
-                            {state === "verifying" && "Please wait while we confirm your address…"}
+                            {state === "verifying" && "Please wait while we confirm your addressâ€¦"}
                             {state === "success" && "Your account is now fully activated."}
                             {state === "error" && "We couldn't verify your email address."}
                         </p>
@@ -99,7 +99,7 @@ function VerifyEmail() {
                             <div className="ev-state ev-state--verifying">
                                 <div className="ev-loading-row">
                                     <span className="ev-pulse-dot" />
-                                    <span className="ev-loading-text">Validating token…</span>
+                                    <span className="ev-loading-text">Validating tokenâ€¦</span>
                                 </div>
                             </div>
                         )}
