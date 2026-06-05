@@ -3,8 +3,6 @@ import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import './NotificationBell.css';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface NotificationItem {
     notificationId: string;
     taskId: string | null;
@@ -17,8 +15,6 @@ export interface NotificationItem {
 interface NotificationBellProps {
     apiEndpoint: string;
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getTypeBadge(type: string): { label: string; cls: string } {
     switch (type) {
@@ -39,16 +35,23 @@ function timeAgo(iso: string): string {
     return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+type FilterTab = 'all' | 'unread';
 
 export default function NotificationBell({ apiEndpoint }: NotificationBellProps) {
     const [notifs, setNotifs] = useState<NotificationItem[]>([]);
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
+    const [activeTab, setActiveTab] = useState<FilterTab>('all');
     const wrapRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const unreadCount = notifs.filter(n => !n.isRead).length;
+    const baseUrl = apiEndpoint.substring(0, apiEndpoint.lastIndexOf('/'));
+
+    const visibleNotifs = activeTab === 'unread'
+        ? notifs.filter(n => !n.isRead)
+        : notifs;
 
     const fetchNotifs = async () => {
         try {
@@ -58,7 +61,15 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
             });
             if (!res.ok) throw new Error();
             const data: NotificationItem[] = await res.json();
-            setNotifs(data);
+            setNotifs(prev => {
+                const locallyRead = new Set(
+                    prev.filter(n => n.isRead).map(n => n.notificationId)
+                );
+                return data.map(n => ({
+                    ...n,
+                    isRead: n.isRead || locallyRead.has(n.notificationId),
+                }));
+            });
         } catch {
             // silently fail
         } finally {
@@ -74,7 +85,10 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+            if (
+                wrapRef.current && !wrapRef.current.contains(e.target as Node) &&
+                dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+            ) {
                 setOpen(false);
             }
         };
@@ -99,35 +113,58 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
         ));
         try {
             const token = localStorage.getItem('authToken');
-            await fetch(`/api/notification/${id}/read`, {
+            const res = await fetch(`${baseUrl}/${id}/read`, {
                 method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
             });
-        } catch { }
+            if (!res.ok) {
+                setNotifs(prev => prev.map(n =>
+                    n.notificationId === id ? { ...n, isRead: false } : n
+                ));
+            }
+        } catch {
+            setNotifs(prev => prev.map(n =>
+                n.notificationId === id ? { ...n, isRead: false } : n
+            ));
+        }
     };
 
     const markAllAsRead = async () => {
         const unread = notifs.filter(n => !n.isRead);
+        if (unread.length === 0) return;
+
         setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+
         const token = localStorage.getItem('authToken');
-        await Promise.allSettled(
+
+        const results = await Promise.allSettled(
             unread.map(n =>
-                fetch(`/api/notification/${n.notificationId}/read`, {
+                fetch(`${baseUrl}/${n.notificationId}/read`, {
                     method: 'PATCH',
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
                 })
             )
         );
+
+        results.forEach((result, index) => {
+            const id = unread[index].notificationId;
+            if (result.status === 'rejected' || !result.value.ok) {
+                setNotifs(prev => prev.map(n =>
+                    n.notificationId === id ? { ...n, isRead: false } : n
+                ));
+            }
+        });
     };
 
     return (
         <div ref={wrapRef} className="notif-wrap">
-            {/* ── Bell Button ── */}
-            <button
-                className="notif-btn"
-                onClick={handleOpen}
-                aria-label="Notifications"
-            >
+            <button className="notif-btn" onClick={handleOpen} aria-label="Notifications">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="18" height="18"
@@ -148,9 +185,9 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                 )}
             </button>
 
-            {/* ── Dropdown (Portal) ── */}
             {open && createPortal(
                 <div
+                    ref={dropdownRef}
                     className="notif-dropdown"
                     style={{ top: dropdownPos.top, right: dropdownPos.right }}
                 >
@@ -164,28 +201,60 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                         )}
                     </div>
 
+                    {/* Tabs */}
+                    <div className="notif-tabs">
+                        <button
+                            className={`notif-tab ${activeTab === 'all' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('all')}
+                        >
+                            All
+                            <span className="notif-tab-count">{notifs.length}</span>
+                        </button>
+                        <button
+                            className={`notif-tab ${activeTab === 'unread' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('unread')}
+                        >
+                            Unread
+                            {unreadCount > 0 && (
+                                <span className="notif-tab-count unread">{unreadCount}</span>
+                            )}
+                        </button>
+                    </div>
+
                     {/* List */}
                     <div className="notif-list">
                         {loading ? (
                             <div className="notif-loading">
                                 <Loader2 size={16} className="spin" /> Loading…
                             </div>
-                        ) : notifs.length === 0 ? (
-                            <div className="notif-empty">No notifications</div>
-                        ) : notifs.map(n => {
+                        ) : visibleNotifs.length === 0 ? (
+                            <div className="notif-empty">
+                                {activeTab === 'unread' ? 'No unread notifications' : 'No notifications'}
+                            </div>
+                        ) : visibleNotifs.map(n => {
                             const badge = getTypeBadge(n.notificationType);
                             return (
                                 <div
                                     key={n.notificationId}
                                     className={`notif-item ${n.isRead ? 'read' : 'unread'}`}
                                     onClick={() => !n.isRead && markAsRead(n.notificationId)}
+                                    style={{ cursor: n.isRead ? 'default' : 'pointer' }}
                                 >
                                     <div className={`notif-dot ${n.isRead ? 'read' : 'unread'}`} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <span className={`notif-type-badge ${badge.cls}`}>
-                                            {badge.label}
-                                        </span>
-                                        <div className="notif-message">{n.message}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                            <span className={`notif-type-badge ${badge.cls}`}>
+                                                {badge.label}
+                                            </span>
+                                            {n.isRead && (
+                                                <span style={{ fontSize: 10, color: 'var(--text-muted, #a3aed0)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                                    ✓ Read
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="notif-message" style={{ color: n.isRead ? 'var(--text-muted, #a3aed0)' : 'var(--text-primary)' }}>
+                                            {n.message}
+                                        </div>
                                         <div className="notif-time">{timeAgo(n.createdAt)}</div>
                                     </div>
                                 </div>

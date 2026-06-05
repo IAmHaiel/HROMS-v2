@@ -277,9 +277,6 @@ export default function Login() {
                             {employeeIdError && (
                                 <span className="field-err-msg">{employeeIdError}</span>
                             )}
-                            {!employeeIdError && employeeId.trim().length >= 3 && (
-                                <span className="field-ok-msg">✓ Looks good</span>
-                            )}
                         </div>
 
                         {/* Password */}
