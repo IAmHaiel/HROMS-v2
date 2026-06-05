@@ -1503,6 +1503,14 @@ function ProfileTab() {
     const employeeName = localStorage.getItem('employeeName') ?? '';
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
 
+    // ── Password Gate ──
+    const [passwordGate, setPasswordGate] = useState(false);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
+    const [pendingEdit, setPendingEdit] = useState<'profile' | null>(null);
+
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({ employeeName, contactNumber: employeeContact });
     const [profileError, setProfileError] = useState('');
@@ -1516,6 +1524,43 @@ function ProfileTab() {
     const [showCurrent, setShowCurrent] = useState(false);
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+
+    // ── Open gate before allowing profile edit ──
+    const requestEditProfile = () => {
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setPendingEdit('profile');
+        setPasswordGate(true);
+    };
+
+    const handleGateConfirm = async () => {
+        if (!gatePassword) { setGateError('Please enter your password.'); return; }
+        setGateLoading(true);
+        setGateError('');
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/systemadmin/verify-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ password: gatePassword }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Incorrect password. Please try again.');
+            }
+            setPasswordGate(false);
+            setGatePassword('');
+            if (pendingEdit === 'profile') {
+                setEditingProfile(true);
+                setProfileSuccess(false);
+            }
+        } catch (err: any) {
+            setGateError(err.message ?? 'Incorrect password. Please try again.');
+        } finally {
+            setGateLoading(false);
+        }
+    };
 
     const handleProfileChange = (key: keyof typeof profileForm) =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1593,6 +1638,78 @@ function ProfileTab() {
 
     return (
         <div className="dashboard-content">
+
+            {/* ── Password Gate Modal ── */}
+            {passwordGate && (
+                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                        <div className="modal-header">
+                            <div>
+                                <h3>Confirm Your Identity</h3>
+                                <p className="modal-subtitle">Enter your password to edit your profile.</p>
+                            </div>
+                            <button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close">
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
+                            <div style={{
+                                width: 52, height: 52, borderRadius: '50%',
+                                background: 'rgba(67,24,255,0.1)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Lock size={22} color="var(--primary)" />
+                            </div>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
+                                For your security, please verify your identity before making changes.
+                            </p>
+                        </div>
+
+                        {gateError && (
+                            <div className="form-api-error" style={{ marginBottom: 12 }}>
+                                <AlertCircle size={14} /><span>{gateError}</span>
+                            </div>
+                        )}
+
+                        <div className="field" style={{ marginBottom: 20 }}>
+                            <label>Password</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showGatePassword ? 'text' : 'password'}
+                                    value={gatePassword}
+                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                    onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
+                                    placeholder="Enter your current password"
+                                    style={{ paddingRight: 40, width: '100%' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGatePassword(p => !p)}
+                                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+                                    tabIndex={-1}
+                                >
+                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
+                                {gateLoading
+                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
+                                    : <><Shield size={13} /> Confirm</>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
 
                 {/* ── Profile Card ── */}
@@ -1603,7 +1720,7 @@ function ProfileTab() {
                             <button
                                 className="btn btn-primary"
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
-                                onClick={() => { setEditingProfile(true); setProfileSuccess(false); }}
+                                onClick={requestEditProfile} // ← gate instead of direct edit
                             >
                                 <Pencil size={12} /> Edit Profile
                             </button>
@@ -1676,7 +1793,7 @@ function ProfileTab() {
                     )}
                 </div>
 
-                {/* ── Security Card ── */}
+                {/* ── Security Card ── (unchanged) */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Security Settings</h3>
@@ -1778,7 +1895,7 @@ function ProfileTab() {
                 </div>
             </div>
 
-            {/* ── Account Overview ── */}
+            {/* ── Account Overview (unchanged) ── */}
             <div className="card">
                 <div className="card-header"><h3>Account Overview</h3></div>
                 <div className="system-status-list">

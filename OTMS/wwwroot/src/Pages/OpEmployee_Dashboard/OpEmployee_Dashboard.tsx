@@ -929,6 +929,15 @@ const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
 interface ProfileTabProps { user: UserProfile; onUpdateUser: (u: UserProfile) => void; }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
+
+    // ── Password Gate state ──────────────────────────────────────────────────
+    const [passwordGate, setPasswordGate] = useState(false);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
+
+    // ── Profile edit state ───────────────────────────────────────────────────
     const [editMode, setEditMode] = useState(false);
     const [pwdMode, setPwdMode] = useState(false);
     const [form, setForm] = useState({ employeeName: user.fullName, contactNumber: user.phone });
@@ -936,37 +945,102 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
+
+    // ── Password change state ────────────────────────────────────────────────
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
     const [pwdError, setPwdError] = useState('');
     const [pwdSaving, setPwdSaving] = useState(false);
 
-    const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm(prev => ({ ...prev, [k]: e.target.value })); setProfileError('');
-    };
-
-    const handleSaveInfo = async () => {
+    // ── "Save" clicked: validate first, then open gate ───────────────────────
+    const requestSave = () => {
+        // Run validation before showing the gate so the user fixes errors first
         if (!form.employeeName.trim()) { setProfileError('Full name is required.'); return; }
         if (form.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
             setProfileError('Enter a valid contact number.'); return;
         }
-        setProfileSaving(true); setProfileError('');
+        // Validation passed — open password gate
+        setProfileError('');
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setPasswordGate(true);
+    };
+
+    // ── Gate confirmed: verify password then save ─────────────────────────────
+    const handleGateConfirm = async () => {
+        if (!gatePassword) { setGateError('Please enter your password.'); return; }
+        setGateLoading(true);
+        setGateError('');
+        try {
+            // Step 1 — verify identity
+            const verifyRes = await fetch('/api/profile/verify-password', {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ password: gatePassword }),
+            });
+            if (!verifyRes.ok) {
+                const err = await verifyRes.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Incorrect password. Please try again.');
+            }
+
+            // Step 2 — identity confirmed, now save the profile
+            setPasswordGate(false);
+            setGatePassword('');
+            await performSave();
+        } catch (err: any) {
+            setGateError(err.message ?? 'Incorrect password. Please try again.');
+        } finally {
+            setGateLoading(false);
+        }
+    };
+
+    // ── Actual API save (called only after password is verified) ─────────────
+    const performSave = async () => {
+        setProfileSaving(true);
+        setProfileError('');
         try {
             const employeeId = localStorage.getItem('employeeId') ?? '';
             const res = await fetch('/api/profile/update-profile', {
-                method: 'PUT', headers: authHeader(),
-                body: JSON.stringify({ employeeNumber: employeeId, employeeName: form.employeeName.trim(), contactNumber: form.contactNumber.trim() }),
+                method: 'PUT',
+                headers: authHeader(),
+                body: JSON.stringify({
+                    employeeNumber: employeeId,
+                    employeeName: form.employeeName.trim(),
+                    contactNumber: form.contactNumber.trim(),
+                }),
             });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Profile update failed.'); }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Profile update failed.');
+            }
             localStorage.setItem('employeeName', form.employeeName.trim());
             localStorage.setItem('contactNumber', form.contactNumber.trim());
             onUpdateUser({ ...user, fullName: form.employeeName.trim(), phone: form.contactNumber.trim() });
-            setProfileSuccess(true); setEditMode(false);
+            setProfileSuccess(true);
+            setEditMode(false);
             setTimeout(() => setProfileSuccess(false), 2500);
-        } catch (err: any) { setProfileError(err.message ?? 'Something went wrong.'); }
-        finally { setProfileSaving(false); }
+        } catch (err: any) {
+            setProfileError(err.message ?? 'Something went wrong.');
+        } finally {
+            setProfileSaving(false);
+        }
     };
 
+    // ── Cancel edit ──────────────────────────────────────────────────────────
+    const handleCancelEdit = () => {
+        setEditMode(false);
+        setPwdMode(false);
+        setProfileError('');
+        setForm({ employeeName: user.fullName, contactNumber: user.phone });
+    };
+
+    const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        setForm(prev => ({ ...prev, [k]: e.target.value }));
+        setProfileError('');
+    };
+
+    // ── Change password ──────────────────────────────────────────────────────
     const handleChangePwd = async () => {
         setPwdError('');
         if (!pwd.current) { setPwdError('Current password is required.'); return; }
@@ -975,14 +1049,22 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setPwdSaving(true);
         try {
             const res = await fetch('/api/profile/change-password', {
-                method: 'PATCH', headers: authHeader(),
+                method: 'PATCH',
+                headers: authHeader(),
                 body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
             });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Password update failed.'); }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Password update failed.');
+            }
             alert('Password changed successfully!');
-            setPwdMode(false); setPwd({ current: '', next: '', confirm: '' });
-        } catch (err: any) { setPwdError(err.message ?? 'Something went wrong.'); }
-        finally { setPwdSaving(false); }
+            setPwdMode(false);
+            setPwd({ current: '', next: '', confirm: '' });
+        } catch (err: any) {
+            setPwdError(err.message ?? 'Something went wrong.');
+        } finally {
+            setPwdSaving(false);
+        }
     };
 
     const toggleShow = (k: keyof typeof showPwd) => setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
@@ -990,7 +1072,114 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
     return (
         <div className="tab-content">
-            {profileSuccess && <div className="toast-success"><CheckCircle2 size={16} /> Profile updated successfully</div>}
+
+            {/* ── Password Gate Modal ─────────────────────────────────────── */}
+            {passwordGate && (
+                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
+                    <div
+                        className="modal-card"
+                        onClick={e => e.stopPropagation()}
+                        style={{ maxWidth: 400 }}
+                    >
+                        <div className="modal-head">
+                            <div>
+                                <h3>Confirm Your Identity</h3>
+                                <p className="modal-sub">Enter your password to save your profile changes.</p>
+                            </div>
+                            <button
+                                className="icon-btn"
+                                onClick={() => setPasswordGate(false)}
+                                aria-label="Close"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        {/* Lock icon + description */}
+                        <div style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            padding: '8px 0 16px', gap: 8,
+                        }}>
+                            <div style={{
+                                width: 52, height: 52, borderRadius: '50%',
+                                background: 'rgba(67,24,255,0.1)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Lock size={22} color="var(--primary)" />
+                            </div>
+                            <p style={{
+                                fontSize: 13, color: 'var(--text-secondary)',
+                                textAlign: 'center', margin: 0,
+                            }}>
+                                For your security, please verify your identity before saving changes.
+                            </p>
+                        </div>
+
+                        {gateError && (
+                            <div className="form-api-error" style={{ marginBottom: 12 }}>
+                                <AlertCircle size={14} /><span>{gateError}</span>
+                            </div>
+                        )}
+
+                        <div className="field" style={{ marginBottom: 20 }}>
+                            <label>Password</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showGatePassword ? 'text' : 'password'}
+                                    value={gatePassword}
+                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                    onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
+                                    placeholder="Enter your current password"
+                                    style={{ paddingRight: 40, width: '100%' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGatePassword(p => !p)}
+                                    style={{
+                                        position: 'absolute', right: 12, top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+                                    }}
+                                    tabIndex={-1}
+                                >
+                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="btn"
+                                onClick={() => setPasswordGate(false)}
+                                disabled={gateLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleGateConfirm}
+                                disabled={gateLoading || !gatePassword}
+                            >
+                                {gateLoading
+                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
+                                    : <><Shield size={13} /> Confirm & Save</>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Success toast ───────────────────────────────────────────── */}
+            {profileSuccess && (
+                <div className="toast-success">
+                    <CheckCircle2 size={16} /> Profile updated successfully
+                </div>
+            )}
+
+            {/* ── Profile Hero Card ───────────────────────────────────────── */}
             <div className="profile-hero card">
                 <div className="ph-avatar">{initials}</div>
                 <div className="ph-info">
@@ -998,93 +1187,176 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                     <p className="ph-role">{toDisplayRole(user.role)}</p>
                     <div className="ph-badges">
                         <span className="badge badge-blue">{user.employeeId}</span>
-                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>{user.accountStatus}</span>
-                        <span className={`badge ${user.presenceStatus === 'Online' ? 'badge-green' : 'badge-gray'}`}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>
+                            {user.accountStatus}
+                        </span>
+                        <span
+                            className={`badge ${user.presenceStatus === 'Online' ? 'badge-green' : 'badge-gray'}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
                             <span style={{
                                 display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                                background: user.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0'
+                                background: user.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
                             }} />
                             {user.presenceStatus ?? 'Offline'}
                         </span>
                     </div>
                 </div>
-                <button className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
-                    onClick={() => { setEditMode(e => !e); setPwdMode(false); setProfileError(''); }}>
+                {/* Edit toggle — no gate here, gate fires on Save */}
+                <button
+                    className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
+                    onClick={editMode ? handleCancelEdit : () => { setEditMode(true); setProfileSuccess(false); }}
+                >
                     {editMode ? <><X size={13} /> Cancel</> : <><Pencil size={13} /> Edit Profile</>}
                 </button>
             </div>
+
+            {/* ── Main profile grid ───────────────────────────────────────── */}
             <div className="profile-grid">
+
+                {/* Basic Information */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Basic Information</h3>
                         {editMode && (
-                            <button className="btn btn-primary" onClick={handleSaveInfo} disabled={profileSaving}>
-                                {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save</>}
+                            // Save button opens password gate (after client validation)
+                            <button
+                                className="btn btn-primary"
+                                onClick={requestSave}
+                                disabled={profileSaving}
+                            >
+                                {profileSaving
+                                    ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                    : <><Save size={13} /> Save</>
+                                }
                             </button>
                         )}
                     </div>
-                    {profileError && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{profileError}</span></div>}
+                    {profileError && (
+                        <div className="form-api-error" style={{ marginBottom: 10 }}>
+                            <AlertCircle size={14} /><span>{profileError}</span>
+                        </div>
+                    )}
                     <div className="info-fields">
                         <div className="info-field">
                             <label>Employee ID</label>
-                            <div className="if-value"><span className="if-icon"><Hash size={15} /></span><span className="read-only-val">{user.employeeId || '—'}</span></div>
+                            <div className="if-value">
+                                <span className="if-icon"><Hash size={15} /></span>
+                                <span className="read-only-val">{user.employeeId || '—'}</span>
+                            </div>
                         </div>
                         <div className="info-field">
                             <label>Full Name</label>
                             {editMode
-                                ? <div className="if-input-wrap"><span className="if-icon"><User size={15} /></span><input type="text" value={form.employeeName} onChange={setF('employeeName')} placeholder="Enter full name" /></div>
-                                : <div className="if-value"><span className="if-icon"><User size={15} /></span><span>{user.fullName || '—'}</span></div>
+                                ? <div className="if-input-wrap">
+                                    <span className="if-icon"><User size={15} /></span>
+                                    <input
+                                        type="text"
+                                        value={form.employeeName}
+                                        onChange={setF('employeeName')}
+                                        placeholder="Enter full name"
+                                    />
+                                </div>
+                                : <div className="if-value">
+                                    <span className="if-icon"><User size={15} /></span>
+                                    <span>{user.fullName || '—'}</span>
+                                </div>
                             }
                         </div>
                         <div className="info-field">
                             <label>Contact Number</label>
                             {editMode
-                                ? <div className="if-input-wrap"><span className="if-icon"><Phone size={15} /></span><input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. +63 917 000 0000" /></div>
-                                : <div className="if-value"><span className="if-icon"><Phone size={15} /></span><span>{user.phone || '—'}</span></div>
+                                ? <div className="if-input-wrap">
+                                    <span className="if-icon"><Phone size={15} /></span>
+                                    <input
+                                        type="tel"
+                                        value={form.contactNumber}
+                                        onChange={setF('contactNumber')}
+                                        placeholder="e.g. +63 917 000 0000"
+                                    />
+                                </div>
+                                : <div className="if-value">
+                                    <span className="if-icon"><Phone size={15} /></span>
+                                    <span>{user.phone || '—'}</span>
+                                </div>
                             }
                         </div>
                     </div>
                 </div>
+
+                {/* Account & Security */}
                 <div className="card">
                     <div className="card-header"><h3>Account & Security</h3></div>
                     <div className="account-info">
                         <div className="info-field">
                             <label>Role</label>
-                            <div className="if-value"><span className="if-icon"><Shield size={15} /></span><span className="read-only-val">{toDisplayRole(user.role) || '—'}</span></div>
+                            <div className="if-value">
+                                <span className="if-icon"><Shield size={15} /></span>
+                                <span className="read-only-val">{toDisplayRole(user.role) || '—'}</span>
+                            </div>
                         </div>
                         <div className="info-field">
                             <label>Account Status</label>
-                            <div className="if-value"><span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>{user.accountStatus ?? 'Active'}</span></div>
+                            <div className="if-value">
+                                <span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>
+                                    {user.accountStatus ?? 'Active'}
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div className="pwd-section">
                         <div className="pwd-header">
                             <div className="pwd-title"><Lock size={15} /><span>Change Password</span></div>
-                            <button className={`btn ${pwdMode ? '' : 'btn-primary'} btn-sm`}
-                                onClick={() => { setPwdMode(m => !m); setPwdError(''); setEditMode(false); }}>
+                            <button
+                                className={`btn ${pwdMode ? '' : 'btn-primary'} btn-sm`}
+                                onClick={() => { setPwdMode(m => !m); setPwdError(''); setEditMode(false); }}
+                            >
                                 {pwdMode ? 'Cancel' : 'Change'}
                             </button>
                         </div>
                         {pwdMode && (
                             <div className="pwd-form">
-                                {pwdError && <div className="form-api-error" style={{ marginBottom: 8 }}><AlertCircle size={14} /><span>{pwdError}</span></div>}
+                                {pwdError && (
+                                    <div className="form-api-error" style={{ marginBottom: 8 }}>
+                                        <AlertCircle size={14} /><span>{pwdError}</span>
+                                    </div>
+                                )}
                                 {(['current', 'next', 'confirm'] as const).map((k, i) => (
                                     <div className="field" key={k}>
-                                        <label>{i === 0 ? 'Current Password' : i === 1 ? 'New Password' : 'Confirm New Password'}</label>
+                                        <label>
+                                            {i === 0 ? 'Current Password' : i === 1 ? 'New Password' : 'Confirm New Password'}
+                                        </label>
                                         <div className="pwd-input-wrap">
-                                            <input type={showPwd[k] ? 'text' : 'password'} value={pwd[k]}
+                                            <input
+                                                type={showPwd[k] ? 'text' : 'password'}
+                                                value={pwd[k]}
                                                 onChange={e => setPwd(p => ({ ...p, [k]: e.target.value }))}
-                                                placeholder={i === 0 ? 'Enter current password' : i === 1 ? 'At least 6 characters' : 'Re-enter new password'}
+                                                placeholder={
+                                                    i === 0 ? 'Enter current password'
+                                                        : i === 1 ? 'At least 6 characters'
+                                                            : 'Re-enter new password'
+                                                }
                                             />
-                                            <button className="pwd-toggle" onClick={() => toggleShow(k)} tabIndex={-1}>
+                                            <button
+                                                className="pwd-toggle"
+                                                onClick={() => toggleShow(k)}
+                                                tabIndex={-1}
+                                            >
                                                 {showPwd[k] ? <EyeOff size={14} /> : <Eye size={14} />}
                                             </button>
                                         </div>
                                         {k === 'next' && pwd.next.length > 0 && (
                                             <div style={{ marginTop: 6 }}>
                                                 <div style={{ display: 'flex', gap: 4 }}>
-                                                    {[1, 2, 3].map(lv => <div key={lv} style={{ flex: 1, height: 4, borderRadius: 2, background: pwd.next.length >= lv * 4 ? lv === 1 ? '#ee5d50' : lv === 2 ? '#ffb547' : '#05cd99' : '#e9edf7', transition: 'background 0.2s' }} />)}
+                                                    {[1, 2, 3].map(lv => (
+                                                        <div key={lv} style={{
+                                                            flex: 1, height: 4, borderRadius: 2,
+                                                            background: pwd.next.length >= lv * 4
+                                                                ? lv === 1 ? '#ee5d50' : lv === 2 ? '#ffb547' : '#05cd99'
+                                                                : '#e9edf7',
+                                                            transition: 'background 0.2s',
+                                                        }} />
+                                                    ))}
                                                 </div>
                                                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
                                                     {pwd.next.length < 4 ? 'Weak' : pwd.next.length < 8 ? 'Fair' : 'Strong'}
@@ -1092,14 +1364,26 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                             </div>
                                         )}
                                         {k === 'confirm' && pwd.confirm.length > 0 && (
-                                            <span style={{ fontSize: 11, color: pwd.next === pwd.confirm ? '#05cd99' : 'var(--danger)', marginTop: 3, display: 'block' }}>
+                                            <span style={{
+                                                fontSize: 11,
+                                                color: pwd.next === pwd.confirm ? '#05cd99' : 'var(--danger)',
+                                                marginTop: 3, display: 'block',
+                                            }}>
                                                 {pwd.next === pwd.confirm ? '✓ Passwords match' : 'Passwords do not match'}
                                             </span>
                                         )}
                                     </div>
                                 ))}
-                                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={handleChangePwd} disabled={pwdSaving}>
-                                    {pwdSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Lock size={13} /> Update Password</>}
+                                <button
+                                    className="btn btn-primary"
+                                    style={{ width: '100%', justifyContent: 'center' }}
+                                    onClick={handleChangePwd}
+                                    disabled={pwdSaving}
+                                >
+                                    {pwdSaving
+                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        : <><Lock size={13} /> Update Password</>
+                                    }
                                 </button>
                             </div>
                         )}

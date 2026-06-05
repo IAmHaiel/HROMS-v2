@@ -1070,18 +1070,27 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
 function ProfileTab() {
     const employeeId = localStorage.getItem('employeeId') ?? '';
     const { success, error } = useToast();
-    const employeeName = localStorage.getItem('employeeName') ?? '';
+    const employeeNameStored = localStorage.getItem('employeeName') ?? '';
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
 
+    // ── Profile edit state ───────────────────────────────────────────────────
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({
-        employeeName: employeeName,
+        employeeName: employeeNameStored,
         contactNumber: employeeContact,
     });
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
 
+    // ── Password Gate state ──────────────────────────────────────────────────
+    const [passwordGate, setPasswordGate] = useState(false);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
+
+    // ── Password change state ────────────────────────────────────────────────
     const [editingPassword, setEditingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
     const [pwError, setPwError] = useState('');
@@ -1090,27 +1099,66 @@ function ProfileTab() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const handleProfileChange = (key: keyof typeof profileForm) =>
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            setProfileForm(prev => ({ ...prev, [key]: e.target.value }));
-            setProfileError('');
-            setProfileSuccess(false);
-        };
+    const authHeader = () => ({
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+    });
 
-    const handleProfileSave = async () => {
-        if (!profileForm.employeeName.trim()) { setProfileError('Full name is required.'); return; }
-        if (profileForm.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(profileForm.contactNumber.trim())) {
-            setProfileError('Enter a valid contact number.'); return;
+    // ── "Save Changes" clicked: validate first, then open gate ───────────────
+    const requestSave = () => {
+        if (!profileForm.employeeName.trim()) {
+            setProfileError('Full name is required.');
+            return;
         }
+        if (
+            profileForm.contactNumber &&
+            !/^[0-9+\-\s()]{7,20}$/.test(profileForm.contactNumber.trim())
+        ) {
+            setProfileError('Enter a valid contact number.');
+            return;
+        }
+        setProfileError('');
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setPasswordGate(true);
+    };
+
+    // ── Gate confirmed: verify password then save ────────────────────────────
+    const handleGateConfirm = async () => {
+        if (!gatePassword) { setGateError('Please enter your password.'); return; }
+        setGateLoading(true);
+        setGateError('');
+        try {
+            const verifyRes = await fetch('/api/profile/verify-password', {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ password: gatePassword }),
+            });
+            if (!verifyRes.ok) {
+                const err = await verifyRes.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Incorrect password. Please try again.');
+            }
+            setPasswordGate(false);
+            setGatePassword('');
+            await performSave();
+        } catch (err: any) {
+            setGateError(err.message ?? 'Incorrect password. Please try again.');
+        } finally {
+            setGateLoading(false);
+        }
+    };
+
+    // ── Actual save (only called after password verified) ────────────────────
+    const performSave = async () => {
         setProfileSaving(true);
         setProfileError('');
         try {
-            const token = localStorage.getItem('authToken');
             const res = await fetch(
                 `/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeId)}`,
                 {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    headers: authHeader(),
                     body: JSON.stringify({
                         employeeNumber: employeeId,
                         employeeName: profileForm.employeeName.trim(),
@@ -1120,18 +1168,27 @@ function ProfileTab() {
             );
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Profile update failed.');
+                throw new Error((err as any).message || 'Profile update failed.');
             }
             localStorage.setItem('employeeName', profileForm.employeeName.trim());
             localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
             setProfileSuccess(true);
             setEditingProfile(false);
+            setTimeout(() => setProfileSuccess(false), 2500);
+            success('Profile updated successfully.');
         } catch (err: any) {
             setProfileError(err.message ?? 'Something went wrong.');
         } finally {
             setProfileSaving(false);
         }
     };
+
+    const handleProfileChange = (key: keyof typeof profileForm) =>
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            setProfileForm(prev => ({ ...prev, [key]: e.target.value }));
+            setProfileError('');
+            setProfileSuccess(false);
+        };
 
     const handlePwChange = (key: keyof typeof pwForm) =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1145,15 +1202,14 @@ function ProfileTab() {
         if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.'); return; }
         setPwSaving(true);
         try {
-            const token = localStorage.getItem('authToken');
             const res = await fetch('/api/profile/change-password', {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: authHeader(),
                 body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Password update failed.');
+                throw new Error((err as any).message || 'Password update failed.');
             }
             success('Password changed successfully!');
             setEditingPassword(false);
@@ -1165,14 +1221,113 @@ function ProfileTab() {
         }
     };
 
-    const displayName = profileForm.employeeName || employeeName || 'System Admin';
+    const displayName = profileForm.employeeName || employeeNameStored || 'System Admin';
     const displayContact = profileForm.contactNumber || employeeContact;
 
     return (
         <div className="dashboard-content">
+
+            {/* ── Password Gate Modal ──────────────────────────────────────── */}
+            {passwordGate && (
+                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
+                    <div
+                        className="modal-card"
+                        onClick={e => e.stopPropagation()}
+                        style={{ maxWidth: 400 }}
+                    >
+                        <div className="modal-head">
+                            <div>
+                                <h3>Confirm Your Identity</h3>
+                                <p className="modal-sub">Enter your password to save your profile changes.</p>
+                            </div>
+                            <button
+                                className="icon-btn"
+                                onClick={() => setPasswordGate(false)}
+                                aria-label="Close"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center',
+                            padding: '8px 0 16px', gap: 8,
+                        }}>
+                            <div style={{
+                                width: 52, height: 52, borderRadius: '50%',
+                                background: 'rgba(67,24,255,0.1)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <Lock size={22} color="var(--primary)" />
+                            </div>
+                            <p style={{
+                                fontSize: 13, color: 'var(--text-secondary)',
+                                textAlign: 'center', margin: 0,
+                            }}>
+                                For your security, please verify your identity before saving changes.
+                            </p>
+                        </div>
+
+                        {gateError && (
+                            <div className="form-api-error" style={{ marginBottom: 12 }}>
+                                <AlertCircle size={14} /><span>{gateError}</span>
+                            </div>
+                        )}
+
+                        <div className="field" style={{ marginBottom: 20 }}>
+                            <label>Password</label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    type={showGatePassword ? 'text' : 'password'}
+                                    value={gatePassword}
+                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                    onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
+                                    placeholder="Enter your current password"
+                                    style={{ paddingRight: 40, width: '100%' }}
+                                    autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGatePassword(p => !p)}
+                                    style={{
+                                        position: 'absolute', right: 12, top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+                                    }}
+                                    tabIndex={-1}
+                                >
+                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="btn"
+                                onClick={() => setPasswordGate(false)}
+                                disabled={gateLoading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleGateConfirm}
+                                disabled={gateLoading || !gatePassword}
+                            >
+                                {gateLoading
+                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
+                                    : <><Shield size={13} /> Confirm & Save</>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
 
-                {/* ── Profile Card ── */}
+                {/* ── Profile Card ─────────────────────────────────────────── */}
                 <div className="card">
                     <div className="card-header">
                         <h3>My Profile</h3>
@@ -1205,7 +1360,14 @@ function ProfileTab() {
                     </div>
 
                     {profileSuccess && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: '#05cd99', fontWeight: 600 }}>
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '8px 12px',
+                            background: 'rgba(5,205,153,0.1)',
+                            border: '1px solid rgba(5,205,153,0.25)',
+                            borderRadius: 10, marginBottom: 12,
+                            fontSize: 13, color: '#05cd99', fontWeight: 600,
+                        }}>
                             <CheckCircle2 size={14} /> Profile updated successfully!
                         </div>
                     )}
@@ -1213,7 +1375,9 @@ function ProfileTab() {
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                             {profileError && (
-                                <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>
+                                <div className="form-api-error">
+                                    <AlertCircle size={14} /><span>{profileError}</span>
+                                </div>
                             )}
                             <div className="field">
                                 <label>Full Name</label>
@@ -1240,7 +1404,7 @@ function ProfileTab() {
                                 </div>
                                 <div className="detail-item">
                                     <span className="detail-label">Role</span>
-                                    <span className="detail-value">System Admin</span>
+                                    <span className="detail-value">Operation Admin</span>
                                 </div>
                             </div>
                             <div className="modal-actions" style={{ padding: '4px 0 0' }}>
@@ -1249,40 +1413,58 @@ function ProfileTab() {
                                     onClick={() => {
                                         setEditingProfile(false);
                                         setProfileError('');
-                                        setProfileForm({ employeeName: employeeName, contactNumber: employeeContact });
+                                        setProfileForm({
+                                            employeeName: employeeNameStored,
+                                            contactNumber: employeeContact,
+                                        });
                                     }}
                                     disabled={profileSaving}
                                 >
                                     Cancel
                                 </button>
-                                <button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>
-                                    {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={requestSave}
+                                    disabled={profileSaving}
+                                >
+                                    {profileSaving
+                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        : <><Save size={13} /> Save Changes</>
+                                    }
                                 </button>
                             </div>
                         </div>
                     ) : (
                         <div className="detail-grid" style={{ marginTop: 4 }}>
                             <div className="detail-item">
-                                <span className="detail-label"><Hash size={11} style={{ display: 'inline', marginRight: 4 }} />Employee ID</span>
+                                <span className="detail-label">
+                                    <Hash size={11} style={{ display: 'inline', marginRight: 4 }} />Employee ID
+                                </span>
                                 <span className="detail-value">{employeeId || '—'}</span>
                             </div>
                             <div className="detail-item">
-                                <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Full Name</span>
+                                <span className="detail-label">
+                                    <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Full Name
+                                </span>
                                 <span className="detail-value">{displayName}</span>
                             </div>
                             <div className="detail-item">
-                                <span className="detail-label"><Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role</span>
-                                <span className="detail-value">System Admin</span>
+                                <span className="detail-label">
+                                    <Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role
+                                </span>
+                                <span className="detail-value">Operation Admin</span>
                             </div>
                             <div className="detail-item">
-                                <span className="detail-label"><Phone size={11} style={{ display: 'inline', marginRight: 4 }} />Contact</span>
+                                <span className="detail-label">
+                                    <Phone size={11} style={{ display: 'inline', marginRight: 4 }} />Contact
+                                </span>
                                 <span className="detail-value">{displayContact || '—'}</span>
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* ── Security Card ── */}
+                {/* ── Security Card ─────────────────────────────────────────── */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Security Settings</h3>
@@ -1305,16 +1487,20 @@ function ProfileTab() {
                                     <span className="system-name">Password</span>
                                     <span className="system-detail">Last updated recently</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#05cd99', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Secure</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#05cd99', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                    Secure
+                                </span>
                             </div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div className="system-status-item" style={{ cursor: 'default' }}>
                                 <div className="system-icon bg-primary"><Shield size={16} /></div>
                                 <div className="system-info">
                                     <span className="system-name">Role Permissions</span>
-                                    <span className="system-detail">Full system access granted</span>
+                                    <span className="system-detail">Operations access granted</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(67,24,255,0.1)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Admin</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(67,24,255,0.1)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                    Op Admin
+                                </span>
                             </div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div className="system-status-item" style={{ cursor: 'default' }}>
@@ -1323,7 +1509,9 @@ function ProfileTab() {
                                     <span className="system-name">Active Session</span>
                                     <span className="system-detail">Logged in on this device</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#ffb547', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Live</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#ffb547', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                    Live
+                                </span>
                             </div>
                         </div>
                     ) : (
@@ -1411,10 +1599,14 @@ function ProfileTab() {
                                     </button>
                                 </div>
                                 {pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && (
-                                    <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>
+                                    <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>
+                                        Passwords do not match
+                                    </span>
                                 )}
                                 {pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && (
-                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Passwords match</span>
+                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                                        ✓ Passwords match
+                                    </span>
                                 )}
                             </div>
                             <div className="modal-actions" style={{ padding: '4px 0 0' }}>
@@ -1429,8 +1621,15 @@ function ProfileTab() {
                                 >
                                     Cancel
                                 </button>
-                                <button className="btn btn-primary" onClick={handlePwSave} disabled={pwSaving}>
-                                    {pwSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Update Password</>}
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handlePwSave}
+                                    disabled={pwSaving}
+                                >
+                                    {pwSaving
+                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        : <><Save size={13} /> Update Password</>
+                                    }
                                 </button>
                             </div>
                         </div>
@@ -1438,7 +1637,7 @@ function ProfileTab() {
                 </div>
             </div>
 
-            {/* ── Account Overview ── */}
+            {/* ── Account Overview ─────────────────────────────────────────── */}
             <div className="card">
                 <div className="card-header"><h3>Account Overview</h3></div>
                 <div className="system-status-list">
@@ -1453,7 +1652,9 @@ function ProfileTab() {
                                 <span className="system-name">{name}</span>
                                 <span className="system-detail">{detail}</span>
                             </div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Full Access</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                Full Access
+                            </span>
                         </div>
                     ))}
                 </div>
