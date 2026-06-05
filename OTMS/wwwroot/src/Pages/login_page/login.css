@@ -504,3 +504,29 @@ body {
         box-shadow: var(--shadow-lg);
     }
 }
+
+.field-wrapper.field-error {
+    border-color: #ee5d50;
+    box-shadow: 0 0 0 3px rgba(238, 93, 80, 0.12);
+}
+
+.field-wrapper.field-success {
+    border-color: #05cd99;
+    box-shadow: 0 0 0 3px rgba(5, 205, 153, 0.12);
+}
+
+.field-err-msg {
+    font-size: 11px;
+    color: #ee5d50;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.field-ok-msg {
+    font-size: 11px;
+    color: #05cd99;
+    margin-top: 4px;
+    display: block;
+}

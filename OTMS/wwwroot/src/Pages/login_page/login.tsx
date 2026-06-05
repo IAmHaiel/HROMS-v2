@@ -58,6 +58,8 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
+    const [employeeIdError, setEmployeeIdError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -66,13 +68,27 @@ export default function Login() {
         setStatusType(type);
     };
 
+    const validateEmployeeId = (value: string): string => {
+        if (!value.trim()) return 'Employee ID is required.';
+        if (value.trim().length < 3) return 'Employee ID must be at least 3 characters.';
+        if (value.trim().length > 20) return 'Employee ID must not exceed 20 characters.';
+        if (!/^EMP-\d{4}$/.test(value.trim())) return 'Employee ID must follow the format EMP-0001.';
+        return '';
+    };
+
+    const validatePassword = (value: string): string => {
+        if (!value) return 'Password is required.';
+        return '';
+    };
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!employeeId.trim() || !password.trim()) {
-            updateStatus('Please fill in all fields.', 'error');
-            return;
-        }
+        const idErr = validateEmployeeId(employeeId);
+        const pwErr = validatePassword(password);
+        setEmployeeIdError(idErr);
+        setPasswordError(pwErr);
+        if (idErr || pwErr) return;
 
         setIsLoading(true);
         updateStatus('Authenticating...', 'info');
@@ -238,7 +254,7 @@ export default function Login() {
                             <label htmlFor="employeeId" className="field-label">
                                 Employee ID
                             </label>
-                            <div className="field-wrapper">
+                            <div className={`field-wrapper${employeeIdError ? ' field-error' : employeeId && !employeeIdError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
                                     <IdIcon />
                                 </span>
@@ -246,14 +262,24 @@ export default function Login() {
                                     id="employeeId"
                                     type="text"
                                     className="field-input"
-                                    placeholder="e.g. EMP-001"
+                                    placeholder="e.g. EMP-0001"
                                     value={employeeId}
-                                    onChange={(e) => setEmployeeId(e.target.value)}
+                                    onChange={(e) => {
+                                        setEmployeeId(e.target.value);
+                                        setEmployeeIdError(validateEmployeeId(e.target.value));
+                                    }}
                                     disabled={isLoading}
                                     autoComplete="username"
                                     autoFocus
+                                    maxLength={20}
                                 />
                             </div>
+                            {employeeIdError && (
+                                <span className="field-err-msg">{employeeIdError}</span>
+                            )}
+                            {!employeeIdError && employeeId.trim().length >= 3 && (
+                                <span className="field-ok-msg">✓ Looks good</span>
+                            )}
                         </div>
 
                         {/* Password */}
@@ -261,7 +287,7 @@ export default function Login() {
                             <label htmlFor="password" className="field-label">
                                 Password
                             </label>
-                            <div className="field-wrapper">
+                            <div className={`field-wrapper${passwordError ? ' field-error' : password && !passwordError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
                                     <LockIcon />
                                 </span>
@@ -271,9 +297,13 @@ export default function Login() {
                                     className="field-input"
                                     placeholder="Enter your password"
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => {
+                                        setPassword(e.target.value);
+                                        setPasswordError(validatePassword(e.target.value));
+                                    }}
                                     disabled={isLoading}
                                     autoComplete="current-password"
+                                    maxLength={100}
                                 />
                                 <button
                                     type="button"
@@ -285,6 +315,9 @@ export default function Login() {
                                     {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                                 </button>
                             </div>
+                            {passwordError && (
+                                <span className="field-err-msg">{passwordError}</span>
+                            )}
                         </div>
 
                         {/* Remember me / Forgot password */}
