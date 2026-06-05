@@ -1,4 +1,6 @@
-﻿/* ─── CSS Variables (matches provided design system) ─────────────────────── */
+﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+
+/* ─── CSS Variables (matches provided design system) ─────────────────────── */
 :root {
     --primary: #4318ff;
     --bg-main: #f4f7fe;
@@ -34,7 +36,15 @@
     display: flex;
     min-height: 100vh;
     background: var(--bg-main);
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'Montserrat', system-ui, sans-serif;
+    color: var(--text-primary);
+}
+
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-main);
+    font-family: 'Montserrat', system-ui, sans-serif;
     color: var(--text-primary);
 }
 

@@ -39,14 +39,14 @@ type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
 type NavTab = 'dashboard' | 'tasks' | 'team' | 'reports' | 'profile';
 
 interface TeamMember {
-    accountId: string;      // use accountId (Guid) from backend
+    accountId: string;  
     employeeName: string;
     role: string;
     presenceStatus?: string;
 }
 
 interface Task {
-    taskId: string;          // Guid from backend
+    taskId: string;
     taskTitle: string;
     taskDescription: string;
     priority: Priority;
@@ -55,8 +55,10 @@ interface Task {
     taskRemarks?: string;
     assignedEmployee: string;
     createdByEmployee: string;
-    assignedTo: string;      // accountId Guid
+    assignedTo: string;
     createdAt: string;
+    deleted?: boolean;  
+    Deleted?: boolean;   
 }
 
 // DTOs matching backend
@@ -217,22 +219,74 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         taskTitle: initial.taskTitle ?? '',
         taskDescription: initial.taskDescription ?? '',
         dueAt: initial.dueAt ? initial.dueAt.split('T')[0] : '',
-        priority: initial.priority ?? 'Medium' as Priority,
+        priority: initial.priority ?? '' as Priority,
         assignedTo: resolvedAssignedTo,
         taskRemarks: initial.taskRemarks ?? '',
     });
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
-
-    const set = (key: keyof typeof form) =>
-        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-            setForm(prev => ({ ...prev, [key]: e.target.value }));
-
     const [formError, setFormError] = useState('');
 
+    // ── Per-field live validator ──────────────────────────────────────────
+    const validateField = (key: string, value: string): string => {
+        switch (key) {
+            case 'taskTitle': {
+                const v = value.trim();
+                if (!v) return 'Task title is required.';
+                if (v.length < 3) return 'Title must be at least 3 characters.';
+                if (v.length > 100) return 'Title must not exceed 100 characters.';
+                return '';
+            }
+            case 'taskDescription': {
+                const v = value.trim();
+                if (v.length > 500) return 'Description must not exceed 500 characters.';
+                return '';
+            }
+            case 'dueAt': {
+                if (!value) return 'Due date is required.';
+                const selected = new Date(value);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (selected < today) return 'Due date cannot be in the past.';
+                return '';
+            }
+            case 'assignedTo': {
+                if (!value) return 'Please assign the task to someone.';
+                return '';
+            }
+            case 'priority': {
+                if (!value) return 'Priority is required.';
+                if (!['High', 'Medium', 'Low'].includes(value)) return 'Please select a valid priority.';
+                return '';
+            }
+            default:
+                return '';
+        }
+    };
+
+    // ── Validate all fields on submit ─────────────────────────────────────
+    const validateAll = (): boolean => {
+        const newErrors: Record<string, string> = {};
+        (['taskTitle', 'taskDescription', 'dueAt', 'assignedTo', 'priority'] as const).forEach(key => {
+            const msg = validateField(key, form[key] ?? '');
+            if (msg) newErrors[key] = msg;
+        });
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    // ── Live change handler ───────────────────────────────────────────────
+    const set = (key: keyof typeof form) =>
+        (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+            const value = e.target.value;
+            setForm(prev => ({ ...prev, [key]: value }));
+            setFormError('');
+            const msg = validateField(key, value);
+            setErrors(prev => ({ ...prev, [key]: msg || '' }));
+        };
+
     const handleSave = () => {
-        if (!form.taskTitle.trim()) { setFormError('Task title is required.'); return; }
-        if (!form.assignedTo) { setFormError('Please assign the task to someone.'); return; }
-        setFormError('');
+        if (!validateAll()) return;
         setSubmitting(true);
         onSave({
             taskTitle: form.taskTitle.trim(),
@@ -244,6 +298,24 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         });
         setSubmitting(false);
     };
+
+    // ── Shared field error renderer ───────────────────────────────────────
+    const FieldErr = ({ name }: { name: string }) =>
+        errors[name] ? (
+            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <AlertCircle size={11} />{errors[name]}
+            </span>
+        ) : null;
+
+    // ── Char counter renderer ─────────────────────────────────────────────
+    const CharCount = ({ value, max }: { value: string; max: number }) => (
+        <span style={{
+            fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right',
+            color: value.length > max * 0.9 ? (value.length >= max ? 'var(--danger, #ee5d50)' : '#c05c00') : 'var(--text-secondary)',
+        }}>
+            {value.length}/{max}
+        </span>
+    );
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -259,38 +331,107 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 </div>
 
                 <div className="modal-form">
+
+                    {/* ── Task Title ── */}
                     <div className="field">
-                        <label>Task Title</label>
-                        <input value={form.taskTitle} onChange={set('taskTitle')} placeholder="e.g. Route planning update" />
+                        <label>Task Title <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <input
+                            value={form.taskTitle}
+                            onChange={set('taskTitle')}
+                            placeholder="e.g. Route planning update"
+                            className={errors.taskTitle ? 'input-error' : ''}
+                            maxLength={100}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <FieldErr name="taskTitle" />
+                            {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
+                                <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3 }}>✓ Looks good</span>
+                            )}
+                            <CharCount value={form.taskTitle} max={100} />
+                        </div>
                     </div>
+
+                    {/* ── Description ── */}
                     <div className="field">
                         <label>Description</label>
-                        <textarea value={form.taskDescription} onChange={set('taskDescription')} placeholder="Describe the task..." rows={3} />
+                        <textarea
+                            value={form.taskDescription}
+                            onChange={set('taskDescription')}
+                            placeholder="Describe the task..."
+                            rows={3}
+                            className={errors.taskDescription ? 'input-error' : ''}
+                            maxLength={500}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <FieldErr name="taskDescription" />
+                            <CharCount value={form.taskDescription} max={500} />
+                        </div>
                     </div>
+
+                    {/* ── Due Date + Priority ── */}
                     <div className="field-row">
                         <div className="field">
-                            <label>Due Date</label>
-                            <input type="date" value={form.dueAt} onChange={set('dueAt')} />
+                            <label>
+                                Due Date <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                            </label>
+                            <input
+                                type="date"
+                                value={form.dueAt}
+                                onChange={set('dueAt')}
+                                className={errors.dueAt ? 'input-error' : form.dueAt ? 'input-success' : ''}
+                                min={new Date().toISOString().split('T')[0]}
+                            />
+                            <FieldErr name="dueAt" />
+                            {!errors.dueAt && form.dueAt && (
+                                <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                                    ✓ {new Date(form.dueAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                </span>
+                            )}
+                            {!form.dueAt && !errors.dueAt && (
+                                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                    Cannot be a past date.
+                                </span>
+                            )}
                         </div>
                         <div className="field">
-                            <label>Priority</label>
-                            <select value={form.priority} onChange={set('priority')}>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
+                            <label>
+                                Priority <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                            </label>
+                            <select
+                                value={form.priority}
+                                onChange={set('priority')}
+                                className={errors.priority ? 'input-error' : ''}
+                            >
+                                <option value="">Select priority</option>
+                                <option value="High">🔴 High</option>
+                                <option value="Medium">🟡 Medium</option>
+                                <option value="Low">🟢 Low</option>
                             </select>
+                            <FieldErr name="priority" />
+                            {!errors.priority && form.priority && (
+                                <span style={{
+                                    fontSize: 11, marginTop: 3, display: 'block',
+                                    color: form.priority === 'High' ? '#ee5d50' : form.priority === 'Medium' ? '#ffb547' : '#05cd99',
+                                }}>
+                                    {form.priority === 'High' && '⚠ High priority — will be flagged for urgent attention'}
+                                    {form.priority === 'Medium' && '✓ Medium priority selected'}
+                                    {form.priority === 'Low' && '✓ Low priority selected'}
+                                </span>
+                            )}
                         </div>
                     </div>
-                    {/* Replace Assign To field in TaskModal */}
+
+                    {/* ── Assign To ── */}
                     <div className="field">
-                        <label>Assign To</label>
-                        <div className="assignee-select" tabIndex={0}
+                        <label>Assign To <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <div
+                            className={`assignee-select${errors.assignedTo ? ' input-error' : ''}`}
+                            tabIndex={0}
                             onBlur={e => {
                                 if (!e.currentTarget.contains(e.relatedTarget))
                                     e.currentTarget.querySelector<HTMLElement>('.assignee-options')?.style.setProperty('display', 'none');
                             }}
                         >
-                            {/* Trigger — looks like a select */}
                             <div
                                 className="assignee-trigger"
                                 onClick={e => {
@@ -307,13 +448,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                                 </svg>
                             </div>
-
-                            {/* Options dropdown */}
                             <div className="assignee-options" style={{ display: 'none' }}>
                                 <div
                                     className="assignee-option placeholder-opt"
                                     onClick={e => {
                                         setForm(prev => ({ ...prev, assignedTo: '' }));
+                                        setErrors(prev => ({ ...prev, assignedTo: 'Please assign the task to someone.' }));
                                         (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                     }}
                                 >
@@ -325,6 +465,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                         className={`assignee-option${form.assignedTo === m.accountId ? ' selected' : ''}`}
                                         onClick={e => {
                                             setForm(prev => ({ ...prev, assignedTo: m.accountId }));
+                                            setErrors(prev => ({ ...prev, assignedTo: '' }));
                                             (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                         }}
                                     >
@@ -334,11 +475,25 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 ))}
                             </div>
                         </div>
+                        <FieldErr name="assignedTo" />
+                        {!errors.assignedTo && form.assignedTo && (
+                            <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                                ✓ {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
+                            </span>
+                        )}
                     </div>
+
+                    {/* ── Remarks (edit mode only) ── */}
                     {mode === 'edit' && (
                         <div className="field">
                             <label>Remarks</label>
-                            <input value={form.taskRemarks} onChange={set('taskRemarks')} placeholder="Optional remarks..." />
+                            <input
+                                value={form.taskRemarks}
+                                onChange={set('taskRemarks')}
+                                placeholder="Optional remarks..."
+                                maxLength={200}
+                            />
+                            <CharCount value={form.taskRemarks} max={200} />
                         </div>
                     )}
                 </div>
@@ -352,11 +507,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 <div className="modal-actions">
                     <div style={{ display: 'flex', gap: 8, flex: 1 }}>
                         {mode === 'edit' && onDelete && (
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => onDelete()}
-                                disabled={submitting}
-                            >
+                            <button className="btn btn-danger" onClick={() => onDelete()} disabled={submitting}>
                                 <Trash2 size={13} /> Delete Task
                             </button>
                         )}
@@ -564,13 +715,19 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
 
 const TasksTab: React.FC<{
     tasks: Task[];
+    allTasks: Task[];  
     loading: boolean;
     searchQuery: string;
     onView: (id: string) => void;
     onEdit: (id: string) => void;
-}> = ({ tasks, loading, searchQuery, onView, onEdit }) => {
+    onRestore: (taskId: string) => void;
+    onEmptyBin: () => void;
+}> = ({ tasks, allTasks, loading, searchQuery, onView, onEdit, onRestore, onEmptyBin }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
+
+    const deletedTasks = allTasks.filter((t: any) => t.deleted === true);
 
     const filtered = tasks.filter(t =>
         (!filterStatus || t.taskStatus === filterStatus) &&
@@ -580,33 +737,150 @@ const TasksTab: React.FC<{
 
     return (
         <div className="dashboard-content">
-            <div className="filter-bar">
-                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="">All Statuses</option>
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Overdue">Overdue</option>
-                </select>
-                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-                    <option value="">All Priorities</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                </select>
-            </div>
-            <div className="card">
-                {loading ? (
-                    <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
-                ) : filtered.length === 0 ? (
-                    <div className="empty-state"><Package size={20} /><p>No tasks match filters</p></div>
-                ) : filtered.map(t => (
-                    <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
+
+            {/* ── Subtab Bar ── */}
+            <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 16, background: 'var(--bg-card)', borderRadius: '12px 12px 0 0', padding: '0 20px' }}>
+                {([
+                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, count: tasks.length },
+                    { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, count: deletedTasks.length },
+                ] as const).map(({ key, label, icon, count }) => (
+                    <button
+                        key={key}
+                        onClick={() => setSubTab(key)}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '13px 16px',
+                            fontSize: 13, fontWeight: 500,
+                            border: 'none', background: 'none', cursor: 'pointer',
+                            borderBottom: `2px solid ${subTab === key ? 'var(--primary)' : 'transparent'}`,
+                            color: subTab === key ? 'var(--primary)' : 'var(--text-secondary)',
+                            marginBottom: -1,
+                        }}
+                    >
+                        {icon}
+                        {label}
+                        {count > 0 && (
+                            <span style={{
+                                fontSize: 11, fontWeight: 600,
+                                padding: '1px 7px', borderRadius: 999,
+                                background: key === 'bin'
+                                    ? 'rgba(238,93,80,0.12)'
+                                    : subTab === key ? 'rgba(67,24,255,0.1)' : 'var(--border)',
+                                color: key === 'bin' ? 'var(--status-failed)' : subTab === key ? 'var(--primary)' : 'var(--text-secondary)',
+                            }}>
+                                {count}
+                            </span>
+                        )}
+                    </button>
                 ))}
             </div>
+
+            {/* ══ ACTIVE TASKS PANE ══ */}
+            {subTab === 'active' && (
+                <>
+                    <div className="filter-bar" style={{ marginBottom: 12 }}>
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Overdue">Overdue</option>
+                        </select>
+                        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+                            <option value="">All Priorities</option>
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div className="card">
+                        {loading ? (
+                            <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
+                        ) : filtered.length === 0 ? (
+                            <div className="empty-state"><Package size={20} /><p>No tasks match filters</p></div>
+                        ) : filtered.map(t => (
+                            <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* ══ BIN PANE ══ */}
+            {subTab === 'bin' && (
+                <div className="card">
+                    {/* Bin notice */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(238,93,80,0.06)', border: '1px solid rgba(238,93,80,0.18)', borderRadius: 10, fontSize: 13, color: '#b42318', flex: 1 }}>
+                            <Trash2 size={14} />
+                            Items in the bin are soft-deleted. You can restore them or empty the bin.
+                        </div>
+                        {deletedTasks.length > 0 && (
+                            <button
+                                className="btn btn-danger"
+                                style={{ marginLeft: 12, whiteSpace: 'nowrap' }}
+                                onClick={() => onEmptyBin()}
+                            >
+                                <Trash2 size={13} /> Empty Bin
+                            </button>
+                        )}
+                    </div>
+
+                    {deletedTasks.length === 0 ? (
+                        <div className="empty-state">
+                            <Trash2 size={24} />
+                            <p>Bin is empty</p>
+                        </div>
+                    ) : (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>TASK</th>
+                                    <th>ASSIGNEE</th>
+                                    <th>PRIORITY</th>
+                                    <th>DUE DATE</th>
+                                    <th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {deletedTasks.map(t => (
+                                    <tr key={t.taskId} style={{ opacity: 0.75 }}>
+                                        <td>
+                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
+                                                {t.taskTitle}
+                                            </div>
+                                            {t.taskDescription && (
+                                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {t.taskDescription}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                                            {t.assignedEmployee || '—'}
+                                        </td>
+                                        <td><PrioBadge p={t.priority} /></td>
+                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                            {t.dueAt ? fmtDate(t.dueAt) : '—'}
+                                        </td>
+                                        <td>
+                                            <button
+                                                className="btn btn-xs"
+                                                style={{ background: 'rgba(5,205,153,0.1)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }}
+                                                onClick={() => onRestore(t.taskId)}
+                                            >
+                                                <CheckCircle2 size={11} /> Restore
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
         </div>
     );
-};
+    };
+
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
 const TeamTab: React.FC<{
@@ -1211,6 +1485,10 @@ export default function OpsAdminDashboard() {
     const token = () => localStorage.getItem('authToken');
 
     // ── Fetch Tasks ──
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
+    const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); // ← ADD
+
+    // ── Update fetchTasks ──
     const fetchTasks = async () => {
         setLoadingTasks(true);
         try {
@@ -1218,13 +1496,54 @@ export default function OpsAdminDashboard() {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: Task[] = await res.json();
-            setTasks(data);
+            const data: any[] = await res.json();
+            console.log('Raw API response:', JSON.stringify(data[0])); // inspect first task's raw shape
+
+            // Normalize: map Deleted → deleted regardless of casing
+            const normalized: Task[] = data.map(t => ({
+                ...t,
+                deleted: deletedTaskIds.has(t.taskId),
+            }));
+
+            console.log('Tasks with deleted flags:', normalized.map(t => ({ title: t.taskTitle, deleted: t.deleted })));
+
+            setAllTasks(normalized);
+            setTasks(normalized.filter(t => !t.deleted));
         } catch {
+            setAllTasks([]);
             setTasks([]);
         } finally {
             setLoadingTasks(false);
         }
+    };
+
+    // ── Restore task ──
+    const handleRestoreTask = async (taskId: string) => {
+        try {
+            const res = await fetch(`/api/task/${taskId}/restore`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to restore task.');
+            }
+            setAllTasks(prev => prev.map(t =>
+                t.taskId === taskId ? { ...t, deleted: false } : t
+            ));
+            setTasks(prev => {
+                const restored = allTasks.find(t => t.taskId === taskId);
+                return restored ? [...prev, { ...restored, deleted: false }] : prev;
+            });
+            success('Task restored successfully.');
+        } catch (err: any) {
+            error(err.message ?? 'Failed to restore task.');
+        }
+    };
+
+    const handleEmptyBin = () => {
+        setAllTasks(prev => prev.filter(t => !t.deleted));
+        success('Bin emptied.');
     };
 
     // ── Fetch Team Members (for assignee dropdown) ──
@@ -1335,7 +1654,7 @@ export default function OpsAdminDashboard() {
         if (!ok) return;
 
         try {
-            const res = await fetch(`/api/task/delete-task/${taskId}`, {
+            const res = await fetch(`/api/task/${taskId}/delete-task`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token()}` },
             });
@@ -1343,9 +1662,20 @@ export default function OpsAdminDashboard() {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Failed to delete task.');
             }
-            await fetchTasks();
+
+            // Track locally so refetches don't resurrect the task
+            setDeletedTaskIds(prev => new Set(prev).add(taskId));
+            setAllTasks(prev => prev.map(t =>
+                t.taskId === taskId ? { ...t, deleted: true } : t
+            ));
+            setTasks(prev => prev.filter(t => t.taskId !== taskId));
             setEditingTask(null);
+            setViewingTask(null);
+            setDetailTask(null);
             success('Task deleted successfully.');
+
+            // No fetchTasks() here — it would overwrite local deleted state
+
         } catch (err: any) {
             error(err.message ?? 'Something went wrong.');
         }
@@ -1474,10 +1804,13 @@ export default function OpsAdminDashboard() {
                 {activeTab === 'tasks' && (
                     <TasksTab
                         tasks={tasks}
+                        allTasks={allTasks}
                         loading={loadingTasks}
                         searchQuery={searchQuery}
                         onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
                         onEdit={id => setEditingTask(tasks.find(t => t.taskId === id) ?? null)}
+                        onRestore={handleRestoreTask}
+                        onEmptyBin={handleEmptyBin}
                     />
                 )}
                 {activeTab === 'team' && (
