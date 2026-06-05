@@ -13,6 +13,7 @@ import ChangePassword from './Pages/change_password/change_password'
 import EmployeeDetail from './Pages/employee_details/employee_detail'
 import EmailVerificationPage from './Pages/email_verification_page/email_verification_page'
 import { ToastProvider } from './components/Toast/Toast'
+import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
 
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
@@ -26,6 +27,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <BrowserRouter>
             <ToastProvider>
+                <AuthSyncWatcher />
                 <Routes>
                     {/* Public routes */}
                     <Route path="/" element={<LoginPage />} />
