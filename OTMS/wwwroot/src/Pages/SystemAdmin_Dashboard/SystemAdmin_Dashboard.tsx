@@ -116,14 +116,6 @@ const ROLES = [
     'Encoder',
 ];
 
-const EMPTY_FORM: FormState = {
-    employeeNumber: '',
-    employeeName: '',
-    contactNumber: '',
-    role: '',
-    email: '',
-};
-
 const NAV_GROUPS = [
     {
         label: 'MAIN MENU',
@@ -153,21 +145,67 @@ const ITEMS_PER_PAGE = 7;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+interface FieldError {
+    employeeName?: string;
+    contactNumber?: string;
+    role?: string;
+    email?: string;
+}
+
+const EMPTY_FORM: FormState = {
+    employeeNumber: '',   // will be auto-filled
+    employeeName: '',
+    contactNumber: '',
+    role: '',
+    email: '',
+};
+
 function validate(form: FormState): FieldError {
     const errs: FieldError = {};
-    if (!form.employeeNumber.trim()) errs.employeeNumber = 'Employee number is required.';
-    if (!form.employeeName.trim()) errs.employeeName = 'Full name is required.';
-    if (!form.contactNumber.trim()) {
-        errs.contactNumber = 'Contact number is required.';
-    } else if (!/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
-        errs.contactNumber = 'Enter a valid contact number.';
+
+    // ── Full Name ──
+    const name = form.employeeName.trim();
+    if (!name) {
+        errs.employeeName = 'Full name is required.';
+    } else if (name.length < 2) {
+        errs.employeeName = 'Name must be at least 2 characters.';
+    } else if (name.length > 80) {
+        errs.employeeName = 'Name must not exceed 80 characters.';
+    } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-\.]+$/.test(name)) {
+        errs.employeeName = 'Name contains invalid characters.';
+    } else if (name.split(/\s+/).filter(Boolean).length < 2) {
+        errs.employeeName = 'Please enter both first and last name.';
     }
-    if (!form.role) errs.role = 'Please select a role.';
-    if (!form.email.trim()) {
+
+    // ── Contact Number ──
+    const contact = form.contactNumber.trim();
+    if (!contact) {
+        errs.contactNumber = 'Contact number is required.';
+    } else if (!/^\d+$/.test(contact)) {
+        errs.contactNumber = 'Contact number must contain digits only.';
+    } else if (contact.length !== 11) {
+        errs.contactNumber = `Must be exactly 11 digits (currently ${contact.length}).`;
+    } else if (!/^09\d{9}$/.test(contact)) {
+        errs.contactNumber = 'Must start with 09 (e.g. 09123456789).';
+    }
+
+    // ── Role ──
+    if (!form.role) {
+        errs.role = 'Please select a role.';
+    } else if (!ROLES.includes(form.role)) {
+        errs.role = 'Selected role is not valid.';
+    }
+
+    // ── Email ──
+    const email = form.email.trim();
+    if (!email) {
         errs.email = 'Email address is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    } else if (email.length > 100) {
+        errs.email = 'Email must not exceed 100 characters.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         errs.email = 'Enter a valid email address.';
     }
+
     return errs;
 }
 
@@ -219,19 +257,103 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [errors, setErrors] = useState<FieldError>({});
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
-    const [successData, setSuccessData] = useState<{ employeeNumber: string; generatedPassword: string } | null>(null);
+    const [successData, setSuccessData] = useState<{ employeeNumber: string } | null>(null);
+    const [empNumLoading, setEmpNumLoading] = useState(true);
+    const [empNumError, setEmpNumError] = useState('');
     const { success } = useToast();
 
+    // ── Auto-generate employee number on mount ──────────────────────────────
+    useEffect(() => {
+        const generateEmployeeNumber = async () => {
+            setEmpNumLoading(true);
+            setEmpNumError('');
+            try {
+                const token = localStorage.getItem('authToken');
+                const res = await fetch('/api/systemadmin/recent-employees', {
+                    headers: { 'Authorization': `Bearer ${token}` },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                const employees: { employeeNumber: string }[] = Array.isArray(data) ? data : [];
+
+                // Extract all numeric parts from existing employee numbers
+                const usedNumbers = new Set(
+                    employees
+                        .map(e => {
+                            const match = e.employeeNumber?.match(/(\d+)$/);
+                            return match ? parseInt(match[1], 10) : null;
+                        })
+                        .filter((n): n is number => n !== null)
+                );
+
+                // Find the next available incremental number (no gaps skipped, just max + 1)
+                let next = 1;
+                while (usedNumbers.has(next)) next++;
+
+                const generated = `EMP-${String(next).padStart(4, '0')}`;
+                setForm(prev => ({ ...prev, employeeNumber: generated }));
+            } catch {
+                setEmpNumError('Could not generate employee number. Please try again.');
+            } finally {
+                setEmpNumLoading(false);
+            }
+        };
+
+        generateEmployeeNumber();
+    }, []);
+
+    // ── Per-field live validator ──────────────────────────────────────────────
+    const validateField = (key: keyof FormState, value: string): string => {
+        switch (key) {
+            case 'employeeName': {
+                const name = value.trim();
+                if (!name) return 'Full name is required.';
+                if (name.length < 2) return 'Name must be at least 2 characters.';
+                if (name.length > 80) return 'Name must not exceed 80 characters.';
+                if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-\.]+$/.test(name)) return 'Name contains invalid characters.';
+                return '';
+            }
+            case 'contactNumber': {
+                const contact = value.trim();
+                if (!contact) return 'Contact number is required.';
+                if (!/^\d+$/.test(contact)) return 'Digits only — no spaces, dashes, or symbols.';
+                if (contact.length !== 11) return `Must be exactly 11 digits (currently ${contact.length}).`;
+                if (!/^09\d{9}$/.test(contact)) return 'Must start with 09 (e.g. 09123456789).';
+                return '';
+            }
+            case 'role': {
+                if (!value) return 'Please select a role.';
+                if (!ROLES.includes(value)) return 'Selected role is not valid.';
+                return '';
+            }
+            case 'email': {
+                const email = value.trim();
+                if (!email) return 'Email address is required.';
+                if (email.length > 100) return 'Email must not exceed 100 characters.';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return 'Enter a valid email address.';
+                return '';
+            }
+            default:
+                return '';
+        }
+    };
+
+    // ── Handle change with live validation ───────────────────────────────────
     const handleChange =
         (key: keyof FormState) =>
             (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-                setForm(prev => ({ ...prev, [key]: e.target.value }));
-                setErrors(prev => ({ ...prev, [key]: undefined }));
+                const value = e.target.value;
+                setForm(prev => ({ ...prev, [key]: value }));
                 setApiError('');
+
+                // Only show live error after the field has been touched
+                const errMsg = validateField(key, value);
+                setErrors(prev => ({ ...prev, [key]: errMsg || undefined }));
             };
 
     const handleSubmit = async () => {
-        if (submitting) return;
+        if (submitting || empNumLoading || !form.employeeNumber) return;
         const errs = validate(form);
         if (Object.keys(errs).length > 0) { setErrors(errs); return; }
         setSubmitting(true);
@@ -239,11 +361,11 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         try {
             const token = localStorage.getItem('authToken');
             const payload: EmployeeRegisterDTO = {
-                employeeNumber: form.employeeNumber.trim(),
+                employeeNumber: form.employeeNumber,
                 employeeName: form.employeeName.trim(),
                 contactNumber: form.contactNumber.trim(),
                 role: toBackendRole(form.role),
-                email: form.email.trim(),           // ← include email
+                email: form.email.trim(),
             };
             const res = await fetch('/api/authorization/systemadmin/register', {
                 method: 'POST',
@@ -255,10 +377,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 throw new Error(errorData.message || `Error ${res.status}: Registration failed`);
             }
             const data = await res.json();
-            setSuccessData({
-                employeeNumber: data.employeeNumber,
-                generatedPassword: data.generatedPassword,
-            });
+            setSuccessData({ employeeNumber: data.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber,
@@ -293,15 +412,61 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                     {/* ── Account info ── */}
                     <p className="modal-section-label">Account info</p>
                     <div className="field-row">
+
+                        {/* ── Employee Number (read-only, system-generated) ── */}
                         <div className="field">
-                            <label htmlFor="emp-number">Employee Number</label>
-                            <input
-                                id="emp-number" type="text" placeholder="e.g. EMP-0001"
-                                value={form.employeeNumber} onChange={handleChange('employeeNumber')}
-                                className={errors.employeeNumber ? 'input-error' : ''}
-                            />
-                            {errors.employeeNumber && <span className="field-error"><AlertCircle size={12} />{errors.employeeNumber}</span>}
+                            <label htmlFor="emp-number">
+                                Employee Number
+                                <span style={{
+                                    marginLeft: 6, fontSize: 10, fontWeight: 600,
+                                    background: 'rgba(67,24,255,0.1)', color: 'var(--primary)',
+                                    padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle',
+                                }}>
+                                    AUTO
+                                </span>
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    id="emp-number"
+                                    type="text"
+                                    value={empNumLoading ? '' : form.employeeNumber}
+                                    readOnly
+                                    placeholder={empNumLoading ? 'Generating…' : ''}
+                                    style={{
+                                        background: 'var(--bg-secondary, #f8f9fc)',
+                                        color: empNumLoading ? 'var(--text-secondary)' : 'var(--text-primary)',
+                                        cursor: 'not-allowed',
+                                        fontWeight: 600,
+                                        letterSpacing: '0.5px',
+                                        paddingRight: 36,
+                                        border: empNumError
+                                            ? '1px solid var(--danger)'
+                                            : '1px solid var(--border)',
+                                    }}
+                                />
+                                <span style={{
+                                    position: 'absolute', right: 10, top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    display: 'flex', alignItems: 'center',
+                                    color: empNumLoading ? 'var(--text-secondary)' : '#05cd99',
+                                }}>
+                                    {empNumLoading
+                                        ? <Loader2 size={13} className="spin" />
+                                        : <CheckCircle2 size={13} />
+                                    }
+                                </span>
+                            </div>
+                            {empNumError
+                                ? <span className="field-error"><AlertCircle size={12} />{empNumError}</span>
+                                : !empNumLoading && (
+                                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                        Assigned automatically. Cannot be changed.
+                                    </span>
+                                )
+                            }
                         </div>
+
+                        {/* ── Role ── */}
                         <div className="field">
                             <label htmlFor="emp-role">Role</label>
                             <select
@@ -323,18 +488,52 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             id="emp-name" type="text" placeholder="e.g. Juan dela Cruz"
                             value={form.employeeName} onChange={handleChange('employeeName')}
                             className={errors.employeeName ? 'input-error' : ''}
+                            maxLength={80}
                         />
-                        {errors.employeeName && <span className="field-error"><AlertCircle size={12} />{errors.employeeName}</span>}
+                        {errors.employeeName
+                            ? <span className="field-error"><AlertCircle size={12} />{errors.employeeName}</span>
+                            : form.employeeName.trim() && (
+                                <span style={{
+                                    fontSize: 11, marginTop: 3, display: 'block',
+                                    color: form.employeeName.trim().split(/\s+/).filter(Boolean).length < 2
+                                        ? '#c05c00' : '#05cd99',
+                                }}>
+                                    {form.employeeName.trim().split(/\s+/).filter(Boolean).length < 2
+                                        ? '⚠ Enter both first and last name'
+                                        : '✓ Looks good'}
+                                </span>
+                            )
+                        }
                     </div>
                     <div className="field-row">
                         <div className="field">
                             <label htmlFor="emp-contact">Contact Number</label>
                             <input
-                                id="emp-contact" type="tel" placeholder="e.g. +63 917 000 0000"
-                                value={form.contactNumber} onChange={handleChange('contactNumber')}
-                                className={errors.contactNumber ? 'input-error' : ''}
+                                id="emp-contact"
+                                type="tel"
+                                placeholder="e.g. 09123456789"
+                                value={form.contactNumber}
+                                onChange={e => {
+                                    // Strip non-digits automatically on input
+                                    const digitsOnly = e.target.value.replace(/\D/g, '');
+                                    setForm(prev => ({ ...prev, contactNumber: digitsOnly }));
+                                    setApiError('');
+                                    const errMsg = validateField('contactNumber', digitsOnly);
+                                    setErrors(prev => ({ ...prev, contactNumber: errMsg || undefined }));
+                                }}
+                                className={errors.contactNumber ? 'input-error' : form.contactNumber.length === 11 && /^09\d{9}$/.test(form.contactNumber) ? 'input-success' : ''}
+                                maxLength={11}
                             />
-                            {errors.contactNumber && <span className="field-error"><AlertCircle size={12} />{errors.contactNumber}</span>}
+                            {errors.contactNumber
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.contactNumber}</span>
+                                : form.contactNumber.length > 0
+                                    ? <span style={{ fontSize: 11, marginTop: 3, display: 'block', color: form.contactNumber.length === 11 ? '#05cd99' : 'var(--text-secondary)' }}>
+                                        {form.contactNumber.length}/11 digits{form.contactNumber.length === 11 && ' ✓'}
+                                    </span>
+                                    : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                        Format: 09XXXXXXXXX (11 digits)
+                                    </span>
+                            }
                         </div>
                         <div className="field">
                             <label htmlFor="emp-email">Email Address</label>
@@ -342,8 +541,15 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                                 id="emp-email" type="email" placeholder="e.g. juan@speedex.com"
                                 value={form.email} onChange={handleChange('email')}
                                 className={errors.email ? 'input-error' : ''}
+                                maxLength={100}
+                                autoComplete="off"
                             />
-                            {errors.email && <span className="field-error"><AlertCircle size={12} />{errors.email}</span>}
+                            {errors.email
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.email}</span>
+                                : form.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim()) && (
+                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Valid email</span>
+                                )
+                            }
                         </div>
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: -6 }}>
@@ -354,7 +560,11 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
 
                 <div className="modal-actions">
                     <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSubmit}
+                        disabled={submitting || empNumLoading || !!empNumError}
+                    >
                         {submitting
                             ? <><Loader2 size={13} className="spin" /> Registering…</>
                             : <><Save size={13} /> Register Employee</>
@@ -375,33 +585,35 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                                 <p className="modal-subtitle">Account has been created successfully.</p>
                             </div>
                         </div>
-                        <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+                        {/* ── Employee details ── */}
+                        <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Employee number</span>
                                 <strong>{successData.employeeNumber}</strong>
                             </div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>Generated password</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <code style={{ fontFamily: 'monospace', fontWeight: 600 }}>{successData.generatedPassword}</code>
-                                    <button
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex' }}
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(successData?.generatedPassword ?? '');
-                                            success('Password copied!');
-                                        }}
-                                        title="Copy password"
-                                    >
-                                        <Copy size={14} />
-                                    </button>
-                                </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Full name</span>
+                                <strong>{form.employeeName.trim()}</strong>
+                            </div>
+                            <div style={{ height: 1, background: 'var(--border)' }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>Email</span>
+                                <span style={{ fontWeight: 500, color: 'var(--text-primary)', wordBreak: 'break-all', textAlign: 'right', maxWidth: 220 }}>
+                                    {form.email.trim()}
+                                </span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,181,71,0.1)', border: '1px solid rgba(255,181,71,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#c05c00' }}>
-                            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                            Save this password now. It will not be shown again.
+
+                        {/* ── Email sent notice ── */}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#05cd99' }}>
+                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                                Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
+                            </span>
                         </div>
+
                         <button
                             className="btn btn-primary"
                             style={{ width: '100%' }}
