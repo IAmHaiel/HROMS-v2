@@ -54,7 +54,7 @@ namespace OTMS.Service.Services
                 );
             }
 
-            if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
+            if (accountStatus is null || accountStatus == "Deactivated" || accountStatus == "Locked" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
                 return null;
             }
@@ -88,7 +88,7 @@ namespace OTMS.Service.Services
                     employee.Account.FailedLoginAttempts++;
 
                     if (employee.Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
-                        employee.Account.AccountStatus = "Deactivated";
+                        employee.Account.AccountStatus = "Locked";
 
                     context.Accounts.Update(employee.Account);
                     await context.SaveChangesAsync();
@@ -96,7 +96,7 @@ namespace OTMS.Service.Services
                 return null;
             }
             
-            if (employee.Account.AccountStatus == "Deactivated")
+            if (employee.Account.AccountStatus == "Deactivated" || employee.Account.AccountStatus == "Locked")
             {
                 return null;
             }
