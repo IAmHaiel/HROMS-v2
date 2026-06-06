@@ -3,6 +3,8 @@ using Microsoft.Identity.Client;
 using OTMS.Data;
 using OTMS.Entities.DTOs.LeaveRequest;
 using OTMS.Entities.DTOs.LeaveRequest.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
@@ -65,12 +67,18 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<List<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync()
+        public async Task<PaginationResponseDTO<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync(PaginationDTO request)
         {
-            return await context.LeaveRequests
-                .Include(lr => lr.Account)
-                    .ThenInclude(a => a.Employee)
-                .OrderByDescending(lr => lr.Start_Date)
+            var query = context.LeaveRequests
+                    .Include(lr => lr.Account)
+                        .ThenInclude(a => a.Employee)
+                    .OrderByDescending(lr => lr.Start_Date);
+
+            var totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
                 .Select(lr => new LeaveRequestResponseDTO
                 {
                     LeaveId = lr.LeaveId,
@@ -84,16 +92,32 @@ namespace OTMS.Service.Services
                     Reason = lr.Reason,
                     Approval_Status = lr.Approval_Status,
                     LeaveRequestNote = lr.LeaveRequestNote,
-                    SubmittedAt = lr.Start_Date         
-                })
-                .ToListAsync();
+                    SubmittedAt = lr.Start_Date // Assuming Start_Date is the submission date
+                }).ToListAsync();
+
+            return new PaginationResponseDTO<LeaveRequestResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Leave requests retrieved successfully.",
+                Data = data,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+            };
         }
 
-        public async Task<IEnumerable<object>> GetMyLeaveRequestsAsync(Guid accountId)
+        public async Task<PaginationResponseDTO<object>> GetMyLeaveRequestsAsync(Guid accountId, PaginationDTO pagination)
         {
-            return await context.LeaveRequests
+            var query = context.LeaveRequests
                 .Where(l => l.AccountId == accountId && l.Deleted == false)
-                .OrderByDescending(l => l.Start_Date)
+                .OrderByDescending(l => l.Start_Date);
+
+            var totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
                 .Select(l => new
                 {
                     l.LeaveId,
@@ -107,6 +131,17 @@ namespace OTMS.Service.Services
                     l.Approved_By,
                 })
                 .ToListAsync();
+
+            return new PaginationResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Leave requests retrieved successfully.",
+                Data = data,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+            };
         }
 
         public async System.Threading.Tasks.Task UpdateEmployeeAvailabilityStatusesAsync(Guid accountId)
