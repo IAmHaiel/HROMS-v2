@@ -84,41 +84,43 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<EmergencyOverrideResponseDTO> RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
+        public async Task<EmergencyOverrideResponseDTO>  RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
         {
-            var tokenType = httpContextAccessor
-                .HttpContext?.User
-                .FindFirst("token_type")?.Value;
+           var account = await context.Accounts
+                .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
 
-            if (tokenType != "emergency_override")
-                throw new UnauthorizedAccessException("Invalid token for this operation.");
+            if (account == null)
+                throw new Exception("Account not found.");
 
-            var accountIdClaim = httpContextAccessor
-                .HttpContext?
-                .User
-                .FindFirst(ClaimTypes.NameIdentifier)?
-                .Value;
-
-            if (string.IsNullOrEmpty(accountIdClaim))
-                throw new UnauthorizedAccessException("Invalid user session.");
-
-            var accountId = Guid.Parse(accountIdClaim);
+            if (account.AccountStatus != "On Leave")
+                throw new InvalidOperationException("Only employees currently on leave can request an emergency override.");
 
             var leaveRequest = await context.LeaveRequests
-                .FirstOrDefaultAsync(lr =>
-                    lr.LeaveId == request.LeaveId &&
-                    lr.AccountId == accountId &&
-                    lr.Approval_Status == "Approved");
+                .FirstOrDefaultAsync(l => 
+                    l.LeaveId == request.LeaveId &&
+                    l.AccountId == request.AccountId &&
+                    l.Approval_Status == "Approved" &&
+                    !l.Deleted);
 
-            if (leaveRequest is null)
-                throw new Exception("You can only request emergency override for approved leave requests.");
+            if (leaveRequest == null)
+                throw new InvalidOperationException("Valid approved leave request not found for the employee.");
+
+            var existingPendingRequest = await context.EmergencyOverrideRequests
+                .AnyAsync(e =>
+                    e.LeaveId == request.LeaveId &&
+                    e.Status == "Pending");
+
+            if (existingPendingRequest)
+                throw new InvalidOperationException("An emergency override request for this leave is already pending.");
 
             var emergencyOverride = new EmergencyOverrideRequest
             {
-                RequestedById = accountId,
+                EmergencyOverrideId = Guid.NewGuid(),
+                RequestedById = request.AccountId,
                 LeaveId = request.LeaveId,
+                Status = "Pending",
                 Reason = request.Reason,
-                Status = "Pending"
+                RequestedAt = DateTime.UtcNow
             };
 
             context.EmergencyOverrideRequests.Add(emergencyOverride);
@@ -135,6 +137,7 @@ namespace OTMS.Service.Services
                 ApprovedAt = emergencyOverride.ApprovedAt,
                 OverrideUntil = emergencyOverride.OverrideUntil
             };
+
         }
     }
 }
