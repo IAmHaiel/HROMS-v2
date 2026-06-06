@@ -12,33 +12,29 @@ namespace OTMS.Service.Services
     {
         public async Task<EmergencyOverrideResponseDTO> ApproveOverrideAsync(ApproveEmergencyOverrideDTO request)
         {
-            var accountIdClaim = httpContextAccessor
-                .HttpContext?
-                .User
-                .FindFirst(ClaimTypes.NameIdentifier)?
-                .Value;
-
-            if (string.IsNullOrEmpty(accountIdClaim))
-            {
-                throw new UnauthorizedAccessException(
-                    "Invalid user session.");
-            }
-
-            var adminId = Guid.Parse(accountIdClaim);
-
             var emergencyOverride = await context.EmergencyOverrideRequests
+                .Include(e => e.RequestedBy)
                 .FirstOrDefaultAsync(e =>
                     e.EmergencyOverrideId == request.EmergencyOverrideId);
 
-            if (emergencyOverride is null)
-            {
-                throw new Exception("Emergency Override request not found");
-            }
+            if (emergencyOverride == null)
+                throw new Exception("Emergency override request not found.");
 
-            emergencyOverride.Status = request.Status;
-            emergencyOverride.ApprovedById = adminId;
+            if (emergencyOverride.Status != "Pending")
+                throw new InvalidOperationException("Only pending requests can be approved.");
+
+            var approver = await context.Accounts
+                .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
+
+            if (approver == null)
+                throw new Exception("Approver account not found.");
+
+            emergencyOverride.Status = "Approved";
+            emergencyOverride.ApprovedById = request.AccountId;
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
             emergencyOverride.OverrideUntil = request.OverrideUntil;
+
+            emergencyOverride.RequestedBy.AccountStatus = "Emergency Overriden";
 
             await context.SaveChangesAsync();
 
