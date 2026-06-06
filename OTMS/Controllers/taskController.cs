@@ -223,5 +223,24 @@ namespace OTMS.Controllers
                 });
             }
         }
-    }
+
+        [Authorize(Policy = "OperationAdminAccess")]
+        [HttpGet("bin-records/{employeeId}")]
+        public async Task<IActionResult> BinRecords(string employeeId)
+        {
+            try
+            {
+                var result = await taskService.BinRecordsAsync(employeeId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
 }

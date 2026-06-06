@@ -422,5 +422,45 @@ namespace OTMS.Service.Services
                 }
             };
         }
+
+        public async Task<ApiResponseDTO<List<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == EmployeeID);
+
+            if (employee == null)
+                throw new Exception("Employee not found.");
+
+            var deletedTasks = await context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .Where(t =>
+                    t.AssignedTo == employee.Account.AccountId &&
+                    t.Deleted == true)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return new ApiResponseDTO<List<TaskResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Deleted tasks retrieved successfully.",
+                Data = deletedTasks.Select(task => new TaskResponseDTO
+                {
+                    TaskId = task.TaskId,
+                    TaskTitle = task.TaskTitle,
+                    TaskDescription = task.TaskDescription,
+                    Priority = task.Priority,
+                    DueAt = task.DueAt,
+                    TaskStatus = task.TaskStatus,
+                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                    CreatedAt = task.CreatedAt,
+                    IsDeleted = task.Deleted
+                }).ToList()
+            };
+        }
     }
 }
