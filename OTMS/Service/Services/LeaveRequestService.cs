@@ -134,9 +134,15 @@ namespace OTMS.Service.Services
                 await context.SaveChangesAsync();
                 return;
             }
+            else
+            {
+                account.AccountStatus = "Active";
+                await context.SaveChangesAsync();
+                return;
+            }
 
-            bool isOnLeave = account.SubmittedLeaveRequests
-                .Any(lr => 
+             bool isOnLeave = account.SubmittedLeaveRequests
+                .Any(lr =>
                     lr.Approval_Status == "Approved" &&
                     currentDate.Date >= lr.Start_Date.Date &&
                     currentDate.Date <= lr.End_Date.Date);
