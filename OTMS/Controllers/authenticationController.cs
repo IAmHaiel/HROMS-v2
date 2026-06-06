@@ -9,6 +9,7 @@ using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.PasswordVerification;
 using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
@@ -204,5 +205,53 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+
+        /// <summary>
+        /// This would be used when the employee forgot their password. An email with a password reset link will be sent to the employee's registered email address.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO request)
+        {
+            try
+            {
+                var result = await authService.ForgotPasswordAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        /// <summary>
+        /// This would be used to reset the password after the employee clicks the password reset link sent to their email. The link will contain a token that will be used to verify the password reset request.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO request)
+        {
+            try
+            {
+                var result = await authService.ResetPasswordAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+
+
+        }
     }
 }
