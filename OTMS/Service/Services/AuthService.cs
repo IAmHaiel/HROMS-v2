@@ -11,6 +11,7 @@ using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
 using OTMS.Entities.DTOs.PasswordVerification;
 using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
@@ -520,6 +521,69 @@ namespace OTMS.Service.Services
             return user;
         }
 
-        
+        public async Task<ApiResponseDTO<object>> ForgotPasswordAsync(ForgotPasswordDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == request.Email);
+
+            if (employee == null || employee.Account == null)
+                throw new Exception("Employee or Account is not Found.");
+
+            var token = Guid.NewGuid().ToString();
+
+            employee.Account.PasswordResetToken = token;
+            employee.Account.PasswordResetTokenExpiryTime = DateTime.UtcNow.AddMinutes(15); // Based on https://www.authgear.com/post/authentication-security-password-reset-best-practices-and-more/#:~:text=How%20long%20should%20a%20password,immediately%20after%20a%20successful%20reset.
+            
+            await context.SaveChangesAsync();
+
+            var resetLink = $"{configuration["FrontendBaseUrl"]}/reset-password?token={token}";
+
+            await emailService.SendAsync(
+                        employee.Email,
+                            "Change Password for Operational Management System Account",
+                            $"""
+                            Welcome {employee.EmployeeName} to the Operational Management System.
+
+                            Please click the link below to reset your password, the link last 15 minutes:
+
+                            {resetLink}
+                            """
+                );
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password reset link has been sent to your email.",
+                Data = null
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ResetPasswordAsync(ResetPasswordDTO request)
+        {
+
+            var account = await context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.PasswordResetToken == request.Token
+                    && a.PasswordResetTokenExpiryTime > DateTime.UtcNow);
+
+            if (account == null)
+                throw new Exception("Invalid or expired password reset token.");
+
+            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, request.NewPassword);
+
+            account.PasswordResetToken = null;
+            account.PasswordResetTokenExpiryTime = null;
+
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password has been reset successfully.",
+                Data = null
+            };
+
+        }
     }
 }

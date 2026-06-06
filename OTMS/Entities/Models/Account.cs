@@ -10,6 +10,9 @@
         public string AccountStatus { get; set; } = "Active";
         public int FailedLoginAttempts { get; set; }
 
+        public string? PasswordResetToken { get; set; }
+        public DateTime? PasswordResetTokenExpiryTime { get; set; }
+
         public string? RefreshToken { get; set; }
         public DateTime? RefreshTokenExpiryTime { get; set; }
 
