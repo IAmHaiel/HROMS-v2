@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
@@ -387,6 +388,39 @@ namespace OTMS.Service.Services
             };
 
             //throw new NotImplementedException();
+        }
+
+        public async Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync(Guid taskId)
+        {
+            var task = await context.Tasks
+                .FirstOrDefaultAsync(t => 
+                t.TaskId == taskId &&
+                t.Deleted == true);
+
+            if (task == null)
+                throw new Exception("Task not found or is not deleted.");
+
+            task.Deleted = false;
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<TaskResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Task restored successfully.",
+                Data = new TaskResponseDTO
+                {
+                    TaskId = task.TaskId,
+                    TaskTitle = task.TaskTitle,
+                    TaskDescription = task.TaskDescription,
+                    Priority = task.Priority,
+                    DueAt = task.DueAt,
+                    TaskStatus = task.TaskStatus,
+                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                    CreatedAt = task.CreatedAt,
+                    IsDeleted = task.Deleted
+                }
+            };
         }
     }
 }

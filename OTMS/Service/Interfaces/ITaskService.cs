@@ -1,4 +1,5 @@
-﻿using OTMS.Entities.DTOs.Task;
+﻿using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 
 namespace OTMS.Service.Interfaces
@@ -11,5 +12,7 @@ namespace OTMS.Service.Interfaces
         Task<TaskResponseDTO> UpdateTaskProgressAsync(Guid taskId, UpdateTaskProgressDTO request);
         Task<List<TaskResponseDTO>> GetMyTasksAsync();
         Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId);
+        Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync (Guid taskId);
+
     }
 }

@@ -6,6 +6,7 @@ using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Entities.DTOs;
 
 namespace OTMS.Controllers
 {
@@ -202,5 +203,24 @@ namespace OTMS.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [Authorize(Policy = "OperationAdminAccess")]
+        [HttpPost("{taskId}/restore-task")]
+        public async Task<IActionResult> RestoreTask(Guid taskId)
+        {
+            try
+            {
+                var result = await taskService.RestoreTaskAsync(taskId);
+                return Ok(result);
+            } 
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
     }
 }
