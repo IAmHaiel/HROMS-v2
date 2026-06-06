@@ -344,7 +344,9 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .Where(t => t.AssignedTo == loggedInAccountId)
+                .Where(t => t.AssignedTo == loggedInAccountId
+                        && !t.Deleted
+                        && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -438,8 +440,9 @@ namespace OTMS.Service.Services
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
                 .Where(t =>
-                    t.AssignedTo == employee.Account.AccountId &&
-                    t.Deleted == true)
+                    t.AssignedTo == employee.Account.AccountId 
+                    && t.Deleted
+                    && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
