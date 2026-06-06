@@ -9,6 +9,7 @@ using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Service.Interfaces;
 using System.ComponentModel.DataAnnotations;
 
@@ -67,43 +68,54 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationAdminAccess")]
         [HttpGet("assignable-employees")]
-        public async Task<ActionResult> GetAssignableEmployees([FromServices] OTMSDbContext context)
+        public async Task<ActionResult> GetAssignableEmployees([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
         {
             try
             {
-                var employees = await context.Accounts
+                var query = context.Accounts
                     .Include(a => a.Employee)
                     .Include(a => a.ActivityLogs)
-                    .Where(a => a.Role == "Encoder" || a.Role == "Coordinator")
-                    .ToListAsync();
+                    .Where(a => a.Role == Common.Constraints.Roles.Encoder || a.Role == Common.Constraints.Roles.Coordinator)
+                    .OrderBy(a => a.Employee.EmployeeName);
 
-                var result = employees.Select(a =>
-                {
-                    var latestLog = a.ActivityLogs
-                        .OrderByDescending(al => al.CreatedAt)
-                        .FirstOrDefault();
+                var totalRecords = await query.CountAsync();
 
-                    var presenceStatus = latestLog?.ActivityType switch
-                    {
-                        "Login" => "Online",
-                        "Logout" => "Offline",
-                        _ => "Offline"
-                    };
-
-                    return new
-                    {
+                var data = await query
+                    .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                    .Take(pagination.PageSize)
+                    .Select(a => new {
                         accountId = a.AccountId,
                         employeeName = a.Employee.EmployeeName,
                         role = a.Role,
-                        presenceStatus
-                    };
-                }).ToList();
+                        presenceStatus = a.ActivityLogs
+                            .OrderByDescending(al => al.CreatedAt)
+                            .Select(al => al.ActivityType == "Login"
+                                ? "Online"
+                                : al.ActivityType == "Logout"
+                                    ? "Offline"
+                                    : "Offline")
+                            .FirstOrDefault() ?? "Offline"
+                    }).ToListAsync();
 
-                return Ok(result);
+                return Ok(new PaginationResponseDTO<object>
+                {
+                    IsSuccess = true,
+                    Message = "Assignable employees retrieved successfully.",
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = $"An error occurred while retrieving assignable employees: {ex.Message}",
+                    Data = null
+                });
             }
         }
 

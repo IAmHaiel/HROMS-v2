@@ -149,19 +149,23 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationAdminAccess")]
         [HttpGet("all-tasks")]
-        public async Task<ActionResult<List<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context)
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
         {
             try
             {
-                var tasks = await context.Tasks
+                var query = context.Tasks
                     .Include(t => t.Assignee)
                         .ThenInclude(a => a.Employee)
                     .Include(t => t.Creator)
-                        .ThenInclude(a => a.Employee)
-                    .Where(t =>
-                        !t.Deleted
-                        && !t.PermanentlyDeleted)
-                    .OrderByDescending(t => t.CreatedAt)
+                        .ThenInclude(c => c.Employee)
+                    .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                    .OrderByDescending(t => t.CreatedAt);
+
+                var totalRecords = await query.CountAsync();
+
+                var data = await query
+                    .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                    .Take(pagination.PageSize)
                     .Select(t => new TaskResponseDTO
                     {
                         TaskId = t.TaskId,
@@ -173,14 +177,29 @@ namespace OTMS.Controllers
                         AssignedEmployee = t.Assignee.Employee.EmployeeName,
                         CreatedByEmployee = t.Creator.Employee.EmployeeName,
                         CreatedAt = t.CreatedAt
-                    })
-                    .ToListAsync();
+                    }).ToListAsync();
 
-                return Ok(tasks);
+                return Ok(new PaginationResponseDTO<TaskResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Tasks retrieved successfully",
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                });
+
+
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
             }
         }
 

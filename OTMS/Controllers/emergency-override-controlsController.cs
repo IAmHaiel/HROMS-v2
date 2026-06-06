@@ -3,7 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest;
+using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
@@ -31,34 +35,52 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("all-requests")]
-        public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context)
+        public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
         {
             try
             {
-                var requests = await (
-                    from e in context.EmergencyOverrideRequests
-                    join a in context.Accounts on e.RequestedById equals a.AccountId
-                    join emp in context.Employees on a.EmployeeId equals emp.EmployeeId
-                    orderby e.RequestedAt descending
-                    select new
+
+                var query = context.EmergencyOverrideRequests
+                    .Include(e => e.RequestedBy)
+                        .ThenInclude(a => a.Employee)
+                    .OrderByDescending(e => e.RequestedAt);
+
+                var totalRecords = await query.CountAsync();
+
+                var data = await query
+                    .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                    .Take(pagination.PageSize)
+                    .Select(e => new EmergencyOverrideResponseDTO
                     {
-                        emergencyOverrideId = e.EmergencyOverrideId,
-                        requestedById = e.RequestedById,
-                        employeeNumber = emp.EmployeeNumber,
-                        employeeName = emp.EmployeeName,
-                        leaveId = e.LeaveId,
-                        reason = e.Reason,
-                        status = e.Status,
-                        requestedAt = e.RequestedAt,
-                        approvedAt = e.ApprovedAt,
-                        overrideUntil = e.OverrideUntil,
-                    }
-                ).ToListAsync();
-                return Ok(requests);
+                        EmergencyOverrideId = e.EmergencyOverrideId,
+                        RequestedById = e.RequestedById,
+                        LeaveId = e.LeaveId,
+                        Status = e.Status.ToString(),
+                        Reason = e.Reason,
+                        RequestedAt = e.RequestedAt,
+                        ApprovedAt = e.ApprovedAt,
+                        OverrideUntil = e.OverrideUntil
+                    }).ToListAsync();
+
+                return Ok(new PaginationResponseDTO<object> 
+                { 
+                    IsSuccess = true,
+                    Message = "Emergency Override Requests retrieved successfully.",
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = $"An error occurred while retrieving emergency override requests: {ex.Message}",
+                    Data = null
+                });
             }
         }
 
