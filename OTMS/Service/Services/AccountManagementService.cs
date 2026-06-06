@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 
@@ -192,16 +193,23 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<List<SearchAccountStatusResponseDTO>> GetAccountsByStatus(SearchAccountStatusDTO request)
+        public async Task<PaginationResponseDTO<SearchAccountStatusResponseDTO>> GetAccountsByStatus(SearchAccountStatusDTO request)
         {
-            var employees = await context.Employees
+            var query = context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
-                .Where(e => e.Account.AccountStatus
-                    .Contains(request.Status))
+                .Where(e => e.Account != null &&
+                            e.Account.AccountStatus == request.Status);
+            
+            var totalEmployees = await query.CountAsync();
+
+            var employees = await query
+                .OrderBy(e => e.EmployeeName)
+                .Skip((request.Pagination.PageNumber - 1) * request.Pagination.PageSize)
+                .Take(request.Pagination.PageSize)
                 .ToListAsync();
 
-            return employees.Select(e =>
+            var data = employees.Select(e =>
             {
                 var latestLog = e.Account?.ActivityLogs
                     .OrderByDescending(al => al.CreatedAt)
@@ -219,15 +227,26 @@ namespace OTMS.Service.Services
                     EmployeeNumber = e.EmployeeNumber,
                     EmployeeName = e.EmployeeName,
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account != null ? e.Account.Role : "No Account",
-                    AccountStatus = e.Account != null ? e.Account.AccountStatus : "No Account",
+                    Role = e.Account?.Role ?? "No Account",
+                    AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Success = true
                 };
             }).ToList();
+
+            return new PaginationResponseDTO<SearchAccountStatusResponseDTO>
+            {
+                IsSuccess = true,
+                Message = $"Accounts with status '{request.Status}' retrieved successfully.",
+                Data = data,
+                PageNumber = request.Pagination.PageNumber,
+                PageSize = request.Pagination.PageSize,
+                TotalRecords = totalEmployees,
+                TotalPages = (int)Math.Ceiling(totalEmployees / (double)request.Pagination.PageSize)
+            };
         }
 
-        public async Task<List<RecentEmployeesResponseDTO>> GetRecentEmployees()
+        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees()
         {
             var employees = await context.Employees
                 .Include(e => e.Account)
