@@ -211,6 +211,7 @@ namespace OTMS.Controllers
         /// </summary>
         [AllowAnonymous]
         [HttpPost("forgot-password")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO request)
         {
             try
@@ -234,6 +235,7 @@ namespace OTMS.Controllers
         /// </summary>
         [AllowAnonymous]
         [HttpPost("reset-password")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO request)
         {
             try
