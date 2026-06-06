@@ -11,6 +11,7 @@ using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
 using OTMS.Entities.DTOs.PasswordVerification;
 using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
@@ -170,7 +171,7 @@ namespace OTMS.Service.Services
 
             if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
                 generatedUserPassword.Length > PasswordLength.MaximumLength)
-                throw new InvalidOperationException("Generated password must be at least 15 characters long.");
+                throw new InvalidOperationException("Generated password must be at least 15 to 64 characters long.");
 
             GeneratedPassword = generatedUserPassword; // assign to static variable for email use
 
@@ -402,20 +403,6 @@ namespace OTMS.Service.Services
             return Convert.ToBase64String(randomNumber);
         }
 
-        private string GeneratePassword()
-        {
-            const string chars =
-                "SpeedexEmployee2026";
-
-            var random = new Random();
-
-            return new string(
-                Enumerable.Repeat(chars, 10)
-                    .Select(x => x[random.Next(x.Length)])
-                    .ToArray()
-            );
-        }
-
         private string CreateToken(Employee employee)
         {
 
@@ -471,29 +458,6 @@ namespace OTMS.Service.Services
                 .WriteToken(tokenDescriptor);
         }
 
-        private string CreateOverrideToken(Employee employee)
-        {
-            var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, employee.Account!.AccountId.ToString()),
-        new Claim(ClaimTypes.Name, employee.EmployeeNumber),
-        new Claim("token_type", "emergency_override"),  // ← scoped claim
-    };
-
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(configuration.GetValue<string>("AppSettings:Token")!));
-
-            var tokenDescriptor = new JwtSecurityToken(
-                issuer: configuration.GetValue<string>("AppSettings:Issuer"),
-                audience: configuration.GetValue<string>("AppSettings:Audience"),
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),  // ← short expiry
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha512)
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
-        }
-
         private async Task<Employee?> ValidateRefreshTokenAsync(
             Guid userId,
             string refreshToken
@@ -520,6 +484,74 @@ namespace OTMS.Service.Services
             return user;
         }
 
-        
+        public async Task<ApiResponseDTO<object>> ForgotPasswordAsync(ForgotPasswordDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == request.Email);
+
+            if (employee == null || employee.Account == null)
+                throw new Exception("Employee or Account is not Found.");
+
+            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+            employee.Account.PasswordResetToken = token;
+            employee.Account.PasswordResetTokenExpiryTime = DateTime.UtcNow.AddMinutes(15); // Based on https://www.authgear.com/post/authentication-security-password-reset-best-practices-and-more/#:~:text=How%20long%20should%20a%20password,immediately%20after%20a%20successful%20reset.
+            
+            await context.SaveChangesAsync();
+
+            var resetLink = $"{configuration["FrontendBaseUrl"]}/reset-password?token={token}";
+
+            await emailService.SendAsync(
+                        employee.Email,
+                            "Change Password for Operational Management System Account",
+                            $"""
+                            Welcome {employee.EmployeeName} to the Operational Management System.
+
+                            Please click the link below to reset your password, the link last 15 minutes:
+
+                            {resetLink}
+                            """
+                );
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password reset link has been sent to your email.",
+                Data = null
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ResetPasswordAsync(ResetPasswordDTO request)
+        {
+
+            var account = await context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.PasswordResetToken == request.Token
+                    && a.PasswordResetTokenExpiryTime > DateTime.UtcNow);
+
+            if (account == null)
+                throw new Exception("Invalid or expired password reset token.");
+
+            if(request.NewPassword.Length < PasswordLength.MinimumLength ||
+                request.NewPassword.Length > PasswordLength.MaximumLength)
+                throw new Exception("New password must be at least 15 to 64 characters long.");
+
+            var passwordHasher = new PasswordHasher<Account>();
+            account.PasswordHash = passwordHasher.HashPassword(account, request.NewPassword);
+
+            account.PasswordResetToken = null;
+            account.PasswordResetTokenExpiryTime = null;
+
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password has been reset successfully.",
+                Data = null
+            };
+
+        }
     }
 }
