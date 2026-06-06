@@ -244,6 +244,24 @@ namespace OTMS.Controllers
             }
         }
 
+        [Authorize(Policy = "OperationAdminAccess")]
+        [HttpDelete("empty-bin/{employeeId}")]
+        public async Task<IActionResult> EmptyBin(string employeeId)
+        {
+            try
+            {
+                var result = await taskService.EmptyBinAsync(employeeId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
 
 
 
@@ -256,5 +274,7 @@ namespace OTMS.Controllers
 
 
 
+
+        }
     }
 }

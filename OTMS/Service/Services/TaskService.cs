@@ -462,5 +462,45 @@ namespace OTMS.Service.Services
                 }).ToList()
             };
         }
+
+        public async Task<ApiResponseDTO<object>> EmptyBinAsync(string EmployeeID)
+        {
+            var employee = context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefault(e => e.EmployeeNumber == EmployeeID);
+
+            if (employee == null)
+                throw new Exception("Employee not found.");
+
+            if (employee.Account == null)
+                throw new Exception("Account not found.");
+
+            // Performs a Single SQL UPDATE instead of loading entities into memory
+            await context.Tasks
+                .Where(t =>
+                    t.AssignedTo == employee.Account.AccountId
+                    && t.Deleted
+                    && !t.PermanentlyDeleted)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(t => t.PermanentlyDeleted, true));
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Bin emptied successfully.",
+                Data = null
+            };
+        }
+
+
+
+
+
+
+
+
+
+
+
     }
 }

@@ -14,6 +14,7 @@ namespace OTMS.Service.Interfaces
         Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId);
         Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync (Guid taskId);
         Task<ApiResponseDTO<List<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID);
+        Task<ApiResponseDTO<object>> EmptyBinAsync(string EmployeeID);
 
     }
 }
