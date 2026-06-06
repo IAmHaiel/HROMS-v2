@@ -6,6 +6,7 @@ using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Entities.DTOs;
 
 namespace OTMS.Controllers
 {
@@ -155,6 +156,9 @@ namespace OTMS.Controllers
                         .ThenInclude(a => a.Employee)
                     .Include(t => t.Creator)
                         .ThenInclude(a => a.Employee)
+                    .Where(t =>
+                        !t.Deleted
+                        && !t.PermanentlyDeleted)
                     .OrderByDescending(t => t.CreatedAt)
                     .Select(t => new TaskResponseDTO
                     {
@@ -201,6 +205,79 @@ namespace OTMS.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [Authorize(Policy = "OperationAdminAccess")]
+        [HttpPost("{taskId}/restore-task")]
+        public async Task<IActionResult> RestoreTask(Guid taskId)
+        {
+            try
+            {
+                var result = await taskService.RestoreTaskAsync(taskId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        [Authorize(Policy = "OperationalTeamAccess")]
+        [HttpGet("bin-records/{employeeId}")]
+        public async Task<IActionResult> BinRecords(string employeeId)
+        {
+            try
+            {
+                var result = await taskService.BinRecordsAsync(employeeId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        [Authorize(Policy = "OperationAdminAccess")]
+        [HttpDelete("empty-bin/{employeeId}")]
+        public async Task<IActionResult> EmptyBin(string employeeId)
+        {
+            try
+            {
+                var result = await taskService.EmptyBinAsync(employeeId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+
+
+
+
+
+
+
+
+
+
+
+
+
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
@@ -81,7 +82,8 @@ namespace OTMS.Service.Services
 
                 TaskStatus = "Pending",
 
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Deleted = false
             };
 
             await context.Tasks.AddAsync(task);
@@ -103,7 +105,8 @@ namespace OTMS.Service.Services
                 AssignedEmployee = assignedAccount.Employee.EmployeeName,
                 CreatedByEmployee = creatorAccount.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -151,7 +154,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -194,7 +198,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -293,7 +298,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -323,7 +329,7 @@ namespace OTMS.Service.Services
 
             // Allowed Roles
             var allowedRoles = new[]
-            {"OperationsAdmin", "Encoder", "Coordinator"};
+            {"OperationAdmin", "Encoder", "Coordinator"};
 
             if (string.IsNullOrEmpty(roleClaim)
                 || !allowedRoles.Contains(roleClaim))
@@ -338,7 +344,13 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .Where(t => t.AssignedTo == loggedInAccountId)
+                .Where(t =>
+                        (
+                            t.AssignedTo == loggedInAccountId
+                            || t.CreatedBy == loggedInAccountId
+                        )
+                        && !t.Deleted
+                        && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -352,7 +364,8 @@ namespace OTMS.Service.Services
                 TaskStatus = task.TaskStatus,
                 AssignedEmployee = task.Assignee.Employee.EmployeeName,
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             }).ToList();
         }
 
@@ -382,5 +395,127 @@ namespace OTMS.Service.Services
 
             //throw new NotImplementedException();
         }
+
+        public async Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync(Guid taskId)
+        {
+            var task = await context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && t.Deleted);
+
+            if (task == null)
+                throw new Exception("Task not found or is not deleted.");
+
+            task.Deleted = false;
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<TaskResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Task restored successfully.",
+                Data = new TaskResponseDTO
+                {
+                    TaskId = task.TaskId,
+                    TaskTitle = task.TaskTitle,
+                    TaskDescription = task.TaskDescription,
+                    Priority = task.Priority,
+                    DueAt = task.DueAt,
+                    TaskStatus = task.TaskStatus,
+                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                    CreatedAt = task.CreatedAt,
+                    IsDeleted = task.Deleted
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<List<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == EmployeeID);
+
+            if (employee == null)
+                throw new Exception("Employee not found.");
+
+            var deletedTasks = await context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .Where(t =>
+                    (
+                        t.AssignedTo == employee.Account.AccountId
+                        || t.CreatedBy == employee.Account.AccountId
+                    )
+                    && t.Deleted
+                    && !t.PermanentlyDeleted)
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return new ApiResponseDTO<List<TaskResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Deleted tasks retrieved successfully.",
+                Data = deletedTasks.Select(task => new TaskResponseDTO
+                {
+                    TaskId = task.TaskId,
+                    TaskTitle = task.TaskTitle,
+                    TaskDescription = task.TaskDescription,
+                    Priority = task.Priority,
+                    DueAt = task.DueAt,
+                    TaskStatus = task.TaskStatus,
+                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                    CreatedAt = task.CreatedAt,
+                    IsDeleted = task.Deleted
+                }).ToList()
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> EmptyBinAsync(string EmployeeID)
+        {
+            var employee = context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefault(e => e.EmployeeNumber == EmployeeID);
+
+            if (employee == null)
+                throw new Exception("Employee not found.");
+
+            if (employee.Account == null)
+                throw new Exception("Account not found.");
+
+            // Performs a Single SQL UPDATE instead of loading entities into memory
+            await context.Tasks
+                .Where(t =>
+                    (
+                        t.AssignedTo == employee.Account.AccountId
+                        || t.CreatedBy == employee.Account.AccountId
+                    )
+                    && t.Deleted
+                    && !t.PermanentlyDeleted)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(t => t.PermanentlyDeleted, true));
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Bin emptied successfully.",
+                Data = null
+            };
+        }
+
+
+
+
+
+
+
+
+
+
+
     }
 }
