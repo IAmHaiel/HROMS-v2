@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs.Notification.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
@@ -81,7 +83,7 @@ namespace OTMS.Service.Services
             }
         }
 
-        public async System.Threading.Tasks.Task<List<NotificationResponseDTO>> GetMyNotificationsAsync()
+        public async System.Threading.Tasks.Task<PaginationResponseDTO<NotificationResponseDTO>> GetMyNotificationsAsync(PaginationDTO request)
         {
             var accountIdClaim = httpContextAccessor
                 .HttpContext?
@@ -97,13 +99,16 @@ namespace OTMS.Service.Services
 
             var accountId = Guid.Parse(accountIdClaim);
 
-            var notifications = await context.Notifications
-                .Where(n => n.EmployeeId == accountId) // EmployeeId = accountId
-                .OrderByDescending(n => n.CreatedAt)
-                .ToListAsync();
+            var query = context.Notifications
+                .Where(n => n.EmployeeId == accountId)
+                .OrderByDescending(n => n.CreatedAt);
 
-            return notifications.Select(n =>
-                new NotificationResponseDTO
+            var totalItems = await query.CountAsync();
+
+            var data = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .Select(n => new NotificationResponseDTO
                 {
                     NotificationId = n.NotificationId,
                     TaskId = n.TaskId,
@@ -111,7 +116,19 @@ namespace OTMS.Service.Services
                     Message = n.Message,
                     IsRead = n.IsRead,
                     CreatedAt = n.CreatedAt
-                }).ToList();
+                }).ToListAsync();
+
+            return new PaginationResponseDTO<NotificationResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Notifications retrieved successfully.",
+                Data = data,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalRecords = totalItems,
+                TotalPages = (int)Math.Ceiling(totalItems / (double)request.PageSize)
+            };
+
         }
 
         public async System.Threading.Tasks.Task<bool> MarkNotificationAsReadAsync(Guid notificationId)

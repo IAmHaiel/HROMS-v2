@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
@@ -303,7 +305,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<List<TaskResponseDTO>> GetMyTasksAsync()
+        public async Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request)
         {
             // Get Logged-In Account ID
             var accountIdClaim = httpContextAccessor
@@ -339,7 +341,7 @@ namespace OTMS.Service.Services
             }
 
             // Get Assigned Tasks
-            var tasks = await context.Tasks
+            var query = context.Tasks
                 .Include(t => t.Assignee)
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
@@ -351,22 +353,38 @@ namespace OTMS.Service.Services
                         )
                         && !t.Deleted
                         && !t.PermanentlyDeleted)
-                .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync();
+                .OrderByDescending(t => t.CreatedAt);
+               
+            var totalRecords = await query.CountAsync();
 
-            return tasks.Select(task => new TaskResponseDTO
+            var data = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .Select(t => new TaskResponseDTO
+                {
+                    TaskId = t.TaskId,
+                    TaskTitle = t.TaskTitle,
+                    TaskDescription = t.TaskDescription,
+                    Priority = t.Priority,
+                    DueAt = t.DueAt,
+                    TaskStatus = t.TaskStatus,
+                    AssignedEmployee = t.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                    CreatedAt = t.CreatedAt,
+                    IsDeleted = t.Deleted
+                }).ToListAsync();
+
+            return new PaginationResponseDTO<TaskResponseDTO>
             {
-                TaskId = task.TaskId,
-                TaskTitle = task.TaskTitle,
-                TaskDescription = task.TaskDescription,
-                Priority = task.Priority,
-                DueAt = task.DueAt,
-                TaskStatus = task.TaskStatus,
-                AssignedEmployee = task.Assignee.Employee.EmployeeName,
-                CreatedByEmployee = task.Creator.Employee.EmployeeName,
-                CreatedAt = task.CreatedAt,
-                IsDeleted = task.Deleted
-            }).ToList();
+                IsSuccess = true,
+                Message = "Tasks retrieved successfully.",
+                Data = data,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling((double)totalRecords / request.PageSize)
+            };
+            
         }
 
         public async Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId)
@@ -431,7 +449,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<ApiResponseDTO<List<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID)
+        public async Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID, PaginationDTO pagination)
         {
             var employee = await context.Employees
                 .Include(e => e.Account)
@@ -440,7 +458,7 @@ namespace OTMS.Service.Services
             if (employee == null)
                 throw new Exception("Employee not found.");
 
-            var deletedTasks = await context.Tasks
+            var query = context.Tasks
                 .Include(t => t.Assignee)
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
@@ -452,26 +470,39 @@ namespace OTMS.Service.Services
                     )
                     && t.Deleted
                     && !t.PermanentlyDeleted)
-                .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync();
+                .OrderByDescending(t => t.CreatedAt);
 
-            return new ApiResponseDTO<List<TaskResponseDTO>>
+            var totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .Select(t => new TaskResponseDTO
+                {
+                    TaskId = t.TaskId,
+                    TaskTitle = t.TaskTitle,
+                    TaskDescription = t.TaskDescription,
+                    Priority = t.Priority,
+                    DueAt = t.DueAt,
+                    TaskStatus = t.TaskStatus,
+                    AssignedEmployee = t.Assignee.Employee.EmployeeName,
+                    CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                    CreatedAt = t.CreatedAt,
+                    IsDeleted = t.Deleted
+                }).ToListAsync();
+
+            return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
             {
                 IsSuccess = true,
-                Message = "Deleted tasks retrieved successfully.",
-                Data = deletedTasks.Select(task => new TaskResponseDTO
+                Message = "Bin records retrieved successfully.",
+                Data = new PaginationResponseDTO<TaskResponseDTO>
                 {
-                    TaskId = task.TaskId,
-                    TaskTitle = task.TaskTitle,
-                    TaskDescription = task.TaskDescription,
-                    Priority = task.Priority,
-                    DueAt = task.DueAt,
-                    TaskStatus = task.TaskStatus,
-                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
-                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
-                    CreatedAt = task.CreatedAt,
-                    IsDeleted = task.Deleted
-                }).ToList()
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling((double)totalRecords / pagination.PageSize)
+                }
             };
         }
 

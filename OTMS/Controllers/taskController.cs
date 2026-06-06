@@ -1,12 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using OTMS.Entities.DTOs;
 
 namespace OTMS.Controllers
 {
@@ -118,11 +120,11 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("my-tasks")]
-        public async Task<ActionResult<List<TaskResponseDTO>>> GetMyTasks()
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks(PaginationDTO request)
         {
             try
             {
-                var result = await taskService.GetMyTasksAsync();
+                var result = await taskService.GetMyTasksAsync(request);
 
                 return Ok(result);
             }
@@ -147,19 +149,23 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationAdminAccess")]
         [HttpGet("all-tasks")]
-        public async Task<ActionResult<List<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context)
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
         {
             try
             {
-                var tasks = await context.Tasks
+                var query = context.Tasks
                     .Include(t => t.Assignee)
                         .ThenInclude(a => a.Employee)
                     .Include(t => t.Creator)
-                        .ThenInclude(a => a.Employee)
-                    .Where(t =>
-                        !t.Deleted
-                        && !t.PermanentlyDeleted)
-                    .OrderByDescending(t => t.CreatedAt)
+                        .ThenInclude(c => c.Employee)
+                    .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                    .OrderByDescending(t => t.CreatedAt);
+
+                var totalRecords = await query.CountAsync();
+
+                var data = await query
+                    .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                    .Take(pagination.PageSize)
                     .Select(t => new TaskResponseDTO
                     {
                         TaskId = t.TaskId,
@@ -171,14 +177,29 @@ namespace OTMS.Controllers
                         AssignedEmployee = t.Assignee.Employee.EmployeeName,
                         CreatedByEmployee = t.Creator.Employee.EmployeeName,
                         CreatedAt = t.CreatedAt
-                    })
-                    .ToListAsync();
+                    }).ToListAsync();
 
-                return Ok(tasks);
+                return Ok(new PaginationResponseDTO<TaskResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Tasks retrieved successfully",
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                });
+
+
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
             }
         }
 
@@ -229,11 +250,11 @@ namespace OTMS.Controllers
 
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("bin-records/{employeeId}")]
-        public async Task<IActionResult> BinRecords(string employeeId)
+        public async Task<IActionResult> BinRecords(string employeeId, PaginationDTO pagination)
         {
             try
             {
-                var result = await taskService.BinRecordsAsync(employeeId);
+                var result = await taskService.BinRecordsAsync(employeeId, pagination);
                 return Ok(result);
             }
             catch (Exception ex)

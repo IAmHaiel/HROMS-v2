@@ -1,13 +1,15 @@
 ﻿using OTMS.Entities.DTOs.LeaveRequest;
 using OTMS.Entities.DTOs.LeaveRequest.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 
 namespace OTMS.Service.Interfaces
 {
     public interface ILeaveRequest
     {
         Task<LeaveRequestResponseDTO> CreateLeaveRequestAsync(CreateLeaveRequestDTO request);
-        Task<List<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync();
-        Task<IEnumerable<object>> GetMyLeaveRequestsAsync(Guid accountId);
+        Task<PaginationResponseDTO<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync(PaginationDTO request);
+        Task<PaginationResponseDTO<object>> GetMyLeaveRequestsAsync(Guid accountId, PaginationDTO pagination);
         Task<bool> UpdateLeaveStatusAsync(Guid leaveId, UpdateLeaveStatusDTO request);
         Task UpdateEmployeeAvailabilityStatusesAsync(Guid accountId);
     }
