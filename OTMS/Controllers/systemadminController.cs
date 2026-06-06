@@ -1,15 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Entities.DTOs.Pagination;
 using OTMS.Service.Interfaces;
 using System.ComponentModel.DataAnnotations;
-using OTMS.Entities.DTOs;
-using OTMS.Entities.DTOs.AccountManagement.Responses;
-using OTMS.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace OTMS.Controllers
 {
@@ -23,9 +24,9 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "SystemAdminAccess")]
         [HttpGet("recent-employees")]
-        public async Task<IActionResult> GetRecentEmployees()
+        public async Task<IActionResult> GetRecentEmployees(PaginationDTO request)
         {
-            var result = await accountManagementService.GetRecentEmployees();
+            var result = await accountManagementService.GetRecentEmployees(request);
             return Ok(result);
         }
 
@@ -54,7 +55,7 @@ namespace OTMS.Controllers
         public async Task<IActionResult> SearchUserByStatus([FromQuery] SearchAccountStatusDTO accountStatus)
         {
             var result = await accountManagementService.GetAccountsByStatus(accountStatus);
-            if(result is null || !result.Any())
+            if(result is null)
             {
                 return NotFound(new { Message = "No employees found with the specified account status." });
             }
