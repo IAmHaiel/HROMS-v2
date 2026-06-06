@@ -25,7 +25,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "SystemAdminAccess")]
         [HttpGet("recent-employees")]
-        public async Task<IActionResult> GetRecentEmployees(PaginationDTO request)
+        public async Task<IActionResult> GetRecentEmployees([FromQuery] PaginationDTO request)
         {
             var result = await accountManagementService.GetRecentEmployees(request);
             return Ok(result);

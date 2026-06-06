@@ -16,7 +16,7 @@ namespace OTMS.Controllers
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("my-notifications")]
         public async Task<
-            ActionResult<PaginationResponseDTO<NotificationResponseDTO>>> GetMyNotifications(PaginationDTO request)
+            ActionResult<PaginationResponseDTO<NotificationResponseDTO>>> GetMyNotifications([FromQuery] PaginationDTO request)
         {
             try
             {

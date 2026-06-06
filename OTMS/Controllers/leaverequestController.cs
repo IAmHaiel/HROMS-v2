@@ -35,8 +35,8 @@ namespace OTMS.Controllers
         /// <summary>
         /// The system shall allow Operational Team members to view their own leave requests.
         /// </summary>
-        [HttpGet("my-leave-requests")]
         [Authorize(Policy = "ManagementAccess")]
+        [HttpPost("my-leave-requests")]
         public async Task<IActionResult> GetMyLeaveRequests(PaginationDTO pagination)
         {
             var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -52,7 +52,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("get-all-leave-requests")]
-        public async Task<IActionResult> GetAllLeaveRequests(PaginationDTO request)
+        public async Task<IActionResult> GetAllLeaveRequests([FromQuery] PaginationDTO request)
         {
             var result = await leaveRequest.GetAllLeaveRequestsAsync(request);
             return Ok(result);
