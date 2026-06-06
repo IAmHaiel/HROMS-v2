@@ -224,7 +224,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("bin-records/{employeeId}")]
         public async Task<IActionResult> BinRecords(string employeeId)
         {
