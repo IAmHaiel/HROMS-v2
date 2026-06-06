@@ -12,7 +12,6 @@ namespace OTMS.Controllers
     [ApiController]
     public class emergency_override_controlsController(IEmergencyOverrideService emergencyOverrideService) : ControllerBase
     {
-        [Authorize(Policy = "OperationalTeamAccess")]
         [HttpPost("request")]
         public async Task<IActionResult> RequestEmergencyOverride(CreateEmergencyOverrideRequestDTO request)
         {
