@@ -9,6 +9,8 @@ using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
+using OTMS.Entities.DTOs.PasswordVerification;
+using OTMS.Entities.DTOs.PasswordVerification.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
@@ -287,6 +289,43 @@ namespace OTMS.Service.Services
                     After verifying your account, we recommend changing your password immediately after logging in.
                     """
             );
+        }
+
+        public async Task<PasswordVerificationResponseDTO> VerifyPasswordAsync(PasswordVerificationDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeID);
+
+            if (employee == null || employee.Account == null)
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Employee or account not found."
+                };
+
+            var verificationResult = new PasswordHasher<Account>()
+                .VerifyHashedPassword(
+                    employee.Account
+                    , employee.Account.PasswordHash
+                    , request.Password);
+
+            if (verificationResult == PasswordVerificationResult.Success)
+                {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = true,
+                    Message = "Password is correct."
+                };
+            }
+            else
+            {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Incorrect password."
+                };
+            }
         }
 
         // ─── Helper Methods ────────────────────────────────────────────────

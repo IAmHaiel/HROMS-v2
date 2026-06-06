@@ -7,6 +7,8 @@ using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.PasswordVerification;
+using OTMS.Entities.DTOs.PasswordVerification.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
@@ -59,7 +61,7 @@ namespace OTMS.Controllers
 
             try
             {
-                if (!isOnLeave)                                                          
+                if (!isOnLeave)
                     await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
 
                 var result = await authService.LoginAsync(request);
@@ -74,11 +76,11 @@ namespace OTMS.Controllers
                 {
                     message = "Your account is currently on leave and cannot be accessed.",
                     employeeName = ex.EmployeeName,
-                    accountId = ex.AccountId, 
-                    leaveId = ex.LeaveId           
+                    accountId = ex.AccountId,
+                    leaveId = ex.LeaveId
                 });
             }
-            
+
         }
 
         /// <summary>
@@ -113,7 +115,7 @@ namespace OTMS.Controllers
                 ActivityTypes.Logout,
                 $"{account.Employee.EmployeeName} timed out at {DateTime.Now:hh:mm tt}");
 
-            return Ok(new {message = "Logged out successfully."});
+            return Ok(new { message = "Logged out successfully." });
         }
 
         /// <summary>
@@ -181,6 +183,18 @@ namespace OTMS.Controllers
             {
                 return BadRequest(ex.Message);
             }
+        }
+
+        [Authorize(Policy = "ManagementAccess")]
+        [HttpPost("verify-password")]
+        public async Task<ActionResult<PasswordVerificationResponseDTO>> VerifyPassword(PasswordVerificationDTO request)
+        {
+            var result = await authService.VerifyPasswordAsync(request);
+            
+            if(result.isSuccess == false)
+                return Unauthorized(result);
+
+            return Ok(result);
         }
 
     }
