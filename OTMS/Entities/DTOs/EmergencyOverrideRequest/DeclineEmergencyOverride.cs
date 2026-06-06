@@ -2,7 +2,7 @@
 {
     public class DeclineEmergencyOverrideDTO
     {
-        public Guid AccountId { get; set; }
+        public Guid ApproverAccountId { get; set; }
         public Guid EmergencyOverrideId { get; set; }
         public string? DeclineReason { get; set; }
     }
