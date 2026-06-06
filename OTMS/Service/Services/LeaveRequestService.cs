@@ -123,20 +123,9 @@ namespace OTMS.Service.Services
                 throw new Exception("Account not found.");
             }
 
-            bool hasActiveOverride = account.RequestedEmergencyOverrides
-                .Any(e =>
-                    e.Status == "Approved" &&
-                    e.OverrideUntil > currentDate);
-
-            if (hasActiveOverride)
-            {
-                account.AccountStatus = "Emergency Overriden";
-                await context.SaveChangesAsync();
-                return;
-            }
-
+            // On Leave
             bool isOnLeave = account.SubmittedLeaveRequests
-                .Any(lr => 
+                .Any(lr =>
                     lr.Approval_Status == "Approved" &&
                     currentDate.Date >= lr.Start_Date.Date &&
                     currentDate.Date <= lr.End_Date.Date);
@@ -145,7 +134,17 @@ namespace OTMS.Service.Services
                 ? "On Leave"
                 : "Active";
 
+            // Emergency Overriden
+            bool hasActiveOverride = account.RequestedEmergencyOverrides
+                .Any(e =>
+                    e.Status == "Approved" &&
+                    e.OverrideUntil > currentDate);
+
+            if (hasActiveOverride)
+                account.AccountStatus = "Emergency Overriden";
+
             await context.SaveChangesAsync();
+            return;
         }
 
         public async Task<bool> UpdateLeaveStatusAsync(Guid leaveId, UpdateLeaveStatusDTO request)

@@ -59,32 +59,15 @@ namespace OTMS.Service.Services
 
             if (accountStatus == "On Leave")
             {
-                var hasEmergencyOverride = await context.EmergencyOverrideRequests
-                    .AnyAsync(e =>
-                        e.RequestedById == employee.Account.AccountId &&
-                        e.Status == "Approved" &&
-                        e.OverrideUntil > DateTime.UtcNow);
+                var activeLeave = await context.LeaveRequests
+                    .FirstOrDefaultAsync(lr =>
+                        lr.AccountId == employee.Account.AccountId &&
+                        lr.Approval_Status == "Approved");
 
-                if (!hasEmergencyOverride)
-                {
-                    // Get the active leave for this employee
-                    var activeLeave = await context.LeaveRequests
-                        .FirstOrDefaultAsync(lr =>
-                            lr.AccountId == employee.Account.AccountId &&
-                            lr.Approval_Status == "Approved");
-
-                    // Generate limited override token
-                    var overrideToken = CreateOverrideToken(employee);
-
-                    throw new OnLeaveException(
-                        overrideToken,
-                        activeLeave?.LeaveId ?? Guid.Empty,
-                        employee.EmployeeName ?? string.Empty
-                    );
-                }
-
-                employee.Account.AccountStatus = "Emergency Overriden";
-                await context.SaveChangesAsync();
+                throw new OnLeaveException(
+                    employee.Account?.AccountId ?? Guid.Empty
+                    , activeLeave?.LeaveId ?? Guid.Empty
+                    , employee.EmployeeName ?? string.Empty);
             }
 
             var verificationResult =
@@ -114,6 +97,24 @@ namespace OTMS.Service.Services
             if (employee.Account.AccountStatus == "Deactivated")
             {
                 return null;
+            }
+
+            if (accountStatus == "Emergency Overriden")
+            {
+                // Save Login Activity
+                await activityLogService.LogActivityAsync(
+                    employee.Account.AccountId,
+                    ActivityTypes.Login,
+                    $"[Emergency Overriden] {employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
+                    );
+
+                employee.Account.FailedLoginAttempts = 0;
+                await context.SaveChangesAsync();
+
+                // Check Task Deadlines
+                await notificationService.CheckTaskDeadlinesAsync();
+
+                return await CreateTokenResponse(employee);
             }
 
             // Save Login Activity

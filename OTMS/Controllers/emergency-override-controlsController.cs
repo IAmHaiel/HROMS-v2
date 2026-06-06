@@ -12,7 +12,6 @@ namespace OTMS.Controllers
     [ApiController]
     public class emergency_override_controlsController(IEmergencyOverrideService emergencyOverrideService) : ControllerBase
     {
-        [Authorize]
         [HttpPost("request")]
         public async Task<IActionResult> RequestEmergencyOverride(CreateEmergencyOverrideRequestDTO request)
         {
@@ -30,7 +29,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Gets all Emergency Override Requests. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
-        [Authorize(Policy = "SystemAdminAccess")]
+        [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("all-requests")]
         public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context)
         {

@@ -74,8 +74,8 @@ namespace OTMS.Controllers
                 {
                     message = "Your account is currently on leave and cannot be accessed.",
                     employeeName = ex.EmployeeName,
-                    overrideToken = ex.OverrideToken,
-                    leaveId = ex.LeaveId,              
+                    accountId = ex.AccountId, 
+                    leaveId = ex.LeaveId           
                 });
             }
             
