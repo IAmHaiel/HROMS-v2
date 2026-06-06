@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
@@ -246,16 +247,21 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees()
+        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request)
         {
-            var employees = await context.Employees
+           var query = context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(10)
+                .OrderByDescending(e => e.CreatedAt);
+
+            var totalRecords = await query.CountAsync();
+
+            var employees = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
                 .ToListAsync();
 
-            return employees.Select(e =>
+            var data = employees.Select(e =>
             {
                 var latestLog = e.Account?.ActivityLogs
                     .OrderByDescending(al => al.CreatedAt)
@@ -273,11 +279,22 @@ namespace OTMS.Service.Services
                     EmployeeNumber = e.EmployeeNumber,
                     EmployeeName = e.EmployeeName,
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account != null ? e.Account.Role : "No Account",
-                    AccountStatus = e.Account != null ? e.Account.AccountStatus : "No Account",
-                    PresenceStatus = presenceStatus,
+                    Role = e.Account?.Role ?? "No Account",
+                    AccountStatus = e.Account?.AccountStatus ?? "No Account",
+                    PresenceStatus = presenceStatus
                 };
             }).ToList();
+
+            return new PaginationResponseDTO<RecentEmployeesResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Recent employees retrieved successfully.",
+                Data = data,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+            };
         }
 
         public async Task<SearchUserResponseDTO?> SearchUser(SearchUserDTO request)
