@@ -53,30 +53,38 @@ namespace OTMS.Service.Services
 
         public async Task<EmergencyOverrideResponseDTO> DeclineOverrideAsync(DeclineEmergencyOverrideDTO request)
         {
-            var overrideRequest = await context.EmergencyOverrideRequests
-                .FirstOrDefaultAsync(e => e.EmergencyOverrideId == request.EmergencyOverrideId);
+            var emergencyOverride = await context.EmergencyOverrideRequests
+                .FirstOrDefaultAsync(e =>
+                    e.EmergencyOverrideId == request.EmergencyOverrideId);
 
-            if (overrideRequest == null)
+            if (emergencyOverride == null)
                 throw new Exception("Emergency override request not found.");
 
-            if (overrideRequest.Status != "Pending")
-                throw new Exception("Only pending requests can be declined.");
+            if (emergencyOverride.Status != "Pending")
+                throw new InvalidOperationException("Only pending requests can be declined.");
 
-            overrideRequest.Status = "Declined";
-            overrideRequest.ApprovedAt = DateTime.UtcNow;
+            var approver = await context.Accounts
+                .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
+
+            if (approver == null)
+                throw new Exception("Approver account not found.");
+
+            emergencyOverride.Status = "Declined";
+            emergencyOverride.ApprovedById = request.AccountId;
+            emergencyOverride.ApprovedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
 
             return new EmergencyOverrideResponseDTO
             {
-                EmergencyOverrideId = overrideRequest.EmergencyOverrideId,
-                RequestedById = overrideRequest.RequestedById,
-                LeaveId = overrideRequest.LeaveId,
-                Status = overrideRequest.Status,
-                Reason = overrideRequest.Reason,
-                RequestedAt = overrideRequest.RequestedAt,
-                ApprovedAt = overrideRequest.ApprovedAt,
-                OverrideUntil = overrideRequest.OverrideUntil
+                EmergencyOverrideId = emergencyOverride.EmergencyOverrideId,
+                RequestedById = emergencyOverride.RequestedById,
+                LeaveId = emergencyOverride.LeaveId,
+                Status = emergencyOverride.Status,
+                Reason = emergencyOverride.Reason,
+                RequestedAt = emergencyOverride.RequestedAt,
+                ApprovedAt = emergencyOverride.ApprovedAt,
+                OverrideUntil = emergencyOverride.OverrideUntil
             };
         }
 
