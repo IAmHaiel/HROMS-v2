@@ -156,6 +156,9 @@ namespace OTMS.Controllers
                         .ThenInclude(a => a.Employee)
                     .Include(t => t.Creator)
                         .ThenInclude(a => a.Employee)
+                    .Where(t =>
+                        !t.Deleted
+                        && !t.PermanentlyDeleted)
                     .OrderByDescending(t => t.CreatedAt)
                     .Select(t => new TaskResponseDTO
                     {

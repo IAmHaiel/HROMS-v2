@@ -329,7 +329,7 @@ namespace OTMS.Service.Services
 
             // Allowed Roles
             var allowedRoles = new[]
-            {"OperationsAdmin", "Encoder", "Coordinator"};
+            {"OperationAdmin", "Encoder", "Coordinator"};
 
             if (string.IsNullOrEmpty(roleClaim)
                 || !allowedRoles.Contains(roleClaim))
@@ -344,7 +344,11 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .Where(t => t.AssignedTo == loggedInAccountId
+                .Where(t =>
+                        (
+                            t.AssignedTo == loggedInAccountId
+                            || t.CreatedBy == loggedInAccountId
+                        )
                         && !t.Deleted
                         && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
@@ -395,9 +399,11 @@ namespace OTMS.Service.Services
         public async Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync(Guid taskId)
         {
             var task = await context.Tasks
-                .FirstOrDefaultAsync(t => 
-                t.TaskId == taskId &&
-                t.Deleted == true);
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && t.Deleted);
 
             if (task == null)
                 throw new Exception("Task not found or is not deleted.");
@@ -440,8 +446,10 @@ namespace OTMS.Service.Services
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
                 .Where(t =>
-                    t.AssignedTo == employee.Account.AccountId
-                    || t.CreatedBy == employee.Account.AccountId
+                    (
+                        t.AssignedTo == employee.Account.AccountId
+                        || t.CreatedBy == employee.Account.AccountId
+                    )
                     && t.Deleted
                     && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
@@ -482,7 +490,10 @@ namespace OTMS.Service.Services
             // Performs a Single SQL UPDATE instead of loading entities into memory
             await context.Tasks
                 .Where(t =>
-                    t.AssignedTo == employee.Account.AccountId
+                    (
+                        t.AssignedTo == employee.Account.AccountId
+                        || t.CreatedBy == employee.Account.AccountId
+                    )
                     && t.Deleted
                     && !t.PermanentlyDeleted)
                 .ExecuteUpdateAsync(setters => setters
