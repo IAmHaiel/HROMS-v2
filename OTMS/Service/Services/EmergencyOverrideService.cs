@@ -24,13 +24,13 @@ namespace OTMS.Service.Services
                 throw new InvalidOperationException("Only pending requests can be approved.");
 
             var approver = await context.Accounts
-                .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
+                .FirstOrDefaultAsync(a => a.AccountId == request.ApproverAccountId);
 
             if (approver == null)
                 throw new Exception("Approver account not found.");
 
             emergencyOverride.Status = "Approved";
-            emergencyOverride.ApprovedById = request.AccountId;
+            emergencyOverride.ApprovedById = request.ApproverAccountId;
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
             emergencyOverride.OverrideUntil = request.OverrideUntil;
 
@@ -64,13 +64,13 @@ namespace OTMS.Service.Services
                 throw new InvalidOperationException("Only pending requests can be declined.");
 
             var approver = await context.Accounts
-                .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
+                .FirstOrDefaultAsync(a => a.AccountId == request.ApproverAccountId);
 
             if (approver == null)
                 throw new Exception("Approver account not found.");
 
             emergencyOverride.Status = "Declined";
-            emergencyOverride.ApprovedById = request.AccountId;
+            emergencyOverride.ApprovedById = request.ApproverAccountId;
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
