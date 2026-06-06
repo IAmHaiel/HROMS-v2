@@ -81,7 +81,8 @@ namespace OTMS.Service.Services
 
                 TaskStatus = "Pending",
 
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                Deleted = false
             };
 
             await context.Tasks.AddAsync(task);
@@ -103,7 +104,8 @@ namespace OTMS.Service.Services
                 AssignedEmployee = assignedAccount.Employee.EmployeeName,
                 CreatedByEmployee = creatorAccount.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -151,7 +153,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -194,7 +197,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -293,7 +297,8 @@ namespace OTMS.Service.Services
 
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
 
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             };
         }
 
@@ -352,7 +357,8 @@ namespace OTMS.Service.Services
                 TaskStatus = task.TaskStatus,
                 AssignedEmployee = task.Assignee.Employee.EmployeeName,
                 CreatedByEmployee = task.Creator.Employee.EmployeeName,
-                CreatedAt = task.CreatedAt
+                CreatedAt = task.CreatedAt,
+                IsDeleted = task.Deleted
             }).ToList();
         }
 

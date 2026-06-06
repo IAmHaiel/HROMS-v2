@@ -11,5 +11,6 @@
         public string AssignedEmployee { get; set; } = string.Empty;
         public string CreatedByEmployee { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public bool IsDeleted { get; set; }
     }
 }
