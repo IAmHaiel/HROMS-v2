@@ -202,7 +202,7 @@ namespace OTMS.Service.Services
                 AccountId = Guid.NewGuid(),
                 EmployeeId = employee.EmployeeId,
                 Role = request.Role.Trim(),
-                AccountStatus = "Active",
+                AccountStatus = "Pending Verification",
                 CreatedAt = DateTime.UtcNow,
                 IsPasswordChanged = false
             };
