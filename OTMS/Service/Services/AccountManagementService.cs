@@ -205,7 +205,7 @@ namespace OTMS.Service.Services
             var totalEmployees = await query.CountAsync();
 
             var employees = await query
-                .OrderBy(e => e.EmployeeName)
+                .OrderBy(e => e.LastName)
                 .Skip((request.Pagination.PageNumber - 1) * request.Pagination.PageSize)
                 .Take(request.Pagination.PageSize)
                 .ToListAsync();
@@ -226,7 +226,10 @@ namespace OTMS.Service.Services
                 return new SearchAccountStatusResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    EmployeeName = e.EmployeeName,
+                    
+                    EmployeeName = string.Join(" ", new[]
+                    {e.FirstName, e.MiddleName, e.LastName, e.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
@@ -277,7 +280,8 @@ namespace OTMS.Service.Services
                 return new RecentEmployeesResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    EmployeeName = e.EmployeeName,
+                    EmployeeName = string.Join(" ", new[]
+                    {e.FirstName, e.MiddleName, e.LastName, e.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
@@ -303,7 +307,10 @@ namespace OTMS.Service.Services
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
                 .FirstOrDefaultAsync(e =>
-                    e.EmployeeName.Contains(request.Search) ||
+                    e.FirstName.Contains(request.Search) ||
+                    e.MiddleName.Contains(request.Search) ||
+                    e.LastName.Contains(request.Search) ||
+                    e.Suffix.Contains(request.Search) ||
                     e.EmployeeNumber.Contains(request.Search) ||
                     e.Account.Role.Contains(request.Search)
                     );
@@ -327,7 +334,8 @@ namespace OTMS.Service.Services
             return new SearchUserResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                EmployeeName = employee.EmployeeName,
+                EmployeeName = string.Join(" ", new[]
+                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                 Role = employee.Account.Role,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
@@ -348,9 +356,24 @@ namespace OTMS.Service.Services
                 request.EmployeeNumber = employee.EmployeeNumber;
             }
 
-            if (request.EmployeeName == "string" || String.IsNullOrEmpty(request.EmployeeName))
+            if(request.FirstName == "string" || String.IsNullOrEmpty(request.FirstName))
             {
-                request.EmployeeName = employee.EmployeeName;
+                request.FirstName = employee.FirstName;
+            }
+            
+            if(request.MiddleName == "string" || String.IsNullOrEmpty(request.MiddleName))
+            {
+                request.MiddleName = employee.MiddleName;
+            }
+            
+            if(request.LastName == "string" || String.IsNullOrEmpty(request.LastName))
+            {
+                request.LastName = employee.LastName;
+            }
+            
+            if(request.Suffix == "string" || String.IsNullOrEmpty(request.Suffix))
+            {
+                request.Suffix = employee.Suffix;
             }
 
             if (request.ContactNumber == "string" || String.IsNullOrEmpty(request.ContactNumber))
@@ -362,14 +385,23 @@ namespace OTMS.Service.Services
                 .Where(e => e.EmployeeId == employee.EmployeeId)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(e => e.EmployeeNumber, request.EmployeeNumber)
-                    .SetProperty(e => e.EmployeeName, request.EmployeeName)
+                    .SetProperty(e => e.FirstName, request.FirstName)
+                    .SetProperty(e => e.MiddleName, request.MiddleName)
+                    .SetProperty(e => e.LastName, request.LastName)
+                    .SetProperty(e => e.Suffix, request.Suffix)
                     .SetProperty(e => e.ContactNumber, request.ContactNumber)
                     .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
 
             return new UpdateEmployeeResponseDTO
             {
                 EmployeeNumber = request.EmployeeNumber,
-                EmployeeName = request.EmployeeName ?? employee.EmployeeName,
+                EmployeeName = string.Join(" ", new[]
+                {
+                    request.FirstName ?? employee.FirstName,
+                    request.MiddleName ?? employee.MiddleName,
+                    request.LastName ?? employee.LastName,
+                    request.Suffix ?? employee.Suffix
+                }.Where(x => !string.IsNullOrWhiteSpace(x))),
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Success = true
             };
