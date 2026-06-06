@@ -117,7 +117,7 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .FirstOrDefaultAsync(t => t.TaskId == taskId);
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
 
             if (task == null)
             {
@@ -166,7 +166,7 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .FirstOrDefaultAsync(t => t.TaskId == taskId);
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
 
             if (task == null)
             {
@@ -228,7 +228,7 @@ namespace OTMS.Service.Services
 
             // Allowed Roles
             var allowedRoles = new[]
-            {"OperationsAdmin", "Encoder", "Coordinator"};
+            {"OperationAdmin", "Encoder", "Coordinator"};
 
             if (string.IsNullOrEmpty(roleClaim)
                 || !allowedRoles.Contains(roleClaim))
@@ -243,7 +243,7 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .FirstOrDefaultAsync(t => t.TaskId == taskId);
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
 
             if (task == null)
             {
@@ -373,7 +373,7 @@ namespace OTMS.Service.Services
         {
             // Get the task to be deleted
             var task = await context.Tasks
-                .FirstOrDefaultAsync(t => t.TaskId == taskId);
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
 
             if (task == null)
             {
@@ -403,7 +403,7 @@ namespace OTMS.Service.Services
                     .ThenInclude(a => a.Employee)
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
-                .FirstOrDefaultAsync(t => t.TaskId == taskId && t.Deleted);
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && t.Deleted && !t.PermanentlyDeleted);
 
             if (task == null)
                 throw new Exception("Task not found or is not deleted.");
