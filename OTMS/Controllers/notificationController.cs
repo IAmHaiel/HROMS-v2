@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs.Notification.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
@@ -14,11 +16,11 @@ namespace OTMS.Controllers
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("my-notifications")]
         public async Task<
-            ActionResult<List<NotificationResponseDTO>>> GetMyNotifications()
+            ActionResult<PaginationResponseDTO<NotificationResponseDTO>>> GetMyNotifications(PaginationDTO request)
         {
             try
             {
-                var result = await notificationService.GetMyNotificationsAsync();
+                var result = await notificationService.GetMyNotificationsAsync(request);
                 return Ok(result);
             }
             catch (Exception ex)

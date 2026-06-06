@@ -1,12 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Service.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using OTMS.Entities.DTOs;
 
 namespace OTMS.Controllers
 {
@@ -118,11 +120,11 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("my-tasks")]
-        public async Task<ActionResult<List<TaskResponseDTO>>> GetMyTasks()
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks(PaginationDTO request)
         {
             try
             {
-                var result = await taskService.GetMyTasksAsync();
+                var result = await taskService.GetMyTasksAsync(request);
 
                 return Ok(result);
             }
@@ -229,11 +231,11 @@ namespace OTMS.Controllers
 
         [Authorize(Policy = "OperationalTeamAccess")]
         [HttpGet("bin-records/{employeeId}")]
-        public async Task<IActionResult> BinRecords(string employeeId)
+        public async Task<IActionResult> BinRecords(string employeeId, PaginationDTO pagination)
         {
             try
             {
-                var result = await taskService.BinRecordsAsync(employeeId);
+                var result = await taskService.BinRecordsAsync(employeeId, pagination);
                 return Ok(result);
             }
             catch (Exception ex)

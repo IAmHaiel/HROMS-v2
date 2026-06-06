@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Entities.DTOs.LeaveRequest;
+using OTMS.Entities.DTOs.Pagination;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
 
@@ -36,13 +37,13 @@ namespace OTMS.Controllers
         /// </summary>
         [HttpGet("my-leave-requests")]
         [Authorize(Policy = "ManagementAccess")]
-        public async Task<IActionResult> GetMyLeaveRequests()
+        public async Task<IActionResult> GetMyLeaveRequests(PaginationDTO pagination)
         {
             var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(accountIdStr) || !Guid.TryParse(accountIdStr, out var accountId))
                 return Unauthorized();
 
-            var result = await leaveRequest.GetMyLeaveRequestsAsync(accountId);
+            var result = await leaveRequest.GetMyLeaveRequestsAsync(accountId, pagination);
             return Ok(result);
         }
 
@@ -51,9 +52,9 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("get-all-leave-requests")]
-        public async Task<IActionResult> GetAllLeaveRequests()
+        public async Task<IActionResult> GetAllLeaveRequests(PaginationDTO request)
         {
-            var result = await leaveRequest.GetAllLeaveRequestsAsync();
+            var result = await leaveRequest.GetAllLeaveRequestsAsync(request);
             return Ok(result);
         }
 
