@@ -149,6 +149,7 @@ namespace OTMS.Controllers
             Console.WriteLine($"Received: [{token}]");
 
             var account = await context.Employees
+                .Include(e => e.Account)
                 .FirstOrDefaultAsync
                     (e => e.EmailVerificationToken == token);
 
@@ -157,11 +158,17 @@ namespace OTMS.Controllers
                 return BadRequest("Invalid token.");
             }
 
+            if (account.Account == null)
+            {
+                return BadRequest("Associated account not found.");
+            }
+
             if (account.EmailVerificationTokenExpiry < DateTime.UtcNow)
             {
                 return BadRequest("Token expired.");
             }
 
+            account.Account.AccountStatus = "Active"; // Turn to Active upon email verification
             account.IsEmailVerified = true;
             account.EmailVerificationToken = null;
             account.EmailVerificationTokenExpiry = null;
