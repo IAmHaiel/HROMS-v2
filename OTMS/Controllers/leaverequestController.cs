@@ -16,7 +16,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// The system shall allow Operational Team members to submit a formal time-off request by specifying the start date, end date, and reason.
         /// </summary>
-        [Authorize(Policy = "ManagementAccess")]
+        [Authorize]
         [HttpPost("create-leave-request")]
         public async Task<IActionResult> CreateLeaveRequest([FromBody] CreateLeaveRequestDTO request)
         {

@@ -65,7 +65,8 @@ namespace OTMS.Service.Services
                         lr.Approval_Status == "Approved");
 
                 throw new OnLeaveException(
-                    activeLeave?.LeaveId ?? Guid.Empty
+                    employee.Account?.AccountId ?? Guid.Empty
+                    , activeLeave?.LeaveId ?? Guid.Empty
                     , employee.EmployeeName ?? string.Empty);
             }
 
