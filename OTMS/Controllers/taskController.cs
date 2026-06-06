@@ -212,7 +212,7 @@ namespace OTMS.Controllers
             {
                 var result = await taskService.RestoreTaskAsync(taskId);
                 return Ok(result);
-            } 
+            }
             catch (Exception ex)
             {
                 return BadRequest(new ApiResponseDTO<object>
@@ -222,5 +222,6 @@ namespace OTMS.Controllers
                     Data = null
                 });
             }
+        }
     }
 }
