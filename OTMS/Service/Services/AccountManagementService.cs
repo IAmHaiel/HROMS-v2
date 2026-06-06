@@ -124,7 +124,7 @@ namespace OTMS.Service.Services
             // Prevent deactivation of System Admin accounts
             var systemAdminAccount = exist.Account.Role;
             
-            if (systemAdminAccount is not null && systemAdminAccount == "SystemAdmin")
+            if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
                 throw new InvalidOperationException("Cannot deactivate a System Admin account.");
             }
@@ -175,7 +175,7 @@ namespace OTMS.Service.Services
             // Check if the account belongs to a System Admin and prevent deletion if it does
             var systemAdminAccount = exist.Account.Role;
 
-            if (systemAdminAccount is not null && systemAdminAccount == "SystemAdmin")
+            if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
                 throw new InvalidOperationException("Cannot delete a System Admin account.");
             }
