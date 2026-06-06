@@ -440,7 +440,8 @@ namespace OTMS.Service.Services
                 .Include(t => t.Creator)
                     .ThenInclude(a => a.Employee)
                 .Where(t =>
-                    t.AssignedTo == employee.Account.AccountId 
+                    t.AssignedTo == employee.Account.AccountId
+                    || t.CreatedBy == employee.Account.AccountId
                     && t.Deleted
                     && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt)
