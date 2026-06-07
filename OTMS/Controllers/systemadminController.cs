@@ -68,7 +68,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "OperationAdminAccess")]
         [HttpGet("assignable-employees")]
-        public async Task<ActionResult> GetAssignableEmployees([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
+        public async Task<ActionResult> GetAssignableEmployees([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination, string? NameFilter)
         {
             try
             {
@@ -76,7 +76,11 @@ namespace OTMS.Controllers
                     .Include(a => a.Employee)
                     .Include(a => a.ActivityLogs)
                     .Where(a => a.Role == Common.Constraints.Roles.Encoder || a.Role == Common.Constraints.Roles.Coordinator)
-                    .OrderBy(a => a.Employee.EmployeeName);
+                    .OrderByDescending(a =>
+                        a.Employee.FirstName.Contains(NameFilter)
+                        || a.Employee.MiddleName.Contains(NameFilter)
+                        || a.Employee.LastName.Contains(NameFilter)
+                        || a.Employee.Suffix.Contains(NameFilter));
 
                 var totalRecords = await query.CountAsync();
 
@@ -85,7 +89,10 @@ namespace OTMS.Controllers
                     .Take(pagination.PageSize)
                     .Select(a => new {
                         accountId = a.AccountId,
-                        employeeName = a.Employee.EmployeeName,
+                        firstName = a.Employee.FirstName,
+                        middleName = a.Employee.MiddleName,
+                        lastName = a.Employee.LastName,
+                        suffix = a.Employee.Suffix,
                         role = a.Role,
                         presenceStatus = a.ActivityLogs
                             .OrderByDescending(al => al.CreatedAt)
