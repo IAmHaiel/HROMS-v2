@@ -20,12 +20,6 @@ import {
     Hash,
     Shield,
     CalendarDays,
-    Send,
-    Palmtree,
-    HeartPulse,
-    AlertTriangle,
-    Baby,
-    MoreHorizontal,
     CalendarCheck,
     CalendarX,
     CalendarClock,
@@ -39,14 +33,18 @@ import {
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
+import LeaveRequestModal, {
+    LeaveRecord,
+    LeaveType,
+    LeaveStatus,
+    LEAVE_TYPES,
+} from '../../components/LeaveRequestModal/LeaveRequestModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
 type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile';
-type LeaveType = 'vacation' | 'sick' | 'emergency' | 'personal' | 'maternity' | 'other';
-type LeaveStatus = 'pending' | 'approved' | 'declined';
 
 interface Task {
     id: string;
@@ -81,18 +79,6 @@ interface UserProfile {
     presenceStatus?: string;
 }
 
-interface LeaveRecord {
-    id: string;
-    leaveType: LeaveType;
-    startDate: string;
-    endDate: string;
-    reason: string;
-    status: LeaveStatus;
-    submittedAt: string;
-    reviewedBy?: string;
-    reviewNote?: string;
-}
-
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
 const authHeader = (): HeadersInit => ({
@@ -102,10 +88,10 @@ const authHeader = (): HeadersInit => ({
 
 const dtoToLeaveRecord = (dto: any): LeaveRecord => {
     const statusMap: Record<string, LeaveStatus> = {
-        Pending: 'pending', pending: 'pending',
-        Approved: 'approved', approved: 'approved',
-        Declined: 'declined', declined: 'declined',
-        Rejected: 'declined', rejected: 'declined',
+        Pending: 'Pending', pending: 'Pending',
+        Approved: 'Approved', approved: 'Approved',
+        Declined: 'Declined', declined: 'Declined',
+        Rejected: 'Declined', rejected: 'Declined',
     };
     const leaveTypeMap: Record<string, LeaveType> = {
         vacation: 'vacation', sick: 'sick', 'sick leave': 'sick',
@@ -122,7 +108,7 @@ const dtoToLeaveRecord = (dto: any): LeaveRecord => {
         startDate: rawStart.split('T')[0],
         endDate: rawEnd.split('T')[0],
         reason: dto.reason ?? dto.Reason ?? '',
-        status: statusMap[rawStatus] ?? 'pending',
+        status: statusMap[rawStatus] ?? 'Pending',
         submittedAt: rawStart.split('T')[0],
         reviewedBy: dto.approvedBy ?? dto.Approved_By ?? undefined,
         reviewNote: dto.leaveRequestNote ?? dto.LeaveRequestNote ?? undefined,
@@ -130,7 +116,9 @@ const dtoToLeaveRecord = (dto: any): LeaveRecord => {
 };
 
 const dtoToTask = (dto: TaskResponseDTO): Task => {
-    const priorityMap: Record<string, Priority> = { High: 'high', Medium: 'medium', Low: 'low' };
+    const priorityMap: Record<string, Priority> = {
+        High: 'high', Medium: 'medium', Low: 'low',
+    };
     const statusMap: Record<string, TaskStatus> = {
         Pending: 'pending', 'In Progress': 'in-progress', Completed: 'completed',
     };
@@ -154,7 +142,9 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
 
 const fmtDate = (d: string): string => {
     if (!d) return '—';
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+    });
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
@@ -175,6 +165,8 @@ const getInitials = (name: string): string => {
     return name.slice(0, 2).toUpperCase();
 };
 
+// ─── Meta Maps ────────────────────────────────────────────────────────────────
+
 const statusMeta: Record<TaskStatus, { label: string; cls: string; icon: React.ReactNode }> = {
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
@@ -189,24 +181,15 @@ const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
 };
 
 const leaveStatusMeta: Record<LeaveStatus, { label: string; cls: string; icon: React.ReactNode }> = {
-    pending: { label: 'Pending', cls: 'badge-amber', icon: <CalendarClock size={12} /> },
-    approved: { label: 'Approved', cls: 'badge-green', icon: <CalendarCheck size={12} /> },
-    declined: { label: 'Declined', cls: 'badge-red', icon: <CalendarX size={12} /> },
+    Pending: { label: 'Pending', cls: 'badge-amber', icon: <CalendarClock size={12} /> },
+    Approved: { label: 'Approved', cls: 'badge-green', icon: <CalendarCheck size={12} /> },
+    Declined: { label: 'Declined', cls: 'badge-red', icon: <CalendarX size={12} /> },
 };
-
-const LEAVE_TYPES: { key: LeaveType; label: string; icon: React.ReactNode }[] = [
-    { key: 'vacation', label: 'Vacation', icon: <Palmtree size={16} /> },
-    { key: 'sick', label: 'Sick Leave', icon: <HeartPulse size={16} /> },
-    { key: 'emergency', label: 'Emergency', icon: <AlertTriangle size={16} /> },
-    { key: 'personal', label: 'Personal', icon: <User size={16} /> },
-    { key: 'maternity', label: 'Maternity/Paternity', icon: <Baby size={16} /> },
-    { key: 'other', label: 'Other', icon: <MoreHorizontal size={16} /> },
-];
 
 const leaveTypeLabel = (key: LeaveType) =>
     LEAVE_TYPES.find(lt => lt.key === key)?.label ?? key;
 
-// ─── Nav config ───────────────────────────────────────────────────────────────
+// ─── Nav Config ───────────────────────────────────────────────────────────────
 
 const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; label: string }[] }[] = [
     {
@@ -243,14 +226,20 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
             <div className="modal-card" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-head">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span className={`prio-strip ${pm.cls}`} style={{ width: 6, height: 36, borderRadius: 3, display: 'inline-block' }} />
+                        <span
+                            className={`prio-strip ${pm.cls}`}
+                            style={{ width: 6, height: 36, borderRadius: 3, display: 'inline-block' }}
+                        />
                         <div>
                             <h3 style={{ margin: 0 }}>{task.name}</h3>
-                            <span className={`badge ${sm.cls}`} style={{ marginTop: 4 }}>{sm.icon}{sm.label}</span>
+                            <span className={`badge ${sm.cls}`} style={{ marginTop: 4 }}>
+                                {sm.icon}{sm.label}
+                            </span>
                         </div>
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
+
                 <div style={{ padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {task.description && (
                         <div>
@@ -259,27 +248,20 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                         </div>
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Deadline</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{fmtDate(task.deadline)}</p>
-                        </div>
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Priority</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14, textTransform: 'capitalize' }}>{task.priority}</p>
-                        </div>
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Assigned by</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.assignedBy}</p>
-                        </div>
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Progress</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.progress}%</p>
-                        </div>
+                        {[
+                            { label: 'Deadline', value: fmtDate(task.deadline) },
+                            { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
+                            { label: 'Assigned by', value: task.assignedBy },
+                            { label: 'Progress', value: `${task.progress}%` },
+                        ].map(({ label, value, style }) => (
+                            <div key={label}>
+                                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
+                                <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
+                            </div>
+                        ))}
                     </div>
-                    <div>
-                        <div className="tc-bar" style={{ height: 8 }}>
-                            <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
-                        </div>
+                    <div className="tc-bar" style={{ height: 8 }}>
+                        <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
                     </div>
                     {task.remarks && (
                         <div>
@@ -288,6 +270,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                         </div>
                     )}
                 </div>
+
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
                     <button className="btn" onClick={onClose}>Close</button>
                     {task.status !== 'completed' && (
@@ -310,9 +293,7 @@ interface ProgressModalProps {
 }
 
 const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
-    const [status, setStatus] = useState<TaskStatus>(
-        task.status === 'overdue' ? 'in-progress' : task.status
-    );
+    const [status, setStatus] = useState<TaskStatus>(task.status === 'overdue' ? 'in-progress' : task.status);
     const [progress, setProgress] = useState(task.progress);
     const [remarks, setRemarks] = useState(task.remarks ?? '');
     const [saving, setSaving] = useState(false);
@@ -353,11 +334,13 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
+
                 {error && (
                     <div className="form-api-error" style={{ marginBottom: 14 }}>
                         <AlertCircle size={14} /><span>{error}</span>
                     </div>
                 )}
+
                 <div className="field">
                     <label>Status</label>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -372,6 +355,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         ))}
                     </div>
                 </div>
+
                 <div className="field">
                     <label>Progress — {progress}%</label>
                     <input
@@ -387,19 +371,25 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         />
                     </div>
                 </div>
+
                 <div className="field">
                     <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                     <textarea
                         className="leave-reason-textarea" rows={3} maxLength={300}
                         placeholder="Add any notes about your progress…"
-                        value={remarks} onChange={e => setRemarks(e.target.value)}
+                        value={remarks}
+                        onChange={e => setRemarks(e.target.value)}
                     />
                     <div className="leave-char-count">{remarks.length} / 300</div>
                 </div>
+
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
                     <button className="btn" onClick={onClose}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Progress</>}
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Saving…</>
+                            : <><Save size={13} /> Save Progress</>
+                        }
                     </button>
                 </div>
             </div>
@@ -441,11 +431,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
             <p className="tc-desc">{task.description}</p>
             <div className="tc-meta">
                 <span className={`tc-deadline${od ? ' overdue-text' : daysLeft !== null && daysLeft <= 2 ? ' warning-text' : ''}`}>
-                    {od ? '⚠ Overdue' : daysLeft !== null
-                        ? daysLeft === 0 ? 'Due today'
-                            : daysLeft === 1 ? 'Due tomorrow'
-                                : `${daysLeft}d left`
-                        : fmtDate(task.deadline)}
+                    {od ? '⚠ Overdue'
+                        : daysLeft !== null
+                            ? daysLeft === 0 ? 'Due today'
+                                : daysLeft === 1 ? 'Due tomorrow'
+                                    : `${daysLeft}d left`
+                            : fmtDate(task.deadline)}
                 </span>
                 <span className="tc-date">{fmtDate(task.deadline)}</span>
             </div>
@@ -455,11 +446,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
                 </div>
                 <span className="tc-pct">{task.progress}%</span>
             </div>
-            <div className="tc-actions">
-                {task.status === 'completed' && (
+            {task.status === 'completed' && (
+                <div className="tc-actions">
                     <span className="completed-pill"><CheckCircle2 size={12} /> Done</span>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -498,7 +489,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                     <div className="wb-ring-wrap">
                         <svg viewBox="0 0 60 60" className="wb-ring">
                             <circle cx="30" cy="30" r="24" className="ring-bg" />
-                            <circle cx="30" cy="30" r="24" className="ring-fill"
+                            <circle
+                                cx="30" cy="30" r="24" className="ring-fill"
                                 strokeDasharray={`${2 * Math.PI * 24}`}
                                 strokeDashoffset={`${2 * Math.PI * 24 * (1 - pct / 100)}`}
                             />
@@ -537,27 +529,34 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                         <h3>High Priority Tasks</h3>
                         <button className="link-btn" onClick={onGoTasks}>All tasks <ChevronRight size={13} /></button>
                     </div>
-                    {urgent.length === 0
-                        ? <div className="empty-state"><CheckCircle2 size={22} /><p>No urgent tasks — great work!</p></div>
-                        : urgent.map(t => (
-                            <div key={t.id} className="dash-task-row" onClick={() => onView(t.id)}>
-                                <div className="dtr-left">
-                                    <span className={`prio-dot ${priorityMeta[t.priority].cls}`} />
-                                    <div>
-                                        <div className="dtr-name">{t.name}</div>
-                                        <div className="dtr-date">{fmtDate(t.deadline)}</div>
-                                    </div>
-                                </div>
-                                <div className="dtr-right">
-                                    <span className={`badge ${statusMeta[effectiveStatus(t)].cls}`}>{statusMeta[effectiveStatus(t)].label}</span>
-                                    {t.status !== 'completed' && (
-                                        <button className="btn btn-xs btn-primary" onClick={e => { e.stopPropagation(); onUpdate(t.id); }}>Update</button>
-                                    )}
+                    {urgent.length === 0 ? (
+                        <div className="empty-state"><CheckCircle2 size={22} /><p>No urgent tasks — great work!</p></div>
+                    ) : urgent.map(t => (
+                        <div key={t.id} className="dash-task-row" onClick={() => onView(t.id)}>
+                            <div className="dtr-left">
+                                <span className={`prio-dot ${priorityMeta[t.priority].cls}`} />
+                                <div>
+                                    <div className="dtr-name">{t.name}</div>
+                                    <div className="dtr-date">{fmtDate(t.deadline)}</div>
                                 </div>
                             </div>
-                        ))
-                    }
+                            <div className="dtr-right">
+                                <span className={`badge ${statusMeta[effectiveStatus(t)].cls}`}>
+                                    {statusMeta[effectiveStatus(t)].label}
+                                </span>
+                                {t.status !== 'completed' && (
+                                    <button
+                                        className="btn btn-xs btn-primary"
+                                        onClick={e => { e.stopPropagation(); onUpdate(t.id); }}
+                                    >
+                                        Update
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
+
                 <div className="card">
                     <div className="card-header"><h3>My Progress</h3></div>
                     <div className="progress-summary">
@@ -601,8 +600,10 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
         { key: 'overdue', label: 'Overdue', count: tasks.filter(t => effectiveStatus(t) === 'overdue').length },
     ];
 
-    const filtered = filter === 'all' ? tasks
-        : filter === 'overdue' ? tasks.filter(t => effectiveStatus(t) === 'overdue')
+    const filtered = filter === 'all'
+        ? tasks
+        : filter === 'overdue'
+            ? tasks.filter(t => effectiveStatus(t) === 'overdue')
             : tasks.filter(t => t.status === filter);
 
     if (loading) {
@@ -638,15 +639,24 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
         <div className="tab-content">
             <div className="filter-pills">
                 {filters.map(f => (
-                    <button key={f.key} className={`filter-pill${filter === f.key ? ' active' : ''}`} onClick={() => setFilter(f.key)}>
+                    <button
+                        key={f.key}
+                        className={`filter-pill${filter === f.key ? ' active' : ''}`}
+                        onClick={() => setFilter(f.key)}
+                    >
                         {f.label}<span className="fp-count">{f.count}</span>
                     </button>
                 ))}
             </div>
-            {filtered.length === 0
-                ? <div className="card"><div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div></div>
-                : <div className="task-grid">{filtered.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}</div>
-            }
+            {filtered.length === 0 ? (
+                <div className="card">
+                    <div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div>
+                </div>
+            ) : (
+                <div className="task-grid">
+                    {filtered.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
+                </div>
+            )}
         </div>
     );
 };
@@ -658,48 +668,89 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     const sm = leaveStatusMeta[record.status];
     const days = calcDays(record.startDate, record.endDate);
 
+    const borderColor =
+        record.status === 'Approved' ? '#05cd99' :
+            record.status === 'Declined' ? '#ee5d50' :
+                '#ffb547';
+
     return (
-        <div className={`leave-record-card leave-record-${record.status}`}>
-            <div className="lrc-main" onClick={() => setExpanded(e => !e)}>
-                <div className="lrc-left">
-                    <div className="lrc-type-icon">
-                        {LEAVE_TYPES.find(lt => lt.key === record.leaveType)?.icon}
+        <div style={{
+            border: '1px solid var(--border)', borderRadius: 12,
+            overflow: 'hidden', borderLeft: `3px solid ${borderColor}`,
+        }}>
+            {/* Main row */}
+            <div
+                style={{
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px', cursor: 'pointer',
+                }}
+                onClick={() => setExpanded(e => !e)}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: 'rgba(67,24,255,0.08)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'var(--primary)', flexShrink: 0,
+                    }}>
+                        {LEAVE_TYPES.find(lt => lt.key === record.leaveType)?.icon ?? <CalendarDays size={16} />}
                     </div>
-                    <div className="lrc-info">
-                        <div className="lrc-title">{leaveTypeLabel(record.leaveType)}</div>
-                        <div className="lrc-dates">
+                    <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                            {leaveTypeLabel(record.leaveType)}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                             {fmtDate(record.startDate)}
                             {record.startDate !== record.endDate && <> — {fmtDate(record.endDate)}</>}
-                            <span className="lrc-days">· {days} {days === 1 ? 'day' : 'days'}</span>
+                            <span style={{ marginLeft: 6, fontWeight: 600 }}>
+                                · {days} {days === 1 ? 'day' : 'days'}
+                            </span>
                         </div>
                     </div>
                 </div>
-                <div className="lrc-right">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
-                    <button className="icon-btn lrc-expand-btn" onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}>
+                    <button
+                        className="icon-btn"
+                        onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+                    >
                         {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                 </div>
             </div>
+
+            {/* Expanded detail */}
             {expanded && (
-                <div className="lrc-detail">
-                    <div className="lrc-detail-row">
-                        <span className="lrc-dl">Submitted</span>
-                        <span className="lrc-dv">{fmtDate(record.submittedAt)}</span>
-                    </div>
-                    <div className="lrc-detail-row">
-                        <span className="lrc-dl">Reason</span>
-                        <span className="lrc-dv">{record.reason}</span>
-                    </div>
-                    {record.reviewedBy && (
-                        <div className="lrc-detail-row">
-                            <span className="lrc-dl">Reviewed by</span>
-                            <span className="lrc-dv">{record.reviewedBy}</span>
+                <div style={{
+                    borderTop: '1px solid var(--border)',
+                    padding: '12px 16px',
+                    background: 'var(--bg-secondary, #f9f9fc)',
+                    display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                    {[
+                        { label: 'Submitted', value: fmtDate(record.submittedAt) },
+                        { label: 'Reason', value: record.reason },
+                        ...(record.reviewedBy ? [{ label: 'Reviewed by', value: record.reviewedBy }] : []),
+                    ].map(({ label, value }) => (
+                        <div key={label} style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                            <span style={{ width: 90, color: 'var(--text-secondary)', fontWeight: 600, flexShrink: 0 }}>
+                                {label}
+                            </span>
+                            <span style={{ color: 'var(--text-primary)' }}>{value}</span>
                         </div>
-                    )}
+                    ))}
                     {record.reviewNote && (
-                        <div className={`lrc-review-note lrc-note-${record.status}`}>
-                            <FileText size={12} />
+                        <div style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 8,
+                            marginTop: 4, padding: '8px 12px', borderRadius: 8,
+                            background: record.status === 'Approved'
+                                ? 'rgba(5,205,153,0.08)' : 'rgba(238,93,80,0.08)',
+                            border: `1px solid ${record.status === 'Approved'
+                                ? 'rgba(5,205,153,0.2)' : 'rgba(238,93,80,0.2)'}`,
+                            fontSize: 12, color: 'var(--text-primary)',
+                        }}>
+                            <FileText size={13} style={{ flexShrink: 0, marginTop: 1 }} />
                             <span>{record.reviewNote}</span>
                         </div>
                     )}
@@ -709,257 +760,228 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     );
 };
 
-// ─── Leave Request Modal ──────────────────────────────────────────────────────
-
-interface LeaveRequestModalProps {
-    onClose: () => void;
-    onSubmit: (record: LeaveRecord) => void;
-}
-
-const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({ onClose, onSubmit }) => {
-    const today = new Date().toISOString().split('T')[0];
-    const [leaveType, setLeaveType] = useState<LeaveType>('vacation');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [reason, setReason] = useState('');
-    const [error, setError] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-
-    const dayCount = startDate && endDate && endDate >= startDate ? calcDays(startDate, endDate) : null;
-
-    const handleSubmit = async () => {
-        setError('');
-        if (!startDate || !endDate) { setError('Please select start and end dates.'); return; }
-        if (endDate < startDate) { setError('End date cannot be before start date.'); return; }
-        if (!reason.trim()) { setError('Please provide a reason for your leave.'); return; }
-        setSubmitting(true);
-        try {
-            const res = await fetch('/api/leaverequest/create-leave-request', {
-                method: 'POST',
-                headers: authHeader(),
-                body: JSON.stringify({ Start_Date: startDate, End_Date: endDate, Reason: reason.trim(), Leave_Type: leaveType }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error((err as any).message || (err as any).Message || 'Failed to submit leave request.');
-            }
-            const data = await res.json();
-            onSubmit({
-                id: String(data.leaveId ?? data.LeaveId ?? Date.now()),
-                leaveType, startDate, endDate,
-                reason: reason.trim(), status: 'pending', submittedAt: today,
-            });
-            onClose();
-        } catch (err: any) {
-            setError(err.message ?? 'Something went wrong.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card leave-request-modal" onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div className="leave-modal-title-block">
-                        <div className="leave-modal-icon"><CalendarDays size={18} /></div>
-                        <div>
-                            <h3>Request Leave</h3>
-                            <p className="modal-sub">Fill in the details below — your manager will review it.</p>
-                        </div>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-                {error && (
-                    <div className="form-api-error" style={{ marginBottom: 14 }}>
-                        <AlertCircle size={14} /><span>{error}</span>
-                    </div>
-                )}
-                <div className="field">
-                    <label>Leave type</label>
-                    <div className="leave-type-grid">
-                        {LEAVE_TYPES.map(lt => (
-                            <button key={lt.key} className={`leave-type-chip${leaveType === lt.key ? ' active' : ''}`} onClick={() => setLeaveType(lt.key)}>
-                                {lt.icon}<span>{lt.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                <div className="leave-date-row">
-                    <div className="field">
-                        <label>Start date</label>
-                        <input type="date" className="leave-date-input" min={today} value={startDate}
-                            onChange={e => { setStartDate(e.target.value); if (endDate && endDate < e.target.value) setEndDate(''); setError(''); }}
-                        />
-                    </div>
-                    <div className="field">
-                        <label>End date</label>
-                        <input type="date" className="leave-date-input" min={startDate || today} value={endDate}
-                            onChange={e => { setEndDate(e.target.value); setError(''); }}
-                        />
-                    </div>
-                </div>
-                {dayCount !== null && (
-                    <div className="leave-duration-pill" style={{ marginBottom: 4 }}>
-                        <Clock size={13} />
-                        {dayCount === 1 ? '1 day' : `${dayCount} days`}
-                    </div>
-                )}
-                <div className="field">
-                    <label>Reason</label>
-                    <textarea className="leave-reason-textarea" maxLength={300} rows={3}
-                        placeholder="Briefly describe your reason for leave…"
-                        value={reason} onChange={e => { setReason(e.target.value); setError(''); }}
-                    />
-                    <div className="leave-char-count">{reason.length} / 300</div>
-                </div>
-                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
-                    <span className="leave-footer-note"><AlertCircle size={12} /> Requires manager approval</span>
-                    <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-                        <button className="btn" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-                            {submitting ? <><Loader2 size={13} className="spin" /> Submitting…</> : <><Send size={13} /> Submit Request</>}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 // ─── Leave Tab ────────────────────────────────────────────────────────────────
 
-interface LeaveTabProps {
+const LeaveTab: React.FC<{
     records: LeaveRecord[];
+    loading: boolean;
     onNewRecord: (r: LeaveRecord) => void;
-}
-
-const LeaveTab: React.FC<LeaveTabProps> = ({ records, onNewRecord }) => {
+}> = ({ records, loading, onNewRecord }) => {
     const [showModal, setShowModal] = useState(false);
-    const [success, setSuccess] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
     const [histFilter, setHistFilter] = useState<'all' | LeaveStatus>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 5;
 
-    const pendingCount = records.filter(r => r.status === 'pending').length;
-    const approvedCount = records.filter(r => r.status === 'approved').length;
-    const declinedCount = records.filter(r => r.status === 'declined').length;
+    const pendingCount = records.filter(r => r.status === 'Pending').length;
+    const approvedCount = records.filter(r => r.status === 'Approved').length;
+    const declinedCount = records.filter(r => r.status === 'Declined').length;
 
-    const filteredRecords = histFilter === 'all' ? records : records.filter(r => r.status === histFilter);
-    const sortedRecords = [...filteredRecords].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+    const filteredRecords = histFilter === 'all'
+        ? records
+        : records.filter(r => r.status === histFilter);
+    const sortedRecords = [...filteredRecords].sort((a, b) =>
+        b.submittedAt.localeCompare(a.submittedAt)
+    );
     const totalPages = Math.max(1, Math.ceil(sortedRecords.length / PAGE_SIZE));
-    const paginatedRecords = sortedRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const paginatedRecords = sortedRecords.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+    );
 
-    const handleFilterChange = (f: 'all' | LeaveStatus) => { setHistFilter(f); setCurrentPage(1); };
+    const handleFilterChange = (f: 'all' | LeaveStatus) => {
+        setHistFilter(f);
+        setCurrentPage(1);
+    };
+
     const handleSubmit = (record: LeaveRecord) => {
         onNewRecord(record);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3500);
+        setSubmitSuccess(true);
+        setTimeout(() => setSubmitSuccess(false), 3500);
     };
 
     return (
         <div className="tab-content">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h2 style={{ margin: 0 }}>Leave Requests</h2>
-                <button className="btn btn-sm btn-primary" onClick={() => setShowModal(true)}>
-                    <Plus size={13} /> Request Leave
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Leave Requests
+                    </h2>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                        Submit and track your time-off requests
+                    </p>
+                </div>
+                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={14} /> Request Leave
                 </button>
             </div>
-            <div className="leave-stats-row">
-                <div className="leave-stat-card leave-stat-pending">
-                    <div className="lst-icon"><CalendarClock size={20} /></div>
-                    <div><span className="lst-val">{pendingCount}</span><span className="lst-label">Pending</span></div>
-                </div>
-                <div className="leave-stat-card leave-stat-approved">
-                    <div className="lst-icon"><CalendarCheck size={20} /></div>
-                    <div><span className="lst-val">{approvedCount}</span><span className="lst-label">Approved</span></div>
-                </div>
-                <div className="leave-stat-card leave-stat-declined">
-                    <div className="lst-icon"><CalendarX size={20} /></div>
-                    <div><span className="lst-val">{declinedCount}</span><span className="lst-label">Declined</span></div>
-                </div>
-            </div>
-            {success && (
-                <div className="toast-success">
-                    <CheckCircle2 size={15} /> Request submitted — your manager will review it shortly.
+
+            {/* Success toast */}
+            {submitSuccess && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
+                    borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                    fontSize: 13, color: '#05cd99', fontWeight: 600,
+                }}>
+                    <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
                 </div>
             )}
+
+            {/* Stat cards */}
+            <div className="stats-row" style={{ marginBottom: 16 }}>
+                {[
+                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
+                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
+                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
+                    { label: 'DECLINED', value: declinedCount, icon: <X size={18} />, cls: 'bg-danger', sub: 'Not approved' },
+                ].map(s => (
+                    <div key={s.label} className="card stat-card">
+                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
+                        <div><p>{s.label}</p><h3>{s.value}</h3><small>{s.sub}</small></div>
+                    </div>
+                ))}
+            </div>
+
+            {/* History card */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="card-header" style={{ padding: '16px 18px 14px' }}>
+                <div className="card-header" style={{ padding: '16px 20px 14px' }}>
                     <h3>My Leave History</h3>
                 </div>
-                <div className="leave-hist-filter" style={{ padding: '0 18px 12px' }}>
-                    {(['all', 'pending', 'approved', 'declined'] as const).map(f => (
-                        <button key={f} className={`filter-pill${histFilter === f ? ' active' : ''}`}
-                            onClick={() => handleFilterChange(f)} style={{ fontSize: 12, padding: '4px 11px' }}>
-                            {f === 'all' ? 'All' : leaveStatusMeta[f].label}
-                            <span className="fp-count">{f === 'all' ? records.length : records.filter(r => r.status === f).length}</span>
+
+                {/* Filter pills */}
+                <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {(['all', 'Pending', 'Approved', 'Declined'] as const).map(f => (
+                        <button
+                            key={f}
+                            className={`filter-pill${histFilter === f ? ' active' : ''}`}
+                            onClick={() => handleFilterChange(f)}
+                            style={{ fontSize: 12, padding: '4px 11px' }}
+                        >
+                            {f === 'all' ? 'All' : f}
+                            <span style={{
+                                marginLeft: 5, fontSize: 11, fontWeight: 600,
+                                padding: '1px 6px', borderRadius: 999,
+                                background: histFilter === f ? 'rgba(67,24,255,0.15)' : 'var(--border)',
+                                color: histFilter === f ? 'var(--primary)' : 'var(--text-secondary)',
+                            }}>
+                                {f === 'all' ? records.length : records.filter(r => r.status === f).length}
+                            </span>
                         </button>
                     ))}
                 </div>
-                <div className="leave-records-list">
-                    {paginatedRecords.length === 0
-                        ? <div className="empty-state" style={{ padding: '32px 20px' }}><CalendarDays size={22} /><p>No leave requests in this category</p></div>
-                        : paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)
-                    }
+
+                {/* Records list */}
+                <div style={{ padding: '0 20px' }}>
+                    {loading ? (
+                        <div className="empty-state" style={{ padding: '32px 0' }}>
+                            <Loader2 size={20} className="spin" /><p>Loading leave records…</p>
+                        </div>
+                    ) : paginatedRecords.length === 0 ? (
+                        <div className="empty-state" style={{ padding: '36px 0' }}>
+                            <div style={{
+                                width: 56, height: 56, borderRadius: '50%',
+                                background: 'rgba(67,24,255,0.07)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginBottom: 8,
+                            }}>
+                                <CalendarDays size={26} color="var(--primary)" />
+                            </div>
+                            <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                {histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`}
+                            </p>
+                            {histFilter === 'all' && (
+                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                    Click "Request Leave" to submit your first request.
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
+                            {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
+                        </div>
+                    )}
                 </div>
+
+                {/* Pagination */}
                 {sortedRecords.length > PAGE_SIZE && (
-                    <div className="leave-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 18px', borderTop: '1px solid var(--border)' }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 20px', borderTop: '1px solid var(--border)',
+                    }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                            {Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
                         </span>
                         <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}><ChevronLeft size={14} /></button>
+                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
+                                <ChevronLeft size={13} />
+                            </button>
                             {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                                <button key={page} className={`btn btn-sm${currentPage === page ? ' btn-primary' : ''}`}
-                                    onClick={() => setCurrentPage(page)} style={{ minWidth: 30 }}>{page}</button>
+                                <button
+                                    key={page}
+                                    className={`btn btn-xs${currentPage === page ? ' btn-primary' : ''}`}
+                                    onClick={() => setCurrentPage(page)}
+                                    style={{ minWidth: 28 }}
+                                >
+                                    {page}
+                                </button>
                             ))}
-                            <button className="btn btn-sm" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}><ChevronRight size={14} /></button>
+                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
+                                <ChevronRight size={13} />
+                            </button>
                         </div>
                     </div>
                 )}
             </div>
-            {showModal && <LeaveRequestModal onClose={() => setShowModal(false)} onSubmit={handleSubmit} />}
+
+            {showModal && (
+                <LeaveRequestModal
+                    onClose={() => setShowModal(false)}
+                    onSubmit={handleSubmit}
+                />
+            )}
         </div>
     );
 };
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
-interface ProfileTabProps { user: UserProfile; onUpdateUser: (u: UserProfile) => void; }
+interface ProfileTabProps {
+    user: UserProfile;
+    onUpdateUser: (u: UserProfile) => void;
+}
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
-
-    // ── Password Gate state ──────────────────────────────────────────────────
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
     const [gateLoading, setGateLoading] = useState(false);
     const [showGatePassword, setShowGatePassword] = useState(false);
 
-    // ── Profile edit state ───────────────────────────────────────────────────
     const [editMode, setEditMode] = useState(false);
     const [pwdMode, setPwdMode] = useState(false);
     const [form, setForm] = useState({ employeeName: user.fullName, contactNumber: user.phone });
-    useEffect(() => { setForm({ employeeName: user.fullName, contactNumber: user.phone }); }, [user.fullName, user.phone]);
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
 
-    // ── Password change state ────────────────────────────────────────────────
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
     const [pwdError, setPwdError] = useState('');
     const [pwdSaving, setPwdSaving] = useState(false);
 
-    // ── "Save" clicked: validate first, then open gate ───────────────────────
+    useEffect(() => {
+        setForm({ employeeName: user.fullName, contactNumber: user.phone });
+    }, [user.fullName, user.phone]);
+
     const requestSave = () => {
-        // Run validation before showing the gate so the user fixes errors first
         if (!form.employeeName.trim()) { setProfileError('Full name is required.'); return; }
         if (form.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
             setProfileError('Enter a valid contact number.'); return;
         }
-        // Validation passed — open password gate
         setProfileError('');
         setGatePassword('');
         setGateError('');
@@ -967,13 +989,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setPasswordGate(true);
     };
 
-    // ── Gate confirmed: verify password then save ─────────────────────────────
     const handleGateConfirm = async () => {
         if (!gatePassword) { setGateError('Please enter your password.'); return; }
         setGateLoading(true);
         setGateError('');
         try {
-            // Step 1 — verify identity
             const verifyRes = await fetch('/api/profile/verify-password', {
                 method: 'POST',
                 headers: authHeader(),
@@ -983,8 +1003,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 const err = await verifyRes.json().catch(() => ({}));
                 throw new Error((err as any).message || 'Incorrect password. Please try again.');
             }
-
-            // Step 2 — identity confirmed, now save the profile
             setPasswordGate(false);
             setGatePassword('');
             await performSave();
@@ -995,7 +1013,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         }
     };
 
-    // ── Actual API save (called only after password is verified) ─────────────
     const performSave = async () => {
         setProfileSaving(true);
         setProfileError('');
@@ -1027,7 +1044,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         }
     };
 
-    // ── Cancel edit ──────────────────────────────────────────────────────────
     const handleCancelEdit = () => {
         setEditMode(false);
         setPwdMode(false);
@@ -1040,7 +1056,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setProfileError('');
     };
 
-    // ── Change password ──────────────────────────────────────────────────────
     const handleChangePwd = async () => {
         setPwdError('');
         if (!pwd.current) { setPwdError('Current password is required.'); return; }
@@ -1057,7 +1072,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 const err = await res.json().catch(() => ({}));
                 throw new Error((err as any).message || 'Password update failed.');
             }
-            alert('Password changed successfully!');
             setPwdMode(false);
             setPwd({ current: '', next: '', confirm: '' });
         } catch (err: any) {
@@ -1067,39 +1081,28 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         }
     };
 
-    const toggleShow = (k: keyof typeof showPwd) => setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
+    const toggleShow = (k: keyof typeof showPwd) =>
+        setShowPwd(prev => ({ ...prev, [k]: !prev[k] }));
+
     const initials = getInitials(user.fullName);
 
     return (
         <div className="tab-content">
 
-            {/* ── Password Gate Modal ─────────────────────────────────────── */}
+            {/* Password Gate Modal */}
             {passwordGate && (
                 <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
-                    <div
-                        className="modal-card"
-                        onClick={e => e.stopPropagation()}
-                        style={{ maxWidth: 400 }}
-                    >
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
                         <div className="modal-head">
                             <div>
                                 <h3>Confirm Your Identity</h3>
                                 <p className="modal-sub">Enter your password to save your profile changes.</p>
                             </div>
-                            <button
-                                className="icon-btn"
-                                onClick={() => setPasswordGate(false)}
-                                aria-label="Close"
-                            >
+                            <button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close">
                                 <X size={16} />
                             </button>
                         </div>
-
-                        {/* Lock icon + description */}
-                        <div style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            padding: '8px 0 16px', gap: 8,
-                        }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
                             <div style={{
                                 width: 52, height: 52, borderRadius: '50%',
                                 background: 'rgba(67,24,255,0.1)',
@@ -1107,20 +1110,15 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             }}>
                                 <Lock size={22} color="var(--primary)" />
                             </div>
-                            <p style={{
-                                fontSize: 13, color: 'var(--text-secondary)',
-                                textAlign: 'center', margin: 0,
-                            }}>
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
                                 For your security, please verify your identity before saving changes.
                             </p>
                         </div>
-
                         {gateError && (
                             <div className="form-api-error" style={{ marginBottom: 12 }}>
                                 <AlertCircle size={14} /><span>{gateError}</span>
                             </div>
                         )}
-
                         <div className="field" style={{ marginBottom: 20 }}>
                             <label>Password</label>
                             <div style={{ position: 'relative' }}>
@@ -1148,20 +1146,9 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                 </button>
                             </div>
                         </div>
-
                         <div className="modal-actions">
-                            <button
-                                className="btn"
-                                onClick={() => setPasswordGate(false)}
-                                disabled={gateLoading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleGateConfirm}
-                                disabled={gateLoading || !gatePassword}
-                            >
+                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
                                 {gateLoading
                                     ? <><Loader2 size={13} className="spin" /> Verifying…</>
                                     : <><Shield size={13} /> Confirm & Save</>
@@ -1172,14 +1159,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 </div>
             )}
 
-            {/* ── Success toast ───────────────────────────────────────────── */}
+            {/* Success toast */}
             {profileSuccess && (
                 <div className="toast-success">
                     <CheckCircle2 size={16} /> Profile updated successfully
                 </div>
             )}
 
-            {/* ── Profile Hero Card ───────────────────────────────────────── */}
+            {/* Profile Hero */}
             <div className="profile-hero card">
                 <div className="ph-avatar">{initials}</div>
                 <div className="ph-info">
@@ -1202,7 +1189,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         </span>
                     </div>
                 </div>
-                {/* Edit toggle — no gate here, gate fires on Save */}
                 <button
                     className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
                     onClick={editMode ? handleCancelEdit : () => { setEditMode(true); setProfileSuccess(false); }}
@@ -1211,20 +1197,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 </button>
             </div>
 
-            {/* ── Main profile grid ───────────────────────────────────────── */}
             <div className="profile-grid">
-
                 {/* Basic Information */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Basic Information</h3>
                         {editMode && (
-                            // Save button opens password gate (after client validation)
-                            <button
-                                className="btn btn-primary"
-                                onClick={requestSave}
-                                disabled={profileSaving}
-                            >
+                            <button className="btn btn-primary" onClick={requestSave} disabled={profileSaving}>
                                 {profileSaving
                                     ? <><Loader2 size={13} className="spin" /> Saving…</>
                                     : <><Save size={13} /> Save</>
@@ -1247,39 +1226,31 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         </div>
                         <div className="info-field">
                             <label>Full Name</label>
-                            {editMode
-                                ? <div className="if-input-wrap">
+                            {editMode ? (
+                                <div className="if-input-wrap">
                                     <span className="if-icon"><User size={15} /></span>
-                                    <input
-                                        type="text"
-                                        value={form.employeeName}
-                                        onChange={setF('employeeName')}
-                                        placeholder="Enter full name"
-                                    />
+                                    <input type="text" value={form.employeeName} onChange={setF('employeeName')} placeholder="Enter full name" />
                                 </div>
-                                : <div className="if-value">
+                            ) : (
+                                <div className="if-value">
                                     <span className="if-icon"><User size={15} /></span>
                                     <span>{user.fullName || '—'}</span>
                                 </div>
-                            }
+                            )}
                         </div>
                         <div className="info-field">
                             <label>Contact Number</label>
-                            {editMode
-                                ? <div className="if-input-wrap">
+                            {editMode ? (
+                                <div className="if-input-wrap">
                                     <span className="if-icon"><Phone size={15} /></span>
-                                    <input
-                                        type="tel"
-                                        value={form.contactNumber}
-                                        onChange={setF('contactNumber')}
-                                        placeholder="e.g. +63 917 000 0000"
-                                    />
+                                    <input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. +63 917 000 0000" />
                                 </div>
-                                : <div className="if-value">
+                            ) : (
+                                <div className="if-value">
                                     <span className="if-icon"><Phone size={15} /></span>
                                     <span>{user.phone || '—'}</span>
                                 </div>
-                            }
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1337,11 +1308,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                                             : 'Re-enter new password'
                                                 }
                                             />
-                                            <button
-                                                className="pwd-toggle"
-                                                onClick={() => toggleShow(k)}
-                                                tabIndex={-1}
-                                            >
+                                            <button className="pwd-toggle" onClick={() => toggleShow(k)} tabIndex={-1}>
                                                 {showPwd[k] ? <EyeOff size={14} /> : <Eye size={14} />}
                                             </button>
                                         </div>
@@ -1397,6 +1364,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeDashboard() {
+    const navigate = useNavigate();
+
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
     const [tasksLoading, setTasksLoading] = useState(true);
@@ -1405,21 +1374,7 @@ export default function EmployeeDashboard() {
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
-
-    const fetchLeaveRecords = async () => {
-        setLeaveLoading(true);
-        try {
-            const res = await fetch('/api/leaverequest/my-leave-requests', { headers: authHeader() });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data: any[] = await res.json();
-            setLeaveRecords(data.map(dtoToLeaveRecord));
-        } catch (err) {
-            console.warn('Could not load leave records:', err);
-            setLeaveRecords([]);
-        } finally {
-            setLeaveLoading(false);
-        }
-    };
+    const [loadingUser, setLoadingUser] = useState(true);
 
     const [user, setUser] = useState<UserProfile>({
         employeeId: localStorage.getItem('employeeId') ?? '',
@@ -1428,15 +1383,13 @@ export default function EmployeeDashboard() {
         role: localStorage.getItem('role') ?? '',
         accountStatus: 'Active',
     });
-    const [loadingUser, setLoadingUser] = useState(true);
-    const navigate = useNavigate();
 
     const handleLogout = async () => {
         const token = localStorage.getItem('authToken');
         if (token) {
             await fetch('/api/authentication/logout', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
             }).catch(() => { });
         }
         ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'contactNumber', 'role']
@@ -1444,32 +1397,9 @@ export default function EmployeeDashboard() {
         navigate('/');
     };
 
-    useEffect(() => {
-        const token = localStorage.getItem('authToken');
-        const employeeId = localStorage.getItem('employeeId');
-        if (!token || !employeeId) { setLoadingUser(false); return; }
-        fetch('/api/profile/view-profile', { headers: authHeader() })
-            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-            .then((data: any) => {
-                const fetched: UserProfile = {
-                    employeeId: data.employeeNumber ?? employeeId,
-                    fullName: data.employeeName ?? localStorage.getItem('employeeName') ?? '',
-                    phone: data.contactNumber ?? localStorage.getItem('contactNumber') ?? '',
-                    role: data.role ?? localStorage.getItem('role') ?? '',
-                    accountStatus: data.accountStatus ?? 'Active',
-                    presenceStatus: data.presenceStatus ?? 'Offline',
-                };
-                setUser(fetched);
-                localStorage.setItem('employeeName', fetched.fullName);
-                localStorage.setItem('contactNumber', fetched.phone);
-                localStorage.setItem('role', fetched.role);
-            })
-            .catch(err => console.warn('Could not fetch profile:', err))
-            .finally(() => setLoadingUser(false));
-    }, []);
-
     const fetchTasks = async () => {
-        setTasksLoading(true); setTasksError('');
+        setTasksLoading(true);
+        setTasksError('');
         try {
             const res = await fetch('/api/task/my-tasks', { headers: authHeader() });
             if (res.status === 401) { handleLogout(); return; }
@@ -1486,7 +1416,45 @@ export default function EmployeeDashboard() {
         }
     };
 
+    const fetchLeaveRecords = async () => {
+        setLeaveLoading(true);
+        try {
+            const res = await fetch('/api/leaverequest/my-leave-requests', { headers: authHeader() });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data: any[] = await res.json();
+            setLeaveRecords(data.map(dtoToLeaveRecord));
+        } catch (err) {
+            console.warn('Could not load leave records:', err);
+            setLeaveRecords([]);
+        } finally {
+            setLeaveLoading(false);
+        }
+    };
+
     useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        const employeeId = localStorage.getItem('employeeId');
+        if (!token || !employeeId) { setLoadingUser(false); return; }
+
+        fetch('/api/profile/view-profile', { headers: authHeader() })
+            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+            .then((data: any) => {
+                const fetched: UserProfile = {
+                    employeeId: data.employeeNumber ?? employeeId,
+                    fullName: data.employeeName ?? localStorage.getItem('employeeName') ?? '',
+                    phone: data.contactNumber ?? localStorage.getItem('contactNumber') ?? '',
+                    role: data.role ?? localStorage.getItem('role') ?? '',
+                    accountStatus: data.accountStatus ?? 'Active',
+                    presenceStatus: data.presenceStatus ?? 'Offline',
+                };
+                setUser(fetched);
+                localStorage.setItem('employeeName', fetched.fullName);
+                localStorage.setItem('contactNumber', fetched.phone);
+                localStorage.setItem('role', fetched.role);
+            })
+            .catch(err => console.warn('Could not fetch profile:', err))
+            .finally(() => setLoadingUser(false));
+
         fetchTasks();
         fetchLeaveRecords();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1496,25 +1464,33 @@ export default function EmployeeDashboard() {
         pending: 'Pending', 'in-progress': 'In Progress', completed: 'Completed', overdue: 'In Progress',
     }[status]);
 
-    const handleSaveProgress = async (id: string, status: TaskStatus, progress: number, remarks: string): Promise<void> => {
+    const handleSaveProgress = async (
+        id: string, status: TaskStatus, progress: number, remarks: string
+    ): Promise<void> => {
         const res = await fetch(`/api/task/${id}/progress`, {
-            method: 'PATCH', headers: authHeader(),
-            body: JSON.stringify({ TaskStatus: toBackendStatus(status), TaskRemarks: remarks.trim() || undefined }),
+            method: 'PATCH',
+            headers: authHeader(),
+            body: JSON.stringify({
+                TaskStatus: toBackendStatus(status),
+                TaskRemarks: remarks.trim() || undefined,
+            }),
         });
         if (res.status === 401) { handleLogout(); return; }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error((err as any).message || 'Failed to update task progress.');
         }
-        setTasks(ts => ts.map(t => t.id === id
-            ? { ...t, status: status === 'overdue' ? 'in-progress' : status, progress: status === 'completed' ? 100 : progress, remarks: remarks.trim() || t.remarks }
-            : t
-        ));
+        setTasks(ts => ts.map(t => t.id === id ? {
+            ...t,
+            status: status === 'overdue' ? 'in-progress' : status,
+            progress: status === 'completed' ? 100 : progress,
+            remarks: remarks.trim() || t.remarks,
+        } : t));
     };
 
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
-    const pendingLeaveCount = leaveRecords.filter(r => r.status === 'pending').length;
+    const pendingLeaveCount = leaveRecords.filter(r => r.status === 'Pending').length;
     const initials = getInitials(user.fullName);
 
     const pageTitles: Record<NavTab, string> = {
@@ -1524,7 +1500,9 @@ export default function EmployeeDashboard() {
         profile: 'My Profile',
     };
 
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const today = new Date().toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
 
     return (
         <div className="dashboard-container">
@@ -1535,7 +1513,6 @@ export default function EmployeeDashboard() {
                     <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="sidebar-logo-img" />
                 </div>
 
-                {/* Role badge — mirrors SystemAdmin */}
                 <div className="sidebar-role-section">
                     <div className="sidebar-role-badge">
                         <div className="role-dot-inner" />
@@ -1543,7 +1520,6 @@ export default function EmployeeDashboard() {
                     </div>
                 </div>
 
-                {/* Nav groups — mirrors SystemAdmin structure */}
                 <nav className="sidebar-nav">
                     {NAV_GROUPS.map(group => (
                         <div key={group.label} className="nav-section">
@@ -1565,7 +1541,6 @@ export default function EmployeeDashboard() {
                     ))}
                 </nav>
 
-                {/* Footer profile card — mirrors SystemAdmin exactly */}
                 <div className="sidebar-footer-profile">
                     <div className="profile-card">
                         <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -1577,7 +1552,7 @@ export default function EmployeeDashboard() {
                                 width: 9, height: 9, borderRadius: '50%',
                                 background: user.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
                                 border: '2px solid var(--sidebar-bg, #1b2559)',
-                                display: 'block'
+                                display: 'block',
                             }} />
                         </div>
                         <div className="profile-info">
@@ -1602,13 +1577,25 @@ export default function EmployeeDashboard() {
                 </div>
 
                 {activeTab === 'dashboard' && (
-                    <DashboardTab tasks={tasks} user={user} onView={setViewingId} onUpdate={setUpdatingId} onGoTasks={() => setActiveTab('my-tasks')} />
+                    <DashboardTab
+                        tasks={tasks} user={user}
+                        onView={setViewingId} onUpdate={setUpdatingId}
+                        onGoTasks={() => setActiveTab('my-tasks')}
+                    />
                 )}
                 {activeTab === 'my-tasks' && (
-                    <MyTasksTab tasks={tasks} loading={tasksLoading} error={tasksError} onView={setViewingId} onUpdate={setUpdatingId} onRetry={fetchTasks} />
+                    <MyTasksTab
+                        tasks={tasks} loading={tasksLoading} error={tasksError}
+                        onView={setViewingId} onUpdate={setUpdatingId}
+                        onRetry={fetchTasks}
+                    />
                 )}
                 {activeTab === 'leave' && (
-                    <LeaveTab records={leaveRecords} onNewRecord={r => setLeaveRecords(prev => [r, ...prev])} />
+                    <LeaveTab
+                        records={leaveRecords}
+                        loading={leaveLoading}
+                        onNewRecord={r => setLeaveRecords(prev => [r, ...prev])}
+                    />
                 )}
                 {activeTab === 'profile' && (
                     <ProfileTab user={user} onUpdateUser={setUser} />
@@ -1624,7 +1611,11 @@ export default function EmployeeDashboard() {
                 />
             )}
             {updatingTask && (
-                <ProgressModal task={updatingTask} onSave={handleSaveProgress} onClose={() => setUpdatingId(null)} />
+                <ProgressModal
+                    task={updatingTask}
+                    onSave={handleSaveProgress}
+                    onClose={() => setUpdatingId(null)}
+                />
             )}
         </div>
     );

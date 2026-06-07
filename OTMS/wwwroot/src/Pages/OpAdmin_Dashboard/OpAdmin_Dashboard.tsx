@@ -24,6 +24,7 @@ import {
     Users,
     Search,
     Trash2,
+    CalendarDays,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -31,12 +32,19 @@ import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import TaskView, { TaskViewTask } from '../../components/TaskView/TaskView';
 import { useToast } from '../../components/Toast/Toast';
+import LeaveRequestModal, { LeaveRecord } from '../../components/LeaveRequestModal/LeaveRequestModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'High' | 'Medium' | 'Low';  // match backend casing
 type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
-type NavTab = 'dashboard' | 'tasks' | 'team' | 'reports' | 'profile';
+type NavTab =
+    | 'dashboard'
+    | 'tasks'
+    | 'team'
+    | 'leave'
+    | 'reports'
+    | 'profile';
 
 interface TeamMember {
     accountId: string;  
@@ -110,6 +118,7 @@ const NAV_GROUPS = [
         label: 'ACCOUNT',
         items: [
             { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
+            { tab: 'leave' as NavTab, icon: CalendarDays, label: 'Leave Requests' },
         ],
     },
 ];
@@ -527,7 +536,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
 };
 
 // ─── Modal: View Task ─────────────────────────────────────────────────────────
-
 
 interface ViewModalProps {
     task: Task;
@@ -1157,7 +1165,7 @@ function ProfileTab() {
         setGateLoading(true);
         setGateError('');
         try {
-            const verifyRes = await fetch('/api/profile/verify-password', {
+            const verifyRes = await fetch('/api/authentication/verify-password', {
                 method: 'POST',
                 headers: authHeader(),
                 body: JSON.stringify({ password: gatePassword }),
@@ -1727,6 +1735,126 @@ function ProfileTab() {
     );
 }
 
+
+// ─── Leave Requests Tab ──────────────────────────────────────────────────────────────
+
+const LeaveRequestsTab: React.FC = () => {
+    const [showLeaveModal, setShowLeaveModal] = useState(false);
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
+
+    const total = leaveRequests.length;
+    const pending = leaveRequests.filter(r => r.status === 'Pending').length;
+    const approved = leaveRequests.filter(r => r.status === 'Approved').length;
+    const declined = leaveRequests.filter(r => r.status === 'Declined').length;
+
+    return (
+        <div className="dashboard-content">
+
+            {/* ── Summary Stats ── */}
+            <div className="stats-row">
+                {[
+                    { label: 'TOTAL REQUESTS', value: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
+                    { label: 'PENDING', value: pending, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
+                    { label: 'APPROVED', value: approved, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
+                    { label: 'DECLINED', value: declined, icon: <X size={18} />, cls: 'bg-danger', sub: 'Declined' },
+                ].map(s => (
+                    <div key={s.label} className="stat-card">
+                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
+                        <div className="stat-text">
+                            <p className="stat-label">{s.label}</p>
+                            <h3 className="stat-value">{s.value}</h3>
+                            <small>{s.sub}</small>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Requests Table ── */}
+            <div className="card">
+                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <h3 style={{ margin: 0 }}>My Leave Requests</h3>
+                        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                            Submit and track your time-off requests
+                        </p>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => setShowLeaveModal(true)}>
+                        <Plus size={14} /> Request Leave
+                    </button>
+                </div>
+
+                {/* Info notice */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.14)',
+                    borderRadius: 12, padding: '10px 14px',
+                    fontSize: 12.5, color: 'var(--primary)', marginBottom: 16,
+                }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    Leave requests are reviewed by your manager within 1–2 business days.
+                </div>
+
+                {leaveRequests.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '36px 0' }}>
+                        <div style={{
+                            width: 56, height: 56, borderRadius: '50%',
+                            background: 'rgba(67,24,255,0.07)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginBottom: 8,
+                        }}>
+                            <CalendarDays size={26} color="var(--primary)" />
+                        </div>
+                        <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No leave requests yet</p>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            Click "Request Leave" to submit your first request.
+                        </span>
+                    </div>
+                ) : (
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>TYPE</th>
+                                <th>START DATE</th>
+                                <th>END DATE</th>
+                                <th>REASON</th>
+                                <th>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {leaveRequests.map((leave, i) => (
+                                <tr key={i}>
+                                    <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>{leave.leaveType}</td>
+                                    <td>{leave.startDate}</td>
+                                    <td>{leave.endDate}</td>
+                                    <td style={{ color: 'var(--text-secondary)' }}>{leave.reason}</td>
+                                    <td>
+                                        <span className={
+                                            leave.status === 'Approved' ? 'badge badge-green' :
+                                                leave.status === 'Declined' ? 'badge badge-red' :
+                                                    'badge badge-blue'
+                                        }>
+                                            {leave.status ?? 'Pending'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {showLeaveModal && (
+                <LeaveRequestModal
+                    onClose={() => setShowLeaveModal(false)}
+                    onSubmit={record => {
+                        setLeaveRequests(prev => [...prev, record]);
+                        setShowLeaveModal(false);
+                    }}
+                />
+            )}
+        </div>
+    );
+};
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function OpsAdminDashboard() {
@@ -1980,6 +2108,7 @@ export default function OpsAdminDashboard() {
         team: 'Team Management',
         reports: 'Performance Reports',
         profile: 'My Profile',
+        leave: 'Leave Requests',
     };
 
     return (
@@ -2049,7 +2178,7 @@ export default function OpsAdminDashboard() {
                         <h2>{pageTitles[activeTab]}</h2>
                         <p>Operations Admin — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     </div>
-                    {activeTab !== 'profile' && (
+                    {activeTab !== 'profile' && activeTab !== 'leave' && (
                         <div className="header-actions">
                             <div className="header-search">
                                 <Search size={15} />
@@ -2097,6 +2226,7 @@ export default function OpsAdminDashboard() {
                 )}
                 {activeTab === 'reports' && <ReportsTab tasks={tasks} teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
+                {activeTab === 'leave' && <LeaveRequestsTab />}
             </main>
 
             {/* ── Modals ── */}
