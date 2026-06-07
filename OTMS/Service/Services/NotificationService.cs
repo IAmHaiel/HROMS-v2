@@ -292,9 +292,43 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
         }
 
-        public System.Threading.Tasks.Task CreateEmergencyOverrideNotificationAsync(EmergencyOverrideRequest emergencyOverride)
+        public async System.Threading.Tasks.Task CreateEmergencyOverrideNotificationAsync(EmergencyOverrideRequest emergencyOverride)
         {
-            throw new NotImplementedException();
+            var sysAdmin = await context.Accounts
+               .Include(a => a.Employee)
+               .FirstOrDefaultAsync(a => a.Role == Roles.SystemAdmin);
+
+            if (sysAdmin == null)
+                throw new Exception("sysAdmin is not existing, cannot proceed.");
+
+            var sysAdminNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = sysAdmin.AccountId,
+                NotificationType =
+                   NotificationTypes.EmergencyOverrideCreated,
+                Message =
+                   $"{string.Join(" ", new[]
+                       {emergencyOverride.RequestedBy.Employee.FirstName, emergencyOverride.RequestedBy.Employee.MiddleName, emergencyOverride.RequestedBy.Employee.LastName, emergencyOverride.RequestedBy.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted an Emergency Override Request at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}. ",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var submitterNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = emergencyOverride.RequestedById,
+                NotificationType =
+                    NotificationTypes.LeaveRequestCreated,
+                Message =
+                    $"You submitted an Emergency Override Request at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}. ",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(sysAdminNotification);
+            await context.Notifications.AddAsync(submitterNotification);
+            await context.SaveChangesAsync();
         }
     }
 }
