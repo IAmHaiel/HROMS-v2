@@ -70,7 +70,13 @@ namespace OTMS.Service.Services
                 throw new OnLeaveException(
                     employee.Account?.AccountId ?? Guid.Empty
                     , activeLeave?.LeaveId ?? Guid.Empty
-                    , employee.EmployeeName ?? string.Empty);
+                    , string.Join(" ", new[]
+                        {
+                            employee.FirstName ?? string.Empty,
+                            employee.MiddleName ?? string.Empty,
+                            employee.LastName ?? string.Empty,
+                            employee.Suffix ?? string.Empty
+                        }.Where(x => !string.IsNullOrWhiteSpace(x))));
             }
 
             var verificationResult =
@@ -108,7 +114,8 @@ namespace OTMS.Service.Services
                 await activityLogService.LogActivityAsync(
                     employee.Account.AccountId,
                     ActivityTypes.Login,
-                    $"[Emergency Overriden] {employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
+                    $"[Emergency Overriden] {string.Join(" ", new[]
+                        {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
                     );
 
                 employee.Account.FailedLoginAttempts = 0;
@@ -124,7 +131,8 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 employee.Account.AccountId,
                 ActivityTypes.Login,
-                $"{employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
+                $"{string.Join(" ", new[]
+                    {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
                 );
 
             employee.Account.FailedLoginAttempts = 0;
@@ -179,7 +187,10 @@ namespace OTMS.Service.Services
             {
                 EmployeeId = Guid.NewGuid(),
                 EmployeeNumber = request.EmployeeNumber,
-                EmployeeName = request.EmployeeName.Trim(),
+                FirstName = request.FirstName.Trim(),
+                MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName,
+                LastName = request.LastName.Trim(),
+                Suffix = string.IsNullOrWhiteSpace(request.Suffix) ? null : request.Suffix,
                 ContactNumber = request.ContactNumber.Trim(),
                 CreatedAt = DateTime.UtcNow,
 
@@ -242,7 +253,10 @@ namespace OTMS.Service.Services
             return new EmployeeRegisterResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                EmployeeName = employee.EmployeeName ?? string.Empty,
+                FirstName = employee.FirstName ?? string.Empty,
+                MiddleName = employee.MiddleName ?? null,
+                LastName = employee.LastName ?? string.Empty,
+                Suffix = employee.Suffix ?? null,
                 ContactNumber = employee.ContactNumber ?? string.Empty,
                 Role = account.Role ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
@@ -366,7 +380,10 @@ namespace OTMS.Service.Services
                 AccessToken = CreateToken(employee),
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
                 Role = employee.Account.Role ?? string.Empty,
-                EmployeeName = employee.EmployeeName ?? string.Empty,
+                FirstName = employee.FirstName ?? string.Empty,
+                MiddleName = employee.MiddleName ?? null,
+                LastName = employee.LastName ?? string.Empty,
+                Suffix = employee.Suffix ?? null,
                 IsPasswordChanged = employee.Account.IsPasswordChanged
             };
         }
@@ -506,7 +523,8 @@ namespace OTMS.Service.Services
                         employee.Email,
                             "Change Password for Operational Management System Account",
                             $"""
-                            Welcome {employee.EmployeeName} to the Operational Management System.
+                            Welcome {string.Join(" ", new[]
+                                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} to the Operational Management System.
 
                             Please click the link below to reset your password, the link last 15 minutes:
 
