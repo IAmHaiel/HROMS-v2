@@ -3,7 +3,6 @@
     public class UpdateEmployeeDTO
     {
         public string EmployeeNumber { get; set; } = String.Empty;
-        public string EmployeeName { get; set; } = String.Empty;
         public string FirstName { get; set; } = String.Empty;
         public string? MiddleName { get; set; } = String.Empty;
         public string LastName { get; set; } = String.Empty;

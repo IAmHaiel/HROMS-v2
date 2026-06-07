@@ -227,8 +227,10 @@ namespace OTMS.Service.Services
                 {
                     EmployeeNumber = e.EmployeeNumber,
                     
-                    EmployeeName = string.Join(" ", new[]
-                    {e.FirstName, e.MiddleName, e.LastName, e.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    FirstName = e.FirstName,
+                    MiddleName = e.MiddleName,
+                    LastName = e.LastName,
+                    Suffix = e.Suffix,
                     
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role ?? "No Account",
@@ -280,8 +282,12 @@ namespace OTMS.Service.Services
                 return new RecentEmployeesResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    EmployeeName = string.Join(" ", new[]
-                    {e.FirstName, e.MiddleName, e.LastName, e.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+
+                    FirstName = e.FirstName,
+                    MiddleName = e.MiddleName,
+                    LastName = e.LastName,
+                    Suffix = e.Suffix,
+
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
@@ -334,8 +340,10 @@ namespace OTMS.Service.Services
             return new SearchUserResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                EmployeeName = string.Join(" ", new[]
-                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                FirstName = employee.FirstName,
+                MiddleName = employee.MiddleName,
+                LastName = employee.LastName,
+                Suffix = employee.Suffix,
                 Role = employee.Account.Role,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
@@ -395,13 +403,10 @@ namespace OTMS.Service.Services
             return new UpdateEmployeeResponseDTO
             {
                 EmployeeNumber = request.EmployeeNumber,
-                EmployeeName = string.Join(" ", new[]
-                {
-                    request.FirstName ?? employee.FirstName,
-                    request.MiddleName ?? employee.MiddleName,
-                    request.LastName ?? employee.LastName,
-                    request.Suffix ?? employee.Suffix
-                }.Where(x => !string.IsNullOrWhiteSpace(x))),
+                FirstName = request.FirstName ?? employee.FirstName,
+                MiddleName = request.MiddleName ?? employee.MiddleName,
+                LastName = request.LastName ?? employee.LastName,
+                Suffix = request.Suffix ?? employee.Suffix,
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Success = true
             };
