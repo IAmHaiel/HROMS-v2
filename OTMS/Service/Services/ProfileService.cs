@@ -111,8 +111,17 @@ namespace OTMS.Service.Services
             if (profile is null && profile.Account is null)
                 return null;
 
-            if (request.EmployeeName == "string" || String.IsNullOrEmpty(request.EmployeeName))
-                request.EmployeeName = profile.EmployeeName;
+            if (request.FirstName == "string" || String.IsNullOrEmpty (request.FirstName))
+                request.FirstName = profile.FirstName;
+
+            if (request.MiddleName == "string" || String.IsNullOrEmpty(request.MiddleName))
+                request.MiddleName = profile.MiddleName;
+
+            if (request.LastName == "string" || String.IsNullOrEmpty(request.LastName))
+                request.LastName = profile.LastName;
+
+            if (request.Suffix == "string" || String.IsNullOrEmpty(request.Suffix))
+                request.Suffix = profile.Suffix;
 
             if (request.ContactNumber == "string" || String.IsNullOrEmpty(request.ContactNumber))
                 request.ContactNumber = profile.ContactNumber;
@@ -121,7 +130,10 @@ namespace OTMS.Service.Services
             request.ContactNumber = GeneralHelper.ContactNumberFormatter(request.ContactNumber);
 
             // Save the updated information to the database
-            profile.EmployeeName = request.EmployeeName;
+            profile.FirstName = request.FirstName;
+            profile.MiddleName = request.MiddleName;
+            profile.LastName = request.LastName;
+            profile.Suffix = request.Suffix;
             profile.ContactNumber = request.ContactNumber;
             profile.UpdatedAt = DateTime.UtcNow;
 
@@ -130,7 +142,10 @@ namespace OTMS.Service.Services
             return new UpdateInformationResponseDTO
             {
                 EmployeeNumber = profile.EmployeeNumber,
-                EmployeeName = request.EmployeeName,
+                FirstName = profile.FirstName,
+                MiddleName = profile.MiddleName,
+                LastName = profile.LastName,
+                Suffix = profile.Suffix,
                 ContactNumber = request.ContactNumber,
                 UpdatedAt = profile.UpdatedAt.Value,
                 Success = true
@@ -172,7 +187,10 @@ namespace OTMS.Service.Services
             return new ViewProfileResponseDTO
             {
                 EmployeeNumber = profile.EmployeeNumber,
-                EmployeeName = profile.EmployeeName,
+                FirstName = profile.FirstName,
+                MiddleName = profile.MiddleName,
+                LastName = profile.LastName,
+                Suffix = profile.Suffix,
                 ContactNumber = profile.ContactNumber,
                 AccountStatus = profile.Account.AccountStatus,
                 Role = profile.Account.Role,
