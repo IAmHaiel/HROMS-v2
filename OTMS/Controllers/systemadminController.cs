@@ -26,14 +26,14 @@ namespace OTMS.Controllers
         /// <param name="request"></param>
         /// <returns></returns>
         [AllowAnonymous]
-        [HttpGet]
+        [HttpPost("create-account")]
         [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
         public async Task<IActionResult> InitializeSystemAdminAccount([FromBody] SystemAdminCreationDTO request)
         {
             try
             {
                 // Checks if there is an existing System Admin Account in the System.
-                await systemAdminService.CheckSystemAdminExistence(request.Email);
+                await systemAdminService.CheckSystemAdminExistence();
 
                 if (string.IsNullOrEmpty(request.Email))
                     return BadRequest(new ApiResponseDTO<object>
