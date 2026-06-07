@@ -4,7 +4,6 @@
     {
         public Guid EmployeeId { get; set; }
         public string EmployeeNumber { get; set; } = string.Empty;
-        public string EmployeeName { get; set; } = string.Empty;
 
         // Names
         public string FirstName { get; set; } = string.Empty;
