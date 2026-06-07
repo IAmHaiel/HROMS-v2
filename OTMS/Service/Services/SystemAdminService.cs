@@ -24,19 +24,19 @@ namespace OTMS.Service.Services
             return;
         }
 
-        public async Task<ApiResponseDTO<object>> CreateSystemAdminAccount(string Email, string Password)
+        public async Task<ApiResponseDTO<object>> CreateSystemAdminAccount(SystemAdminCreationDTO request)
         {
-            if (string.IsNullOrEmpty(Email) || string.IsNullOrEmpty(Password))
+            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
                 throw new Exception("Email or Password is invalid or empty.");
 
-            if (Password.Length < PasswordLength.MinimumLength ||
-                Password.Length > PasswordLength.MaximumLength)
+            if (request.Password.Length < PasswordLength.MinimumLength ||
+                request.Password.Length > PasswordLength.MaximumLength)
                 throw new InvalidOperationException("Password must be at least 15 to 64 characters long.");
 
             var employee = new Employee
             {
                 EmployeeId = Guid.NewGuid(),
-                EmployeeNumber = Email,
+                EmployeeNumber = request.Email,
                 FirstName = string.Empty,
                 MiddleName = null,
                 LastName = string.Empty,
@@ -69,7 +69,7 @@ namespace OTMS.Service.Services
                 IsPasswordChanged = false
             };
 
-            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, Password);
+            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, request.Password);
             employee.Account = account;
 
             context.Employees.Add(employee);
@@ -85,7 +85,7 @@ namespace OTMS.Service.Services
                         employee.Email,
                             "Verify your Operational Management System Account",
                             $"""
-                            Hello System Admin!
+                            Hello, System Admin!
 
                             Welcome to the Operational Management System.
                             Please verify your System Admin account by clicking the link below:
@@ -99,7 +99,7 @@ namespace OTMS.Service.Services
             return new ApiResponseDTO<object>
             {
                 IsSuccess = true,
-                Message = $"Email Verification sent to {Email}. Please check you inbox.",
+                Message = $"Email Verification sent to {request.Email}. Please check you inbox.",
                 Data = null
             };
 

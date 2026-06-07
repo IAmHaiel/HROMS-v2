@@ -23,20 +23,19 @@ namespace OTMS.Controllers
         /// <summary>
         /// Initializes the System Admin Account by Registering the Email and Password to the System.
         /// </summary>
-        /// <param name="Email"></param>
-        /// <param name="Password"></param>
+        /// <param name="request"></param>
         /// <returns></returns>
         [AllowAnonymous]
         [HttpGet]
         [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
-        public async Task<IActionResult> InitializeSystemAdminAccount([FromBody] string Email, [FromBody] string Password)
+        public async Task<IActionResult> InitializeSystemAdminAccount([FromBody] SystemAdminCreationDTO request)
         {
             try
             {
                 // Checks if there is an existing System Admin Account in the System.
-                await systemAdminService.CheckSystemAdminExistence(Email);
+                await systemAdminService.CheckSystemAdminExistence(request.Email);
 
-                if (string.IsNullOrEmpty(Email))
+                if (string.IsNullOrEmpty(request.Email))
                     return BadRequest(new ApiResponseDTO<object>
                     {
                         IsSuccess = false,
@@ -44,7 +43,7 @@ namespace OTMS.Controllers
                         Data = null
                     });
 
-                if (string.IsNullOrEmpty(Password))
+                if (string.IsNullOrEmpty(request.Password))
                     return BadRequest(new ApiResponseDTO<object>
                     {
                         IsSuccess = false,
@@ -52,7 +51,7 @@ namespace OTMS.Controllers
                         Data = null
                     });
 
-                var result = await systemAdminService.CreateSystemAdminAccount(Email, Password);
+                var result = await systemAdminService.CreateSystemAdminAccount(request);
                 return Ok(result);
             }
             catch (Exception ex)
