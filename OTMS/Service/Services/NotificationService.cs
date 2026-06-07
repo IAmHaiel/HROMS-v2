@@ -37,7 +37,7 @@ namespace OTMS.Service.Services
             var notification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo, // EmployeeId = AccountId
+                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's AccountId
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskAssigned,
@@ -147,6 +147,40 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             return true;
+        }
+
+        public async System.Threading.Tasks.Task CreateTaskUpdateNotificationAsync(Entities.Models.Task task)
+        {
+            var creatorNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy, // EmployeeId = Creator's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"You updated the task: '{task.TaskTitle}'.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var assigneeNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"{string.Join(" ", new[]
+                        {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}'.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(creatorNotification);
+            await context.Notifications.AddAsync(assigneeNotification);
+            await context.SaveChangesAsync();
         }
     }
 }

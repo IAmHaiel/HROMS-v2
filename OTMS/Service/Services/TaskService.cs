@@ -147,6 +147,10 @@ namespace OTMS.Service.Services
                 .Include(a => a.Employee)
                 .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
 
+            // Integrate Notification
+            await notificationService
+                .CreateTaskUpdateNotificationAsync(task);
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
