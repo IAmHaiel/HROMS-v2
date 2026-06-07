@@ -5,7 +5,10 @@
         public Guid LeaveId { get; set; }
         public Guid AccountId { get; set; }
         public string EmployeeNumber { get; set; } = string.Empty;
-        public string EmployeeName { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string? MiddleName { get; set; } = null;
+        public string LastName { get; set; } = string.Empty;
+        public string? Suffix { get; set; } = null;
         public string Role { get; set; } = string.Empty;
         public DateTime Start_Date { get; set; }
         public DateTime End_Date { get; set; }
