@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NETCore.MailKit.Extensions;
 using NETCore.MailKit.Infrastructure.Internal;
+using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.Models;
@@ -156,79 +157,14 @@ builder.Services.AddMailKit(config =>
         Server = "smtp.gmail.com",
         Port = 587,
         SenderName = "Operational Management System",
-        SenderEmail = "mikhjnelo@gmail.com",
-        Account = "mikhjnelo@gmail.com",
-        Password = "yzqn vcvw kwcd cdij",
+        SenderEmail = "operationalmanagementsystemoms@gmail.com",
+        Account = "operationalmanagementsystemoms@gmail.com",
+        Password = "fmda mprv nlga haxq",
         Security = true
     });
 });
 
-static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext context)
-{
-    const string employeeNumber = "SPDX-SPR-01";
-
-    // Check if the system admin already exists
-    var exists = await context.Employees
-        .Include(e => e.Account)
-        .AnyAsync(e => e.EmployeeNumber == employeeNumber);
-
-    if (exists)
-        return;
-
-    // Create the system admin employee
-    var employee = new Employee
-    {
-        EmployeeId = Guid.NewGuid(),
-        EmployeeNumber = employeeNumber,
-        FirstName = "System Admin",
-        MiddleName = null,
-        LastName = string.Empty,
-        Suffix = null,
-        ContactNumber = string.Empty,
-        CreatedAt = DateTime.UtcNow,
-        Email = string.Empty,
-        IsEmailVerified = true
-    };
-
-    var account = new Account
-    {
-        AccountId = Guid.NewGuid(),
-        EmployeeId = employee.EmployeeId, // FK
-        Role = Roles.SystemAdmin,
-        AccountStatus = "Active",
-        CreatedAt = DateTime.UtcNow
-    };
-
-    // Hash Password
-    var passwordHasher = new PasswordHasher<Account>();
-    account.PasswordHash = passwordHasher.HashPassword(
-        account,
-        "SuperAdmin123"
-        );
-
-    // Link navigation
-    employee.Account = account;
-
-    // Save
-    context.Employees.Add(employee);
-    context.Accounts.Add(account);
-
-    await context.SaveChangesAsync();
-}
-
 var app = builder.Build();
-
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-
-    var context = services.GetRequiredService<OTMSDbContext>();
-
-    // Apply migrations automatically
-    context.Database.Migrate();
-
-    await SeedSystemAdminAsync(context);
-}
 
 if (app.Environment.IsDevelopment())
 {

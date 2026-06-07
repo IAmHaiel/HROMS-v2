@@ -17,8 +17,54 @@ namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class systemadminController(IAccountManagementService accountManagementService) : ControllerBase
+    public class systemadminController(IAccountManagementService accountManagementService, ISystemAdminService systemAdminService) : ControllerBase
     {
+
+        /// <summary>
+        /// Initializes the System Admin Account by Registering the Email and Password to the System.
+        /// </summary>
+        /// <param name="Email"></param>
+        /// <param name="Password"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        [HttpGet]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
+        public async Task<IActionResult> InitializeSystemAdminAccount([FromBody] string Email, [FromBody] string Password)
+        {
+            try
+            {
+                // Checks if there is an existing System Admin Account in the System.
+                await systemAdminService.CheckSystemAdminExistence(Email);
+
+                if (string.IsNullOrEmpty(Email))
+                    return BadRequest(new ApiResponseDTO<object>
+                    {
+                        IsSuccess = false,
+                        Message = "The Email field is empty.",
+                        Data = null
+                    });
+
+                if (string.IsNullOrEmpty(Password))
+                    return BadRequest(new ApiResponseDTO<object>
+                    {
+                        IsSuccess = false,
+                        Message = "The Password field is empty.",
+                        Data = null
+                    });
+
+                var result = await systemAdminService.CreateSystemAdminAccount(Email, Password);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
 
         /// <summary>
         /// Get the Recent Employees from the System. Only accessible to users with the "SystemAdmin" role.
