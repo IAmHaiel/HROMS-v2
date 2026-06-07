@@ -8,6 +8,7 @@ using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
+using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
@@ -174,8 +175,10 @@ namespace OTMS.Controllers
                         Priority = t.Priority,
                         DueAt = t.DueAt,
                         TaskStatus = t.TaskStatus,
-                        AssignedEmployee = t.Assignee.Employee.EmployeeName,
-                        CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                        AssignedEmployee = string.Join(" ", new[]
+                            {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                        CreatedByEmployee = string.Join(" ", new[]
+                            {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                         CreatedAt = t.CreatedAt
                     }).ToListAsync();
 

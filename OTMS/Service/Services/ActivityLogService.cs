@@ -62,7 +62,12 @@ namespace OTMS.Service.Services
             return new PresenceResponseDTO
             {
                 accountId = account.AccountId,
-                employeeName = account.Employee.EmployeeName,
+
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
                 presenceStatus = isOnline ? "Online" : "Offline",
                 lastSeen = lastSeen
             };
@@ -93,7 +98,12 @@ namespace OTMS.Service.Services
             {
                 ActivityLogId = activityLog.ActivityLogId,
                 AccountId = AccountId,
-                EmployeeName = account.Employee.EmployeeName,
+                
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
                 ActivityType = activityLog.ActivityType,
                 Description = activityLog.Description,
                 CreatedAt = activityLog.CreatedAt

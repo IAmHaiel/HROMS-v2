@@ -5,8 +5,10 @@ using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
+using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
@@ -104,8 +106,10 @@ namespace OTMS.Service.Services
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
 
-                AssignedEmployee = assignedAccount.Employee.EmployeeName,
-                CreatedByEmployee = creatorAccount.Employee.EmployeeName,
+                AssignedEmployee = string.Join(" ", new[]
+                    {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),   
 
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
@@ -152,10 +156,16 @@ namespace OTMS.Service.Services
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
 
-                AssignedEmployee = assignedAccount?.Employee.EmployeeName ?? "",
+                AssignedEmployee = string.Join(" ", new[]
+                                        {
+                                            assignedAccount?.Employee.FirstName,
+                                            assignedAccount?.Employee.MiddleName,
+                                            assignedAccount?.Employee.LastName,
+                                            assignedAccount?.Employee.Suffix
+                                        }.Where(n => !string.IsNullOrEmpty(n))),
 
-                CreatedByEmployee = task.Creator.Employee.EmployeeName,
-
+                CreatedByEmployee = string.Join(" ", new[]
+                                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
@@ -196,9 +206,11 @@ namespace OTMS.Service.Services
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
 
-                AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                AssignedEmployee = string.Join(" ", new[]
+                                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
 
-                CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                CreatedByEmployee = string.Join(" ", new[]
+                                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
 
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
@@ -285,7 +297,8 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 loggedInAccountId,
                 "Task Progress Update",
-                $"{task.Assignee.Employee.EmployeeName} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
+                $"{string.Join(" ", new[]
+                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
 
             return new TaskResponseDTO
             {
@@ -296,9 +309,11 @@ namespace OTMS.Service.Services
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
 
-                AssignedEmployee = task.Assignee.Employee.EmployeeName,
+                AssignedEmployee = string.Join(" ", new[]
+                                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
 
-                CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                CreatedByEmployee = string.Join(" ", new[]
+                                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
 
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
@@ -368,8 +383,11 @@ namespace OTMS.Service.Services
                     Priority = t.Priority,
                     DueAt = t.DueAt,
                     TaskStatus = t.TaskStatus,
-                    AssignedEmployee = t.Assignee.Employee.EmployeeName,
-                    CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                    AssignedEmployee = string.Join(" ", new[]
+                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+
+                    CreatedByEmployee = string.Join(" ", new[]
+                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                     CreatedAt = t.CreatedAt,
                     IsDeleted = t.Deleted
                 }).ToListAsync();
@@ -441,8 +459,11 @@ namespace OTMS.Service.Services
                     Priority = task.Priority,
                     DueAt = task.DueAt,
                     TaskStatus = task.TaskStatus,
-                    AssignedEmployee = task.Assignee.Employee.EmployeeName,
-                    CreatedByEmployee = task.Creator.Employee.EmployeeName,
+                    AssignedEmployee = string.Join(" ", new[]
+                                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+
+                    CreatedByEmployee = string.Join(" ", new[]
+                                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                     CreatedAt = task.CreatedAt,
                     IsDeleted = task.Deleted
                 }
@@ -485,8 +506,11 @@ namespace OTMS.Service.Services
                     Priority = t.Priority,
                     DueAt = t.DueAt,
                     TaskStatus = t.TaskStatus,
-                    AssignedEmployee = t.Assignee.Employee.EmployeeName,
-                    CreatedByEmployee = t.Creator.Employee.EmployeeName,
+                    AssignedEmployee = string.Join(" ", new[]
+                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+
+                    CreatedByEmployee = string.Join(" ", new[]
+                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                     CreatedAt = t.CreatedAt,
                     IsDeleted = t.Deleted
                 }).ToListAsync();
