@@ -12,6 +12,7 @@ using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using OTMS.Service.Services;
 using System;
+using System.Data;
 using System.Reflection;
 using System.Text;
 
@@ -179,10 +180,13 @@ static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext cont
     {
         EmployeeId = Guid.NewGuid(),
         EmployeeNumber = employeeNumber,
-        EmployeeName = "System Admin",
-        ContactNumber = "0912 671 9251",
+        FirstName = "System Admin",
+        MiddleName = null,
+        LastName = string.Empty,
+        Suffix = null,
+        ContactNumber = string.Empty,
         CreatedAt = DateTime.UtcNow,
-        Email = "test@gmail.com",
+        Email = string.Empty,
         IsEmailVerified = true
     };
 
@@ -190,7 +194,7 @@ static async System.Threading.Tasks.Task SeedSystemAdminAsync(OTMSDbContext cont
     {
         AccountId = Guid.NewGuid(),
         EmployeeId = employee.EmployeeId, // FK
-        Role = "SystemAdmin",
+        Role = Roles.SystemAdmin,
         AccountStatus = "Active",
         CreatedAt = DateTime.UtcNow
     };
