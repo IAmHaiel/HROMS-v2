@@ -48,13 +48,19 @@ namespace OTMS.Controllers
                     return Unauthorized(new
                     {
                         message = "Your account has been locked due to 3 consecutive failed login attempts. Please contact your administrator.",
-                        employeeName = employee.EmployeeName
+                        firstName = employee.FirstName,
+                        middleName = employee.MiddleName,
+                        lastName = employee.LastName,
+                        suffix = employee.Suffix
                     });
 
                 return Unauthorized(new
                 {
                     message = "Your account has been deactivated by the System Administrator. Please contact your administrator.",
-                    employeeName = employee.EmployeeName
+                    firstName = employee.FirstName,
+                    middleName = employee.MiddleName,
+                    lastName = employee.LastName,
+                    suffix = employee.Suffix
                 });
             }
 
@@ -76,7 +82,7 @@ namespace OTMS.Controllers
                 return Unauthorized(new
                 {
                     message = "Your account is currently on leave and cannot be accessed.",
-                    employeeName = ex.EmployeeName,
+                    employeeName = ex.EmployeeName, // Separated Names are already joined to one string at this point.
                     accountId = ex.AccountId,
                     leaveId = ex.LeaveId
                 });
@@ -114,7 +120,8 @@ namespace OTMS.Controllers
             await activitylogService.LogActivityAsync(
                 accountId,
                 ActivityTypes.Logout,
-                $"{account.Employee.EmployeeName} timed out at {DateTime.Now:hh:mm tt}");
+                $"{string.Join(" ", new[]
+                    {account.Employee.FirstName, account.Employee.MiddleName, account.Employee.LastName, account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed out at {DateTime.Now:hh:mm tt}");
 
             return Ok(new { message = "Logged out successfully." });
         }
