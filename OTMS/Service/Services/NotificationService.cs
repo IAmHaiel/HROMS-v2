@@ -8,6 +8,7 @@ using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
@@ -249,6 +250,51 @@ namespace OTMS.Service.Services
             await context.Notifications.AddAsync(creatorNotification);
             await context.Notifications.AddAsync(assigneeNotification);
             await context.SaveChangesAsync();
+        }
+
+        public async System.Threading.Tasks.Task CreateLeaveRequestNotificationAsync(LeaveRequest leaveRequest)
+        {
+
+            var sysAdmin = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.Role == Roles.SystemAdmin);
+
+            if (sysAdmin == null)
+                throw new Exception("sysAdmin is not existing, cannot proceed.");
+
+            var sysAdminNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = sysAdmin.AccountId,
+                NotificationType =
+                    NotificationTypes.LeaveRequestCreated,
+                Message =
+                    $"{string.Join(" ", new[]
+                        {leaveRequest.Account.Employee.FirstName, leaveRequest.Account.Employee.MiddleName, leaveRequest.Account.Employee.LastName, leaveRequest.Account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted a Leave Request at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}. ",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var submitterNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = leaveRequest.AccountId,
+                NotificationType =
+                    NotificationTypes.LeaveRequestCreated,
+                Message =
+                    $"You submitted a Leave Request at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}. ",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(sysAdminNotification);
+            await context.Notifications.AddAsync(submitterNotification);
+            await context.SaveChangesAsync();
+        }
+
+        public System.Threading.Tasks.Task CreateEmergencyOverrideNotificationAsync(EmergencyOverrideRequest emergencyOverride)
+        {
+            throw new NotImplementedException();
         }
     }
 }
