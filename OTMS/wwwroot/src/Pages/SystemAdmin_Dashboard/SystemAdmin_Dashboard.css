@@ -1162,7 +1162,8 @@ body {
     align-items: center;
     justify-content: center;
     z-index: 200;
-    padding: 16px;
+    padding: 20px 16px;
+    overflow-y: auto;
 }
 
 .modal-card {
@@ -1170,9 +1171,11 @@ body {
     padding: 26px;
     border-radius: var(--radius);
     width: 100%;
-    max-width: 480px;
+    max-width: 800px;
+    min-width: 600px;
     box-shadow: 0 20px 56px rgba(10,17,40,0.18);
     border: 1px solid var(--border);
+    margin: auto;
 }
 
 .modal-header {

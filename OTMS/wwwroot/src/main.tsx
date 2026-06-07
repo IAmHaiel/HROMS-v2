@@ -14,6 +14,7 @@ import EmployeeDetail from './Pages/employee_details/employee_detail'
 import EmailVerificationPage from './Pages/email_verification_page/email_verification_page'
 import { ToastProvider } from './components/Toast/Toast'
 import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
+import OnboardingPage from './Pages/onboarding_page/onboarding_page'
 
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
@@ -35,6 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="/account_locked" element={<AccountLocked />} />
                     <Route path="/change-password" element={<ChangePassword />} />
                     <Route path="/verify-email" element={<EmailVerificationPage />} />
+                    <Route path="/onboarding" element={<OnboardingPage />} />
 
                     {/* System Admin routes */}
                     <Route element={<ProtectedRoute allowedRoles={['System Admin', 'SystemAdmin']} />}>

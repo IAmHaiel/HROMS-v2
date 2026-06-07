@@ -54,9 +54,13 @@ type NavTab =
     | 'emergency_override'
     | 'profile';
 
+// Split name fields — employeeName is now a display-only computed value
 interface EmployeeRegisterDTO {
     employeeNumber: string;
-    employeeName: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    suffix: string;
     contactNumber: string;
     role: string;
     email: string;
@@ -64,7 +68,10 @@ interface EmployeeRegisterDTO {
 
 interface FieldError {
     employeeNumber?: string;
-    employeeName?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    suffix?: string;
     contactNumber?: string;
     role?: string;
     email?: string;
@@ -80,7 +87,12 @@ interface ActivityLog {
 
 interface RecentEmployee {
     employeeNumber: string;
+    // employeeName is a joined display string from backend; may also come as parts
     employeeName: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    suffix?: string;
     contactNumber: string;
     role: string;
     accountStatus: string;
@@ -145,36 +157,87 @@ const ITEMS_PER_PAGE = 7;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-interface FieldError {
-    employeeName?: string;
-    contactNumber?: string;
-    role?: string;
-    email?: string;
-}
+/** Build a single display name string from parts */
+const buildDisplayName = (
+    firstName: string,
+    middleName: string,
+    lastName: string,
+    suffix: string
+): string => {
+    return [firstName, middleName, lastName, suffix]
+        .map(s => s.trim())
+        .filter(Boolean)
+        .join(' ');
+};
+
+/** Get display name from a RecentEmployee (handles both split parts and joined string) */
+const getEmployeeDisplayName = (emp: RecentEmployee): string => {
+    if (emp.firstName || emp.lastName) {
+        return buildDisplayName(
+            emp.firstName ?? '',
+            emp.middleName ?? '',
+            emp.lastName ?? '',
+            emp.suffix ?? ''
+        );
+    }
+    return emp.employeeName ?? '';
+};
 
 const EMPTY_FORM: FormState = {
-    employeeNumber: '',   // will be auto-filled
-    employeeName: '',
+    employeeNumber: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    suffix: '',
     contactNumber: '',
     role: '',
     email: '',
 };
 
+// ── Name field regex: letters, spaces, hyphens, apostrophes, dots ──
+const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-.]+$/;
+
 function validate(form: FormState): FieldError {
     const errs: FieldError = {};
 
-    // ── Full Name ──
-    const name = form.employeeName.trim();
-    if (!name) {
-        errs.employeeName = 'Full name is required.';
-    } else if (name.length < 2) {
-        errs.employeeName = 'Name must be at least 2 characters.';
-    } else if (name.length > 80) {
-        errs.employeeName = 'Name must not exceed 80 characters.';
-    } else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-\.]+$/.test(name)) {
-        errs.employeeName = 'Name contains invalid characters.';
-    } else if (name.split(/\s+/).filter(Boolean).length < 2) {
-        errs.employeeName = 'Please enter both first and last name.';
+    // ── First Name ──
+    const firstName = form.firstName.trim();
+    if (!firstName) {
+        errs.firstName = 'First name is required.';
+    } else if (firstName.length < 2) {
+        errs.firstName = 'First name must be at least 2 characters.';
+    } else if (firstName.length > 50) {
+        errs.firstName = 'First name must not exceed 50 characters.';
+    } else if (!NAME_REGEX.test(firstName)) {
+        errs.firstName = 'First name contains invalid characters.';
+    }
+
+    // ── Middle Name (nullable) ──
+    const middleName = form.middleName.trim();
+    if (middleName) {
+        if (middleName.length > 50) {
+            errs.middleName = 'Middle name must not exceed 50 characters.';
+        } else if (!NAME_REGEX.test(middleName)) {
+            errs.middleName = 'Middle name contains invalid characters.';
+        }
+    }
+
+    // ── Last Name ──
+    const lastName = form.lastName.trim();
+    if (!lastName) {
+        errs.lastName = 'Last name is required.';
+    } else if (lastName.length < 2) {
+        errs.lastName = 'Last name must be at least 2 characters.';
+    } else if (lastName.length > 50) {
+        errs.lastName = 'Last name must not exceed 50 characters.';
+    } else if (!NAME_REGEX.test(lastName)) {
+        errs.lastName = 'Last name contains invalid characters.';
+    }
+
+    // ── Suffix (nullable) ──
+    const suffix = form.suffix.trim();
+    if (suffix && suffix.length > 10) {
+        errs.suffix = 'Suffix must not exceed 10 characters.';
     }
 
     // ── Contact Number ──
@@ -240,7 +303,7 @@ const getInitials = (name: string): string => {
     const cleanName = name.trim();
     const parts = cleanName.split(/\s+/);
     if (parts.length >= 2) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
     return cleanName.slice(0, 2).toUpperCase();
 };
@@ -262,7 +325,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [empNumError, setEmpNumError] = useState('');
     const { success } = useToast();
 
-    // ── Auto-generate employee number on mount ──────────────────────────────
+    // ── Auto-generate employee number on mount ──
     useEffect(() => {
         const generateEmployeeNumber = async () => {
             setEmpNumLoading(true);
@@ -277,21 +340,19 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
 
                 const employees: { employeeNumber: string }[] = Array.isArray(data) ? data : [];
 
-                // Extract all numeric parts from existing employee numbers
                 const usedNumbers = new Set(
                     employees
                         .map(e => {
-                            const match = e.employeeNumber?.match(/(\d+)$/);
-                            return match ? parseInt(match[1], 10) : null;
+                            const num = parseInt(e.employeeNumber, 10);
+                            return isNaN(num) ? null : num;
                         })
                         .filter((n): n is number => n !== null)
                 );
 
-                // Find the next available incremental number (no gaps skipped, just max + 1)
                 let next = 1;
                 while (usedNumbers.has(next)) next++;
 
-                const generated = `EMP-${String(next).padStart(4, '0')}`;
+                const generated = String(next).padStart(4, '0');
                 setForm(prev => ({ ...prev, employeeNumber: generated }));
             } catch {
                 setEmpNumError('Could not generate employee number. Please try again.');
@@ -299,19 +360,39 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 setEmpNumLoading(false);
             }
         };
-
         generateEmployeeNumber();
     }, []);
 
-    // ── Per-field live validator ──────────────────────────────────────────────
+    // ── Per-field live validator ──
     const validateField = (key: keyof FormState, value: string): string => {
         switch (key) {
-            case 'employeeName': {
-                const name = value.trim();
-                if (!name) return 'Full name is required.';
-                if (name.length < 2) return 'Name must be at least 2 characters.';
-                if (name.length > 80) return 'Name must not exceed 80 characters.';
-                if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-\.]+$/.test(name)) return 'Name contains invalid characters.';
+            case 'firstName': {
+                const v = value.trim();
+                if (!v) return 'First name is required.';
+                if (v.length < 2) return 'Must be at least 2 characters.';
+                if (v.length > 50) return 'Must not exceed 50 characters.';
+                if (!NAME_REGEX.test(v)) return 'Contains invalid characters.';
+                return '';
+            }
+            case 'middleName': {
+                const v = value.trim();
+                if (!v) return ''; // nullable
+                if (v.length > 50) return 'Must not exceed 50 characters.';
+                if (!NAME_REGEX.test(v)) return 'Contains invalid characters.';
+                return '';
+            }
+            case 'lastName': {
+                const v = value.trim();
+                if (!v) return 'Last name is required.';
+                if (v.length < 2) return 'Must be at least 2 characters.';
+                if (v.length > 50) return 'Must not exceed 50 characters.';
+                if (!NAME_REGEX.test(v)) return 'Contains invalid characters.';
+                return '';
+            }
+            case 'suffix': {
+                const v = value.trim();
+                if (!v) return ''; // nullable
+                if (v.length > 10) return 'Must not exceed 10 characters.';
                 return '';
             }
             case 'contactNumber': {
@@ -339,15 +420,12 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         }
     };
 
-    // ── Handle change with live validation ───────────────────────────────────
     const handleChange =
         (key: keyof FormState) =>
             (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
                 const value = e.target.value;
                 setForm(prev => ({ ...prev, [key]: value }));
                 setApiError('');
-
-                // Only show live error after the field has been touched
                 const errMsg = validateField(key, value);
                 setErrors(prev => ({ ...prev, [key]: errMsg || undefined }));
             };
@@ -362,7 +440,10 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             const token = localStorage.getItem('authToken');
             const payload: EmployeeRegisterDTO = {
                 employeeNumber: form.employeeNumber,
-                employeeName: form.employeeName.trim(),
+                firstName: form.firstName.trim(),
+                middleName: form.middleName.trim(),
+                lastName: form.lastName.trim(),
+                suffix: form.suffix.trim(),
                 contactNumber: form.contactNumber.trim(),
                 role: toBackendRole(form.role),
                 email: form.email.trim(),
@@ -377,11 +458,18 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 throw new Error(errorData.message || `Error ${res.status}: Registration failed`);
             }
             const data = await res.json();
+            const displayName = buildDisplayName(
+                form.firstName, form.middleName, form.lastName, form.suffix
+            );
             setSuccessData({ employeeNumber: data.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber,
-                employeeName: data.employeeName,
+                employeeName: data.employeeName ?? displayName,
+                firstName: form.firstName.trim(),
+                middleName: form.middleName.trim(),
+                lastName: form.lastName.trim(),
+                suffix: form.suffix.trim(),
                 contactNumber: payload.contactNumber,
                 role: data.role,
                 accountStatus: 'Active',
@@ -392,6 +480,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             setSubmitting(false);
         }
     };
+
+    const previewName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -412,8 +502,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                     {/* ── Account info ── */}
                     <p className="modal-section-label">Account info</p>
                     <div className="field-row">
-
-                        {/* ── Employee Number (read-only, system-generated) ── */}
+                        {/* Employee Number */}
                         <div className="field">
                             <label htmlFor="emp-number">
                                 Employee Number
@@ -466,9 +555,9 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             }
                         </div>
 
-                        {/* ── Role ── */}
+                        {/* Role */}
                         <div className="field">
-                            <label htmlFor="emp-role">Role</label>
+                            <label htmlFor="emp-role">Role <span style={{ color: 'var(--danger)' }}>*</span></label>
                             <select
                                 id="emp-role" value={form.role} onChange={handleChange('role')}
                                 className={errors.role ? 'input-error' : ''}
@@ -482,46 +571,145 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
 
                     {/* ── Personal info ── */}
                     <p className="modal-section-label" style={{ marginTop: 8 }}>Personal info</p>
-                    <div className="field">
-                        <label htmlFor="emp-name">Full Name</label>
-                        <input
-                            id="emp-name" type="text" placeholder="e.g. Juan dela Cruz"
-                            value={form.employeeName} onChange={handleChange('employeeName')}
-                            className={errors.employeeName ? 'input-error' : ''}
-                            maxLength={80}
-                        />
-                        {errors.employeeName
-                            ? <span className="field-error"><AlertCircle size={12} />{errors.employeeName}</span>
-                            : form.employeeName.trim() && (
-                                <span style={{
-                                    fontSize: 11, marginTop: 3, display: 'block',
-                                    color: form.employeeName.trim().split(/\s+/).filter(Boolean).length < 2
-                                        ? '#c05c00' : '#05cd99',
-                                }}>
-                                    {form.employeeName.trim().split(/\s+/).filter(Boolean).length < 2
-                                        ? '⚠ Enter both first and last name'
-                                        : '✓ Looks good'}
-                                </span>
-                            )
-                        }
-                    </div>
+
+                    {/* Name preview */}
+                    {previewName && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.15)',
+                            borderRadius: 8, padding: '7px 12px', marginBottom: 10, fontSize: 13,
+                        }}>
+                            <UserCircle2 size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                            <span style={{ color: 'var(--text-secondary)' }}>Preview:</span>
+                            <strong style={{ color: 'var(--text-primary)' }}>{previewName}</strong>
+                        </div>
+                    )}
+
+                    {/* First Name + Last Name */}
                     <div className="field-row">
                         <div className="field">
-                            <label htmlFor="emp-contact">Contact Number</label>
+                            <label htmlFor="emp-firstname">
+                                First Name <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
+                            <input
+                                id="emp-firstname"
+                                type="text"
+                                placeholder="e.g. Juan"
+                                value={form.firstName}
+                                onChange={handleChange('firstName')}
+                                className={errors.firstName ? 'input-error' : form.firstName.trim().length >= 2 && !errors.firstName ? 'input-success' : ''}
+                                maxLength={50}
+                            />
+                            {errors.firstName
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.firstName}</span>
+                                : form.firstName.trim() && !errors.firstName && (
+                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Looks good</span>
+                                )
+                            }
+                        </div>
+                        <div className="field">
+                            <label htmlFor="emp-lastname">
+                                Last Name <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
+                            <input
+                                id="emp-lastname"
+                                type="text"
+                                placeholder="e.g. dela Cruz"
+                                value={form.lastName}
+                                onChange={handleChange('lastName')}
+                                className={errors.lastName ? 'input-error' : form.lastName.trim().length >= 2 && !errors.lastName ? 'input-success' : ''}
+                                maxLength={50}
+                            />
+                            {errors.lastName
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.lastName}</span>
+                                : form.lastName.trim() && !errors.lastName && (
+                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Looks good</span>
+                                )
+                            }
+                        </div>
+                    </div>
+
+                    {/* Middle Name + Suffix */}
+                    <div className="field-row">
+                        <div className="field">
+                            <label htmlFor="emp-middlename">
+                                Middle Name
+                                <span style={{
+                                    marginLeft: 6, fontSize: 10, fontWeight: 600,
+                                    background: 'rgba(163,174,208,0.2)', color: 'var(--text-secondary)',
+                                    padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle',
+                                }}>
+                                    OPTIONAL
+                                </span>
+                            </label>
+                            <input
+                                id="emp-middlename"
+                                type="text"
+                                placeholder="e.g. Santos"
+                                value={form.middleName}
+                                onChange={handleChange('middleName')}
+                                className={errors.middleName ? 'input-error' : ''}
+                                maxLength={50}
+                            />
+                            {errors.middleName
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.middleName}</span>
+                                : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                    Leave blank if none
+                                </span>
+                            }
+                        </div>
+                        <div className="field">
+                            <label htmlFor="emp-suffix">
+                                Suffix
+                                <span style={{
+                                    marginLeft: 6, fontSize: 10, fontWeight: 600,
+                                    background: 'rgba(163,174,208,0.2)', color: 'var(--text-secondary)',
+                                    padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle',
+                                }}>
+                                    OPTIONAL
+                                </span>
+                            </label>
+                            <input
+                                id="emp-suffix"
+                                type="text"
+                                placeholder="e.g. Jr., Sr., III"
+                                value={form.suffix}
+                                onChange={handleChange('suffix')}
+                                className={errors.suffix ? 'input-error' : ''}
+                                maxLength={10}
+                            />
+                            {errors.suffix
+                                ? <span className="field-error"><AlertCircle size={12} />{errors.suffix}</span>
+                                : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
+                                    Leave blank if none
+                                </span>
+                            }
+                        </div>
+                    </div>
+
+                    {/* Contact + Email */}
+                    <div className="field-row">
+                        <div className="field">
+                            <label htmlFor="emp-contact">
+                                Contact Number <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
                             <input
                                 id="emp-contact"
                                 type="tel"
                                 placeholder="e.g. 09123456789"
                                 value={form.contactNumber}
                                 onChange={e => {
-                                    // Strip non-digits automatically on input
                                     const digitsOnly = e.target.value.replace(/\D/g, '');
                                     setForm(prev => ({ ...prev, contactNumber: digitsOnly }));
                                     setApiError('');
                                     const errMsg = validateField('contactNumber', digitsOnly);
                                     setErrors(prev => ({ ...prev, contactNumber: errMsg || undefined }));
                                 }}
-                                className={errors.contactNumber ? 'input-error' : form.contactNumber.length === 11 && /^09\d{9}$/.test(form.contactNumber) ? 'input-success' : ''}
+                                className={
+                                    errors.contactNumber ? 'input-error'
+                                        : form.contactNumber.length === 11 && /^09\d{9}$/.test(form.contactNumber) ? 'input-success'
+                                            : ''
+                                }
                                 maxLength={11}
                             />
                             {errors.contactNumber
@@ -536,10 +724,15 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             }
                         </div>
                         <div className="field">
-                            <label htmlFor="emp-email">Email Address</label>
+                            <label htmlFor="emp-email">
+                                Email Address <span style={{ color: 'var(--danger)' }}>*</span>
+                            </label>
                             <input
-                                id="emp-email" type="email" placeholder="e.g. juan@speedex.com"
-                                value={form.email} onChange={handleChange('email')}
+                                id="emp-email"
+                                type="email"
+                                placeholder="e.g. juan@speedex.com"
+                                value={form.email}
+                                onChange={handleChange('email')}
                                 className={errors.email ? 'input-error' : ''}
                                 maxLength={100}
                                 autoComplete="off"
@@ -552,6 +745,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             }
                         </div>
                     </div>
+
                     <p style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: -6 }}>
                         <AlertCircle size={11} />
                         A verification link will be sent to this address after registration.
@@ -573,6 +767,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 </div>
             </div>
 
+            {/* ── Success Modal ── */}
             {successData && (
                 <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
@@ -586,7 +781,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             </div>
                         </div>
 
-                        {/* ── Employee details ── */}
                         <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Employee number</span>
@@ -595,7 +789,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                                 <span style={{ color: 'var(--text-secondary)' }}>Full name</span>
-                                <strong>{form.employeeName.trim()}</strong>
+                                <strong>{previewName}</strong>
                             </div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -606,19 +800,14 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             </div>
                         </div>
 
-                        {/* ── Email sent notice ── */}
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13, color: '#05cd99' }}>
-                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
+                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="#05cd99" />
                             <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
                                 Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
                             </span>
                         </div>
 
-                        <button
-                            className="btn btn-primary"
-                            style={{ width: '100%' }}
-                            onClick={() => { setSuccessData(null); onClose(); }}
-                        >
+                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>
                             Done
                         </button>
                     </div>
@@ -639,13 +828,18 @@ interface EmployeeDetailModalProps {
 function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailModalProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [form, setForm] = useState({
-        employeeName: employee.employeeName,
+        firstName: employee.firstName ?? '',
+        middleName: employee.middleName ?? '',
+        lastName: employee.lastName ?? '',
+        suffix: employee.suffix ?? '',
         contactNumber: employee.contactNumber,
         role: toDisplayRole(employee.role),
         accountStatus: employee.accountStatus,
     });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
+
+    const displayName = getEmployeeDisplayName(employee);
 
     const handleChange = (key: keyof typeof form) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -658,12 +852,20 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
         setApiError('');
         try {
             const token = localStorage.getItem('authToken');
+            const builtName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
             const updateRes = await fetch(
                 `/api/profile/update-profile?employeeNumber=${encodeURIComponent(employee.employeeNumber)}`,
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ employeeNumber: employee.employeeNumber, employeeName: form.employeeName, contactNumber: form.contactNumber }),
+                    body: JSON.stringify({
+                        employeeNumber: employee.employeeNumber,
+                        firstName: form.firstName.trim(),
+                        middleName: form.middleName.trim(),
+                        lastName: form.lastName.trim(),
+                        suffix: form.suffix.trim(),
+                        contactNumber: form.contactNumber,
+                    }),
                 }
             );
             if (!updateRes.ok) {
@@ -695,7 +897,11 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
             }
             const updated: RecentEmployee = {
                 ...employee,
-                employeeName: form.employeeName,
+                firstName: form.firstName.trim(),
+                middleName: form.middleName.trim(),
+                lastName: form.lastName.trim(),
+                suffix: form.suffix.trim(),
+                employeeName: builtName,
                 contactNumber: form.contactNumber,
                 role: toBackendRole(form.role),
                 accountStatus: form.accountStatus,
@@ -712,7 +918,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${employee.employeeName}? This cannot be undone.`)) return;
+        if (!confirm(`Are you sure you want to delete ${displayName}? This cannot be undone.`)) return;
         setSubmitting(true);
         setApiError('');
         try {
@@ -726,7 +932,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || `Error ${res.status}: Delete failed`);
             }
-            alert(`${employee.employeeName} has been deleted.`);
+            alert(`${displayName} has been deleted.`);
             onUpdated({ ...employee, accountStatus: '__deleted__' });
             onClose();
         } catch (err: any) {
@@ -736,6 +942,8 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
         }
     };
 
+    const editDisplayName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -743,7 +951,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     <div>
                         <h3>Employee Details</h3>
                         <p className="modal-subtitle">
-                            {isEditing ? 'Editing profile' : 'Viewing profile'} of {employee.employeeName}
+                            {isEditing ? 'Editing profile' : 'Viewing profile'} of {displayName}
                         </p>
                     </div>
                     <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
@@ -753,9 +961,9 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                 )}
                 <div className="modal-form">
                     <div className="employee-detail-avatar">
-                        <div className="avatar-circle large">{employee.employeeName.charAt(0).toUpperCase()}</div>
+                        <div className="avatar-circle large">{(displayName || '?').charAt(0).toUpperCase()}</div>
                         <div className="avatar-info">
-                            <h4>{form.employeeName}</h4>
+                            <h4>{isEditing ? editDisplayName || '—' : displayName}</h4>
                             <div className="avatar-meta">
                                 {isEditing ? (
                                     <select value={form.accountStatus} onChange={handleChange('accountStatus')} className="detail-input status-select">
@@ -778,10 +986,6 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                             <span className="detail-value">{employee.employeeNumber}</span>
                         </div>
                         <div className="detail-item">
-                            <span className="detail-label">Full Name</span>
-                            {isEditing ? <input type="text" value={form.employeeName} onChange={handleChange('employeeName')} className="detail-input" /> : <span className="detail-value">{form.employeeName}</span>}
-                        </div>
-                        <div className="detail-item">
                             <span className="detail-label">Role</span>
                             {isEditing ? (
                                 <select value={form.role} onChange={handleChange('role')} className="detail-input">
@@ -792,8 +996,34 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                             )}
                         </div>
                         <div className="detail-item">
+                            <span className="detail-label">First Name</span>
+                            {isEditing
+                                ? <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="detail-input" maxLength={50} />
+                                : <span className="detail-value">{form.firstName || '—'}</span>}
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Last Name</span>
+                            {isEditing
+                                ? <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="detail-input" maxLength={50} />
+                                : <span className="detail-value">{form.lastName || '—'}</span>}
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>
+                            {isEditing
+                                ? <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="detail-input" maxLength={50} placeholder="None" />
+                                : <span className="detail-value">{form.middleName || '—'}</span>}
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>
+                            {isEditing
+                                ? <input type="text" value={form.suffix} onChange={handleChange('suffix')} className="detail-input" maxLength={10} placeholder="None" />
+                                : <span className="detail-value">{form.suffix || '—'}</span>}
+                        </div>
+                        <div className="detail-item">
                             <span className="detail-label">Contact Number</span>
-                            {isEditing ? <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="detail-input" /> : <span className="detail-value">{form.contactNumber}</span>}
+                            {isEditing
+                                ? <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="detail-input" />
+                                : <span className="detail-value">{form.contactNumber}</span>}
                         </div>
                     </div>
                 </div>
@@ -933,21 +1163,12 @@ interface DashboardTabProps {
     onViewAll: () => void;
 }
 
-function DashboardTab({
-    employees,
-    recentEmployees,
-    activityLogs,
-    loading,
-    onSelectEmployee,
-    onViewAll,
-}: DashboardTabProps) {
+function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll }: DashboardTabProps) {
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
     return (
         <div className="dashboard-content">
-
-            {/* ── STATS ROW ───────────────────────────────────── */}
             <div className="stats-row">
                 {[
                     { icon: Users, bg: 'bg-primary', accent: 'accent-primary', label: 'TOTAL EMPLOYEES', value: employees.length, sub: 'All registered staff' },
@@ -957,12 +1178,8 @@ function DashboardTab({
                 ].map(({ icon: Icon, bg, accent, label, value, sub }) => (
                     <div key={label} className={`stat-card ${accent}`}>
                         <div className="stat-card-top">
-                            <div className={`stat-icon ${bg}`}>
-                                <Icon size={20} strokeWidth={2.3} />
-                            </div>
-                            <div className="stat-text">
-                                <span className="stat-label">{label}</span>
-                            </div>
+                            <div className={`stat-icon ${bg}`}><Icon size={20} strokeWidth={2.3} /></div>
+                            <div className="stat-text"><span className="stat-label">{label}</span></div>
                         </div>
                         <h3 className="stat-value">{value}</h3>
                         <div className="stat-subtext">{sub}</div>
@@ -970,10 +1187,7 @@ function DashboardTab({
                 ))}
             </div>
 
-            {/* ── MAIN GRID ──────────────────────────────────── */}
             <div className="dashboard-grid">
-
-                {/* ── RECENT EMPLOYEES ───────────────────────── */}
                 <div className="card">
                     <div className="card-header">
                         <button className="text-link">Recent Employees</button>
@@ -983,73 +1197,47 @@ function DashboardTab({
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>NAME</th>
-                                    <th>EMPLOYEE NO.</th>
-                                    <th>ROLE</th>
-                                    <th>STATUS</th>
+                                    <th>NAME</th><th>EMPLOYEE NO.</th><th>ROLE</th><th>STATUS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr>
-                                        <td colSpan={4}>
-                                            <div className="empty-state">
-                                                <Loader2 size={22} className="spin" />
-                                                <p>Loading...</p>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <tr><td colSpan={4}><div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div></td></tr>
                                 ) : recentEmployees.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4}>
-                                            <div className="empty-state">
-                                                <Package size={22} />
-                                                <p>No data available</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    recentEmployees.slice(0, 7).map(emp => (
-                                        <tr
-                                            key={emp.employeeNumber}
-                                            onClick={() => onSelectEmployee(emp)}
-                                            className="clickable-row"
-                                        >
+                                    <tr><td colSpan={4}><div className="empty-state"><Package size={22} /><p>No data available</p></div></td></tr>
+                                ) : recentEmployees.slice(0, 7).map(emp => {
+                                    const name = getEmployeeDisplayName(emp);
+                                    return (
+                                        <tr key={emp.employeeNumber} onClick={() => onSelectEmployee(emp)} className="clickable-row">
                                             <td>
                                                 <div className="emp-name-cell">
                                                     <div style={{ position: 'relative', display: 'inline-block' }}>
-                                                        <div className="emp-avatar">
-                                                            {emp.employeeName.charAt(0).toUpperCase()}
-                                                        </div>
+                                                        <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
                                                         <span style={{
                                                             position: 'absolute', bottom: 1, right: 1,
                                                             width: 9, height: 9, borderRadius: '50%',
                                                             background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
-                                                            border: '2px solid var(--bg-primary, #fff)',
-                                                            display: 'block'
+                                                            border: '2px solid var(--bg-primary, #fff)', display: 'block'
                                                         }} title={emp.presenceStatus ?? 'Offline'} />
                                                     </div>
-                                                    <span className="cell-name">{emp.employeeName}</span>
+                                                    <span className="cell-name">{name}</span>
                                                 </div>
                                             </td>
                                             <td className="cell-id">{emp.employeeNumber}</td>
-                                            <td>
-                                                {emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}
-                                            </td>
+                                            <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
                                             <td>
                                                 <span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>
                                                     {emp.accountStatus ?? 'Active'}
                                                 </span>
                                             </td>
                                         </tr>
-                                    ))
-                                )}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* ── RECENT ACTIVITY ────────────────────────── */}
                 <div className="card activity-card">
                     <div className="card-header">
                         <button className="text-link">Recent Activity</button>
@@ -1057,37 +1245,26 @@ function DashboardTab({
                     </div>
                     <div className="activity-feed-list">
                         {loading ? (
-                            <div className="empty-state">
-                                <Loader2 size={22} className="spin" />
-                                <p>Loading...</p>
-                            </div>
+                            <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
                         ) : activityLogs.length === 0 ? (
-                            <div className="empty-state">
-                                <ClipboardList size={22} />
-                                <p>No recent activity</p>
-                            </div>
-                        ) : (
-                            activityLogs.slice(0, 8).map(log => (
-                                <div key={log.id} className="activity-feed-item">
-                                    <div className="activity-feed-dot bg-primary" />
-                                    <div className="activity-feed-content">
-                                        <span className="activity-feed-text">{log.description}</span>
-                                        <span className="activity-feed-time">
-                                            {new Date(log.timestamp).toLocaleString()}
-                                        </span>
-                                    </div>
+                            <div className="empty-state"><ClipboardList size={22} /><p>No recent activity</p></div>
+                        ) : activityLogs.slice(0, 8).map(log => (
+                            <div key={log.id} className="activity-feed-item">
+                                <div className="activity-feed-dot bg-primary" />
+                                <div className="activity-feed-content">
+                                    <span className="activity-feed-text">{log.description}</span>
+                                    <span className="activity-feed-time">{new Date(log.timestamp).toLocaleString()}</span>
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))}
                     </div>
                 </div>
-
             </div>
         </div>
     );
 }
 
-// ─── Manage Employees Tab (with pagination) ───────────────────────────────────
+// ─── Manage Employees Tab ─────────────────────────────────────────────────────
 
 type EmployeeSubTab = 'employees' | 'leave';
 
@@ -1143,7 +1320,10 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
     }, []);
 
     const filteredEmps = employees.filter(emp => {
-        const matchSearch = !search || emp.employeeName.toLowerCase().includes(search.toLowerCase()) || emp.employeeNumber.toLowerCase().includes(search.toLowerCase());
+        const name = getEmployeeDisplayName(emp);
+        const matchSearch = !search
+            || name.toLowerCase().includes(search.toLowerCase())
+            || emp.employeeNumber.toLowerCase().includes(search.toLowerCase());
         const matchRole = !filterRole || emp.role === filterRole || toDisplayRole(emp.role) === filterRole;
         const matchStatus = !filterStatus || emp.accountStatus === filterStatus;
         return matchSearch && matchRole && matchStatus;
@@ -1192,34 +1372,25 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
     return (
         <div className="dashboard-content">
             <div className="card employees-table-card" style={{ minHeight: 520, padding: 0, overflow: 'hidden' }}>
-
                 {/* ── Subtab Bar ── */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 20px' }}>
                     {([
                         { key: 'employees' as EmployeeSubTab, label: 'All Employees', icon: <Users size={14} />, badge: undefined },
                         { key: 'leave' as EmployeeSubTab, label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: pendingCount },
                     ]).map(({ key, label, icon, badge }) => (
-                        <button
-                            key={key}
-                            onClick={() => setSubTab(key as EmployeeSubTab)}
+                        <button key={key} onClick={() => setSubTab(key as EmployeeSubTab)}
                             style={{
-                                display: 'flex', alignItems: 'center', gap: 6,
-                                padding: '13px 16px',
-                                fontSize: 13, fontWeight: 500,
-                                border: 'none', background: 'none', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6, padding: '13px 16px',
+                                fontSize: 13, fontWeight: 500, border: 'none', background: 'none', cursor: 'pointer',
                                 borderBottom: `2px solid ${subTab === key ? 'var(--primary)' : 'transparent'}`,
-                                color: subTab === key ? 'var(--primary)' : 'var(--text-secondary)',
-                                marginBottom: -1,
-                            }}
-                        >
-                            {icon}
-                            {label}
+                                color: subTab === key ? 'var(--primary)' : 'var(--text-secondary)', marginBottom: -1,
+                            }}>
+                            {icon}{label}
                             {badge !== undefined && badge > 0 && (
                                 <span style={{
                                     background: subTab === key ? 'rgba(67,24,255,0.12)' : 'rgba(255,181,71,0.2)',
                                     color: subTab === key ? 'var(--primary)' : '#c05c00',
-                                    fontSize: 11, fontWeight: 600,
-                                    padding: '1px 7px', borderRadius: 999,
+                                    fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 999,
                                 }}>
                                     {badge} pending
                                 </span>
@@ -1256,47 +1427,46 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
                         <div className="data-table-wrap">
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>NAME</th><th>EMPLOYEE NO</th><th>ROLE</th><th>CONTACT</th><th>STATUS</th><th>ACTION</th>
-                                    </tr>
+                                    <tr><th>NAME</th><th>EMPLOYEE NO</th><th>ROLE</th><th>CONTACT</th><th>STATUS</th><th>ACTION</th></tr>
                                 </thead>
                                 <tbody>
                                     {loading ? (
                                         <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading employees…</p></div></td></tr>
                                     ) : paginatedEmps.length === 0 ? (
                                         <tr><td colSpan={6}><div className="empty-state"><Package size={20} /><p>No employees match your filters</p></div></td></tr>
-                                    ) : paginatedEmps.map(emp => (
-                                        <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
-                                            <td>
-                                                <div className="emp-name-cell">
-                                                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                                                        <div className="emp-avatar">{emp.employeeName.charAt(0).toUpperCase()}</div>
-                                                        <span style={{
-                                                            position: 'absolute', bottom: 1, right: 1,
-                                                            width: 9, height: 9, borderRadius: '50%',
-                                                            background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
-                                                            border: '2px solid var(--bg-primary, #fff)',
-                                                            display: 'block'
-                                                        }} title={emp.presenceStatus ?? 'Offline'} />
+                                    ) : paginatedEmps.map(emp => {
+                                        const name = getEmployeeDisplayName(emp);
+                                        return (
+                                            <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
+                                                <td>
+                                                    <div className="emp-name-cell">
+                                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                            <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
+                                                            <span style={{
+                                                                position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%',
+                                                                background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
+                                                                border: '2px solid var(--bg-primary, #fff)', display: 'block'
+                                                            }} title={emp.presenceStatus ?? 'Offline'} />
+                                                        </div>
+                                                        {name}
                                                     </div>
-                                                    {emp.employeeName}
-                                                </div>
-                                            </td>
-                                            <td>{emp.employeeNumber}</td>
-                                            <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                            <td>{emp.contactNumber}</td>
-                                            <td>
-                                                <span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>
-                                                    {emp.accountStatus ?? 'Active'}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onSelectEmployee(emp); }}>
-                                                    <Pencil size={11} /> Edit
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td>{emp.employeeNumber}</td>
+                                                <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
+                                                <td>{emp.contactNumber}</td>
+                                                <td>
+                                                    <span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>
+                                                        {emp.accountStatus ?? 'Active'}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onSelectEmployee(emp); }}>
+                                                        <Pencil size={11} /> Edit
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -1347,9 +1517,7 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
                         <div className="data-table-wrap">
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>EMPLOYEE</th><th>LEAVE TYPE</th><th>DATES</th><th>DURATION</th><th>SUBMITTED</th><th>STATUS</th><th>ACTIONS</th>
-                                    </tr>
+                                    <tr><th>EMPLOYEE</th><th>LEAVE TYPE</th><th>DATES</th><th>DURATION</th><th>SUBMITTED</th><th>STATUS</th><th>ACTIONS</th></tr>
                                 </thead>
                                 <tbody>
                                     {leaveLoading ? (
@@ -1383,11 +1551,9 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
                                                 <td onClick={e => e.stopPropagation()}>
                                                     {r.status === 'pending' ? (
                                                         <div style={{ display: 'flex', gap: 6 }}>
-                                                            <button
-                                                                className="btn btn-xs"
+                                                            <button className="btn btn-xs"
                                                                 style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }}
-                                                                onClick={() => setActionModal({ request: r, action: 'approve' })}
-                                                            >
+                                                                onClick={() => setActionModal({ request: r, action: 'approve' })}>
                                                                 <CheckCircle2 size={11} /> Approve
                                                             </button>
                                                             <button className="btn btn-xs btn-danger" onClick={() => setActionModal({ request: r, action: 'decline' })}>
@@ -1422,15 +1588,11 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
                             </div>
                         )}
 
-                        {/* ── Leave Detail Modal ── */}
                         {detailModal && (
                             <div className="modal-overlay" onClick={() => setDetailModal(null)}>
                                 <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
                                     <div className="modal-header">
-                                        <div>
-                                            <h3>Leave Request Detail</h3>
-                                            <p className="modal-subtitle">Full details for this request</p>
-                                        </div>
+                                        <div><h3>Leave Request Detail</h3><p className="modal-subtitle">Full details for this request</p></div>
                                         <button className="icon-btn" onClick={() => setDetailModal(null)}><X size={16} /></button>
                                     </div>
                                     <div className="employee-detail-avatar" style={{ marginBottom: 16 }}>
@@ -1480,7 +1642,6 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
                             </div>
                         )}
 
-                        {/* ── Action Confirm Modal ── */}
                         {actionModal && (
                             <LeaveActionModal
                                 request={actionModal.request}
@@ -1500,10 +1661,14 @@ function ManageEmployeesTab({ employees, loading, onSelectEmployee, onAddEmploye
 
 function ProfileTab() {
     const employeeId = localStorage.getItem('employeeId') ?? '';
-    const employeeName = localStorage.getItem('employeeName') ?? '';
+    const storedFirstName = localStorage.getItem('firstName') ?? '';
+    const storedMiddleName = localStorage.getItem('middleName') ?? '';
+    const storedLastName = localStorage.getItem('lastName') ?? '';
+    const storedSuffix = localStorage.getItem('suffix') ?? '';
+    // Fallback: if split parts not stored, try legacy employeeName
+    const legacyName = localStorage.getItem('employeeName') ?? '';
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
 
-    // ── Password Gate ──
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
@@ -1512,7 +1677,13 @@ function ProfileTab() {
     const [pendingEdit, setPendingEdit] = useState<'profile' | null>(null);
 
     const [editingProfile, setEditingProfile] = useState(false);
-    const [profileForm, setProfileForm] = useState({ employeeName, contactNumber: employeeContact });
+    const [profileForm, setProfileForm] = useState({
+        firstName: storedFirstName,
+        middleName: storedMiddleName,
+        lastName: storedLastName,
+        suffix: storedSuffix,
+        contactNumber: employeeContact,
+    });
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -1525,19 +1696,14 @@ function ProfileTab() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    // ── Open gate before allowing profile edit ──
     const requestEditProfile = () => {
-        setGatePassword('');
-        setGateError('');
-        setShowGatePassword(false);
-        setPendingEdit('profile');
-        setPasswordGate(true);
+        setGatePassword(''); setGateError(''); setShowGatePassword(false);
+        setPendingEdit('profile'); setPasswordGate(true);
     };
 
     const handleGateConfirm = async () => {
         if (!gatePassword) { setGateError('Please enter your password.'); return; }
-        setGateLoading(true);
-        setGateError('');
+        setGateLoading(true); setGateError('');
         try {
             const token = localStorage.getItem('authToken');
             const res = await fetch('/api/systemadmin/verify-password', {
@@ -1549,12 +1715,8 @@ function ProfileTab() {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Incorrect password. Please try again.');
             }
-            setPasswordGate(false);
-            setGatePassword('');
-            if (pendingEdit === 'profile') {
-                setEditingProfile(true);
-                setProfileSuccess(false);
-            }
+            setPasswordGate(false); setGatePassword('');
+            if (pendingEdit === 'profile') { setEditingProfile(true); setProfileSuccess(false); }
         } catch (err: any) {
             setGateError(err.message ?? 'Incorrect password. Please try again.');
         } finally {
@@ -1565,17 +1727,16 @@ function ProfileTab() {
     const handleProfileChange = (key: keyof typeof profileForm) =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
             setProfileForm(prev => ({ ...prev, [key]: e.target.value }));
-            setProfileError('');
-            setProfileSuccess(false);
+            setProfileError(''); setProfileSuccess(false);
         };
 
     const handleProfileSave = async () => {
-        if (!profileForm.employeeName.trim()) { setProfileError('Full name is required.'); return; }
+        if (!profileForm.firstName.trim()) { setProfileError('First name is required.'); return; }
+        if (!profileForm.lastName.trim()) { setProfileError('Last name is required.'); return; }
         if (profileForm.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(profileForm.contactNumber.trim())) {
             setProfileError('Enter a valid contact number.'); return;
         }
-        setProfileSaving(true);
-        setProfileError('');
+        setProfileSaving(true); setProfileError('');
         try {
             const token = localStorage.getItem('authToken');
             const res = await fetch(
@@ -1583,17 +1744,29 @@ function ProfileTab() {
                 {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ employeeNumber: employeeId, employeeName: profileForm.employeeName.trim(), contactNumber: profileForm.contactNumber.trim() }),
+                    body: JSON.stringify({
+                        employeeNumber: employeeId,
+                        firstName: profileForm.firstName.trim(),
+                        middleName: profileForm.middleName.trim(),
+                        lastName: profileForm.lastName.trim(),
+                        suffix: profileForm.suffix.trim(),
+                        contactNumber: profileForm.contactNumber.trim(),
+                    }),
                 }
             );
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Profile update failed.');
             }
-            localStorage.setItem('employeeName', profileForm.employeeName.trim());
+            localStorage.setItem('firstName', profileForm.firstName.trim());
+            localStorage.setItem('middleName', profileForm.middleName.trim());
+            localStorage.setItem('lastName', profileForm.lastName.trim());
+            localStorage.setItem('suffix', profileForm.suffix.trim());
             localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
-            setProfileSuccess(true);
-            setEditingProfile(false);
+            // Keep legacy key updated too for sidebar display
+            const fullName = buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix);
+            localStorage.setItem('employeeName', fullName);
+            setProfileSuccess(true); setEditingProfile(false);
         } catch (err: any) {
             setProfileError(err.message ?? 'Something went wrong.');
         } finally {
@@ -1602,10 +1775,7 @@ function ProfileTab() {
     };
 
     const handlePwChange = (key: keyof typeof pwForm) =>
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            setPwForm(prev => ({ ...prev, [key]: e.target.value }));
-            setPwError('');
-        };
+        (e: React.ChangeEvent<HTMLInputElement>) => { setPwForm(prev => ({ ...prev, [key]: e.target.value })); setPwError(''); };
 
     const handlePwSave = async () => {
         if (!pwForm.current) { setPwError('Current password is required.'); return; }
@@ -1633,12 +1803,17 @@ function ProfileTab() {
         }
     };
 
-    const displayName = profileForm.employeeName || employeeName || 'System Admin';
+    const displayName = buildDisplayName(
+        profileForm.firstName || storedFirstName,
+        profileForm.middleName || storedMiddleName,
+        profileForm.lastName || storedLastName,
+        profileForm.suffix || storedSuffix
+    ) || legacyName || 'System Admin';
+
     const displayContact = profileForm.contactNumber || employeeContact;
 
     return (
         <div className="dashboard-content">
-
             {/* ── Password Gate Modal ── */}
             {passwordGate && (
                 <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
@@ -1648,30 +1823,17 @@ function ProfileTab() {
                                 <h3>Confirm Your Identity</h3>
                                 <p className="modal-subtitle">Enter your password to edit your profile.</p>
                             </div>
-                            <button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close">
-                                <X size={16} />
-                            </button>
+                            <button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close"><X size={16} /></button>
                         </div>
-
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
-                            <div style={{
-                                width: 52, height: 52, borderRadius: '50%',
-                                background: 'rgba(67,24,255,0.1)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
+                            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(67,24,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Lock size={22} color="var(--primary)" />
                             </div>
                             <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
                                 For your security, please verify your identity before making changes.
                             </p>
                         </div>
-
-                        {gateError && (
-                            <div className="form-api-error" style={{ marginBottom: 12 }}>
-                                <AlertCircle size={14} /><span>{gateError}</span>
-                            </div>
-                        )}
-
+                        {gateError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{gateError}</span></div>}
                         <div className="field" style={{ marginBottom: 20 }}>
                             <label>Password</label>
                             <div style={{ position: 'relative' }}>
@@ -1684,26 +1846,17 @@ function ProfileTab() {
                                     style={{ paddingRight: 40, width: '100%' }}
                                     autoFocus
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowGatePassword(p => !p)}
+                                <button type="button" onClick={() => setShowGatePassword(p => !p)}
                                     style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
-                                    tabIndex={-1}
-                                >
+                                    tabIndex={-1}>
                                     {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
                                 </button>
                             </div>
                         </div>
-
                         <div className="modal-actions">
-                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>
-                                Cancel
-                            </button>
+                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
-                                {gateLoading
-                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
-                                    : <><Shield size={13} /> Confirm</>
-                                }
+                                {gateLoading ? <><Loader2 size={13} className="spin" /> Verifying…</> : <><Shield size={13} /> Confirm</>}
                             </button>
                         </div>
                     </div>
@@ -1711,26 +1864,21 @@ function ProfileTab() {
             )}
 
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
-
                 {/* ── Profile Card ── */}
                 <div className="card">
                     <div className="card-header">
                         <h3>My Profile</h3>
                         {!editingProfile && (
-                            <button
-                                className="btn btn-primary"
+                            <button className="btn btn-primary"
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
-                                onClick={requestEditProfile} // ← gate instead of direct edit
-                            >
+                                onClick={requestEditProfile}>
                                 <Pencil size={12} /> Edit Profile
                             </button>
                         )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 16px', gap: 10 }}>
-                        <div
-                            className="avatar-circle large"
-                            style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}
-                        >
+                        <div className="avatar-circle large"
+                            style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}>
                             {displayName.charAt(0).toUpperCase()}
                         </div>
                         <div style={{ textAlign: 'center' }}>
@@ -1744,11 +1892,27 @@ function ProfileTab() {
                         </div>
                     )}
                     {editingProfile ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {profileError && <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>}
-                            <div className="field">
-                                <label>Full Name</label>
-                                <input type="text" value={profileForm.employeeName} onChange={handleProfileChange('employeeName')} placeholder="Enter full name" />
+                            <div className="field-row">
+                                <div className="field">
+                                    <label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                    <input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} />
+                                </div>
+                                <div className="field">
+                                    <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                    <input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} />
+                                </div>
+                            </div>
+                            <div className="field-row">
+                                <div className="field">
+                                    <label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
+                                    <input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} />
+                                </div>
+                                <div className="field">
+                                    <label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
+                                    <input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} />
+                                </div>
                             </div>
                             <div className="field">
                                 <label>Contact Number</label>
@@ -1765,7 +1929,10 @@ function ProfileTab() {
                                 </div>
                             </div>
                             <div className="modal-actions" style={{ padding: '4px 0 0' }}>
-                                <button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ employeeName, contactNumber: employeeContact }); }} disabled={profileSaving}>Cancel</button>
+                                <button className="btn" onClick={() => {
+                                    setEditingProfile(false); setProfileError('');
+                                    setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact });
+                                }} disabled={profileSaving}>Cancel</button>
                                 <button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>
                                     {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
                                 </button>
@@ -1778,9 +1945,23 @@ function ProfileTab() {
                                 <span className="detail-value">{employeeId || '—'}</span>
                             </div>
                             <div className="detail-item">
-                                <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Full Name</span>
-                                <span className="detail-value">{displayName}</span>
+                                <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name</span>
+                                <span className="detail-value">{profileForm.firstName || '—'}</span>
                             </div>
+                            <div className="detail-item">
+                                <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name</span>
+                                <span className="detail-value">{profileForm.lastName || '—'}</span>
+                            </div>
+                            <div className="detail-item">
+                                <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name</span>
+                                <span className="detail-value">{profileForm.middleName || '—'}</span>
+                            </div>
+                            {profileForm.suffix && (
+                                <div className="detail-item">
+                                    <span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Suffix</span>
+                                    <span className="detail-value">{profileForm.suffix}</span>
+                                </div>
+                            )}
                             <div className="detail-item">
                                 <span className="detail-label"><Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role</span>
                                 <span className="detail-value">System Admin</span>
@@ -1793,16 +1974,14 @@ function ProfileTab() {
                     )}
                 </div>
 
-                {/* ── Security Card ── (unchanged) */}
+                {/* ── Security Card ── */}
                 <div className="card">
                     <div className="card-header">
                         <h3>Security Settings</h3>
                         {!editingPassword && (
-                            <button
-                                className="btn btn-primary"
+                            <button className="btn btn-primary"
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
-                                onClick={() => setEditingPassword(true)}
-                            >
+                                onClick={() => setEditingPassword(true)}>
                                 <Lock size={12} /> Change Password
                             </button>
                         )}
@@ -1895,7 +2074,6 @@ function ProfileTab() {
                 </div>
             </div>
 
-            {/* ── Account Overview (unchanged) ── */}
             <div className="card">
                 <div className="card-header"><h3>Account Overview</h3></div>
                 <div className="system-status-list">
@@ -1915,277 +2093,6 @@ function ProfileTab() {
                     ))}
                 </div>
             </div>
-        </div>
-    );
-}
-
-// ─── Leave Management Tab ─────────────────────────────────────────────────────
-
-function LeaveManagementTab() {
-    const [requests, setRequests] = useState<LeaveRequest[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [filterStatus, setFilterStatus] = useState<'all' | LeaveStatus>('pending');
-    const [filterRole, setFilterRole] = useState('');
-    const [search, setSearch] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [actionModal, setActionModal] = useState<{ request: LeaveRequest; action: 'approve' | 'decline' } | null>(null);
-    const [detailModal, setDetailModal] = useState<LeaveRequest | null>(null);
-
-    const PAGE_SIZE = 7;
-    const adminName = localStorage.getItem('employeeName') ?? 'System Admin';
-
-    useEffect(() => {
-        const token = localStorage.getItem('authToken');
-        fetch('/api/leave/all', { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-            .then((data: any[]) => {
-                setRequests(Array.isArray(data) ? data.map(r => ({
-                    id: r.id,
-                    employeeNumber: r.employeeNumber,
-                    employeeName: r.employeeName,
-                    role: r.role ?? '',
-                    leaveType: r.leaveType,
-                    startDate: r.startDate,
-                    endDate: r.endDate,
-                    reason: r.reason,
-                    status: r.status,
-                    submittedAt: r.submittedAt,
-                    reviewedBy: r.reviewedBy,
-                    reviewNote: r.reviewNote,
-                })) : []);
-            })
-            .catch(() => setRequests([]))
-            .finally(() => setLoading(false));
-    }, []);
-
-    const filtered = requests.filter(r => {
-        const matchStatus = filterStatus === 'all' || r.status === filterStatus;
-        const matchRole = !filterRole || r.role === filterRole || toDisplayRole(r.role) === filterRole;
-        const matchSearch = !search || r.employeeName.toLowerCase().includes(search.toLowerCase()) || r.employeeNumber.toLowerCase().includes(search.toLowerCase());
-        return matchStatus && matchRole && matchSearch;
-    });
-
-    useEffect(() => { setCurrentPage(1); }, [filterStatus, filterRole, search]);
-
-    const sorted = [...filtered].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-    const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-    const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-    const pendingCount = requests.filter(r => r.status === 'pending').length;
-    const approvedCount = requests.filter(r => r.status === 'approved').length;
-    const declinedCount = requests.filter(r => r.status === 'declined').length;
-
-    const handleConfirm = (id: number, action: 'approve' | 'decline', note: string) => {
-        setRequests(prev => prev.map(r =>
-            r.id === id
-                ? { ...r, status: action === 'approve' ? 'approved' : 'declined', reviewedBy: adminName, reviewNote: note || undefined }
-                : r
-        ));
-    };
-
-    const getPageNumbers = () => {
-        const pages: (number | '...')[] = [];
-        if (totalPages <= 5) {
-            for (let i = 1; i <= totalPages; i++) pages.push(i);
-        } else {
-            pages.push(1);
-            if (currentPage > 3) pages.push('...');
-            const start = Math.max(2, currentPage - 1);
-            const end = Math.min(totalPages - 1, currentPage + 1);
-            for (let i = start; i <= end; i++) pages.push(i);
-            if (currentPage < totalPages - 2) pages.push('...');
-            pages.push(totalPages);
-        }
-        return pages;
-    };
-
-    return (
-        <div className="dashboard-content">
-            <div className="stats-row" style={{ marginBottom: 20 }}>
-                {[
-                    { icon: Clock, bg: 'bg-warning', label: 'PENDING', value: pendingCount, sub: 'Awaiting review' },
-                    { icon: CheckCircle2, bg: 'bg-success', label: 'APPROVED', value: approvedCount, sub: 'Granted this period' },
-                    { icon: AlertCircle, bg: 'bg-danger', label: 'DECLINED', value: declinedCount, sub: 'Rejected requests' },
-                    { icon: Users, bg: 'bg-primary', label: 'TOTAL', value: requests.length, sub: 'All leave requests' },
-                ].map(({ icon: Icon, bg, label, value, sub }) => (
-                    <div key={label} className="stat-card">
-                        <div className={`stat-icon ${bg}`}><Icon size={18} /></div>
-                        <div className="stat-text">
-                            <p className="stat-label">{label}</p>
-                            <h3 className="stat-value">{value}</h3>
-                            <small>{sub}</small>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div className="card employees-table-card" style={{ minHeight: 520 }}>
-                <div className="card-header">
-                    <h3>Leave Requests</h3>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                    </span>
-                </div>
-                <div className="filter-bar">
-                    <div className="search-input-wrap">
-                        <Search size={14} className="search-icon" />
-                        <input type="text" placeholder="Search by name or ID…" value={search} onChange={e => setSearch(e.target.value)} className="search-input" />
-                    </div>
-                    <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}>
-                        <option value="all">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="declined">Declined</option>
-                    </select>
-                    <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-                        <option value="">All Roles</option>
-                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                </div>
-                <div className="data-table-wrap">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>EMPLOYEE</th><th>LEAVE TYPE</th><th>DATES</th><th>DURATION</th><th>SUBMITTED</th><th>STATUS</th><th>ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan={7}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
-                            ) : paginated.length === 0 ? (
-                                <tr><td colSpan={7}><div className="empty-state"><Package size={20} /><p>No leave requests match your filters</p></div></td></tr>
-                            ) : paginated.map(r => {
-                                const days = calcDays(r.startDate, r.endDate);
-                                const meta = LEAVE_STATUS_META[r.status];
-                                return (
-                                    <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
-                                        <td>
-                                            <div className="emp-name-cell">
-                                                <div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div>
-                                                <div>
-                                                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div>
-                                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
-                                        <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
-                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
-                                        <td>
-                                            <span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`}
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                {meta.icon}{meta.label}
-                                            </span>
-                                        </td>
-                                        <td onClick={e => e.stopPropagation()}>
-                                            {r.status === 'pending' ? (
-                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button
-                                                        className="btn btn-xs"
-                                                        style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }}
-                                                        onClick={() => setActionModal({ request: r, action: 'approve' })}
-                                                    >
-                                                        <CheckCircle2 size={11} /> Approve
-                                                    </button>
-                                                    <button className="btn btn-xs btn-danger" onClick={() => setActionModal({ request: r, action: 'decline' })}>
-                                                        <X size={11} /> Decline
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                                                    {r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-                {!loading && filtered.length > 0 && (
-                    <div className="pagination-bar">
-                        <span className="pagination-info">
-                            Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
-                        </span>
-                        <div className="pagination-controls">
-                            <button className="page-btn page-btn-nav" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}><ChevronLeft size={15} /></button>
-                            {getPageNumbers().map((p, i) =>
-                                p === '...' ? <span key={`ellipsis-${i}`} className="page-ellipsis">…</span> :
-                                    <button key={p} className={`page-btn${currentPage === p ? ' active' : ''}`} onClick={() => setCurrentPage(p as number)}>{p}</button>
-                            )}
-                            <button className="page-btn page-btn-nav" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}><ChevronRight size={15} /></button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {detailModal && (
-                <div className="modal-overlay" onClick={() => setDetailModal(null)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
-                        <div className="modal-header">
-                            <div>
-                                <h3>Leave Request Detail</h3>
-                                <p className="modal-subtitle">Full details for this request</p>
-                            </div>
-                            <button className="icon-btn" onClick={() => setDetailModal(null)}><X size={16} /></button>
-                        </div>
-                        <div className="employee-detail-avatar" style={{ marginBottom: 16 }}>
-                            <div className="avatar-circle large">{detailModal.employeeName.charAt(0).toUpperCase()}</div>
-                            <div className="avatar-info">
-                                <h4>{detailModal.employeeName}</h4>
-                                <div className="avatar-meta" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                    {detailModal.employeeNumber} · {toDisplayRole(detailModal.role)}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="detail-grid">
-                            {[
-                                { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType] },
-                                { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days` },
-                                { label: 'Start Date', value: fmtDate(detailModal.startDate) },
-                                { label: 'End Date', value: fmtDate(detailModal.endDate) },
-                                { label: 'Submitted', value: fmtDate(detailModal.submittedAt) },
-                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label },
-                            ].map(({ label, value }) => (
-                                <div key={label} className="detail-item">
-                                    <span className="detail-label">{label}</span>
-                                    <span className="detail-value">{value}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="detail-item" style={{ margin: '12px 0' }}>
-                            <span className="detail-label">Reason</span>
-                            <span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{detailModal.reason}</span>
-                        </div>
-                        {detailModal.reviewNote && (
-                            <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : 'rgba(238,93,80,0.08)', border: `1px solid ${detailModal.status === 'approved' ? 'rgba(5,205,153,0.25)' : 'rgba(238,93,80,0.25)'}`, borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>
-                                <strong>Review Note:</strong> {detailModal.reviewNote}
-                            </div>
-                        )}
-                        <div className="modal-actions">
-                            {detailModal.status === 'pending' ? (
-                                <>
-                                    <button className="btn btn-danger" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }}><X size={13} /> Decline</button>
-                                    <button className="btn btn-primary" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }}><CheckCircle2 size={13} /> Approve</button>
-                                </>
-                            ) : (
-                                <button className="btn" onClick={() => setDetailModal(null)}>Close</button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {actionModal && (
-                <LeaveActionModal
-                    request={actionModal.request}
-                    action={actionModal.action}
-                    onClose={() => setActionModal(null)}
-                    onConfirm={handleConfirm}
-                />
-            )}
         </div>
     );
 }
@@ -2250,9 +2157,7 @@ function EmergencyOverridesTab() {
         const matchSearch = !search || o.employeeName.toLowerCase().includes(search.toLowerCase()) || o.employeeNumber.toLowerCase().includes(search.toLowerCase());
         return matchStatus && matchSearch;
     });
-
     useEffect(() => { setCurrentPage(1); }, [filterStatus, search]);
-
     const sorted = [...filtered].sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
     const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
     const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -2264,11 +2169,9 @@ function EmergencyOverridesTab() {
     const handleAction = async () => {
         if (!actionModal) return;
         if (actionModal.action === 'Approved' && !overrideUntil) {
-            setActionError('Please set an override expiry date and time.');
-            return;
+            setActionError('Please set an override expiry date and time.'); return;
         }
-        setSubmitting(true);
-        setActionError('');
+        setSubmitting(true); setActionError('');
         try {
             const token = localStorage.getItem('authToken');
             const isApprove = actionModal.action === 'Approved';
@@ -2290,9 +2193,7 @@ function EmergencyOverridesTab() {
                     ? { ...o, status: actionModal.action, overrideUntil: overrideUntil || undefined }
                     : o
             ));
-            setActionModal(null);
-            setOverrideUntil('');
-            setNote('');
+            setActionModal(null); setOverrideUntil(''); setNote('');
         } catch (err: any) {
             setActionError(err.message ?? 'Something went wrong.');
         } finally {
@@ -2302,9 +2203,8 @@ function EmergencyOverridesTab() {
 
     const getPageNumbers = () => {
         const pages: (number | '...')[] = [];
-        if (totalPages <= 5) {
-            for (let i = 1; i <= totalPages; i++) pages.push(i);
-        } else {
+        if (totalPages <= 5) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+        else {
             pages.push(1);
             if (currentPage > 3) pages.push('...');
             const start = Math.max(2, currentPage - 1);
@@ -2333,11 +2233,7 @@ function EmergencyOverridesTab() {
                 ].map(({ icon: Icon, bg, label, value, sub }) => (
                     <div key={label} className="stat-card">
                         <div className={`stat-icon ${bg}`}><Icon size={18} /></div>
-                        <div className="stat-text">
-                            <p className="stat-label">{label}</p>
-                            <h3 className="stat-value">{value}</h3>
-                            <small>{sub}</small>
-                        </div>
+                        <div className="stat-text"><p className="stat-label">{label}</p><h3 className="stat-value">{value}</h3><small>{sub}</small></div>
                     </div>
                 ))}
             </div>
@@ -2345,9 +2241,7 @@ function EmergencyOverridesTab() {
             <div className="card employees-table-card" style={{ minHeight: 520 }}>
                 <div className="card-header">
                     <h3>Emergency Override Requests</h3>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
-                        {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="filter-bar">
                     <div className="search-input-wrap">
@@ -2364,9 +2258,7 @@ function EmergencyOverridesTab() {
                 <div className="data-table-wrap">
                     <table className="data-table">
                         <thead>
-                            <tr>
-                                <th>EMPLOYEE</th><th>REASON</th><th>REQUESTED</th><th>OVERRIDE UNTIL</th><th>STATUS</th><th>ACTIONS</th>
-                            </tr>
+                            <tr><th>EMPLOYEE</th><th>REASON</th><th>REQUESTED</th><th>OVERRIDE UNTIL</th><th>STATUS</th><th>ACTIONS</th></tr>
                         </thead>
                         <tbody>
                             {loading ? (
@@ -2387,9 +2279,7 @@ function EmergencyOverridesTab() {
                                             </div>
                                         </td>
                                         <td style={{ fontSize: 13, maxWidth: 200 }}>
-                                            <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                                {o.reason}
-                                            </span>
+                                            <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.reason}</span>
                                         </td>
                                         <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{new Date(o.requestedAt).toLocaleString()}</td>
                                         <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.overrideUntil ? new Date(o.overrideUntil).toLocaleString() : '—'}</td>
@@ -2401,11 +2291,9 @@ function EmergencyOverridesTab() {
                                         <td>
                                             {o.status === 'Pending' ? (
                                                 <div style={{ display: 'flex', gap: 6 }}>
-                                                    <button
-                                                        className="btn btn-xs"
+                                                    <button className="btn btn-xs"
                                                         style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }}
-                                                        onClick={() => { setActionModal({ override: o, action: 'Approved' }); setOverrideUntil(''); setNote(''); setActionError(''); }}
-                                                    >
+                                                        onClick={() => { setActionModal({ override: o, action: 'Approved' }); setOverrideUntil(''); setNote(''); setActionError(''); }}>
                                                         <CheckCircle2 size={11} /> Approve
                                                     </button>
                                                     <button className="btn btn-xs btn-danger" onClick={() => { setActionModal({ override: o, action: 'Rejected' }); setOverrideUntil(''); setNote(''); setActionError(''); }}>
@@ -2448,9 +2336,7 @@ function EmergencyOverridesTab() {
                             <div>
                                 <h3>{actionModal.action === 'Approved' ? 'Approve Override Request' : 'Reject Override Request'}</h3>
                                 <p className="modal-subtitle">
-                                    {actionModal.action === 'Approved'
-                                        ? 'Set how long the employee can access the system.'
-                                        : 'Confirm rejection of this emergency override request.'}
+                                    {actionModal.action === 'Approved' ? 'Set how long the employee can access the system.' : 'Confirm rejection of this emergency override request.'}
                                 </p>
                             </div>
                             <button className="icon-btn" onClick={() => setActionModal(null)}><X size={16} /></button>
@@ -2475,11 +2361,7 @@ function EmergencyOverridesTab() {
                                 </span>
                             </div>
                         )}
-                        {actionError && (
-                            <div className="form-api-error" style={{ marginBottom: 12 }}>
-                                <AlertCircle size={14} /><span>{actionError}</span>
-                            </div>
-                        )}
+                        {actionError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{actionError}</span></div>}
                         <div className="modal-actions">
                             <button className="btn" onClick={() => setActionModal(null)} disabled={submitting}>Cancel</button>
                             <button className={`btn ${actionModal.action === 'Approved' ? 'btn-primary' : 'btn-danger'}`} onClick={handleAction} disabled={submitting}>
@@ -2503,7 +2385,14 @@ function EmergencyOverridesTab() {
 export default function Dashboard() {
     const navigate = useNavigate();
     const employeeId = localStorage.getItem('employeeId') ?? '';
-    const employeeName = localStorage.getItem('employeeName') ?? '';
+    // Compose display name from split parts, fall back to legacy key
+    const storedFirst = localStorage.getItem('firstName') ?? '';
+    const storedMiddle = localStorage.getItem('middleName') ?? '';
+    const storedLast = localStorage.getItem('lastName') ?? '';
+    const storedSuffix = localStorage.getItem('suffix') ?? '';
+    const employeeName = buildDisplayName(storedFirst, storedMiddle, storedLast, storedSuffix)
+        || localStorage.getItem('employeeName')
+        || '';
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -2526,7 +2415,12 @@ export default function Dashboard() {
                     ? data
                         .map((e: any) => ({
                             employeeNumber: e.employeeNumber,
-                            employeeName: e.employeeName,
+                            // Accept split fields from backend; fall back to joined employeeName
+                            firstName: e.firstName ?? '',
+                            middleName: e.middleName ?? '',
+                            lastName: e.lastName ?? '',
+                            suffix: e.suffix ?? '',
+                            employeeName: e.employeeName ?? buildDisplayName(e.firstName ?? '', e.middleName ?? '', e.lastName ?? '', e.suffix ?? ''),
                             contactNumber: e.contactNumber,
                             role: e.role,
                             accountStatus: e.accountStatus ?? 'Unknown',
@@ -2558,16 +2452,13 @@ export default function Dashboard() {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             }).catch(() => { });
         }
-        ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'contactNumber', 'role']
+        ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'firstName', 'middleName', 'lastName', 'suffix', 'contactNumber', 'role']
             .forEach(k => localStorage.removeItem(k));
         navigate('/');
     };
 
     const handleSelectEmployee = (emp: RecentEmployee) => setSelectedEmployee(emp);
-
-    const handleSelectEmployeeFromManage = (emp: RecentEmployee) => {
-        setSelectedPanelEmployee(emp);
-    };
+    const handleSelectEmployeeFromManage = (emp: RecentEmployee) => setSelectedPanelEmployee(emp);
 
     const handleEmployeeUpdated = (updated: RecentEmployee) => {
         if (updated.accountStatus === '__deleted__') {
@@ -2610,14 +2501,8 @@ export default function Dashboard() {
                             {group.items.map(({ tab, icon: Icon, label }) => {
                                 const isActive = activeTab === tab;
                                 return (
-                                    <div
-                                        key={tab}
-                                        className={`nav-item${isActive ? ' nav-item-active' : ''}`}
-                                        onClick={() => {
-                                            setActiveTab(tab);
-                                            setSelectedPanelEmployee(null);
-                                        }}
-                                    >
+                                    <div key={tab} className={`nav-item${isActive ? ' nav-item-active' : ''}`}
+                                        onClick={() => { setActiveTab(tab); setSelectedPanelEmployee(null); }}>
                                         <Icon size={18} />
                                         <span className="nav-item-label">{label}</span>
                                     </div>
@@ -2628,9 +2513,7 @@ export default function Dashboard() {
                 </nav>
                 <div className="sidebar-footer-profile">
                     <div className="profile-card">
-                        <div className="profile-avatar">
-                            {getInitials(employeeName || 'Super Admin')}
-                        </div>
+                        <div className="profile-avatar">{getInitials(employeeName || 'Super Admin')}</div>
                         <div className="profile-info">
                             <span className="profile-name">{employeeName || 'Super Admin'}</span>
                             <span className="profile-role">SUPER ADMIN</span>
@@ -2648,8 +2531,7 @@ export default function Dashboard() {
                     <div className="dashboard-header">
                         <div className="header-title">
                             <h2>{pageTitles[activeTab]}</h2>
-                            <p>
-                                Speedex Courier Inc. —{' '}
+                            <p>Speedex Courier Inc. —{' '}
                                 {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                             </p>
                         </div>
@@ -2661,8 +2543,7 @@ export default function Dashboard() {
                             {(activeTab === 'dashboard' || activeTab === 'employees') && (
                                 <div className="header-actions">
                                     <button className="quick-action-btn-header" onClick={() => setShowAddModal(true)}>
-                                        <Users size={18} />
-                                        Add Employee
+                                        <Users size={18} /> Add Employee
                                     </button>
                                 </div>
                             )}
@@ -2678,10 +2559,7 @@ export default function Dashboard() {
                         activityLogs={activityLogs}
                         loading={loading}
                         onSelectEmployee={handleSelectEmployee}
-                        onViewAll={() => {
-                            setActiveTab('employees');
-                            setSelectedPanelEmployee(null);
-                        }}
+                        onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }}
                     />
                 )}
 
@@ -2692,11 +2570,8 @@ export default function Dashboard() {
                             onBack={() => setSelectedPanelEmployee(null)}
                             onEmployeeUpdated={(updated) => {
                                 handleEmployeeUpdated(updated);
-                                if (updated.accountStatus === '__deleted__') {
-                                    setSelectedPanelEmployee(null);
-                                } else {
-                                    setSelectedPanelEmployee(updated);
-                                }
+                                if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null);
+                                else setSelectedPanelEmployee(updated);
                             }}
                         />
                     ) : (
@@ -2714,10 +2589,7 @@ export default function Dashboard() {
                 {activeTab === 'delivery' && (
                     <div className="dashboard-content">
                         <div className="card">
-                            <div className="empty-state" style={{ padding: 48 }}>
-                                <Truck size={32} />
-                                <p>Delivery module coming soon.</p>
-                            </div>
+                            <div className="empty-state" style={{ padding: 48 }}><Truck size={32} /><p>Delivery module coming soon.</p></div>
                         </div>
                     </div>
                 )}
@@ -2725,10 +2597,7 @@ export default function Dashboard() {
                 {activeTab === 'analytics' && (
                     <div className="dashboard-content">
                         <div className="card">
-                            <div className="empty-state" style={{ padding: 48 }}>
-                                <BarChart3 size={32} />
-                                <p>Analytics module coming soon.</p>
-                            </div>
+                            <div className="empty-state" style={{ padding: 48 }}><BarChart3 size={32} /><p>Analytics module coming soon.</p></div>
                         </div>
                     </div>
                 )}
@@ -2738,23 +2607,13 @@ export default function Dashboard() {
                 {activeTab === 'activity_logs' && (
                     <div className="dashboard-content">
                         <div className="card">
-                            <div className="card-header">
-                                <h3>System Activity Logs</h3>
-                            </div>
+                            <div className="card-header"><h3>System Activity Logs</h3></div>
                             {activityLogs.length === 0 ? (
-                                <div className="empty-state" style={{ padding: 48 }}>
-                                    <Activity size={32} />
-                                    <p>No activity logs found.</p>
-                                </div>
+                                <div className="empty-state" style={{ padding: 48 }}><Activity size={32} /><p>No activity logs found.</p></div>
                             ) : (
                                 <div className="data-table-wrap">
                                     <table className="data-table">
-                                        <thead>
-                                            <tr>
-                                                <th>DESCRIPTION</th>
-                                                <th>TIMESTAMP</th>
-                                            </tr>
-                                        </thead>
+                                        <thead><tr><th>DESCRIPTION</th><th>TIMESTAMP</th></tr></thead>
                                         <tbody>
                                             {activityLogs.map(log => (
                                                 <tr key={log.id}>

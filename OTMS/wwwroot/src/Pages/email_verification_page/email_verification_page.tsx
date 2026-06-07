@@ -4,7 +4,7 @@ import axios from "axios";
 import "./email_verification_page.css";
 
 type VerifyState = "verifying" | "success" | "error";
-
+const navigate = useNavigate();
 function VerifyEmail() {
     const [searchParams] = useSearchParams();
     const [state, setState] = useState<VerifyState>("verifying");
@@ -116,12 +116,12 @@ function VerifyEmail() {
                                         <p className="ev-alert-desc">Your email address has been confirmed.</p>
                                     </div>
                                 </div>
-                                <a href="/" className="ev-btn ev-btn--primary">
-                                    Continue to Login
+                                <button className="ev-btn ev-btn--primary" onClick={() => navigate('/onboarding')}>
+                                    Continue to Setup
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                                         <path d="M5 12h14M12 5l7 7-7 7" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                </a>
+                                </button>
                             </div>
                         )}
 

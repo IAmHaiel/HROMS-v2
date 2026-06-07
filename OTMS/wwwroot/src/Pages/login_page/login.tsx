@@ -70,9 +70,13 @@ export default function Login() {
 
     const validateEmployeeId = (value: string): string => {
         if (!value.trim()) return 'Employee ID is required.';
-        if (value.trim().length < 3) return 'Employee ID must be at least 3 characters.';
         if (value.trim().length > 20) return 'Employee ID must not exceed 20 characters.';
-        if (!/^EMP-\d{4}$/.test(value.trim())) return 'Employee ID must follow the format EMP-0001.';
+        // Allow digits-only (regular employees) OR SPDX-SPR-XXX format (super admins)
+        const isDigitsOnly = /^\d{1,5}$/.test(value.trim());
+        const isSuperAdmin = /^SPDX-SPR-\d{2,}$/.test(value.trim());
+        if (!isDigitsOnly && !isSuperAdmin) {
+            return 'Enter a valid Employee ID (e.g. 0001 or SPDX-SPR-01).';
+        }
         return '';
     };
 
@@ -262,7 +266,7 @@ export default function Login() {
                                     id="employeeId"
                                     type="text"
                                     className="field-input"
-                                    placeholder="e.g. EMP-0001"
+                                    placeholder="e.g. 0001"
                                     value={employeeId}
                                     onChange={(e) => {
                                         setEmployeeId(e.target.value);
@@ -271,7 +275,7 @@ export default function Login() {
                                     disabled={isLoading}
                                     autoComplete="username"
                                     autoFocus
-                                    maxLength={20}
+                                    maxLength={20}   
                                 />
                             </div>
                             {employeeIdError && (
