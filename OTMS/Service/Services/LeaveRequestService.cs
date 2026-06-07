@@ -13,7 +13,8 @@ namespace OTMS.Service.Services
 {
     public class LeaveRequestService(
         OTMSDbContext context,
-        IHttpContextAccessor httpContextAccessor
+        IHttpContextAccessor httpContextAccessor,
+        INotificationService notificationService
         ) : ILeaveRequest
     {
         public async Task<LeaveRequestResponseDTO> CreateLeaveRequestAsync(CreateLeaveRequestDTO request)
@@ -54,6 +55,9 @@ namespace OTMS.Service.Services
 
             context.LeaveRequests.Add(leaveRequest);
             await context.SaveChangesAsync();
+
+            // Send Notification
+            await notificationService.CreateLeaveRequestNotificationAsync(leaveRequest);
 
             return new LeaveRequestResponseDTO
             {
