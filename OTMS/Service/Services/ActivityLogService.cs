@@ -62,8 +62,12 @@ namespace OTMS.Service.Services
             return new PresenceResponseDTO
             {
                 accountId = account.AccountId,
-                employeeName = string.Join(" ", new[]
-                {account.Employee.FirstName, account.Employee.MiddleName, account.Employee.LastName, account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
                 presenceStatus = isOnline ? "Online" : "Offline",
                 lastSeen = lastSeen
             };
@@ -94,8 +98,12 @@ namespace OTMS.Service.Services
             {
                 ActivityLogId = activityLog.ActivityLogId,
                 AccountId = AccountId,
-                EmployeeName = string.Join(" ", new[]
-                {account.Employee.FirstName, account.Employee.MiddleName, account.Employee.LastName, account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
                 ActivityType = activityLog.ActivityType,
                 Description = activityLog.Description,
                 CreatedAt = activityLog.CreatedAt
