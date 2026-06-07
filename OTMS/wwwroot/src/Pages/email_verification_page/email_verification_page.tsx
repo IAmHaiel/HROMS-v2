@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./email_verification_page.css";
 
 type VerifyState = "verifying" | "success" | "error";
-const navigate = useNavigate();
 function VerifyEmail() {
     const [searchParams] = useSearchParams();
     const [state, setState] = useState<VerifyState>("verifying");
+    const navigate = useNavigate();
+    const hasVerified = useRef(false);
 
     useEffect(() => {
+        if (hasVerified.current) return; 
+        hasVerified.current = true;    
+
         const verifyEmail = async () => {
             const token = searchParams.get("token");
             if (!token) {
@@ -17,12 +21,10 @@ function VerifyEmail() {
                 return;
             }
             try {
-                await axios.get(
-                    "/api/authentication/verify-email",
-                    { params: { token } }
-                );
+                await axios.get(`/api/authentication/verify-email?token=${token}`);
                 setState("success");
-            } catch {
+            } catch (error: any) {
+                console.log("Error response:", error.response?.data); 
                 setState("error");
             }
         };
@@ -116,11 +118,8 @@ function VerifyEmail() {
                                         <p className="ev-alert-desc">Your email address has been confirmed.</p>
                                     </div>
                                 </div>
-                                <button className="ev-btn ev-btn--primary" onClick={() => navigate('/onboarding')}>
-                                    Continue to Setup
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                        <path d="M5 12h14M12 5l7 7-7 7" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
+                                <button className="ev-btn ev-btn--primary" onClick={() => navigate('/')}>
+                                    Continue to Login
                                 </button>
                             </div>
                         )}

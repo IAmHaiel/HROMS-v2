@@ -60,7 +60,11 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error();
-            const data: NotificationItem[] = await res.json();
+            const json = await res.json();
+            console.log('Notifications API response:', json);
+            const data: NotificationItem[] = Array.isArray(json)
+                ? json
+                : json?.data ?? json?.notifications ?? json?.items ?? [];
             setNotifs(prev => {
                 const locallyRead = new Set(
                     prev.filter(n => n.isRead).map(n => n.notificationId)

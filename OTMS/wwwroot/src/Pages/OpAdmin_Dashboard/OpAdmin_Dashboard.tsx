@@ -1068,15 +1068,20 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
 function ProfileTab() {
-    const employeeId = localStorage.getItem('employeeId') ?? '';
     const { success, error } = useToast();
-    const employeeNameStored = localStorage.getItem('employeeName') ?? '';
+    const employeeId = localStorage.getItem('employeeId') ?? '';
+    const firstName = localStorage.getItem('firstName') ?? '';
+    const middleName = localStorage.getItem('middleName') ?? '';
+    const lastName = localStorage.getItem('lastName') ?? '';
+    const employeeNameStored = [firstName, middleName, lastName].filter(Boolean).join(' ');
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
 
     // ── Profile edit state ───────────────────────────────────────────────────
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({
-        employeeName: employeeNameStored,
+        firstName: firstName,
+        middleName: middleName,
+        lastName: lastName,
         contactNumber: employeeContact,
     });
     const [profileError, setProfileError] = useState('');
@@ -1099,6 +1104,24 @@ function ProfileTab() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
+    useEffect(() => {
+        const t = localStorage.getItem('authToken');
+        if (!t) return;
+        fetch('/api/profile/view-profile', {
+            headers: { Authorization: `Bearer ${t}` },
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (!data) return;
+                const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
+                if (contact) {
+                    localStorage.setItem('contactNumber', contact);
+                    setProfileForm(prev => ({ ...prev, contactNumber: contact }));
+                }
+            })
+            .catch(() => { });
+    }, []);
+
     const authHeader = () => ({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('authToken')}`,
@@ -1106,8 +1129,12 @@ function ProfileTab() {
 
     // ── "Save Changes" clicked: validate first, then open gate ───────────────
     const requestSave = () => {
-        if (!profileForm.employeeName.trim()) {
-            setProfileError('Full name is required.');
+        if (!profileForm.firstName.trim()) {
+            setProfileError('First name is required.');
+            return;
+        }
+        if (!profileForm.lastName.trim()) {
+            setProfileError('Last name is required.');
             return;
         }
         if (
@@ -1161,7 +1188,9 @@ function ProfileTab() {
                     headers: authHeader(),
                     body: JSON.stringify({
                         employeeNumber: employeeId,
-                        employeeName: profileForm.employeeName.trim(),
+                        firstName: profileForm.firstName.trim(),
+                        middleName: profileForm.middleName.trim(),
+                        lastName: profileForm.lastName.trim(),
                         contactNumber: profileForm.contactNumber.trim(),
                     }),
                 }
@@ -1170,7 +1199,9 @@ function ProfileTab() {
                 const err = await res.json().catch(() => ({}));
                 throw new Error((err as any).message || 'Profile update failed.');
             }
-            localStorage.setItem('employeeName', profileForm.employeeName.trim());
+            localStorage.setItem('firstName', profileForm.firstName.trim());
+            localStorage.setItem('middleName', profileForm.middleName.trim());
+            localStorage.setItem('lastName', profileForm.lastName.trim());
             localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
             setProfileSuccess(true);
             setEditingProfile(false);
@@ -1183,17 +1214,17 @@ function ProfileTab() {
         }
     };
 
+    const handlePwChange = (key: keyof typeof pwForm) =>
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            setPwForm(prev => ({ ...prev, [key]: e.target.value }));
+            setPwError('');
+        };
+
     const handleProfileChange = (key: keyof typeof profileForm) =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
             setProfileForm(prev => ({ ...prev, [key]: e.target.value }));
             setProfileError('');
             setProfileSuccess(false);
-        };
-
-    const handlePwChange = (key: keyof typeof pwForm) =>
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            setPwForm(prev => ({ ...prev, [key]: e.target.value }));
-            setPwError('');
         };
 
     const handlePwSave = async () => {
@@ -1221,7 +1252,8 @@ function ProfileTab() {
         }
     };
 
-    const displayName = profileForm.employeeName || employeeNameStored || 'System Admin';
+    const displayName = [profileForm.firstName, profileForm.middleName, profileForm.lastName]
+        .filter(Boolean).join(' ') || 'Operation Admin';
     const displayContact = profileForm.contactNumber || employeeContact;
 
     return (
@@ -1380,12 +1412,30 @@ function ProfileTab() {
                                 </div>
                             )}
                             <div className="field">
-                                <label>Full Name</label>
+                                <label>First Name</label>
                                 <input
                                     type="text"
-                                    value={profileForm.employeeName}
-                                    onChange={handleProfileChange('employeeName')}
-                                    placeholder="Enter full name"
+                                    value={profileForm.firstName}
+                                    onChange={handleProfileChange('firstName')}
+                                    placeholder="Enter first name"
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Middle Name</label>
+                                <input
+                                    type="text"
+                                    value={profileForm.middleName}
+                                    onChange={handleProfileChange('middleName')}
+                                    placeholder="Enter middle name (optional)"
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Last Name</label>
+                                <input
+                                    type="text"
+                                    value={profileForm.lastName}
+                                    onChange={handleProfileChange('lastName')}
+                                    placeholder="Enter last name"
                                 />
                             </div>
                             <div className="field">
@@ -1414,7 +1464,9 @@ function ProfileTab() {
                                         setEditingProfile(false);
                                         setProfileError('');
                                         setProfileForm({
-                                            employeeName: employeeNameStored,
+                                            firstName: localStorage.getItem('firstName') ?? '',
+                                            middleName: localStorage.getItem('middleName') ?? '',
+                                            lastName: localStorage.getItem('lastName') ?? '',
                                             contactNumber: employeeContact,
                                         });
                                     }}
@@ -1442,12 +1494,24 @@ function ProfileTab() {
                                 </span>
                                 <span className="detail-value">{employeeId || '—'}</span>
                             </div>
-                            <div className="detail-item">
-                                <span className="detail-label">
-                                    <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Full Name
-                                </span>
-                                <span className="detail-value">{displayName}</span>
-                            </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">
+                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name
+                                    </span>
+                                    <span className="detail-value">{profileForm.firstName || '—'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">
+                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name
+                                    </span>
+                                    <span className="detail-value">{profileForm.middleName || '—'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">
+                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name
+                                    </span>
+                                    <span className="detail-value">{profileForm.lastName || '—'}</span>
+                                </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role
@@ -1668,7 +1732,10 @@ function ProfileTab() {
 export default function OpsAdminDashboard() {
     const navigate = useNavigate();
     const employeeId = localStorage.getItem('employeeId') ?? '';
-    const employeeName = localStorage.getItem('employeeName') ?? '';
+    const firstName = localStorage.getItem('firstName') ?? '';
+    const lastName = localStorage.getItem('lastName') ?? '';
+    const middleName = localStorage.getItem('middleName') ?? '';
+    const employeeName = [firstName, middleName, lastName].filter(Boolean).join(' ') || 'Op Admin';
     const { success, error, confirm } = useToast();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -1772,14 +1839,20 @@ export default function OpsAdminDashboard() {
     useEffect(() => {
         fetchTasks();
         fetchTeamMembers();
-        // Fetch own presence status
-        const t = token();
-        if (t) {
-            fetch('/api/profile/view-profile', { headers: { Authorization: `Bearer ${t}` } })
-                .then(res => res.ok ? res.json() : null)
-                .then(data => { if (data?.presenceStatus) setUserPresenceStatus(data.presenceStatus); })
-                .catch(() => {});
-        }
+        const t = localStorage.getItem('authToken');
+        if (!t) return;
+        fetch('/api/profile/view-profile', {
+            headers: { Authorization: `Bearer ${t}` },
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (!data) return;
+                const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
+                if (contact) {
+                    localStorage.setItem('contactNumber', contact);
+                }
+            })
+            .catch(() => { });
     }, []);
 
     // ── Create Task ──
@@ -1895,7 +1968,8 @@ export default function OpsAdminDashboard() {
             }).catch(() => { }); // non-fatal — clear localStorage regardless
         }
 
-        ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'contactNumber', 'role']
+        ['employeeId', 'refreshToken', 'authToken', 'employeeName',
+            'firstName', 'middleName', 'lastName', 'contactNumber', 'role']
             .forEach(k => localStorage.removeItem(k));
         navigate('/');
     };

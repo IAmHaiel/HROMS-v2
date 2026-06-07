@@ -378,6 +378,7 @@ namespace OTMS.Service.Services
             return new TokenResponseDTO
             {
                 AccessToken = CreateToken(employee),
+                EmployeeNumber = employee.EmployeeNumber,
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
                 Role = employee.Account.Role ?? string.Empty,
                 FirstName = employee.FirstName ?? string.Empty,

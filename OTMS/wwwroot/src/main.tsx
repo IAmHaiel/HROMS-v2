@@ -19,7 +19,7 @@ import OnboardingPage from './Pages/onboarding_page/onboarding_page'
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
     if (!isPasswordChanged) {
-        return <Navigate to="/change-password" replace />;
+        return <Navigate to="/onboarding" replace />; 
     }
     return <Outlet />;
 }

@@ -4,6 +4,7 @@ namespace OTMS.Entities.DTOs
 {
     public class TokenResponseDTO
     {
+        public string EmployeeNumber { get; set; } = string.Empty;
         public required string AccessToken { get; set; }
         public required string RefreshToken { get; set; }
         public string FirstName { get; set; } = string.Empty;

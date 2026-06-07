@@ -17,6 +17,7 @@ interface LoginResponse {
     accessToken: string;
     role: UserRole;
     employeeName: string;
+    employeeNumber: string;
     message?: string;
     isPasswordChanged: boolean;
 }
@@ -160,12 +161,13 @@ export default function Login() {
             localStorage.setItem('employeeId', employeeId.trim());
             localStorage.setItem('employeeName', data.employeeName);
             localStorage.setItem('isPasswordChanged', data.isPasswordChanged.toString());
+            localStorage.setItem('contactNumber', data.contactNumber ?? data.contact ?? data.phoneNumber ?? '');
 
             updateStatus('Login successful. Redirecting...', 'success');
 
             if (!data.isPasswordChanged) {
-                updateStatus('Please change your password to continue.', 'info');
-                setTimeout(() => navigate('/change-password'), 800);
+                updateStatus('Please complete your account setup.', 'info');
+                setTimeout(() => navigate('/onboarding'), 800);
                 return;
             }
 
