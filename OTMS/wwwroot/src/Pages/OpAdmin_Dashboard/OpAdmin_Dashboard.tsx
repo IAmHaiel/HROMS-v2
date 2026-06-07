@@ -723,19 +723,20 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
 
 const TasksTab: React.FC<{
     tasks: Task[];
-    allTasks: Task[];  
+    allTasks: Task[];
+    binTasks: Task[];
     loading: boolean;
     searchQuery: string;
     onView: (id: string) => void;
     onEdit: (id: string) => void;
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
-}> = ({ tasks, allTasks, loading, searchQuery, onView, onEdit, onRestore, onEmptyBin }) => {
+}> = ({ tasks, allTasks, binTasks, loading, searchQuery, onView, onEdit, onRestore, onEmptyBin }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
 
-    const deletedTasks = allTasks.filter((t: any) => t.deleted === true);
+    const deletedTasks = binTasks;
 
     const filtered = tasks.filter(t =>
         (!filterStatus || t.taskStatus === filterStatus) &&
@@ -1885,7 +1886,8 @@ export default function OpsAdminDashboard() {
 
     // ── Fetch Tasks ──
     const [allTasks, setAllTasks] = useState<Task[]>([]);
-    const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); // ← ADD
+    const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); 
+    const [binTasks, setBinTasks] = useState<Task[]>([]);
 
     // ── Update fetchTasks ──
     const fetchTasks = async () => {
@@ -1916,10 +1918,31 @@ export default function OpsAdminDashboard() {
         }
     };
 
+    const fetchBinRecords = async () => {
+        try {
+            const res = await fetch(
+                `/api/task/bin-records/${employeeId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token()}`,
+                    },
+                }
+            );
+
+            if (!res.ok) throw new Error();
+
+            const data = await res.json();
+
+            setBinTasks(data);
+        } catch {
+            setBinTasks([]);
+        }
+    };
+
     // ── Restore task ──
     const handleRestoreTask = async (taskId: string) => {
         try {
-            const res = await fetch(`/api/task/${taskId}/restore`, {
+            const res = await fetch(`/api/task/${taskId}/restore-task`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${token()}` },
             });
@@ -1935,14 +1958,46 @@ export default function OpsAdminDashboard() {
                 return restored ? [...prev, { ...restored, deleted: false }] : prev;
             });
             success('Task restored successfully.');
+            await fetchTasks();
+            await fetchBinRecords();
         } catch (err: any) {
             error(err.message ?? 'Failed to restore task.');
         }
     };
 
-    const handleEmptyBin = () => {
-        setAllTasks(prev => prev.filter(t => !t.deleted));
-        success('Bin emptied.');
+    const handleEmptyBin = async () => {
+        const ok = await confirm(
+            'Permanently remove all items in the bin?',
+            {
+                confirmLabel: 'Empty Bin',
+                cancelLabel: 'Cancel',
+            }
+        );
+
+        if (!ok) return;
+
+        try {
+            const res = await fetch(
+                `/api/task/empty-bin/${employeeId}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${token()}`,
+                    },
+                }
+            );
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to empty bin.');
+            }
+
+            setBinTasks([]);
+            await fetchTasks();
+            success('Bin emptied successfully.');
+        } catch (err: any) {
+            error(err.message ?? 'Failed to empty bin.');
+        }
     };
 
     // ── Fetch Team Members (for assignee dropdown) ──
@@ -1969,6 +2024,7 @@ export default function OpsAdminDashboard() {
 
     useEffect(() => {
         fetchTasks();
+        fetchBinRecords();
         fetchTeamMembers();
         const t = localStorage.getItem('authToken');
         if (!t) return;
@@ -2079,7 +2135,7 @@ export default function OpsAdminDashboard() {
             setDetailTask(null);
             success('Task deleted successfully.');
 
-            // No fetchTasks() here — it would overwrite local deleted state
+            await fetchBinRecords();
 
         } catch (err: any) {
             error(err.message ?? 'Something went wrong.');
@@ -2212,6 +2268,7 @@ export default function OpsAdminDashboard() {
                     <TasksTab
                         tasks={tasks}
                         allTasks={allTasks}
+                        binTasks={binTasks}
                         loading={loadingTasks}
                         searchQuery={searchQuery}
                         onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
