@@ -5,6 +5,7 @@ import './index.css'
 import LoginPage from './Pages/login_page/login'
 import SystemAdmin_Dashboard from './Pages/SystemAdmin_Dashboard/SystemAdmin_Dashboard'
 import ForgotPasswordPage from './Pages/forgotpassword_page/forgotpassword_page'
+import ResetPasswordPage from './Pages/resetpassword_page/resetpassword_page'
 import OpAdmin_Dashboard from './Pages/OpAdmin_Dashboard/OpAdmin_Dashboard'
 import OpEmployee_Dashboard from './Pages/OpEmployee_Dashboard/OpEmployee_Dashboard'
 import AccountLocked from './Pages/account_locked/account_locked'
@@ -19,7 +20,7 @@ import OnboardingPage from './Pages/onboarding_page/onboarding_page'
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
     if (!isPasswordChanged) {
-        return <Navigate to="/onboarding" replace />; 
+        return <Navigate to="/onboarding" replace />;
     }
     return <Outlet />;
 }
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     {/* Public routes */}
                     <Route path="/" element={<LoginPage />} />
                     <Route path="/forgotpassword_page" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/account_locked" element={<AccountLocked />} />
                     <Route path="/change-password" element={<ChangePassword />} />
                     <Route path="/verify-email" element={<EmailVerificationPage />} />

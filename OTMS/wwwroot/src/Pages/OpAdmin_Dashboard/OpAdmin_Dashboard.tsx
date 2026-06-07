@@ -1168,7 +1168,10 @@ function ProfileTab() {
             const verifyRes = await fetch('/api/authentication/verify-password', {
                 method: 'POST',
                 headers: authHeader(),
-                body: JSON.stringify({ password: gatePassword }),
+                body: JSON.stringify({
+                    employeeID: employeeId,   
+                    password: gatePassword,
+                }),
             });
             if (!verifyRes.ok) {
                 const err = await verifyRes.json().catch(() => ({}));

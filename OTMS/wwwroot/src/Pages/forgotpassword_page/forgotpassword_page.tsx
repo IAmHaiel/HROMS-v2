@@ -1,7 +1,7 @@
-﻿import React, { useState, useRef } from 'react';
+﻿import React, { useState } from 'react';
 import './forgotpassword_page.css';
 import { Link } from 'react-router-dom';
-import { Package } from 'lucide-react';
+import { Package, Mail, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 /* ── Reusable Feature Item ── */
 function FeatureItem({ title, description }: { title: string; description: string }) {
@@ -15,70 +15,51 @@ function FeatureItem({ title, description }: { title: string; description: strin
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
-    const [otp, setOtp] = useState<string[]>(['', '', '', '', '']);
-    const [step, setStep] = useState<'email' | 'otp'>('email');
+    const [step, setStep] = useState<'email' | 'sent'>('email');
     const [status, setStatus] = useState<{ type: 'info' | 'error' | 'success'; message: string } | null>(null);
     const [loading, setLoading] = useState(false);
-
-    const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
     /* ── Email validation ── */
     const isValidEmail = (value: string) =>
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-    const handleSendCode = () => {
+    const handleSendResetLink = async () => {
         if (!email) {
             setStatus({ type: 'error', message: 'Please enter your email.' });
             return;
         }
-
         if (!isValidEmail(email)) {
             setStatus({ type: 'error', message: 'Enter a valid email address.' });
             return;
         }
 
         setLoading(true);
-        setStatus({ type: 'info', message: 'Sending verification code...' });
+        setStatus({ type: 'info', message: 'Sending reset link...' });
 
-        setTimeout(() => {
-            setStep('otp');
+        try {
+            const res = await fetch('/api/authentication/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to send reset link. Please try again.');
+            }
+
+            setStep('sent');
+            setStatus(null);
+        } catch (err: any) {
+            setStatus({ type: 'error', message: err.message ?? 'Something went wrong. Please try again.' });
+        } finally {
             setLoading(false);
-            setStatus({ type: 'success', message: 'Verification code sent.' });
-            inputsRef.current[0]?.focus();
-        }, 1000);
-    };
-
-    const handleOtpChange = (value: string, index: number) => {
-        if (!/^[0-9]?$/.test(value)) return;
-
-        const updated = [...otp];
-        updated[index] = value;
-        setOtp(updated);
-
-        if (value && index < otp.length - 1) {
-            inputsRef.current[index + 1]?.focus();
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-        if (e.key === 'Backspace' && !otp[index] && index > 0) {
-            inputsRef.current[index - 1]?.focus();
-        }
-    };
-
-    const handleVerify = () => {
-        if (otp.some(d => d === '')) {
-            setStatus({ type: 'error', message: 'Please complete the OTP.' });
-            return;
-        }
-
-        setLoading(true);
-        setStatus({ type: 'info', message: 'Verifying code...' });
-
-        setTimeout(() => {
-            setLoading(false);
-            setStatus({ type: 'success', message: 'Code verified! Proceed to reset password.' });
-        }, 1000);
+    const handleResend = () => {
+        setStep('email');
+        setStatus(null);
     };
 
     return (
@@ -108,7 +89,6 @@ export default function ForgotPassword() {
                         </p>
                     </div>
 
-                    {/* Features */}
                     <div className="feature-list">
                         <FeatureItem
                             title="Real-Time Delivery Tracking"
@@ -131,77 +111,93 @@ export default function ForgotPassword() {
             <div className="forgot-right">
                 <div className="forgot-card">
 
-                    <div className="forgot-header">
-                        <h2 className="forgot-title">Forgot Password</h2>
-                        <p className="forgot-subtitle">Recover your account securely</p>
-                    </div>
+                    {/* ── STEP: Email entry ── */}
+                    {step === 'email' && (
+                        <>
+                            <div className="forgot-header">
+                                <div className="forgot-icon-wrap">
+                                    <Mail size={22} />
+                                </div>
+                                <h2 className="forgot-title">Forgot Password</h2>
+                                <p className="forgot-subtitle">
+                                    Enter your registered email address and we'll send you a link to reset your password.
+                                </p>
+                            </div>
 
-                    {status && (
-                        <div className={`status-bar ${status.type}`}>
-                            {status.message}
-                        </div>
-                    )}
+                            {status && (
+                                <div className={`status-bar ${status.type}`}>
+                                    {status.type === 'error' && <AlertCircle size={14} />}
+                                    {status.message}
+                                </div>
+                            )}
 
-                    <form
-                        className="forgot-form"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            step === 'email' ? handleSendCode() : handleVerify();
-                        }}
-                    >
-
-                        {step === 'email' && (
-                            <>
-                                <input
-                                    className="forgot-input"
-                                    type="email"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-
-                                <button
-                                    type="submit"
-                                    className={`submit-btn ${loading ? 'loading' : ''}`}
-                                    disabled={loading}
-                                >
-                                    {loading ? 'Sending...' : 'Send Verification Code'}
-                                </button>
-                            </>
-                        )}
-
-                        {step === 'otp' && (
-                            <>
-                                <div className="otp-container">
-                                    {otp.map((digit, index) => (
-                                        <input
-                                            key={index}
-                                            ref={(el) => (inputsRef.current[index] = el)}
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={digit}
-                                            onChange={(e) => handleOtpChange(e.target.value, index)}
-                                            onKeyDown={(e) => handleKeyDown(e, index)}
-                                            maxLength={1}
-                                        />
-                                    ))}
+                            <form
+                                className="forgot-form"
+                                onSubmit={(e) => { e.preventDefault(); handleSendResetLink(); }}
+                            >
+                                <div className="field-group">
+                                    <label className="field-label">Email Address</label>
+                                    <input
+                                        className={`forgot-input${status?.type === 'error' ? ' input-error' : ''}`}
+                                        type="email"
+                                        placeholder="e.g. employee@speedex.com"
+                                        value={email}
+                                        onChange={(e) => { setEmail(e.target.value); setStatus(null); }}
+                                        autoFocus
+                                    />
                                 </div>
 
                                 <button
                                     type="submit"
-                                    className={`submit-btn ${loading ? 'loading' : ''}`}
+                                    className={`submit-btn${loading ? ' loading' : ''}`}
                                     disabled={loading}
                                 >
-                                    {loading ? 'Verifying...' : 'Verify Code'}
+                                    {loading
+                                        ? <><Loader2 size={15} className="spin" /> Sending…</>
+                                        : 'Send Reset Link'
+                                    }
                                 </button>
-                            </>
-                        )}
+                            </form>
 
-                    </form>
+                            <div className="right-footer">
+                                Remembered your password?{' '}
+                                <Link className="login-link" to="/">Login here</Link>
+                            </div>
+                        </>
+                    )}
 
-                    <div className="right-footer">
-                        Already have an account? <Link className="login-link" to="/">Login here</Link>
-                    </div>
+                    {/* ── STEP: Email sent confirmation ── */}
+                    {step === 'sent' && (
+                        <>
+                            <div className="forgot-header">
+                                <div className="forgot-icon-wrap success">
+                                    <CheckCircle size={22} />
+                                </div>
+                                <h2 className="forgot-title">Check Your Email</h2>
+                                <p className="forgot-subtitle">
+                                    We've sent a password reset link to:
+                                </p>
+                                <p className="sent-email">{email}</p>
+                                <p className="forgot-subtitle" style={{ marginTop: 8 }}>
+                                    Click the link in the email to reset your password.
+                                    The link will expire in a short time for your security.
+                                </p>
+                            </div>
+
+                            <div className="sent-notice">
+                                <AlertCircle size={13} />
+                                <span>Didn't receive it? Check your spam folder or request a new link.</span>
+                            </div>
+
+                            <button className="submit-btn outline" onClick={handleResend}>
+                                Resend Reset Link
+                            </button>
+
+                            <div className="right-footer">
+                                <Link className="login-link" to="/">← Back to Login</Link>
+                            </div>
+                        </>
+                    )}
 
                 </div>
             </div>
