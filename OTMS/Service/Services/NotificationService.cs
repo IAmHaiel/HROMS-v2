@@ -182,5 +182,73 @@ namespace OTMS.Service.Services
             await context.Notifications.AddAsync(assigneeNotification);
             await context.SaveChangesAsync();
         }
+
+        public async System.Threading.Tasks.Task CreateEmployeeTaskUpdateNotificationAsync(Entities.Models.Task task)
+        {
+            var assigneeNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var creatorNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy, // EmployeeId = Creator's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"{string.Join(" ", new[]
+                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(creatorNotification);
+            await context.Notifications.AddAsync(assigneeNotification);
+            await context.SaveChangesAsync();
+        }
+
+        public async System.Threading.Tasks.Task CreateCompletedTaskUpdateNotificationAsync(Entities.Models.Task task)
+        {
+            var assigneeNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var creatorNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy, // EmployeeId = Creator's Account ID
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskUpdated,
+                Message =
+                    $"{string.Join(" ", new[]
+                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(creatorNotification);
+            await context.Notifications.AddAsync(assigneeNotification);
+            await context.SaveChangesAsync();
+        }
     }
 }

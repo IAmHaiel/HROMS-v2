@@ -297,6 +297,17 @@ namespace OTMS.Service.Services
 
             await context.SaveChangesAsync();
 
+            // For Notification
+            if (task.TaskStatus == "Completed")
+            {
+                await notificationService
+                    .CreateCompletedTaskUpdateNotificationAsync(task);
+            } else
+            {
+                await notificationService
+                    .CreateEmployeeTaskUpdateNotificationAsync(task);
+            }
+
             // Activity Log
             await activityLogService.LogActivityAsync(
                 loggedInAccountId,

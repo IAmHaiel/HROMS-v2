@@ -9,6 +9,8 @@ namespace OTMS.Service.Interfaces
     {
         System.Threading.Tasks.Task CreateTaskAssignedNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateTaskUpdateNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateEmployeeTaskUpdateNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateCompletedTaskUpdateNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task<PaginationResponseDTO<NotificationResponseDTO>> GetMyNotificationsAsync(PaginationDTO request);
         System.Threading.Tasks.Task<bool> MarkNotificationAsReadAsync(Guid notificationId);
