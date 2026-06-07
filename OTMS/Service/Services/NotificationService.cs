@@ -35,7 +35,21 @@ namespace OTMS.Service.Services
 
         public async System.Threading.Tasks.Task CreateTaskAssignedNotificationAsync(Entities.Models.Task task)
         {
-            var notification = new Notification
+            var creatorNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy, // EmployeeId = Creator's AccountId
+                TaskId = task.TaskId,
+                NotificationType =
+                    NotificationTypes.TaskAssigned,
+                Message =
+                    $"You assigned a new task: '{task.TaskTitle}' for Employee {task.Assignee.Employee.EmployeeNumber} | {string.Join(" ", new[]
+                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var assigneeNotification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
                 EmployeeId = task.AssignedTo, // EmployeeId = Assignee's AccountId
@@ -43,12 +57,13 @@ namespace OTMS.Service.Services
                 NotificationType =
                     NotificationTypes.TaskAssigned,
                 Message =
-                    $"You were assigned a new task: '{task.TaskTitle}'.",
+                    $"You were assigned a new task: '{task.TaskTitle}' by {string.Join(" ", new[]
+                        {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
 
-            await context.Notifications.AddAsync(notification);
+            await context.Notifications.AddAsync(assigneeNotification);
             await context.SaveChangesAsync();
         }
 
@@ -160,7 +175,7 @@ namespace OTMS.Service.Services
                 NotificationType =
                     NotificationTypes.TaskUpdated,
                 Message =
-                    $"You updated the task: '{task.TaskTitle}'.",
+                    $"You updated the task: '{task.TaskTitle}' at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -174,7 +189,7 @@ namespace OTMS.Service.Services
                     NotificationTypes.TaskUpdated,
                 Message =
                     $"{string.Join(" ", new[]
-                        {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}'.",
+                        {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}' at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -194,7 +209,7 @@ namespace OTMS.Service.Services
                 NotificationType =
                     NotificationTypes.TaskUpdated,
                 Message =
-                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}.",
+                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. Updated at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -208,7 +223,7 @@ namespace OTMS.Service.Services
                     NotificationTypes.TaskUpdated,
                 Message =
                     $"{string.Join(" ", new[]
-                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}.",
+                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. Updated at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -228,7 +243,7 @@ namespace OTMS.Service.Services
                 NotificationType =
                     NotificationTypes.TaskUpdated,
                 Message =
-                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing.",
+                    $"You updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing. Updated at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
@@ -242,7 +257,7 @@ namespace OTMS.Service.Services
                     NotificationTypes.TaskUpdated,
                 Message =
                     $"{string.Join(" ", new[]
-                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing.",
+                        {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}', its Task Status is now {task.TaskStatus}. It is ready for Reviewing. Updated at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}",
                 IsRead = false,
                 CreatedAt = DateTime.UtcNow
             };
