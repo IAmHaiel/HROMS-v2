@@ -147,6 +147,10 @@ namespace OTMS.Service.Services
                 .Include(a => a.Employee)
                 .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
 
+            // Integrate Notification
+            await notificationService
+                .CreateTaskUpdateNotificationAsync(task);
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
@@ -292,6 +296,17 @@ namespace OTMS.Service.Services
             task.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
+
+            // For Notification
+            if (task.TaskStatus == "Completed")
+            {
+                await notificationService
+                    .CreateCompletedTaskUpdateNotificationAsync(task);
+            } else
+            {
+                await notificationService
+                    .CreateEmployeeTaskUpdateNotificationAsync(task);
+            }
 
             // Activity Log
             await activityLogService.LogActivityAsync(

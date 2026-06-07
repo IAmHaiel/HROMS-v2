@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
-    public class EmergencyOverrideService(IHttpContextAccessor httpContextAccessor, OTMSDbContext context) : IEmergencyOverrideService
+    public class EmergencyOverrideService(IHttpContextAccessor httpContextAccessor, OTMSDbContext context, INotificationService notificationService) : IEmergencyOverrideService
     {
         public async Task<EmergencyOverrideResponseDTO> ApproveOverrideAsync(ApproveEmergencyOverrideDTO request)
         {
@@ -129,6 +129,9 @@ namespace OTMS.Service.Services
 
             context.EmergencyOverrideRequests.Add(emergencyOverride);
             await context.SaveChangesAsync();
+
+            // Send Notification
+            await notificationService.CreateEmergencyOverrideNotificationAsync(emergencyOverride);
 
             return new EmergencyOverrideResponseDTO
             {
