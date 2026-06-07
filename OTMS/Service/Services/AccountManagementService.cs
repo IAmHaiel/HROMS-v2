@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 
@@ -122,7 +124,7 @@ namespace OTMS.Service.Services
             // Prevent deactivation of System Admin accounts
             var systemAdminAccount = exist.Account.Role;
             
-            if (systemAdminAccount is not null && systemAdminAccount == "SystemAdmin")
+            if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
                 throw new InvalidOperationException("Cannot deactivate a System Admin account.");
             }
@@ -173,7 +175,7 @@ namespace OTMS.Service.Services
             // Check if the account belongs to a System Admin and prevent deletion if it does
             var systemAdminAccount = exist.Account.Role;
 
-            if (systemAdminAccount is not null && systemAdminAccount == "SystemAdmin")
+            if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
                 throw new InvalidOperationException("Cannot delete a System Admin account.");
             }
@@ -192,16 +194,23 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<List<SearchAccountStatusResponseDTO>> GetAccountsByStatus(SearchAccountStatusDTO request)
+        public async Task<PaginationResponseDTO<SearchAccountStatusResponseDTO>> GetAccountsByStatus(SearchAccountStatusDTO request)
         {
-            var employees = await context.Employees
+            var query = context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
-                .Where(e => e.Account.AccountStatus
-                    .Contains(request.Status))
+                .Where(e => e.Account != null &&
+                            e.Account.AccountStatus == request.Status);
+            
+            var totalEmployees = await query.CountAsync();
+
+            var employees = await query
+                .OrderBy(e => e.LastName)
+                .Skip((request.Pagination.PageNumber - 1) * request.Pagination.PageSize)
+                .Take(request.Pagination.PageSize)
                 .ToListAsync();
 
-            return employees.Select(e =>
+            var data = employees.Select(e =>
             {
                 var latestLog = e.Account?.ActivityLogs
                     .OrderByDescending(al => al.CreatedAt)
@@ -217,26 +226,47 @@ namespace OTMS.Service.Services
                 return new SearchAccountStatusResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    EmployeeName = e.EmployeeName,
+                    
+                    FirstName = e.FirstName,
+                    MiddleName = e.MiddleName,
+                    LastName = e.LastName,
+                    Suffix = e.Suffix,
+                    
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account != null ? e.Account.Role : "No Account",
-                    AccountStatus = e.Account != null ? e.Account.AccountStatus : "No Account",
+                    Role = e.Account?.Role ?? "No Account",
+                    AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Success = true
                 };
             }).ToList();
+
+            return new PaginationResponseDTO<SearchAccountStatusResponseDTO>
+            {
+                IsSuccess = true,
+                Message = $"Accounts with status '{request.Status}' retrieved successfully.",
+                Data = data,
+                PageNumber = request.Pagination.PageNumber,
+                PageSize = request.Pagination.PageSize,
+                TotalRecords = totalEmployees,
+                TotalPages = (int)Math.Ceiling(totalEmployees / (double)request.Pagination.PageSize)
+            };
         }
 
-        public async Task<List<RecentEmployeesResponseDTO>> GetRecentEmployees()
+        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request)
         {
-            var employees = await context.Employees
+           var query = context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(10)
+                .OrderByDescending(e => e.CreatedAt);
+
+            var totalRecords = await query.CountAsync();
+
+            var employees = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
                 .ToListAsync();
 
-            return employees.Select(e =>
+            var data = employees.Select(e =>
             {
                 var latestLog = e.Account?.ActivityLogs
                     .OrderByDescending(al => al.CreatedAt)
@@ -252,13 +282,29 @@ namespace OTMS.Service.Services
                 return new RecentEmployeesResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    EmployeeName = e.EmployeeName,
+
+                    FirstName = e.FirstName,
+                    MiddleName = e.MiddleName,
+                    LastName = e.LastName,
+                    Suffix = e.Suffix,
+
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account != null ? e.Account.Role : "No Account",
-                    AccountStatus = e.Account != null ? e.Account.AccountStatus : "No Account",
-                    PresenceStatus = presenceStatus,
+                    Role = e.Account?.Role ?? "No Account",
+                    AccountStatus = e.Account?.AccountStatus ?? "No Account",
+                    PresenceStatus = presenceStatus
                 };
             }).ToList();
+
+            return new PaginationResponseDTO<RecentEmployeesResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Recent employees retrieved successfully.",
+                Data = data,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+            };
         }
 
         public async Task<SearchUserResponseDTO?> SearchUser(SearchUserDTO request)
@@ -267,7 +313,10 @@ namespace OTMS.Service.Services
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
                 .FirstOrDefaultAsync(e =>
-                    e.EmployeeName.Contains(request.Search) ||
+                    e.FirstName.Contains(request.Search) ||
+                    e.MiddleName.Contains(request.Search) ||
+                    e.LastName.Contains(request.Search) ||
+                    e.Suffix.Contains(request.Search) ||
                     e.EmployeeNumber.Contains(request.Search) ||
                     e.Account.Role.Contains(request.Search)
                     );
@@ -291,7 +340,10 @@ namespace OTMS.Service.Services
             return new SearchUserResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                EmployeeName = employee.EmployeeName,
+                FirstName = employee.FirstName,
+                MiddleName = employee.MiddleName,
+                LastName = employee.LastName,
+                Suffix = employee.Suffix,
                 Role = employee.Account.Role,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
@@ -312,9 +364,24 @@ namespace OTMS.Service.Services
                 request.EmployeeNumber = employee.EmployeeNumber;
             }
 
-            if (request.EmployeeName == "string" || String.IsNullOrEmpty(request.EmployeeName))
+            if(request.FirstName == "string" || String.IsNullOrEmpty(request.FirstName))
             {
-                request.EmployeeName = employee.EmployeeName;
+                request.FirstName = employee.FirstName;
+            }
+            
+            if(request.MiddleName == "string" || String.IsNullOrEmpty(request.MiddleName))
+            {
+                request.MiddleName = employee.MiddleName;
+            }
+            
+            if(request.LastName == "string" || String.IsNullOrEmpty(request.LastName))
+            {
+                request.LastName = employee.LastName;
+            }
+            
+            if(request.Suffix == "string" || String.IsNullOrEmpty(request.Suffix))
+            {
+                request.Suffix = employee.Suffix;
             }
 
             if (request.ContactNumber == "string" || String.IsNullOrEmpty(request.ContactNumber))
@@ -326,14 +393,20 @@ namespace OTMS.Service.Services
                 .Where(e => e.EmployeeId == employee.EmployeeId)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(e => e.EmployeeNumber, request.EmployeeNumber)
-                    .SetProperty(e => e.EmployeeName, request.EmployeeName)
+                    .SetProperty(e => e.FirstName, request.FirstName)
+                    .SetProperty(e => e.MiddleName, request.MiddleName)
+                    .SetProperty(e => e.LastName, request.LastName)
+                    .SetProperty(e => e.Suffix, request.Suffix)
                     .SetProperty(e => e.ContactNumber, request.ContactNumber)
                     .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
 
             return new UpdateEmployeeResponseDTO
             {
                 EmployeeNumber = request.EmployeeNumber,
-                EmployeeName = request.EmployeeName ?? employee.EmployeeName,
+                FirstName = request.FirstName ?? employee.FirstName,
+                MiddleName = request.MiddleName ?? employee.MiddleName,
+                LastName = request.LastName ?? employee.LastName,
+                Suffix = request.Suffix ?? employee.Suffix,
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Success = true
             };

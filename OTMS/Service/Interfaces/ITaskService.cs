@@ -1,4 +1,7 @@
-﻿using OTMS.Entities.DTOs.Task;
+﻿using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Pagination;
+using OTMS.Entities.DTOs.Pagination.Response;
+using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 
 namespace OTMS.Service.Interfaces
@@ -9,7 +12,11 @@ namespace OTMS.Service.Interfaces
         Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request);
         Task<TaskResponseDTO> ReopenTaskAsync(Guid taskId);
         Task<TaskResponseDTO> UpdateTaskProgressAsync(Guid taskId, UpdateTaskProgressDTO request);
-        Task<List<TaskResponseDTO>> GetMyTasksAsync();
+        Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request);
         Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId);
+        Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync (Guid taskId);
+        Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> BinRecordsAsync(string EmployeeID, PaginationDTO pagination);
+        Task<ApiResponseDTO<object>> EmptyBinAsync(string EmployeeID);
+
     }
 }

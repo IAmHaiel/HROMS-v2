@@ -7,6 +7,9 @@ using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.PasswordVerification;
+using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
@@ -45,13 +48,19 @@ namespace OTMS.Controllers
                     return Unauthorized(new
                     {
                         message = "Your account has been locked due to 3 consecutive failed login attempts. Please contact your administrator.",
-                        employeeName = employee.EmployeeName
+                        firstName = employee.FirstName,
+                        middleName = employee.MiddleName,
+                        lastName = employee.LastName,
+                        suffix = employee.Suffix
                     });
 
                 return Unauthorized(new
                 {
                     message = "Your account has been deactivated by the System Administrator. Please contact your administrator.",
-                    employeeName = employee.EmployeeName
+                    firstName = employee.FirstName,
+                    middleName = employee.MiddleName,
+                    lastName = employee.LastName,
+                    suffix = employee.Suffix
                 });
             }
 
@@ -59,7 +68,7 @@ namespace OTMS.Controllers
 
             try
             {
-                if (!isOnLeave)                                                          
+                if (!isOnLeave)
                     await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
 
                 var result = await authService.LoginAsync(request);
@@ -73,12 +82,12 @@ namespace OTMS.Controllers
                 return Unauthorized(new
                 {
                     message = "Your account is currently on leave and cannot be accessed.",
-                    employeeName = ex.EmployeeName,
-                    overrideToken = ex.OverrideToken,
-                    leaveId = ex.LeaveId,              
+                    employeeName = ex.EmployeeName, // Separated Names are already joined to one string at this point.
+                    accountId = ex.AccountId,
+                    leaveId = ex.LeaveId
                 });
             }
-            
+
         }
 
         /// <summary>
@@ -111,9 +120,10 @@ namespace OTMS.Controllers
             await activitylogService.LogActivityAsync(
                 accountId,
                 ActivityTypes.Logout,
-                $"{account.Employee.EmployeeName} timed out at {DateTime.Now:hh:mm tt}");
+                $"{string.Join(" ", new[]
+                    {account.Employee.FirstName, account.Employee.MiddleName, account.Employee.LastName, account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed out at {DateTime.Now:hh:mm tt}");
 
-            return Ok(new {message = "Logged out successfully."});
+            return Ok(new { message = "Logged out successfully." });
         }
 
         /// <summary>
@@ -147,6 +157,7 @@ namespace OTMS.Controllers
             Console.WriteLine($"Received: [{token}]");
 
             var account = await context.Employees
+                .Include(e => e.Account)
                 .FirstOrDefaultAsync
                     (e => e.EmailVerificationToken == token);
 
@@ -155,11 +166,17 @@ namespace OTMS.Controllers
                 return BadRequest("Invalid token.");
             }
 
+            if (account.Account == null)
+            {
+                return BadRequest("Associated account not found.");
+            }
+
             if (account.EmailVerificationTokenExpiry < DateTime.UtcNow)
             {
                 return BadRequest("Token expired.");
             }
 
+            account.Account.AccountStatus = "Active"; // Turn to Active upon email verification
             account.IsEmailVerified = true;
             account.EmailVerificationToken = null;
             account.EmailVerificationTokenExpiry = null;
@@ -183,5 +200,67 @@ namespace OTMS.Controllers
             }
         }
 
+        [Authorize(Policy = "ManagementAccess")]
+        [HttpPost("verify-password")]
+        public async Task<ActionResult<PasswordVerificationResponseDTO>> VerifyPassword(PasswordVerificationDTO request)
+        {
+            var result = await authService.VerifyPasswordAsync(request);
+            
+            if(result.isSuccess == false)
+                return Unauthorized(result);
+
+            return Ok(result);
+        }
+
+
+        /// <summary>
+        /// This would be used when the employee forgot their password. An email with a password reset link will be sent to the employee's registered email address.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO request)
+        {
+            try
+            {
+                var result = await authService.ForgotPasswordAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        /// <summary>
+        /// This would be used to reset the password after the employee clicks the password reset link sent to their email. The link will contain a token that will be used to verify the password reset request.
+        /// </summary>
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO request)
+        {
+            try
+            {
+                var result = await authService.ResetPasswordAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+
+
+        }
     }
 }

@@ -9,6 +9,9 @@ using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
+using OTMS.Entities.DTOs.PasswordVerification;
+using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
@@ -52,39 +55,28 @@ namespace OTMS.Service.Services
                 );
             }
 
-            if (accountStatus is null || accountStatus == "Deactivated" || accountFailedAttempts == MaxFailedLoginAttempts)
+            if (accountStatus is null || accountStatus == "Deactivated" || accountStatus == "Locked" || accountFailedAttempts == MaxFailedLoginAttempts)
             {
                 return null;
             }
 
             if (accountStatus == "On Leave")
             {
-                var hasEmergencyOverride = await context.EmergencyOverrideRequests
-                    .AnyAsync(e =>
-                        e.RequestedById == employee.Account.AccountId &&
-                        e.Status == "Approved" &&
-                        e.OverrideUntil > DateTime.UtcNow);
+                var activeLeave = await context.LeaveRequests
+                    .FirstOrDefaultAsync(lr =>
+                        lr.AccountId == employee.Account.AccountId &&
+                        lr.Approval_Status == "Approved");
 
-                if (!hasEmergencyOverride)
-                {
-                    // Get the active leave for this employee
-                    var activeLeave = await context.LeaveRequests
-                        .FirstOrDefaultAsync(lr =>
-                            lr.AccountId == employee.Account.AccountId &&
-                            lr.Approval_Status == "Approved");
-
-                    // Generate limited override token
-                    var overrideToken = CreateOverrideToken(employee);
-
-                    throw new OnLeaveException(
-                        overrideToken,
-                        activeLeave?.LeaveId ?? Guid.Empty,
-                        employee.EmployeeName ?? string.Empty
-                    );
-                }
-
-                employee.Account.AccountStatus = "Emergency Overriden";
-                await context.SaveChangesAsync();
+                throw new OnLeaveException(
+                    employee.Account?.AccountId ?? Guid.Empty
+                    , activeLeave?.LeaveId ?? Guid.Empty
+                    , string.Join(" ", new[]
+                        {
+                            employee.FirstName ?? string.Empty,
+                            employee.MiddleName ?? string.Empty,
+                            employee.LastName ?? string.Empty,
+                            employee.Suffix ?? string.Empty
+                        }.Where(x => !string.IsNullOrWhiteSpace(x))));
             }
 
             var verificationResult =
@@ -103,7 +95,7 @@ namespace OTMS.Service.Services
                     employee.Account.FailedLoginAttempts++;
 
                     if (employee.Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
-                        employee.Account.AccountStatus = "Deactivated";
+                        employee.Account.AccountStatus = "Locked";
 
                     context.Accounts.Update(employee.Account);
                     await context.SaveChangesAsync();
@@ -111,16 +103,36 @@ namespace OTMS.Service.Services
                 return null;
             }
             
-            if (employee.Account.AccountStatus == "Deactivated")
+            if (employee.Account.AccountStatus == "Deactivated" || employee.Account.AccountStatus == "Locked")
             {
                 return null;
+            }
+
+            if (accountStatus == "Emergency Overriden")
+            {
+                // Save Login Activity
+                await activityLogService.LogActivityAsync(
+                    employee.Account.AccountId,
+                    ActivityTypes.Login,
+                    $"[Emergency Overriden] {string.Join(" ", new[]
+                        {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
+                    );
+
+                employee.Account.FailedLoginAttempts = 0;
+                await context.SaveChangesAsync();
+
+                // Check Task Deadlines
+                await notificationService.CheckTaskDeadlinesAsync();
+
+                return await CreateTokenResponse(employee);
             }
 
             // Save Login Activity
             await activityLogService.LogActivityAsync(
                 employee.Account.AccountId,
                 ActivityTypes.Login,
-                $"{employee.EmployeeName} timed in at {DateTime.Now:hh:mm tt}"
+                $"{string.Join(" ", new[]
+                    {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
                 );
 
             employee.Account.FailedLoginAttempts = 0;
@@ -167,7 +179,7 @@ namespace OTMS.Service.Services
 
             if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
                 generatedUserPassword.Length > PasswordLength.MaximumLength)
-                throw new InvalidOperationException("Generated password must be at least 15 characters long.");
+                throw new InvalidOperationException("Generated password must be at least 15 to 64 characters long.");
 
             GeneratedPassword = generatedUserPassword; // assign to static variable for email use
 
@@ -175,7 +187,10 @@ namespace OTMS.Service.Services
             {
                 EmployeeId = Guid.NewGuid(),
                 EmployeeNumber = request.EmployeeNumber,
-                EmployeeName = request.EmployeeName.Trim(),
+                FirstName = request.FirstName.Trim(),
+                MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName,
+                LastName = request.LastName.Trim(),
+                Suffix = string.IsNullOrWhiteSpace(request.Suffix) ? null : request.Suffix,
                 ContactNumber = request.ContactNumber.Trim(),
                 CreatedAt = DateTime.UtcNow,
 
@@ -199,7 +214,7 @@ namespace OTMS.Service.Services
                 AccountId = Guid.NewGuid(),
                 EmployeeId = employee.EmployeeId,
                 Role = request.Role.Trim(),
-                AccountStatus = "Active",
+                AccountStatus = "Pending Verification",
                 CreatedAt = DateTime.UtcNow,
                 IsPasswordChanged = false
             };
@@ -238,7 +253,10 @@ namespace OTMS.Service.Services
             return new EmployeeRegisterResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                EmployeeName = employee.EmployeeName ?? string.Empty,
+                FirstName = employee.FirstName ?? string.Empty,
+                MiddleName = employee.MiddleName ?? null,
+                LastName = employee.LastName ?? string.Empty,
+                Suffix = employee.Suffix ?? null,
                 ContactNumber = employee.ContactNumber ?? string.Empty,
                 Role = account.Role ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
@@ -288,6 +306,43 @@ namespace OTMS.Service.Services
             );
         }
 
+        public async Task<PasswordVerificationResponseDTO> VerifyPasswordAsync(PasswordVerificationDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeID);
+
+            if (employee == null || employee.Account == null)
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Employee or account not found."
+                };
+
+            var verificationResult = new PasswordHasher<Account>()
+                .VerifyHashedPassword(
+                    employee.Account
+                    , employee.Account.PasswordHash
+                    , request.Password);
+
+            if (verificationResult == PasswordVerificationResult.Success)
+                {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = true,
+                    Message = "Password is correct."
+                };
+            }
+            else
+            {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Incorrect password."
+                };
+            }
+        }
+
         // ─── Helper Methods ────────────────────────────────────────────────
 
         private static string ContactNumberFormatter(string contactNumber)
@@ -325,7 +380,10 @@ namespace OTMS.Service.Services
                 AccessToken = CreateToken(employee),
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
                 Role = employee.Account.Role ?? string.Empty,
-                EmployeeName = employee.EmployeeName ?? string.Empty,
+                FirstName = employee.FirstName ?? string.Empty,
+                MiddleName = employee.MiddleName ?? null,
+                LastName = employee.LastName ?? string.Empty,
+                Suffix = employee.Suffix ?? null,
                 IsPasswordChanged = employee.Account.IsPasswordChanged
             };
         }
@@ -360,20 +418,6 @@ namespace OTMS.Service.Services
             rng.GetBytes(randomNumber);
 
             return Convert.ToBase64String(randomNumber);
-        }
-
-        private string GeneratePassword()
-        {
-            const string chars =
-                "SpeedexEmployee2026";
-
-            var random = new Random();
-
-            return new string(
-                Enumerable.Repeat(chars, 10)
-                    .Select(x => x[random.Next(x.Length)])
-                    .ToArray()
-            );
         }
 
         private string CreateToken(Employee employee)
@@ -431,29 +475,6 @@ namespace OTMS.Service.Services
                 .WriteToken(tokenDescriptor);
         }
 
-        private string CreateOverrideToken(Employee employee)
-        {
-            var claims = new List<Claim>
-    {
-        new Claim(ClaimTypes.NameIdentifier, employee.Account!.AccountId.ToString()),
-        new Claim(ClaimTypes.Name, employee.EmployeeNumber),
-        new Claim("token_type", "emergency_override"),  // ← scoped claim
-    };
-
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(configuration.GetValue<string>("AppSettings:Token")!));
-
-            var tokenDescriptor = new JwtSecurityToken(
-                issuer: configuration.GetValue<string>("AppSettings:Issuer"),
-                audience: configuration.GetValue<string>("AppSettings:Audience"),
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(15),  // ← short expiry
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha512)
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
-        }
-
         private async Task<Employee?> ValidateRefreshTokenAsync(
             Guid userId,
             string refreshToken
@@ -480,6 +501,75 @@ namespace OTMS.Service.Services
             return user;
         }
 
-        
+        public async Task<ApiResponseDTO<object>> ForgotPasswordAsync(ForgotPasswordDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == request.Email);
+
+            if (employee == null || employee.Account == null)
+                throw new Exception("Employee or Account is not Found.");
+
+            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+            employee.Account.PasswordResetToken = token;
+            employee.Account.PasswordResetTokenExpiryTime = DateTime.UtcNow.AddMinutes(15); // Based on https://www.authgear.com/post/authentication-security-password-reset-best-practices-and-more/#:~:text=How%20long%20should%20a%20password,immediately%20after%20a%20successful%20reset.
+            
+            await context.SaveChangesAsync();
+
+            var resetLink = $"{configuration["FrontendBaseUrl"]}/reset-password?token={token}";
+
+            await emailService.SendAsync(
+                        employee.Email,
+                            "Change Password for Operational Management System Account",
+                            $"""
+                            Welcome {string.Join(" ", new[]
+                                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} to the Operational Management System.
+
+                            Please click the link below to reset your password, the link last 15 minutes:
+
+                            {resetLink}
+                            """
+                );
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password reset link has been sent to your email.",
+                Data = null
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ResetPasswordAsync(ResetPasswordDTO request)
+        {
+
+            var account = await context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.PasswordResetToken == request.Token
+                    && a.PasswordResetTokenExpiryTime > DateTime.UtcNow);
+
+            if (account == null)
+                throw new Exception("Invalid or expired password reset token.");
+
+            if(request.NewPassword.Length < PasswordLength.MinimumLength ||
+                request.NewPassword.Length > PasswordLength.MaximumLength)
+                throw new Exception("New password must be at least 15 to 64 characters long.");
+
+            var passwordHasher = new PasswordHasher<Account>();
+            account.PasswordHash = passwordHasher.HashPassword(account, request.NewPassword);
+
+            account.PasswordResetToken = null;
+            account.PasswordResetTokenExpiryTime = null;
+
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password has been reset successfully.",
+                Data = null
+            };
+
+        }
     }
 }
