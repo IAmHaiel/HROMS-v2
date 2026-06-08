@@ -12,6 +12,7 @@ namespace OTMS.Entities.Models
         public Guid? ApprovedById { get; set; }
 
         public string Status { get; set; } = "Pending"; // Pending, Approved, Rejected
+        public bool Deleted { get; set; } = false;
         public string Reason { get; set; } = string.Empty;
         public DateTime RequestedAt { get; set; }
         public DateTime? ApprovedAt { get; set; }

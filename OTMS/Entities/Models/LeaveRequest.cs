@@ -16,6 +16,8 @@ namespace OTMS.Entities.Models
         public DateTime End_Date { get; set; }
         public string Reason { get; set; } = string.Empty;
         public string Approval_Status { get; set; } = "Pending";
+        public DateTime SubmittedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         // Navigation properties
         public Account Account { get; set; } // Submitter
