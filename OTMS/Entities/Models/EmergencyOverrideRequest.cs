@@ -17,6 +17,8 @@ namespace OTMS.Entities.Models
         public DateTime RequestedAt { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public DateTime? OverrideUntil { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+
 
         // Navigation properties
         public Account RequestedBy { get; set; } = null!;
