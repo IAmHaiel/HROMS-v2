@@ -52,7 +52,8 @@ namespace OTMS.Service.Services
                 End_Date = request.End_Date,
                 Reason = request.Reason,
                 Approval_Status = "Pending",
-                SubmittedAt = DateTime.UtcNow
+                SubmittedAt = DateTime.UtcNow,  
+                UpdatedAt = DateTime.UtcNow
             };
 
             context.LeaveRequests.Add(leaveRequest);

@@ -41,6 +41,7 @@ import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import { useToast } from '../../components/Toast/Toast';
 import EmployeeDetailPanel from './EmployeeDetailPanel';
+import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1304,6 +1305,7 @@ export default function Dashboard() {
     const storedLast = localStorage.getItem('lastName') ?? '';
     const storedSuffix = localStorage.getItem('suffix') ?? '';
     const employeeName = buildDisplayName(storedFirst, storedMiddle, storedLast, storedSuffix) || localStorage.getItem('employeeName') || '';
+    usePreventBackNav();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);

@@ -39,6 +39,7 @@ import LeaveRequestModal, {
     LeaveStatus,
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
+import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1357,6 +1358,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
 export default function EmployeeDashboard() {
     const navigate = useNavigate();
+    usePreventBackNav();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);

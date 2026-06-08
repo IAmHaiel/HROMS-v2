@@ -64,6 +64,13 @@ export default function Login() {
 
     useEffect(() => { setMounted(true); }, []);
 
+    useEffect(() => {
+        ['authToken', 'refreshToken', 'employeeId', 'employeeName',
+            'firstName', 'middleName', 'lastName', 'suffix',
+            'contactNumber', 'role', 'isPasswordChanged', 'userRole']
+            .forEach(k => localStorage.removeItem(k));
+    }, []);
+
     const updateStatus = (message: string, type: StatusType) => {
         setStatusMessage(message);
         setStatusType(type);

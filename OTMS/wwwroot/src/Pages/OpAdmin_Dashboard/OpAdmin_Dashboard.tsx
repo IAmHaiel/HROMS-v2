@@ -39,6 +39,7 @@ import LeaveRequestModal, {
     LeaveStatus,
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
+import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1976,6 +1977,8 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
 
 export default function OpsAdminDashboard() {
     const navigate = useNavigate();
+    usePreventBackNav();
+
     const employeeId = localStorage.getItem('employeeId') ?? '';
     const firstName = localStorage.getItem('firstName') ?? '';
     const lastName = localStorage.getItem('lastName') ?? '';
