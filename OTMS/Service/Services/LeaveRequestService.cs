@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.LeaveRequest;
 using OTMS.Entities.DTOs.LeaveRequest.Responses;
 using OTMS.Entities.DTOs.Pagination;
@@ -50,7 +51,8 @@ namespace OTMS.Service.Services
                 Start_Date = request.Start_Date,
                 End_Date = request.End_Date,
                 Reason = request.Reason,
-                Approval_Status = "Pending"
+                Approval_Status = "Pending",
+                SubmittedAt = DateTime.UtcNow
             };
 
             context.LeaveRequests.Add(leaveRequest);
@@ -67,8 +69,33 @@ namespace OTMS.Service.Services
                 End_Date = leaveRequest.End_Date,
                 Leave_Type = leaveRequest.Leave_Type,
                 Reason = leaveRequest.Reason,
-                Approval_Status = leaveRequest.Approval_Status
+                Approval_Status = leaveRequest.Approval_Status,
+                SubmittedAt = DateTime.UtcNow
             };
+        }
+
+        public async Task<ApiResponseDTO<object>> DeleteLeaveRequestAsync(Guid leaveId)
+        {
+            var leaveRequest = await context.LeaveRequests
+                .Include(lr => lr.Account)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(lr => lr.LeaveId == leaveId);
+
+            if (leaveRequest == null)
+                throw new Exception("Leave Request does not exist.");
+
+            leaveRequest.Deleted = true;
+            leaveRequest.UpdatedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = $"{leaveRequest.Leave_Type} is deleted.",
+                Data = leaveRequest
+            };
+
         }
 
         public async Task<PaginationResponseDTO<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync(PaginationDTO request)
@@ -76,6 +103,7 @@ namespace OTMS.Service.Services
             var query = context.LeaveRequests
                     .Include(lr => lr.Account)
                         .ThenInclude(a => a.Employee)
+                    .Where(lr => !lr.Deleted)
                     .OrderByDescending(lr => lr.Start_Date);
 
             var totalRecords = await query.CountAsync();
@@ -117,7 +145,7 @@ namespace OTMS.Service.Services
         public async Task<PaginationResponseDTO<object>> GetMyLeaveRequestsAsync(Guid accountId, PaginationDTO pagination)
         {
             var query = context.LeaveRequests
-                .Where(l => l.AccountId == accountId && l.Deleted == false)
+                .Where(l => l.AccountId == accountId && !l.Deleted)
                 .OrderByDescending(l => l.Start_Date);
 
             var totalRecords = await query.CountAsync();
@@ -187,6 +215,68 @@ namespace OTMS.Service.Services
 
             await context.SaveChangesAsync();
             return;
+        }
+
+        public async Task<LeaveRequestResponseDTO> UpdateLeaveRequestAsync(UpdateLeaveRequestDTO request)
+        {
+            // Get the Account
+            var claimProfile = httpContextAccessor
+               .HttpContext?
+               .User
+               .FindFirst(ClaimTypes.NameIdentifier)?
+               .Value;
+
+            if (string.IsNullOrEmpty(claimProfile))
+                return null;
+
+            var profile = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account.AccountId.ToString() == claimProfile);
+
+            if (profile is null || profile.Account is null)
+                return null;
+
+            // Validate
+            if (request.EndDate < request.StartDate)
+            {
+                throw new ArgumentException("End date cannot be before start date.");
+            }
+
+            var leaveRequest = await context.LeaveRequests
+                .Include(lr => lr.Account)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(lr => lr.LeaveId == request.LeaveId);
+
+            if (leaveRequest == null)
+                throw new Exception("Leave Request doesn't exist.");
+
+            // Update
+            leaveRequest.Leave_Type = request.LeaveType;
+            leaveRequest.LeaveRequestNote = request.LeaveRequestNote;
+            leaveRequest.Start_Date = request.StartDate;
+            leaveRequest.End_Date = request.EndDate;
+            leaveRequest.Reason = request.Reason;
+            leaveRequest.UpdatedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            return new LeaveRequestResponseDTO
+            {
+                EmployeeNumber = profile.EmployeeNumber,
+                FirstName = profile.FirstName,
+                MiddleName = profile.MiddleName,
+                LastName = profile.LastName,
+                Suffix = profile.Suffix,
+                Role = profile.Account.Role,
+                Start_Date = request.StartDate,
+                End_Date = request.EndDate,
+                Leave_Type = request.LeaveType,
+                Reason = request.Reason,
+                Approval_Status = leaveRequest.Approval_Status,
+                LeaveRequestNote = request.LeaveRequestNote,
+                SubmittedAt = leaveRequest.SubmittedAt,
+                UpdatedAt = leaveRequest.UpdatedAt
+            };
         }
 
         public async Task<bool> UpdateLeaveStatusAsync(Guid leaveId, UpdateLeaveStatusDTO request)

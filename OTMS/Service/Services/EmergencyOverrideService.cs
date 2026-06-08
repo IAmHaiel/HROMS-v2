@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
 using OTMS.Entities.Models;
@@ -88,7 +89,29 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<EmergencyOverrideResponseDTO>  RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
+        public async Task<ApiResponseDTO<object>> DeleteEmergencyOverrideAsync(Guid EmergencyOverrideId)
+        {
+            var emergencyOverride = await context.EmergencyOverrideRequests
+                .FirstOrDefaultAsync(eor => eor.EmergencyOverrideId == EmergencyOverrideId);
+
+            if (emergencyOverride == null)
+                throw new Exception("Emergency Override doesn't exist.");
+
+            emergencyOverride.Deleted = true;
+            emergencyOverride.UpdatedAt = DateTime.UtcNow;
+            
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Emergency Override Request deleted.",
+                Data = null
+            };
+
+        }
+
+        public async Task<EmergencyOverrideResponseDTO> RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
         {
            var account = await context.Accounts
                 .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
@@ -145,6 +168,29 @@ namespace OTMS.Service.Services
                 OverrideUntil = emergencyOverride.OverrideUntil
             };
 
+        }
+
+        public async Task<UpdateEmergencyOverrideDTO> UpdateEmergencyOverrideAsync(UpdateEmergencyOverrideDTO request)
+        {
+            var emergencyOverrideRequest = await context.EmergencyOverrideRequests
+                .Include(eor => eor.RequestedBy)
+                .FirstOrDefaultAsync(eor => eor.EmergencyOverrideId ==  request.EmergencyOverrideId);
+
+            if (emergencyOverrideRequest == null)
+                throw new Exception("Emergency Override Request doesn't exist.");
+
+            emergencyOverrideRequest.Reason = request.Reason;
+            emergencyOverrideRequest.UpdatedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            return new UpdateEmergencyOverrideDTO
+            {
+                EmergencyOverrideId = request.EmergencyOverrideId,
+                Reason = request.Reason,
+                UpdatedAt = DateTime.UtcNow
+            };
+                
         }
     }
 }
