@@ -335,16 +335,20 @@ namespace OTMS.Service.Services
 
         public async Task<SearchUserResponseDTO?> SearchUser(SearchUserDTO request)
         {
+            var searchFiltered = request.Search.Length > 150
+                ? request.Search.Substring(0, 150)
+                : request.Search;
+
             var employee = await context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
                 .FirstOrDefaultAsync(e =>
-                    e.FirstName.Contains(request.Search) ||
-                    e.MiddleName.Contains(request.Search) ||
-                    e.LastName.Contains(request.Search) ||
-                    e.Suffix.Contains(request.Search) ||
-                    e.EmployeeNumber.Contains(request.Search) ||
-                    e.Account.Role.Contains(request.Search)
+                    e.FirstName.Contains(searchFiltered) ||
+                    e.MiddleName.Contains(searchFiltered) ||
+                    e.LastName.Contains(searchFiltered) ||
+                    e.Suffix.Contains(searchFiltered) ||
+                    e.EmployeeNumber.Contains(searchFiltered) ||
+                    e.Account.Role.Contains(searchFiltered)
                     );
 
             if (employee is null || employee.Account is null)
