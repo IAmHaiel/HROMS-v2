@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using OTMS.Data;
 using OTMS.Entities.DTOs.LeaveRequest;
@@ -71,12 +71,33 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<PaginationResponseDTO<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync(PaginationDTO request)
+        public async Task<PaginationResponseDTO<LeaveRequestResponseDTO>> GetAllLeaveRequestsAsync(PaginationDTO request, string? status, string? role, string? search)
         {
             var query = context.LeaveRequests
                     .Include(lr => lr.Account)
                         .ThenInclude(a => a.Employee)
-                    .OrderByDescending(lr => lr.Start_Date);
+                    .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+            {
+                query = query.Where(lr => lr.Approval_Status.ToLower() == status.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(role))
+            {
+                query = query.Where(lr => lr.Account != null && lr.Account.Role.ToLower() == role.ToLower());
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(lr => lr.Account != null && lr.Account.Employee != null &&
+                                         (lr.Account.Employee.FirstName.ToLower().Contains(lowerSearch) ||
+                                          lr.Account.Employee.LastName.ToLower().Contains(lowerSearch) ||
+                                          lr.Account.Employee.EmployeeNumber.ToLower().Contains(lowerSearch)));
+            }
+
+            query = query.OrderByDescending(lr => lr.Start_Date);
 
             var totalRecords = await query.CountAsync();
 

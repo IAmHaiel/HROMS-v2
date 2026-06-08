@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -52,9 +52,9 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("get-all-leave-requests")]
-        public async Task<IActionResult> GetAllLeaveRequests([FromQuery] PaginationDTO request)
+        public async Task<IActionResult> GetAllLeaveRequests([FromQuery] PaginationDTO request, [FromQuery] string? status, [FromQuery] string? role, [FromQuery] string? search)
         {
-            var result = await leaveRequest.GetAllLeaveRequestsAsync(request);
+            var result = await leaveRequest.GetAllLeaveRequestsAsync(request, status, role, search);
             return Ok(result);
         }
 

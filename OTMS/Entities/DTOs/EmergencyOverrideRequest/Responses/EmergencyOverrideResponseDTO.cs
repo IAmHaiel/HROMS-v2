@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses
+namespace OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses
 {
     public class EmergencyOverrideResponseDTO
     {
@@ -10,5 +10,7 @@
         public DateTime RequestedAt { get; set; }
         public DateTime? ApprovedAt { get; set; }
         public DateTime? OverrideUntil { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeNumber { get; set; } = string.Empty;
     }
 }

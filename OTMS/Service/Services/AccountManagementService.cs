@@ -252,12 +252,37 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request)
+        public async Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request, string? search, string? role, string? status)
         {
-           var query = context.Employees
-                .Include(e => e.Account)
-                    .ThenInclude(a => a.ActivityLogs)
-                .OrderByDescending(e => e.CreatedAt);
+            var query = context.Employees
+                 .Include(e => e.Account)
+                     .ThenInclude(a => a.ActivityLogs)
+                 .AsQueryable();
+
+            // Exclude deleted accounts
+            query = query.Where(e => e.Account == null || e.Account.AccountStatus != "Deleted");
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                query = query.Where(e => e.Account != null && e.Account.AccountStatus == status);
+            }
+
+            if (!string.IsNullOrEmpty(role))
+            {
+                query = query.Where(e => e.Account != null && e.Account.Role == role);
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(e => e.FirstName.ToLower().Contains(lowerSearch) ||
+                                         (e.MiddleName != null && e.MiddleName.ToLower().Contains(lowerSearch)) ||
+                                         e.LastName.ToLower().Contains(lowerSearch) ||
+                                         (e.Suffix != null && e.Suffix.ToLower().Contains(lowerSearch)) ||
+                                         e.EmployeeNumber.ToLower().Contains(lowerSearch));
+            }
+
+            query = query.OrderByDescending(e => e.CreatedAt);
 
             var totalRecords = await query.CountAsync();
 

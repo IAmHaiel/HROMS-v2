@@ -18,6 +18,7 @@ import {
     Phone,
     Lock,
     ChevronRight,
+    ChevronLeft,
     LogOut,
     Save,
     Loader2,
@@ -32,7 +33,12 @@ import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import TaskView, { TaskViewTask } from '../../components/TaskView/TaskView';
 import { useToast } from '../../components/Toast/Toast';
-import LeaveRequestModal, { LeaveRecord } from '../../components/LeaveRequestModal/LeaveRequestModal';
+import LeaveRequestModal, {
+    LeaveRecord,
+    LeaveType,
+    LeaveStatus,
+    LEAVE_TYPES,
+} from '../../components/LeaveRequestModal/LeaveRequestModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1742,123 +1748,230 @@ function ProfileTab() {
 
 // ─── Leave Requests Tab ──────────────────────────────────────────────────────────────
 
-const LeaveRequestsTab: React.FC = () => {
-    const [showLeaveModal, setShowLeaveModal] = useState(false);
-    const [leaveRequests, setLeaveRequests] = useState<LeaveRecord[]>([]);
+const LeaveTab: React.FC<{
+    records: LeaveRecord[];
+    loading: boolean;
+    onNewRecord: (r: LeaveRecord) => void;
+}> = ({ records, loading, onNewRecord }) => {
+    const [showModal, setShowModal] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [histFilter, setHistFilter] = useState<'all' | LeaveStatus>('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 5;
 
-    const total = leaveRequests.length;
-    const pending = leaveRequests.filter(r => r.status === 'Pending').length;
-    const approved = leaveRequests.filter(r => r.status === 'Approved').length;
-    const declined = leaveRequests.filter(r => r.status === 'Declined').length;
+    const pendingCount = records.filter(r => r.status === 'Pending').length;
+    const approvedCount = records.filter(r => r.status === 'Approved').length;
+    const declinedCount = records.filter(r => r.status === 'Declined').length;
+
+    const filteredRecords = histFilter === 'all'
+        ? records
+        : records.filter(r => r.status === histFilter);
+    const sortedRecords = [...filteredRecords].sort((a, b) =>
+        b.submittedAt.localeCompare(a.submittedAt)
+    );
+    const totalPages = Math.max(1, Math.ceil(sortedRecords.length / PAGE_SIZE));
+    const paginatedRecords = sortedRecords.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+    );
+
+    const handleFilterChange = (f: 'all' | LeaveStatus) => {
+        setHistFilter(f);
+        setCurrentPage(1);
+    };
+
+    const handleSubmit = (record: LeaveRecord) => {
+        onNewRecord(record);
+        setSubmitSuccess(true);
+        setTimeout(() => setSubmitSuccess(false), 3500);
+    };
 
     return (
-        <div className="dashboard-content">
+        <div className="tab-content">
 
-            {/* ── Summary Stats ── */}
-            <div className="stats-row">
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={14} /> Request Leave
+                </button>
+            </div>
+
+            {/* Success toast */}
+            {submitSuccess && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
+                    borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                    fontSize: 13, color: '#05cd99', fontWeight: 600,
+                }}>
+                    <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
+                </div>
+            )}
+
+            {/* Stat cards */}
+            <div className="stats-row" style={{ marginBottom: 16 }}>
                 {[
-                    { label: 'TOTAL REQUESTS', value: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
-                    { label: 'PENDING', value: pending, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
-                    { label: 'APPROVED', value: approved, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
-                    { label: 'DECLINED', value: declined, icon: <X size={18} />, cls: 'bg-danger', sub: 'Declined' },
+                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
+                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
+                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
+                    { label: 'DECLINED', value: declinedCount, icon: <X size={18} />, cls: 'bg-danger', sub: 'Not approved' },
                 ].map(s => (
-                    <div key={s.label} className="stat-card">
+                    <div key={s.label} className="card stat-card">
                         <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div className="stat-text">
-                            <p className="stat-label">{s.label}</p>
-                            <h3 className="stat-value">{s.value}</h3>
-                            <small>{s.sub}</small>
-                        </div>
+                        <div><p>{s.label}</p><h3>{s.value}</h3><small>{s.sub}</small></div>
                     </div>
                 ))}
             </div>
 
-            {/* ── Requests Table ── */}
-            <div className="card">
-                <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <h3 style={{ margin: 0 }}>My Leave Requests</h3>
-                        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                            Submit and track your time-off requests
-                        </p>
-                    </div>
-                    <button className="btn btn-primary" onClick={() => setShowLeaveModal(true)}>
-                        <Plus size={14} /> Request Leave
-                    </button>
+            {/* History card */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card-header" style={{ padding: '16px 20px 14px' }}>
+                    <h3>My Leave History</h3>
                 </div>
 
-                {/* Info notice */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.14)',
-                    borderRadius: 12, padding: '10px 14px',
-                    fontSize: 12.5, color: 'var(--primary)', marginBottom: 16,
-                }}>
-                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                    Leave requests are reviewed by your manager within 1–2 business days.
+                {/* Filter pills */}
+                <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {(['all', 'Pending', 'Approved', 'Declined'] as const).map(f => (
+                        <button
+                            key={f}
+                            className={`filter-pill${histFilter === f ? ' active' : ''}`}
+                            onClick={() => handleFilterChange(f)}
+                            style={{ fontSize: 12, padding: '4px 11px' }}
+                        >
+                            {f === 'all' ? 'All' : f}
+                            <span style={{
+                                marginLeft: 5, fontSize: 11, fontWeight: 600,
+                                padding: '1px 6px', borderRadius: 999,
+                                background: histFilter === f ? 'rgba(67,24,255,0.15)' : 'var(--border)',
+                                color: histFilter === f ? 'var(--primary)' : 'var(--text-secondary)',
+                            }}>
+                                {f === 'all' ? records.length : records.filter(r => r.status === f).length}
+                            </span>
+                        </button>
+                    ))}
                 </div>
 
-                {leaveRequests.length === 0 ? (
-                    <div className="empty-state" style={{ padding: '36px 0' }}>
-                        <div style={{
-                            width: 56, height: 56, borderRadius: '50%',
-                            background: 'rgba(67,24,255,0.07)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            marginBottom: 8,
-                        }}>
-                            <CalendarDays size={26} color="var(--primary)" />
+                {/* Records list */}
+                <div style={{ padding: '0 20px' }}>
+                    {loading ? (
+                        <div className="empty-state" style={{ padding: '32px 0' }}>
+                            <Loader2 size={20} className="spin" /><p>Loading leave records…</p>
                         </div>
-                        <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>No leave requests yet</p>
+                    ) : paginatedRecords.length === 0 ? (
+                        <div className="empty-state" style={{ padding: '36px 0' }}>
+                            <div style={{
+                                width: 56, height: 56, borderRadius: '50%',
+                                background: 'rgba(67,24,255,0.07)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                marginBottom: 8,
+                            }}>
+                                <CalendarDays size={26} color="var(--primary)" />
+                            </div>
+                            <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                {histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`}
+                            </p>
+                            {histFilter === 'all' && (
+                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                    Click "Request Leave" to submit your first request.
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
+                            {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
+                        </div>
+                    )}
+                </div>
+
+                {/* Pagination */}
+                {sortedRecords.length > PAGE_SIZE && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 20px', borderTop: '1px solid var(--border)',
+                    }}>
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                            Click "Request Leave" to submit your first request.
+                            Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                            {Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
                         </span>
-                    </div>
-                ) : (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>TYPE</th>
-                                <th>START DATE</th>
-                                <th>END DATE</th>
-                                <th>REASON</th>
-                                <th>STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {leaveRequests.map((leave, i) => (
-                                <tr key={i}>
-                                    <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>{leave.leaveType}</td>
-                                    <td>{leave.startDate}</td>
-                                    <td>{leave.endDate}</td>
-                                    <td style={{ color: 'var(--text-secondary)' }}>{leave.reason}</td>
-                                    <td>
-                                        <span className={
-                                            leave.status === 'Approved' ? 'badge badge-green' :
-                                                leave.status === 'Declined' ? 'badge badge-red' :
-                                                    'badge badge-blue'
-                                        }>
-                                            {leave.status ?? 'Pending'}
-                                        </span>
-                                    </td>
-                                </tr>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
+                                <ChevronLeft size={13} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <button
+                                    key={page}
+                                    className={`btn btn-xs${currentPage === page ? ' btn-primary' : ''}`}
+                                    onClick={() => setCurrentPage(page)}
+                                    style={{ minWidth: 28 }}
+                                >
+                                    {page}
+                                </button>
                             ))}
-                        </tbody>
-                    </table>
+                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
+                                <ChevronRight size={13} />
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {showLeaveModal && (
+            {showModal && (
                 <LeaveRequestModal
-                    onClose={() => setShowLeaveModal(false)}
-                    onSubmit={record => {
-                        setLeaveRequests(prev => [...prev, record]);
-                        setShowLeaveModal(false);
-                    }}
+                    onClose={() => setShowModal(false)}
+                    onSubmit={handleSubmit}
                 />
             )}
         </div>
     );
+    };
+
+
+const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
+    const statusColors: Record<LeaveStatus, { bg: string; color: string }> = {
+        Pending: { bg: 'rgba(255,181,71,0.12)', color: '#c05c00' },
+        Approved: { bg: 'rgba(5,205,153,0.12)', color: '#05cd99' },
+        Declined: { bg: 'rgba(238,93,80,0.12)', color: '#ee5d50' },
+    };
+    const meta = statusColors[record.status];
+
+    return (
+        <div style={{
+            border: '1px solid var(--border)', borderRadius: 10,
+            padding: '12px 16px', background: 'var(--bg-card)',
+            display: 'flex', flexDirection: 'column', gap: 6,
+        }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+                    {record.leaveType}
+                </span>
+                <span style={{
+                    fontSize: 12, fontWeight: 600, padding: '3px 10px',
+                    borderRadius: 999, background: meta.bg, color: meta.color,
+                }}>
+                    {record.status}
+                </span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <span>From: <strong style={{ color: 'var(--text-primary)' }}>{record.startDate}</strong></span>
+                <span>To: <strong style={{ color: 'var(--text-primary)' }}>{record.endDate}</strong></span>
+            </div>
+            {record.reason && (
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+                    {record.reason}
+                </p>
+            )}
+            {record.reviewNote && (
+                <div style={{
+                    fontSize: 12, padding: '6px 10px', borderRadius: 8,
+                    background: meta.bg, color: meta.color,
+                }}>
+                    <strong>Note:</strong> {record.reviewNote}
+                </div>
+            )}
+        </div>
+    );
 };
+
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function OpsAdminDashboard() {
@@ -1888,6 +2001,10 @@ export default function OpsAdminDashboard() {
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); 
     const [binTasks, setBinTasks] = useState<Task[]>([]);
+
+    // Fetch Leave records
+    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
+    const [leaveLoading, setLeaveLoading] = useState(false);
 
     // ── Update fetchTasks ──
     const fetchTasks = async () => {
@@ -2022,10 +2139,27 @@ export default function OpsAdminDashboard() {
         }
     };
 
+    const fetchLeaveRecords = async () => {
+        setLeaveLoading(true);
+        try {
+            const res = await fetch('/api/leaverequest/my-leave-requests', {
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            setLeaveRecords(Array.isArray(data) ? data : []);
+        } catch {
+            setLeaveRecords([]);
+        } finally {
+            setLeaveLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchTasks();
         fetchBinRecords();
         fetchTeamMembers();
+        fetchLeaveRecords();
         const t = localStorage.getItem('authToken');
         if (!t) return;
         fetch('/api/profile/view-profile', {
@@ -2286,7 +2420,13 @@ export default function OpsAdminDashboard() {
                 )}
                 {activeTab === 'reports' && <ReportsTab tasks={tasks} teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
-                {activeTab === 'leave' && <LeaveRequestsTab />}
+                {activeTab === 'leave' && (
+                    <LeaveTab
+                        records={leaveRecords}
+                        loading={leaveLoading}
+                        onNewRecord={record => setLeaveRecords(prev => [record, ...prev])}
+                    />
+                )}
             </main>
 
             {/* ── Modals ── */}

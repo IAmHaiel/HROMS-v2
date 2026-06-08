@@ -1,4 +1,4 @@
-﻿using OTMS.Entities.DTOs.AccountManagement;
+using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
@@ -7,7 +7,7 @@ namespace OTMS.Service.Interfaces
 {
     public interface IAccountManagementService
     {
-        Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request);
+        Task<PaginationResponseDTO<RecentEmployeesResponseDTO>> GetRecentEmployees(PaginationDTO request, string? search, string? role, string? status);
         Task<PaginationResponseDTO<SearchAccountStatusResponseDTO>> GetAccountsByStatus(SearchAccountStatusDTO request);
         Task<SearchUserResponseDTO?> SearchUser(SearchUserDTO request);
         Task<UpdateEmployeeResponseDTO?> UpdateEmployee(string employeeNumber, UpdateEmployeeDTO request);

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -35,15 +35,30 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "HigherRankAccess")]
         [HttpGet("all-requests")]
-        public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
+        public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination, [FromQuery] string? status, [FromQuery] string? search)
         {
             try
             {
-
                 var query = context.EmergencyOverrideRequests
                     .Include(e => e.RequestedBy)
                         .ThenInclude(a => a.Employee)
-                    .OrderByDescending(e => e.RequestedAt);
+                    .AsQueryable();
+
+                if (!string.IsNullOrEmpty(status) && status.ToLower() != "all")
+                {
+                    query = query.Where(e => e.Status.ToLower() == status.ToLower());
+                }
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    var lowerSearch = search.ToLower();
+                    query = query.Where(e => e.RequestedBy != null && e.RequestedBy.Employee != null &&
+                                             (e.RequestedBy.Employee.FirstName.ToLower().Contains(lowerSearch) ||
+                                              e.RequestedBy.Employee.LastName.ToLower().Contains(lowerSearch) ||
+                                              e.RequestedBy.Employee.EmployeeNumber.ToLower().Contains(lowerSearch)));
+                }
+
+                query = query.OrderByDescending(e => e.RequestedAt);
 
                 var totalRecords = await query.CountAsync();
 
@@ -59,8 +74,21 @@ namespace OTMS.Controllers
                         Reason = e.Reason,
                         RequestedAt = e.RequestedAt,
                         ApprovedAt = e.ApprovedAt,
-                        OverrideUntil = e.OverrideUntil
+                        OverrideUntil = e.OverrideUntil,
+                        EmployeeName = e.RequestedBy != null && e.RequestedBy.Employee != null 
+                            ? e.RequestedBy.Employee.FirstName + " " + e.RequestedBy.Employee.LastName 
+                            : string.Empty,
+                        EmployeeNumber = e.RequestedBy != null && e.RequestedBy.Employee != null 
+                            ? e.RequestedBy.Employee.EmployeeNumber 
+                            : string.Empty
                     }).ToListAsync();
+
+                var totalPending = await context.EmergencyOverrideRequests
+                    .CountAsync(e => e.Status.ToLower() == "pending");
+                var totalApproved = await context.EmergencyOverrideRequests
+                    .CountAsync(e => e.Status.ToLower() == "approved");
+                var totalRejected = await context.EmergencyOverrideRequests
+                    .CountAsync(e => e.Status.ToLower() == "rejected");
 
                 return Ok(new PaginationResponseDTO<object> 
                 { 
@@ -70,7 +98,10 @@ namespace OTMS.Controllers
                     PageNumber = pagination.PageNumber,
                     PageSize = pagination.PageSize,
                     TotalRecords = totalRecords,
-                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize),
+                    TotalPending = totalPending,  
+                    TotalApproved = totalApproved,
+                    TotalRejected = totalRejected,
                 });
             }
             catch (Exception ex)

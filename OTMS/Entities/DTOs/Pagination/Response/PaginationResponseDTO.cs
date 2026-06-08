@@ -9,5 +9,9 @@
         public int PageSize { get; set; }
         public int TotalRecords { get; set; }
         public int TotalPages { get; set; }
+
+        public int? TotalPending { get; set; }
+        public int? TotalApproved { get; set; }
+        public int? TotalRejected { get; set; }
     }
 }

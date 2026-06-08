@@ -159,9 +159,21 @@ export default function Login() {
             localStorage.setItem('authToken', data.accessToken);
             localStorage.setItem('userRole', normalizedRole);
             localStorage.setItem('employeeId', employeeId.trim());
-            localStorage.setItem('employeeName', data.employeeName);
             localStorage.setItem('isPasswordChanged', data.isPasswordChanged.toString());
             localStorage.setItem('contactNumber', data.contactNumber ?? data.contact ?? data.phoneNumber ?? '');
+
+            // Save name parts
+            localStorage.setItem('firstName', data.firstName ?? '');
+            localStorage.setItem('middleName', data.middleName ?? '');
+            localStorage.setItem('lastName', data.lastName ?? '');
+            localStorage.setItem('suffix', data.suffix ?? '');
+
+            // Build full display name as fallback
+            const fullName = [data.firstName, data.middleName, data.lastName, data.suffix]
+                .map(s => (s ?? '').trim())
+                .filter(Boolean)
+                .join(' ');
+            localStorage.setItem('employeeName', fullName || data.employeeName || '');
 
             updateStatus('Login successful. Redirecting...', 'success');
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
@@ -14,6 +14,7 @@ namespace OTMS.Service.Services
         {
             var emergencyOverride = await context.EmergencyOverrideRequests
                 .Include(e => e.RequestedBy)
+                    .ThenInclude(a => a.Employee)
                 .FirstOrDefaultAsync(e =>
                     e.EmergencyOverrideId == request.EmergencyOverrideId);
 
@@ -47,13 +48,21 @@ namespace OTMS.Service.Services
                 Reason = emergencyOverride.Reason,
                 RequestedAt = emergencyOverride.RequestedAt,
                 ApprovedAt = emergencyOverride.ApprovedAt,
-                OverrideUntil = emergencyOverride.OverrideUntil
+                OverrideUntil = emergencyOverride.OverrideUntil,
+                EmployeeName = emergencyOverride.RequestedBy != null && emergencyOverride.RequestedBy.Employee != null 
+                    ? emergencyOverride.RequestedBy.Employee.FirstName + " " + emergencyOverride.RequestedBy.Employee.LastName 
+                    : string.Empty,
+                EmployeeNumber = emergencyOverride.RequestedBy != null && emergencyOverride.RequestedBy.Employee != null 
+                    ? emergencyOverride.RequestedBy.Employee.EmployeeNumber 
+                    : string.Empty
             };
         }
 
         public async Task<EmergencyOverrideResponseDTO> DeclineOverrideAsync(DeclineEmergencyOverrideDTO request)
         {
             var emergencyOverride = await context.EmergencyOverrideRequests
+                .Include(e => e.RequestedBy)
+                    .ThenInclude(a => a.Employee)
                 .FirstOrDefaultAsync(e =>
                     e.EmergencyOverrideId == request.EmergencyOverrideId);
 
@@ -84,13 +93,20 @@ namespace OTMS.Service.Services
                 Reason = emergencyOverride.Reason,
                 RequestedAt = emergencyOverride.RequestedAt,
                 ApprovedAt = emergencyOverride.ApprovedAt,
-                OverrideUntil = emergencyOverride.OverrideUntil
+                OverrideUntil = emergencyOverride.OverrideUntil,
+                EmployeeName = emergencyOverride.RequestedBy != null && emergencyOverride.RequestedBy.Employee != null 
+                    ? emergencyOverride.RequestedBy.Employee.FirstName + " " + emergencyOverride.RequestedBy.Employee.LastName 
+                    : string.Empty,
+                EmployeeNumber = emergencyOverride.RequestedBy != null && emergencyOverride.RequestedBy.Employee != null 
+                    ? emergencyOverride.RequestedBy.Employee.EmployeeNumber 
+                    : string.Empty
             };
         }
 
         public async Task<EmergencyOverrideResponseDTO>  RequestOverrideAsync(CreateEmergencyOverrideRequestDTO request)
         {
            var account = await context.Accounts
+                .Include(a => a.Employee)
                 .FirstOrDefaultAsync(a => a.AccountId == request.AccountId);
 
             if (account == null)
@@ -142,7 +158,11 @@ namespace OTMS.Service.Services
                 Reason = emergencyOverride.Reason,
                 RequestedAt = emergencyOverride.RequestedAt,
                 ApprovedAt = emergencyOverride.ApprovedAt,
-                OverrideUntil = emergencyOverride.OverrideUntil
+                OverrideUntil = emergencyOverride.OverrideUntil,
+                EmployeeName = account.Employee != null 
+                    ? account.Employee.FirstName + " " + account.Employee.LastName 
+                    : string.Empty,
+                EmployeeNumber = account.Employee?.EmployeeNumber ?? string.Empty
             };
 
         }

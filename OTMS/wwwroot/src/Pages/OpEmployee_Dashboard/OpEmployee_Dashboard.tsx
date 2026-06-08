@@ -804,15 +804,7 @@ const LeaveTab: React.FC<{
         <div className="tab-content">
 
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div>
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
-                        Leave Requests
-                    </h2>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        Submit and track your time-off requests
-                    </p>
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
                 <button className="btn btn-primary" onClick={() => setShowModal(true)}>
                     <Plus size={14} /> Request Leave
                 </button>

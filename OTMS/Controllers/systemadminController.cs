@@ -70,9 +70,9 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "SystemAdminAccess")]
         [HttpGet("recent-employees")]
-        public async Task<IActionResult> GetRecentEmployees([FromQuery] PaginationDTO request)
+        public async Task<IActionResult> GetRecentEmployees([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] string? role, [FromQuery] string? status)
         {
-            var result = await accountManagementService.GetRecentEmployees(request);
+            var result = await accountManagementService.GetRecentEmployees(request, search, role, status);
             return Ok(result);
         }
 
