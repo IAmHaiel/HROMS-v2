@@ -173,13 +173,17 @@ namespace OTMS.Service.Services
 
             var exists = await context.Employees.AnyAsync(u => u.EmployeeNumber == request.EmployeeNumber);
             if (exists)
-                throw new InvalidOperationException("Employee Number already exists.");
+                throw new Exception("Employee Number already exists.");
+
+            var emailExists = await context.Employees.AnyAsync(e => e.Email == request.Email);
+            if (emailExists)
+                throw new Exception("Email already exists.");
 
             var generatedUserPassword = PasswordGenerator.Generate(); // one password only
 
             if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
                 generatedUserPassword.Length > PasswordLength.MaximumLength)
-                throw new InvalidOperationException("Generated password must be at least 15 to 64 characters long.");
+                throw new Exception("Generated password must be at least 15 to 64 characters long.");
 
             GeneratedPassword = generatedUserPassword; // assign to static variable for email use
 
