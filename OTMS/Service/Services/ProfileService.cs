@@ -13,7 +13,8 @@ namespace OTMS.Service.Services
 {
     public class ProfileService(
         OTMSDbContext context,
-        IHttpContextAccessor httpContextAccessor
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService
         ) : IProfileService
     {
         public async Task<ChangePasswordResponseDTO?> ChangePassword(ChangePasswordDTO request)
@@ -153,6 +154,12 @@ namespace OTMS.Service.Services
             profile.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                profile.Account.AccountId,
+                ActivityTypes.ProfileUpdate,
+                $"{string.Join(" ", new[] { profile.FirstName, profile.MiddleName, profile.LastName, profile.Suffix }.Where(n => !string.IsNullOrEmpty(n)))} updated their profile information."
+            );
 
             return new UpdateInformationResponseDTO
             {

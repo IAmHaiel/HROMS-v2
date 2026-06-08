@@ -117,9 +117,10 @@ namespace OTMS.Service.Services
                 .Take(count)
                 .Select(al => new
                 {
-                    id = al.ActivityLogId,
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
                     description = al.Description,
-                    timestamp = al.CreatedAt
+                    createdAt = al.CreatedAt
                 })
                 .ToListAsync();
         }
@@ -135,9 +136,10 @@ namespace OTMS.Service.Services
                 .OrderByDescending(al => al.CreatedAt)
                 .Select(al => new
                 {
-                    id = al.ActivityLogId,
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
                     description = al.Description,
-                    timestamp = al.CreatedAt
+                    createdAt = al.CreatedAt
                 })
                 .ToListAsync();
         }

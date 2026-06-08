@@ -21,6 +21,7 @@ import {
     ChevronLeft,
 } from 'lucide-react';
 import '../employee_details/employee_detail.css';
+import { useToast } from '../../components/Toast/Toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
     });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
+    const { confirm, success, error } = useToast();
 
     const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -165,6 +167,13 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
 
             // 3. Update status in database if changed
             if (form.accountStatus !== profile.accountStatus) {
+                const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
+                const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${profile.employeeName}?`);
+                if (!isConfirmed) {
+                    setSubmitting(false);
+                    return;
+                }
+
                 const statusEndpoint =
                     form.accountStatus === 'Active'
                         ? '/api/systemadmin/activate-user'
@@ -190,8 +199,10 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                 role: toBackendRole(form.role),
                 accountStatus: form.accountStatus,
             });
+            success('Employee details updated successfully!');
             onClose();
         } catch (err: any) {
+            error(err.message ?? 'Something went wrong.');
             setApiError(err.message ?? 'Something went wrong.');
         } finally {
             setSubmitting(false);
@@ -293,6 +304,7 @@ export default function EmployeeDetailPanel({
     const [showEdit, setShowEdit] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [activeSection, setActiveSection] = useState<'overview' | 'deliveries' | 'activity'>('overview');
+    const { confirm, success, error } = useToast();
 
     // Sync profile state if employee prop changes
     useEffect(() => {
@@ -328,7 +340,8 @@ export default function EmployeeDetailPanel({
 
     // Delete Employee
     const handleDelete = async () => {
-        if (!confirm(`Delete ${profile.employeeName} permanently?`)) return;
+        const isConfirmed = await confirm(`Are you sure you want to permanently delete ${profile.employeeName}?`);
+        if (!isConfirmed) return;
         setDeleting(true);
         try {
             const token = localStorage.getItem('authToken');
@@ -341,9 +354,10 @@ export default function EmployeeDetailPanel({
                 body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
             });
             if (!res.ok) throw new Error();
+            success(`Successfully deleted ${profile.employeeName}.`);
             onEmployeeUpdated({ ...profile, accountStatus: '__deleted__' });
         } catch {
-            alert('Failed to delete employee.');
+            error('Failed to delete employee.');
         } finally {
             setDeleting(false);
         }
@@ -353,6 +367,11 @@ export default function EmployeeDetailPanel({
     const handleToggleStatus = async () => {
         const isActive = ['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus);
         const next = isActive ? 'Deactivated' : 'Active';
+        const actionText = next === 'Deactivated' ? 'deactivate' : 'activate';
+        
+        const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${profile.employeeName}?`);
+        if (!isConfirmed) return;
+
         const endpoint =
             next === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
 
@@ -371,8 +390,9 @@ export default function EmployeeDetailPanel({
             const updatedProfile = { ...profile, accountStatus: next };
             setProfile(updatedProfile);
             onEmployeeUpdated(updatedProfile);
+            success(`Successfully ${next.toLowerCase()} ${profile.employeeName}.`);
         } catch {
-            alert('Failed to update status.');
+            error(`Failed to ${actionText} employee.`);
         }
     };
 

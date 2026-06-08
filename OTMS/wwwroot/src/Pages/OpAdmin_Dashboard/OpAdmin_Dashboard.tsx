@@ -1102,7 +1102,9 @@ function ProfileTab() {
         lastName: lastName,
         contactNumber: employeeContact,
         email: storedEmail,
+        email: storedEmail,
     });
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -1255,9 +1257,29 @@ function ProfileTab() {
             setPwError('');
         };
 
+    const validateField = (key: string, value: string) => {
+        let err = '';
+        if (key === 'firstName' || key === 'middleName' || key === 'lastName') {
+            if (value && !/^[A-Za-z\s]+$/.test(value)) err = 'Letters only (A-Z, a-z)';
+            else if (value.length > 50) err = 'Max 50 characters';
+            else if ((key === 'firstName' || key === 'lastName') && !value) err = 'Required';
+        } else if (key === 'email') {
+            if (!value) err = 'Required';
+            else if (value.length < 12 || value.length > 64) err = 'Must be 12-64 characters';
+            else if (!/^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) err = 'Invalid format';
+        } else if (key === 'contactNumber') {
+            if (value && !/^\d+$/.test(value)) err = 'Numbers only';
+            else if (value && value.length !== 11) err = 'Must be exactly 11 digits';
+        }
+        setValidationErrors(prev => ({ ...prev, [key]: err }));
+        return err;
+    };
+
     const handleProfileChange = (key: keyof typeof profileForm) =>
         (e: React.ChangeEvent<HTMLInputElement>) => {
-            setProfileForm(prev => ({ ...prev, [key]: e.target.value }));
+            const val = e.target.value;
+            setProfileForm(prev => ({ ...prev, [key]: val }));
+            validateField(key, val);
             setProfileError('');
             setProfileSuccess(false);
         };
@@ -1402,7 +1424,11 @@ function ProfileTab() {
                             <button
                                 className="btn btn-primary"
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
-                                onClick={() => { setEditingProfile(true); setProfileSuccess(false); }}
+                                onClick={() => { 
+                                    setEditingProfile(true); 
+                                    setProfileSuccess(false); 
+                                    ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
+                                }}
                             >
                                 <Pencil size={12} /> Edit Profile
                             </button>
@@ -1447,22 +1473,28 @@ function ProfileTab() {
                                 </div>
                             )}
                             <div className="field">
-                                <label>First Name</label>
+                                <label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label>
                                 <input
                                     type="text"
                                     value={profileForm.firstName}
                                     onChange={handleProfileChange('firstName')}
                                     placeholder="Enter first name"
+                                    maxLength={50}
+                                    style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}}
                                 />
+                                {validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
                             </div>
                             <div className="field">
-                                <label>Middle Name</label>
+                                <label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
                                 <input
                                     type="text"
                                     value={profileForm.middleName}
                                     onChange={handleProfileChange('middleName')}
-                                    placeholder="Enter middle name (optional)"
+                                    placeholder="Enter middle name"
+                                    maxLength={50}
+                                    style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}}
                                 />
+                                {validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
                             </div>
                             <div className="field">
                                 <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -1471,7 +1503,10 @@ function ProfileTab() {
                                     value={profileForm.lastName}
                                     onChange={handleProfileChange('lastName')}
                                     placeholder="Enter last name"
+                                    maxLength={50}
+                                    style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}}
                                 />
+                                {validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
                             </div>
                             <div className="field">
                                 <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -1480,7 +1515,9 @@ function ProfileTab() {
                                     value={profileForm.email}
                                     onChange={handleProfileChange('email')}
                                     placeholder="e.g. name@company.com"
+                                    style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}}
                                 />
+                                {validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
                             </div>
                             <div className="field">
                                 <label>Contact Number</label>
@@ -1488,8 +1525,10 @@ function ProfileTab() {
                                     type="tel"
                                     value={profileForm.contactNumber}
                                     onChange={handleProfileChange('contactNumber')}
-                                    placeholder="e.g. +63 917 000 0000"
+                                    placeholder="e.g. 09170000000"
+                                    style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}}
                                 />
+                                {validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
                             </div>
                             <div className="detail-grid" style={{ marginTop: 4 }}>
                                 <div className="detail-item">

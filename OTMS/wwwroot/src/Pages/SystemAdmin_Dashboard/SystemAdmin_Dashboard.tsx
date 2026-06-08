@@ -71,10 +71,15 @@ interface FieldError {
 type FormState = EmployeeRegisterDTO;
 
 interface ActivityLog {
-    id: number;
+    activityLogId: string;
+    accountId: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    suffix?: string;
+    activityType: string;
     description: string;
-    timestamp: string;
-    account?: string;
+    createdAt: string;
 }
 
 interface RecentEmployee {
@@ -455,6 +460,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
     const [form, setForm] = useState({ firstName: employee.firstName ?? '', middleName: employee.middleName ?? '', lastName: employee.lastName ?? '', suffix: employee.suffix ?? '', contactNumber: employee.contactNumber, role: toDisplayRole(employee.role), accountStatus: employee.accountStatus });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
+    const { confirm, success, error } = useToast();
     const displayName = getEmployeeDisplayName(employee);
 
     const handleChange = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setForm(prev => ({ ...prev, [key]: e.target.value })); setApiError(''); };
@@ -471,26 +477,31 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                 if (!roleRes.ok) { const err = await roleRes.json().catch(() => ({})); throw new Error(err.message || `Error ${roleRes.status}: Role update failed`); }
             }
             if (form.accountStatus !== employee.accountStatus) {
+                const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
+                const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${displayName}?`);
+                if (!isConfirmed) { setSubmitting(false); return; }
+
                 const statusEndpoint = form.accountStatus === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
                 const statusRes = await fetch(statusEndpoint, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber }) });
                 if (!statusRes.ok) { const err = await statusRes.json().catch(() => ({})); throw new Error(err.message || `Error ${statusRes.status}: Status update failed`); }
             }
             onUpdated({ ...employee, firstName: form.firstName.trim(), middleName: form.middleName.trim(), lastName: form.lastName.trim(), suffix: form.suffix.trim(), employeeName: builtName, contactNumber: form.contactNumber, role: toBackendRole(form.role), accountStatus: form.accountStatus });
             setIsEditing(false);
-            alert('Employee details updated successfully!');
+            success('Employee details updated successfully!');
             onClose();
-        } catch (err: any) { setApiError(err.message ?? 'Something went wrong. Please try again.'); }
+        } catch (err: any) { error(err.message ?? 'Something went wrong. Please try again.'); setApiError(err.message ?? 'Something went wrong. Please try again.'); }
         finally { setSubmitting(false); }
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${displayName}? This cannot be undone.`)) return;
+        const isConfirmed = await confirm(`Are you sure you want to permanently delete ${displayName}?`);
+        if (!isConfirmed) return;
         setSubmitting(true); setApiError('');
         try {
             const token = localStorage.getItem('authToken');
             const res = await fetch('/api/systemadmin/delete-user', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber }) });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || `Error ${res.status}: Delete failed`); }
-            alert(`${displayName} has been deleted.`);
+            success(`${displayName} has been deleted.`);
             onUpdated({ ...employee, accountStatus: '__deleted__' });
             onClose();
         } catch (err: any) { setApiError(err.message ?? 'Something went wrong. Please try again.'); }
@@ -669,12 +680,36 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     <div className="activity-feed-list">
                         {loading ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
                             : activityLogs.length === 0 ? <div className="empty-state"><ClipboardList size={22} /><p>No recent activity</p></div>
-                                : activityLogs.slice(0, 8).map(log => (
-                                    <div key={log.id} className="activity-feed-item">
-                                        <div className="activity-feed-dot bg-primary" />
-                                        <div className="activity-feed-content"><span className="activity-feed-text">{log.description}</span><span className="activity-feed-time">{new Date(log.timestamp).toLocaleString()}</span></div>
-                                    </div>
-                                ))}
+                                : activityLogs.slice(0, 8).map((log, index) => {
+                                    let dotColor = '#4318FF'; // primary
+                                    let ringColor = 'rgba(67, 24, 255, 0.15)';
+                                    if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
+                                    else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
+                                    else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
+
+                                    return (
+                                        <div key={log.activityLogId} className="activity-feed-item" style={{ display: 'flex', gap: 16, marginBottom: 20, position: 'relative' }}>
+                                            {index < Math.min(activityLogs.length, 8) - 1 && (
+                                                <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: '#e2e8f0', zIndex: 0 }} />
+                                            )}
+
+                                            <div style={{
+                                                width: 10, height: 10, borderRadius: '50%',
+                                                background: dotColor,
+                                                boxShadow: `0 0 0 4px ${ringColor}`,
+                                                zIndex: 1, flexShrink: 0, marginTop: 4
+                                            }} />
+
+                                            <div className="activity-feed-content" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                <span className="activity-feed-text" style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 13 }}>{log.description}</span>
+                                                <span className="activity-feed-time" style={{ color: 'var(--text-secondary)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                    <Clock size={10} />
+                                                    {new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                     </div>
                 </div>
             </div>
@@ -924,6 +959,7 @@ function ProfileTab() {
     const [pendingEdit, setPendingEdit] = useState<'profile' | null>(null);
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail });
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -935,7 +971,29 @@ function ProfileTab() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const requestEditProfile = () => { setEditingProfile(true); setProfileSuccess(false); };
+    const validateField = (key: string, value: string) => {
+        let err = '';
+        if (key === 'firstName' || key === 'middleName' || key === 'lastName') {
+            if (value && !/^[A-Za-z\s]+$/.test(value)) err = 'Letters only (A-Z, a-z)';
+            else if (value.length > 50) err = 'Max 50 characters';
+            else if ((key === 'firstName' || key === 'lastName') && !value) err = 'Required';
+        } else if (key === 'email') {
+            if (!value) err = 'Required';
+            else if (value.length < 12 || value.length > 64) err = 'Must be 12-64 characters';
+            else if (!/^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) err = 'Invalid format';
+        } else if (key === 'contactNumber') {
+            if (value && !/^\d+$/.test(value)) err = 'Numbers only';
+            else if (value && value.length !== 11) err = 'Must be exactly 11 digits';
+        }
+        setValidationErrors(prev => ({ ...prev, [key]: err }));
+        return err;
+    };
+
+    const requestEditProfile = () => {
+        setEditingProfile(true);
+        setProfileSuccess(false);
+        ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
+    };
 
     const handleGateConfirm = async () => {
         if (!gatePassword) { setGateError('Please enter your password.'); return; }
@@ -962,7 +1020,13 @@ function ProfileTab() {
         finally { setGateLoading(false); }
     };
 
-    const handleProfileChange = (key: keyof typeof profileForm) => (e: React.ChangeEvent<HTMLInputElement>) => { setProfileForm(prev => ({ ...prev, [key]: e.target.value })); setProfileError(''); setProfileSuccess(false); };
+    const handleProfileChange = (key: keyof typeof profileForm) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setProfileForm(prev => ({ ...prev, [key]: val }));
+        validateField(key, val);
+        setProfileError('');
+        setProfileSuccess(false);
+    };
 
     const handleProfileSave = () => {
         if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
@@ -1020,9 +1084,9 @@ function ProfileTab() {
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {profileError && <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>}
-                            <div className="field-row"><div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} /></div><div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} /></div></div>
-                            <div className="field-row"><div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} /></div><div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div></div>
-                            <div className="field-row"><div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" /></div><div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. +63 917 000 0000" /></div></div>
+                            <div className="field-row"><div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}</div><div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}</div></div>
+                            <div className="field-row"><div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}</div><div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div></div>
+                            <div className="field-row"><div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}</div><div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. 09170000000" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}</div></div>
                             <div className="detail-grid" style={{ marginTop: 4 }}><div className="detail-item"><span className="detail-label">Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div><div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">System Admin</span></div></div>
                             <div className="modal-actions" style={{ padding: '4px 0 0' }}><button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button><button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>{profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}</button></div>
                         </div>
@@ -1220,6 +1284,7 @@ export default function Dashboard() {
     const storedLast = localStorage.getItem('lastName') ?? '';
     const storedSuffix = localStorage.getItem('suffix') ?? '';
     const employeeName = buildDisplayName(storedFirst, storedMiddle, storedLast, storedSuffix) || localStorage.getItem('employeeName') || '';
+    const currentEmployeeId = localStorage.getItem('employeeId') || '';
     usePreventBackNav();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
@@ -1276,7 +1341,7 @@ export default function Dashboard() {
                     role: e.role,
                     accountStatus: e.accountStatus ?? 'Unknown',
                     presenceStatus: e.presenceStatus ?? 'Offline',
-                })).filter((e: RecentEmployee) => e.accountStatus !== 'Deleted');
+                })).filter((e: RecentEmployee) => e.accountStatus !== 'Deleted' && e.employeeNumber !== currentEmployeeId);
                 setEmployees(list);
                 setRecentEmployees(list);
                 setEmpTotalPages(result.totalPages ?? 1);
@@ -1520,22 +1585,56 @@ export default function Dashboard() {
                                     <p style={{ fontSize: '15px', color: '#64748b' }}>No activity logs found in the system.</p>
                                 </div>
                             ) : (
-                                <div className="global-timeline">
-                                    {activityLogs.map((log, index) => (
-                                        <div key={log.id} className="global-timeline-item">
-                                            <div className="global-timeline-line">
-                                                <div className="global-timeline-dot" />
-                                                {index < activityLogs.length - 1 && <div className="global-timeline-connector" />}
-                                            </div>
-                                            <div className="global-timeline-content">
-                                                <div className="global-timeline-desc">{log.description}</div>
-                                                <div className="global-timeline-time">
-                                                    <Clock size={12} />
-                                                    {new Date(log.timestamp).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                <div className="global-timeline" style={{ padding: '24px 36px' }}>
+                                    {activityLogs.map((log, index) => {
+                                        let dotColor = '#4318FF'; // primary (blue/purple)
+                                        let ringColor = 'rgba(67, 24, 255, 0.15)';
+
+                                        if (log.activityType === 'Login') {
+                                            dotColor = '#05CD99'; // green
+                                            ringColor = 'rgba(5, 205, 153, 0.15)';
+                                        } else if (log.activityType === 'Logout') {
+                                            dotColor = '#FFCE20'; // yellow
+                                            ringColor = 'rgba(255, 206, 32, 0.15)';
+                                        } else if (log.activityType === 'Profile Update') {
+                                            dotColor = '#39B8FF'; // light blue
+                                            ringColor = 'rgba(57, 184, 255, 0.15)';
+                                        }
+
+                                        return (
+                                            <div key={log.activityLogId} className="global-timeline-item" style={{ display: 'flex', gap: 24, marginBottom: 32, position: 'relative' }}>
+                                                {/* Connecting Line */}
+                                                {index < activityLogs.length - 1 && (
+                                                    <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: '#e2e8f0', zIndex: 0 }} />
+                                                )}
+
+                                                {/* Timeline Dot */}
+                                                <div style={{
+                                                    width: 10, height: 10, borderRadius: '50%',
+                                                    background: dotColor,
+                                                    boxShadow: `0 0 0 6px ${ringColor}`,
+                                                    zIndex: 1, flexShrink: 0, marginTop: 4, marginLeft: 0
+                                                }} />
+
+                                                {/* Content */}
+                                                <div className="global-timeline-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>
+                                                        {log.description}
+                                                    </div>
+                                                    <div style={{
+                                                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                                                        background: '#f8fafc', color: '#64748b',
+                                                        padding: '6px 12px', borderRadius: 999,
+                                                        fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
+                                                        border: '1px solid #e2e8f0'
+                                                    }}>
+                                                        <Clock size={13} />
+                                                        {new Date(log.createdAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

@@ -962,9 +962,10 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         firstName: localStorage.getItem('firstName') ?? '', 
         middleName: localStorage.getItem('middleName') ?? '', 
         lastName: localStorage.getItem('lastName') ?? '', 
-        contactNumber: localStorage.getItem('contactNumber') ?? '', 
+        contactNumber: user.phone, 
         email: localStorage.getItem('email') ?? '' 
     });
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -1084,8 +1085,28 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         });
     };
 
+    const validateField = (key: string, value: string) => {
+        let err = '';
+        if (key === 'firstName' || key === 'middleName' || key === 'lastName') {
+            if (value && !/^[A-Za-z\s]+$/.test(value)) err = 'Letters only (A-Z, a-z)';
+            else if (value.length > 50) err = 'Max 50 characters';
+            else if ((key === 'firstName' || key === 'lastName') && !value) err = 'Required';
+        } else if (key === 'email') {
+            if (!value) err = 'Required';
+            else if (value.length < 12 || value.length > 64) err = 'Must be 12-64 characters';
+            else if (!/^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) err = 'Invalid format';
+        } else if (key === 'contactNumber') {
+            if (value && !/^\d+$/.test(value)) err = 'Numbers only';
+            else if (value && value.length !== 11) err = 'Must be exactly 11 digits';
+        }
+        setValidationErrors(prev => ({ ...prev, [key]: err }));
+        return err;
+    };
+
     const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm(prev => ({ ...prev, [k]: e.target.value }));
+        const val = e.target.value;
+        setForm(prev => ({ ...prev, [k]: val }));
+        validateField(k, val);
         setProfileError('');
     };
 
@@ -1224,7 +1245,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 </div>
                 <button
                     className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
-                    onClick={editMode ? handleCancelEdit : () => { setEditMode(true); setProfileSuccess(false); }}
+                    onClick={editMode ? handleCancelEdit : () => { 
+                        setEditMode(true); 
+                        setProfileSuccess(false); 
+                        ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (form as any)[k]));
+                    }}
                 >
                     {editMode ? <><X size={13} /> Cancel</> : <><Pencil size={13} /> Edit Profile</>}
                 </button>
@@ -1261,24 +1286,27 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             <>
                                 <div className="info-field">
                                     <label>Given Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                    <div className="if-input-wrap">
+                                    <div className="if-input-wrap" style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.firstName} onChange={setF('firstName')} placeholder="Given Name" maxLength={50} />
                                     </div>
+                                    {validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
                                 </div>
                                 <div className="info-field">
-                                    <label>Middle Name</label>
-                                    <div className="if-input-wrap">
+                                    <label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
+                                    <div className="if-input-wrap" style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.middleName} onChange={setF('middleName')} placeholder="Middle Name" maxLength={50} />
                                     </div>
+                                    {validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
                                 </div>
                                 <div className="info-field">
                                     <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                    <div className="if-input-wrap">
+                                    <div className="if-input-wrap" style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.lastName} onChange={setF('lastName')} placeholder="Last Name" maxLength={50} />
                                     </div>
+                                    {validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
                                 </div>
                             </>
                         ) : (
@@ -1293,10 +1321,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         <div className="info-field">
                             <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
                             {editMode ? (
-                                <div className="if-input-wrap">
-                                    <span className="if-icon"><Mail size={15} /></span>
-                                    <input type="email" value={form.email} onChange={setF('email')} placeholder="e.g. name@company.com" />
-                                </div>
+                                <>
+                                    <div className="if-input-wrap" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}}>
+                                        <span className="if-icon"><Mail size={15} /></span>
+                                        <input type="email" value={form.email} onChange={setF('email')} placeholder="e.g. name@company.com" />
+                                    </div>
+                                    {validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
+                                </>
                             ) : (
                                 <div className="if-value">
                                     <span className="if-icon"><Mail size={15} /></span>
@@ -1307,10 +1338,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         <div className="info-field">
                             <label>Contact Number</label>
                             {editMode ? (
-                                <div className="if-input-wrap">
-                                    <span className="if-icon"><Phone size={15} /></span>
-                                    <input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. +63 917 000 0000" />
-                                </div>
+                                <>
+                                    <div className="if-input-wrap" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}}>
+                                        <span className="if-icon"><Phone size={15} /></span>
+                                        <input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. 09170000000" />
+                                    </div>
+                                    {validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
+                                </>
                             ) : (
                                 <div className="if-value">
                                     <span className="if-icon"><Phone size={15} /></span>
