@@ -17,5 +17,6 @@
         public string Approval_Status { get; set; } = string.Empty;
         public string? LeaveRequestNote { get; set; }
         public DateTime SubmittedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 }

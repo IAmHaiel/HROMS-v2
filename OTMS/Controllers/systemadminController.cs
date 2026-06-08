@@ -179,12 +179,22 @@ namespace OTMS.Controllers
         [HttpPut("update-user")]
         public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, UpdateEmployeeDTO request)
         {
-            var result = await accountManagementService.UpdateEmployee(employeeNumber, request);
-            if(result is null)
+
+            try
             {
-                return NotFound(new { Message = "Employee not found." });
+                var result = await accountManagementService.UpdateEmployee(employeeNumber, request);
+                return Ok(result);
             }
-            return Ok(result);
+            catch(Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+            
         }
 
 

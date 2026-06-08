@@ -68,13 +68,21 @@ namespace OTMS.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> Register(EmployeeRegisterDTO request)
         {
-            var result = await authService.RegisterAsync(request);
+            try
+            {
+                var result = await authService.RegisterAsync(request);
+                return Ok(result);
+            }
+            catch(Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
 
-            if (result == null)
-
-                return BadRequest("Registration failed");
-
-            return Ok(result);
         }
     }
 }

@@ -126,6 +126,20 @@ namespace OTMS.Service.Services
             if (request.ContactNumber == "string" || String.IsNullOrEmpty(request.ContactNumber))
                 request.ContactNumber = profile.ContactNumber;
 
+            if (request.Email == "string" || String.IsNullOrEmpty(request.Email))
+                request.Email = profile.Email;
+
+            var contactNoExists = await context.Employees
+                .AnyAsync(e => e.ContactNumber == request.ContactNumber && e.EmployeeNumber != profile.EmployeeNumber);
+            if (contactNoExists)
+                throw new Exception("Contact number already exists.");
+
+            var emailExists = await context.Employees
+                .AnyAsync(e => e.Email == request.Email && e.EmployeeNumber != profile.EmployeeNumber);
+            if (emailExists)
+                throw new Exception("Email already exists.");
+
+
             // Format Profile Contact Number
             request.ContactNumber = GeneralHelper.ContactNumberFormatter(request.ContactNumber);
 
@@ -135,6 +149,7 @@ namespace OTMS.Service.Services
             profile.LastName = request.LastName;
             profile.Suffix = request.Suffix;
             profile.ContactNumber = request.ContactNumber;
+            profile.Email = request.Email;
             profile.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
@@ -147,6 +162,7 @@ namespace OTMS.Service.Services
                 LastName = profile.LastName,
                 Suffix = profile.Suffix,
                 ContactNumber = request.ContactNumber,
+                Email = request.Email,
                 UpdatedAt = profile.UpdatedAt.Value,
                 Success = true
             };

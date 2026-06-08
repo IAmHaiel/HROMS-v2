@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Profile;
 using OTMS.Service.Interfaces;
 
@@ -32,12 +33,22 @@ namespace OTMS.Controllers
         [HttpPut("update-profile")]
         public async Task<IActionResult> UpdateProfile(UpdateInformationDTO request)
         {
-            var result = await profileService.UpdateBasicInformation(request);
-            if (result is null)
+
+            try
             {
-                return NotFound(new { Message = "Employee not found." });
+                var result = await profileService.UpdateBasicInformation(request);
+                return Ok(result);
             }
-            return Ok(result);
+            catch(Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+            
         }
 
         /// <summary>

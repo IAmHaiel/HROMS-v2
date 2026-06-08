@@ -8,5 +8,6 @@
         public string LastName { get; set; } = String.Empty;
         public string? Suffix { get; set; } = String.Empty;
         public string ContactNumber { get; set; } = String.Empty;
+        public string Email {  get; set; } = String.Empty;
     }
 }
