@@ -103,6 +103,7 @@ namespace OTMS.Service.Services
             var query = context.LeaveRequests
                     .Include(lr => lr.Account)
                         .ThenInclude(a => a.Employee)
+                    .Where(lr => !lr.Deleted)
                     .OrderByDescending(lr => lr.Start_Date);
 
             var totalRecords = await query.CountAsync();
@@ -144,7 +145,7 @@ namespace OTMS.Service.Services
         public async Task<PaginationResponseDTO<object>> GetMyLeaveRequestsAsync(Guid accountId, PaginationDTO pagination)
         {
             var query = context.LeaveRequests
-                .Where(l => l.AccountId == accountId && l.Deleted == false)
+                .Where(l => l.AccountId == accountId && !l.Deleted)
                 .OrderByDescending(l => l.Start_Date);
 
             var totalRecords = await query.CountAsync();

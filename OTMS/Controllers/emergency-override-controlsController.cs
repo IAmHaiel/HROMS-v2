@@ -43,6 +43,7 @@ namespace OTMS.Controllers
                 var query = context.EmergencyOverrideRequests
                     .Include(e => e.RequestedBy)
                         .ThenInclude(a => a.Employee)
+                    .Where(e => !e.Deleted)
                     .OrderByDescending(e => e.RequestedAt);
 
                 var totalRecords = await query.CountAsync();
