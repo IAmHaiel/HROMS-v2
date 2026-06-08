@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.LeaveRequest;
 using OTMS.Entities.DTOs.Pagination;
 using OTMS.Service.Interfaces;
@@ -71,6 +72,46 @@ namespace OTMS.Controllers
                 return NotFound(new { Message = "Leave request not found." });
 
             return Ok("Leave Request status updated successfully.");
+        }
+
+        [Authorize(Policy = "OperationalTeamAccess")]
+        [HttpPut("{leaveId}/update")]
+        public async Task<IActionResult> UpdateLeaveRequest(UpdateLeaveRequestDTO request)
+        {
+            try
+            {
+                var result = await leaveRequest.UpdateLeaveRequestAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        [Authorize(Policy = "OperationalTeamAccess")]
+        [HttpDelete("{leaveId}/delete")]
+        public async Task<IActionResult> DeleteLeaveRequest([FromBody] Guid leaveId)
+        {
+            try
+            {
+                var result = await leaveRequest.DeleteLeaveRequestAsync(leaveId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
         }
     }
 }
