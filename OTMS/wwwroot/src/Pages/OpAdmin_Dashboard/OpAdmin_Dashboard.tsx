@@ -26,6 +26,7 @@ import {
     Search,
     Trash2,
     CalendarDays,
+    Mail,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -1091,6 +1092,7 @@ function ProfileTab() {
     const lastName = localStorage.getItem('lastName') ?? '';
     const employeeNameStored = [firstName, middleName, lastName].filter(Boolean).join(' ');
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
+    const storedEmail = localStorage.getItem('email') ?? '';
 
     // ── Profile edit state ───────────────────────────────────────────────────
     const [editingProfile, setEditingProfile] = useState(false);
@@ -1099,6 +1101,7 @@ function ProfileTab() {
         middleName: middleName,
         lastName: lastName,
         contactNumber: employeeContact,
+        email: storedEmail,
     });
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
@@ -1130,9 +1133,14 @@ function ProfileTab() {
             .then(data => {
                 if (!data) return;
                 const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
+                const email = data.email ?? '';
                 if (contact) {
                     localStorage.setItem('contactNumber', contact);
                     setProfileForm(prev => ({ ...prev, contactNumber: contact }));
+                }
+                if (email) {
+                    localStorage.setItem('email', email);
+                    setProfileForm(prev => ({ ...prev, email: email }));
                 }
             })
             .catch(() => { });
@@ -1145,19 +1153,25 @@ function ProfileTab() {
 
     // ── "Save Changes" clicked: validate first, then open gate ───────────────
     const requestSave = () => {
-        if (!profileForm.firstName.trim()) {
-            setProfileError('First name is required.');
+        if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) {
+            setProfileError('Given Name must contain letters only and be up to 50 characters.');
             return;
         }
-        if (!profileForm.lastName.trim()) {
-            setProfileError('Last name is required.');
+        if (profileForm.middleName?.trim() && !/^[A-Za-z\s]{1,50}$/.test(profileForm.middleName.trim())) {
+            setProfileError('Middle Name must contain letters only and be up to 50 characters.');
             return;
         }
-        if (
-            profileForm.contactNumber &&
-            !/^[0-9+\-\s()]{7,20}$/.test(profileForm.contactNumber.trim())
-        ) {
-            setProfileError('Enter a valid contact number.');
+        if (!profileForm.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.lastName.trim())) {
+            setProfileError('Last Name must contain letters only and be up to 50 characters.');
+            return;
+        }
+        const email = profileForm.email.trim();
+        if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+            setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).');
+            return;
+        }
+        if (!profileForm.contactNumber.trim() || !/^[0-9]{11}$/.test(profileForm.contactNumber.trim())) {
+            setProfileError('Contact Number must be exactly 11 digits.');
             return;
         }
         setProfileError('');
@@ -1211,6 +1225,7 @@ function ProfileTab() {
                         middleName: profileForm.middleName.trim(),
                         lastName: profileForm.lastName.trim(),
                         contactNumber: profileForm.contactNumber.trim(),
+                        email: profileForm.email.trim(),
                     }),
                 }
             );
@@ -1222,6 +1237,7 @@ function ProfileTab() {
             localStorage.setItem('middleName', profileForm.middleName.trim());
             localStorage.setItem('lastName', profileForm.lastName.trim());
             localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
+            localStorage.setItem('email', profileForm.email.trim());
             setProfileSuccess(true);
             setEditingProfile(false);
             setTimeout(() => setProfileSuccess(false), 2500);
@@ -1449,12 +1465,21 @@ function ProfileTab() {
                                 />
                             </div>
                             <div className="field">
-                                <label>Last Name</label>
+                                <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
                                 <input
                                     type="text"
                                     value={profileForm.lastName}
                                     onChange={handleProfileChange('lastName')}
                                     placeholder="Enter last name"
+                                />
+                            </div>
+                            <div className="field">
+                                <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <input
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={handleProfileChange('email')}
+                                    placeholder="e.g. name@company.com"
                                 />
                             </div>
                             <div className="field">
@@ -1487,6 +1512,7 @@ function ProfileTab() {
                                             middleName: localStorage.getItem('middleName') ?? '',
                                             lastName: localStorage.getItem('lastName') ?? '',
                                             contactNumber: employeeContact,
+                                            email: storedEmail,
                                         });
                                     }}
                                     disabled={profileSaving}
@@ -1531,6 +1557,12 @@ function ProfileTab() {
                                     </span>
                                     <span className="detail-value">{profileForm.lastName || '—'}</span>
                                 </div>
+                            <div className="detail-item">
+                                <span className="detail-label">
+                                    <Mail size={11} style={{ display: 'inline', marginRight: 4 }} />Email Address
+                                </span>
+                                <span className="detail-value">{profileForm.email || '—'}</span>
+                            </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role
@@ -2172,8 +2204,12 @@ export default function OpsAdminDashboard() {
             .then(data => {
                 if (!data) return;
                 const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
+                const email = data.email ?? '';
                 if (contact) {
                     localStorage.setItem('contactNumber', contact);
+                }
+                if (email) {
+                    localStorage.setItem('email', email);
                 }
             })
             .catch(() => { });

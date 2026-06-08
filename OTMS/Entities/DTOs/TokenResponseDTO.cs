@@ -1,4 +1,4 @@
-﻿using OTMS.Entities.DTOs.ActivityLogs.Responses;
+using OTMS.Entities.DTOs.ActivityLogs.Responses;
 
 namespace OTMS.Entities.DTOs
 {
@@ -11,6 +11,8 @@ namespace OTMS.Entities.DTOs
         public string? MiddleName { get; set; } = null;
         public string LastName { get; set; } = string.Empty;
         public string? Suffix { get; set; } = null;
+        public string ContactNumber { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public bool IsPasswordChanged { get; set; }
     }

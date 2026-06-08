@@ -208,6 +208,7 @@ namespace OTMS.Service.Services
                 LastName = profile.LastName,
                 Suffix = profile.Suffix,
                 ContactNumber = profile.ContactNumber,
+                Email = profile.Email,
                 AccountStatus = profile.Account.AccountStatus,
                 Role = profile.Account.Role,
                 PresenceStatus = presenceStatus,

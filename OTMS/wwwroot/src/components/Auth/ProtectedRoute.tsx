@@ -8,7 +8,6 @@ function getTokenPayload(): { role?: string; exp?: number } | null {
     try {
         const token = localStorage.getItem('authToken');
         if (!token) return null;
-        console.log('token:', token); 
         const payload = JSON.parse(atob(token.split('.')[1]));
 
         if (payload.exp && payload.exp * 1000 < Date.now()) {
@@ -22,7 +21,7 @@ function getTokenPayload(): { role?: string; exp?: number } | null {
 
         return { ...payload, role };
     } catch (error) {
-        console.log('token parse failed', error);
+
         return null;
     }
 }

@@ -34,6 +34,7 @@ import {
     Settings,
     Activity,
     FileText,
+    Mail,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './SystemAdmin_Dashboard.css';
@@ -57,22 +58,12 @@ type NavTab =
 
 interface EmployeeRegisterDTO {
     employeeNumber: string;
-    firstName: string;
-    middleName: string;
-    lastName: string;
-    suffix: string;
-    contactNumber: string;
     role: string;
     email: string;
 }
 
 interface FieldError {
     employeeNumber?: string;
-    firstName?: string;
-    middleName?: string;
-    lastName?: string;
-    suffix?: string;
-    contactNumber?: string;
     role?: string;
     email?: string;
 }
@@ -83,6 +74,7 @@ interface ActivityLog {
     id: number;
     description: string;
     timestamp: string;
+    account?: string;
 }
 
 interface RecentEmployee {
@@ -197,11 +189,6 @@ const getEmployeeDisplayName = (emp: RecentEmployee): string => {
 
 const EMPTY_FORM: FormState = {
     employeeNumber: '',
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    suffix: '',
-    contactNumber: '',
     role: '',
     email: '',
 };
@@ -210,32 +197,6 @@ const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-.]+$/;
 
 function validate(form: FormState): FieldError {
     const errs: FieldError = {};
-    const firstName = form.firstName.trim();
-    if (!firstName) { errs.firstName = 'First name is required.'; }
-    else if (firstName.length < 2) { errs.firstName = 'First name must be at least 2 characters.'; }
-    else if (firstName.length > 50) { errs.firstName = 'First name must not exceed 50 characters.'; }
-    else if (!NAME_REGEX.test(firstName)) { errs.firstName = 'First name contains invalid characters.'; }
-
-    const middleName = form.middleName.trim();
-    if (middleName) {
-        if (middleName.length > 50) { errs.middleName = 'Middle name must not exceed 50 characters.'; }
-        else if (!NAME_REGEX.test(middleName)) { errs.middleName = 'Middle name contains invalid characters.'; }
-    }
-
-    const lastName = form.lastName.trim();
-    if (!lastName) { errs.lastName = 'Last name is required.'; }
-    else if (lastName.length < 2) { errs.lastName = 'Last name must be at least 2 characters.'; }
-    else if (lastName.length > 50) { errs.lastName = 'Last name must not exceed 50 characters.'; }
-    else if (!NAME_REGEX.test(lastName)) { errs.lastName = 'Last name contains invalid characters.'; }
-
-    const suffix = form.suffix.trim();
-    if (suffix && suffix.length > 10) { errs.suffix = 'Suffix must not exceed 10 characters.'; }
-
-    const contact = form.contactNumber.trim();
-    if (!contact) { errs.contactNumber = 'Contact number is required.'; }
-    else if (!/^\d+$/.test(contact)) { errs.contactNumber = 'Contact number must contain digits only.'; }
-    else if (contact.length !== 11) { errs.contactNumber = `Must be exactly 11 digits (currently ${contact.length}).`; }
-    else if (!/^09\d{9}$/.test(contact)) { errs.contactNumber = 'Must start with 09 (e.g. 09123456789).'; }
 
     if (!form.role) { errs.role = 'Please select a role.'; }
     else if (!ROLES.includes(form.role)) { errs.role = 'Selected role is not valid.'; }
@@ -350,11 +311,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
 
     const validateField = (key: keyof FormState, value: string): string => {
         switch (key) {
-            case 'firstName': { const v = value.trim(); if (!v) return 'First name is required.'; if (v.length < 2) return 'Must be at least 2 characters.'; if (v.length > 50) return 'Must not exceed 50 characters.'; if (!NAME_REGEX.test(v)) return 'Contains invalid characters.'; return ''; }
-            case 'middleName': { const v = value.trim(); if (!v) return ''; if (v.length > 50) return 'Must not exceed 50 characters.'; if (!NAME_REGEX.test(v)) return 'Contains invalid characters.'; return ''; }
-            case 'lastName': { const v = value.trim(); if (!v) return 'Last name is required.'; if (v.length < 2) return 'Must be at least 2 characters.'; if (v.length > 50) return 'Must not exceed 50 characters.'; if (!NAME_REGEX.test(v)) return 'Contains invalid characters.'; return ''; }
-            case 'suffix': { const v = value.trim(); if (!v) return ''; if (v.length > 10) return 'Must not exceed 10 characters.'; return ''; }
-            case 'contactNumber': { const c = value.trim(); if (!c) return 'Contact number is required.'; if (!/^\d+$/.test(c)) return 'Digits only.'; if (c.length !== 11) return `Must be exactly 11 digits (currently ${c.length}).`; if (!/^09\d{9}$/.test(c)) return 'Must start with 09.'; return ''; }
             case 'role': { if (!value) return 'Please select a role.'; if (!ROLES.includes(value)) return 'Selected role is not valid.'; return ''; }
             case 'email': { const e = value.trim(); if (!e) return 'Email address is required.'; if (e.length > 100) return 'Email must not exceed 100 characters.'; if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return 'Enter a valid email address.'; return ''; }
             default: return '';
@@ -379,11 +335,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             const token = localStorage.getItem('authToken');
             const payload: EmployeeRegisterDTO = {
                 employeeNumber: form.employeeNumber,
-                firstName: form.firstName.trim(),
-                middleName: form.middleName.trim(),
-                lastName: form.lastName.trim(),
-                suffix: form.suffix.trim(),
-                contactNumber: form.contactNumber.trim(),
                 role: toBackendRole(form.role),
                 email: form.email.trim(),
             };
@@ -397,17 +348,16 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 throw new Error(errorData.message || `Error ${res.status}: Registration failed`);
             }
             const data = await res.json();
-            const displayName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
             setSuccessData({ employeeNumber: data.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber,
-                employeeName: data.employeeName ?? displayName,
-                firstName: form.firstName.trim(),
-                middleName: form.middleName.trim(),
-                lastName: form.lastName.trim(),
-                suffix: form.suffix.trim(),
-                contactNumber: payload.contactNumber,
+                employeeName: data.employeeName ?? form.email.trim(),
+                firstName: '',
+                middleName: '',
+                lastName: '',
+                suffix: '',
+                contactNumber: '',
                 role: data.role,
                 accountStatus: 'Active',
             });
@@ -417,8 +367,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             setSubmitting(false);
         }
     };
-
-    const previewName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -453,44 +401,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             {errors.role && <span className="field-error"><AlertCircle size={12} />{errors.role}</span>}
                         </div>
                     </div>
-                    <p className="modal-section-label" style={{ marginTop: 8 }}>Personal info</p>
-                    {previewName && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8, padding: '7px 12px', marginBottom: 10, fontSize: 13 }}>
-                            <UserCircle2 size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
-                            <span style={{ color: 'var(--text-secondary)' }}>Preview:</span>
-                            <strong style={{ color: 'var(--text-primary)' }}>{previewName}</strong>
-                        </div>
-                    )}
+                    <p className="modal-section-label" style={{ marginTop: 8 }}>Contact info</p>
                     <div className="field-row">
-                        <div className="field">
-                            <label htmlFor="emp-firstname">First Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                            <input id="emp-firstname" type="text" placeholder="e.g. Juan" value={form.firstName} onChange={handleChange('firstName')} className={errors.firstName ? 'input-error' : form.firstName.trim().length >= 2 && !errors.firstName ? 'input-success' : ''} maxLength={50} />
-                            {errors.firstName ? <span className="field-error"><AlertCircle size={12} />{errors.firstName}</span> : form.firstName.trim() && !errors.firstName && <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Looks good</span>}
-                        </div>
-                        <div className="field">
-                            <label htmlFor="emp-lastname">Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                            <input id="emp-lastname" type="text" placeholder="e.g. dela Cruz" value={form.lastName} onChange={handleChange('lastName')} className={errors.lastName ? 'input-error' : form.lastName.trim().length >= 2 && !errors.lastName ? 'input-success' : ''} maxLength={50} />
-                            {errors.lastName ? <span className="field-error"><AlertCircle size={12} />{errors.lastName}</span> : form.lastName.trim() && !errors.lastName && <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Looks good</span>}
-                        </div>
-                    </div>
-                    <div className="field-row">
-                        <div className="field">
-                            <label htmlFor="emp-middlename">Middle Name <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, background: 'rgba(163,174,208,0.2)', color: 'var(--text-secondary)', padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle' }}>OPTIONAL</span></label>
-                            <input id="emp-middlename" type="text" placeholder="e.g. Santos" value={form.middleName} onChange={handleChange('middleName')} className={errors.middleName ? 'input-error' : ''} maxLength={50} />
-                            {errors.middleName ? <span className="field-error"><AlertCircle size={12} />{errors.middleName}</span> : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>Leave blank if none</span>}
-                        </div>
-                        <div className="field">
-                            <label htmlFor="emp-suffix">Suffix <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, background: 'rgba(163,174,208,0.2)', color: 'var(--text-secondary)', padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle' }}>OPTIONAL</span></label>
-                            <input id="emp-suffix" type="text" placeholder="e.g. Jr., Sr., III" value={form.suffix} onChange={handleChange('suffix')} className={errors.suffix ? 'input-error' : ''} maxLength={10} />
-                            {errors.suffix ? <span className="field-error"><AlertCircle size={12} />{errors.suffix}</span> : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>Leave blank if none</span>}
-                        </div>
-                    </div>
-                    <div className="field-row">
-                        <div className="field">
-                            <label htmlFor="emp-contact">Contact Number <span style={{ color: 'var(--danger)' }}>*</span></label>
-                            <input id="emp-contact" type="tel" placeholder="e.g. 09123456789" value={form.contactNumber} onChange={e => { const d = e.target.value.replace(/\D/g, ''); setForm(prev => ({ ...prev, contactNumber: d })); setApiError(''); setErrors(prev => ({ ...prev, contactNumber: validateField('contactNumber', d) || undefined })); }} className={errors.contactNumber ? 'input-error' : form.contactNumber.length === 11 && /^09\d{9}$/.test(form.contactNumber) ? 'input-success' : ''} maxLength={11} />
-                            {errors.contactNumber ? <span className="field-error"><AlertCircle size={12} />{errors.contactNumber}</span> : form.contactNumber.length > 0 ? <span style={{ fontSize: 11, marginTop: 3, display: 'block', color: form.contactNumber.length === 11 ? '#05cd99' : 'var(--text-secondary)' }}>{form.contactNumber.length}/11 digits{form.contactNumber.length === 11 && ' ✓'}</span> : <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>Format: 09XXXXXXXXX (11 digits)</span>}
-                        </div>
                         <div className="field">
                             <label htmlFor="emp-email">Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
                             <input id="emp-email" type="email" placeholder="e.g. juan@speedex.com" value={form.email} onChange={handleChange('email')} className={errors.email ? 'input-error' : ''} maxLength={100} autoComplete="off" />
@@ -515,8 +427,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         </div>
                         <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--text-secondary)' }}>Employee number</span><strong>{successData.employeeNumber}</strong></div>
-                            <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--text-secondary)' }}>Full name</span><strong>{previewName}</strong></div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--text-secondary)' }}>Email</span><span style={{ fontWeight: 500, color: 'var(--text-primary)', wordBreak: 'break-all', textAlign: 'right', maxWidth: 220 }}>{form.email.trim()}</span></div>
                         </div>
@@ -1004,6 +914,7 @@ function ProfileTab() {
     const storedSuffix = localStorage.getItem('suffix') ?? '';
     const legacyName = localStorage.getItem('employeeName') ?? '';
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
+    const storedEmail = localStorage.getItem('email') ?? '';
 
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
@@ -1012,7 +923,7 @@ function ProfileTab() {
     const [showGatePassword, setShowGatePassword] = useState(false);
     const [pendingEdit, setPendingEdit] = useState<'profile' | null>(null);
     const [editingProfile, setEditingProfile] = useState(false);
-    const [profileForm, setProfileForm] = useState({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact });
+    const [profileForm, setProfileForm] = useState({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail });
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -1024,41 +935,44 @@ function ProfileTab() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const requestEditProfile = () => { setGatePassword(''); setGateError(''); setShowGatePassword(false); setPendingEdit('profile'); setPasswordGate(true); };
+    const requestEditProfile = () => { setEditingProfile(true); setProfileSuccess(false); };
 
     const handleGateConfirm = async () => {
         if (!gatePassword) { setGateError('Please enter your password.'); return; }
         setGateLoading(true); setGateError('');
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/systemadmin/verify-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ password: gatePassword }) });
+            const res = await fetch('/api/authentication/verify-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeID: employeeId, password: gatePassword }) });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password. Please try again.'); }
+
+            if (pendingEdit === 'profile') {
+                const saveRes = await fetch(`/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employeeId, firstName: profileForm.firstName.trim(), middleName: profileForm.middleName.trim(), lastName: profileForm.lastName.trim(), suffix: profileForm.suffix.trim(), contactNumber: profileForm.contactNumber.trim(), email: profileForm.email.trim() }) });
+                if (!saveRes.ok) { const err = await saveRes.json().catch(() => ({})); throw new Error(err.message || 'Profile update failed.'); }
+                localStorage.setItem('firstName', profileForm.firstName.trim());
+                localStorage.setItem('middleName', profileForm.middleName.trim());
+                localStorage.setItem('lastName', profileForm.lastName.trim());
+                localStorage.setItem('suffix', profileForm.suffix.trim());
+                localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
+                localStorage.setItem('email', profileForm.email.trim());
+                localStorage.setItem('employeeName', buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix));
+                setProfileSuccess(true); setEditingProfile(false);
+            }
             setPasswordGate(false); setGatePassword('');
-            if (pendingEdit === 'profile') { setEditingProfile(true); setProfileSuccess(false); }
         } catch (err: any) { setGateError(err.message ?? 'Incorrect password. Please try again.'); }
         finally { setGateLoading(false); }
     };
 
     const handleProfileChange = (key: keyof typeof profileForm) => (e: React.ChangeEvent<HTMLInputElement>) => { setProfileForm(prev => ({ ...prev, [key]: e.target.value })); setProfileError(''); setProfileSuccess(false); };
 
-    const handleProfileSave = async () => {
-        if (!profileForm.firstName.trim()) { setProfileError('First name is required.'); return; }
-        if (!profileForm.lastName.trim()) { setProfileError('Last name is required.'); return; }
-        if (profileForm.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(profileForm.contactNumber.trim())) { setProfileError('Enter a valid contact number.'); return; }
-        setProfileSaving(true); setProfileError('');
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employeeId, firstName: profileForm.firstName.trim(), middleName: profileForm.middleName.trim(), lastName: profileForm.lastName.trim(), suffix: profileForm.suffix.trim(), contactNumber: profileForm.contactNumber.trim() }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Profile update failed.'); }
-            localStorage.setItem('firstName', profileForm.firstName.trim());
-            localStorage.setItem('middleName', profileForm.middleName.trim());
-            localStorage.setItem('lastName', profileForm.lastName.trim());
-            localStorage.setItem('suffix', profileForm.suffix.trim());
-            localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
-            localStorage.setItem('employeeName', buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix));
-            setProfileSuccess(true); setEditingProfile(false);
-        } catch (err: any) { setProfileError(err.message ?? 'Something went wrong.'); }
-        finally { setProfileSaving(false); }
+    const handleProfileSave = () => {
+        if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
+        if (profileForm.middleName?.trim() && !/^[A-Za-z\s]{1,50}$/.test(profileForm.middleName.trim())) { setProfileError('Middle Name must contain letters only and be up to 50 characters.'); return; }
+        if (!profileForm.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.lastName.trim())) { setProfileError('Last Name must contain letters only and be up to 50 characters.'); return; }
+        const email = profileForm.email.trim();
+        if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) { setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).'); return; }
+        if (!profileForm.contactNumber.trim() || !/^[0-9]{11}$/.test(profileForm.contactNumber.trim())) { setProfileError('Contact Number must be exactly 11 digits.'); return; }
+        setProfileError('');
+        setGatePassword(''); setGateError(''); setShowGatePassword(false); setPendingEdit('profile'); setPasswordGate(true);
     };
 
     const handlePwChange = (key: keyof typeof pwForm) => (e: React.ChangeEvent<HTMLInputElement>) => { setPwForm(prev => ({ ...prev, [key]: e.target.value })); setPwError(''); };
@@ -1108,9 +1022,9 @@ function ProfileTab() {
                             {profileError && <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>}
                             <div className="field-row"><div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} /></div><div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} /></div></div>
                             <div className="field-row"><div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} /></div><div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div></div>
-                            <div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. +63 917 000 0000" /></div>
+                            <div className="field-row"><div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" /></div><div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. +63 917 000 0000" /></div></div>
                             <div className="detail-grid" style={{ marginTop: 4 }}><div className="detail-item"><span className="detail-label">Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div><div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">System Admin</span></div></div>
-                            <div className="modal-actions" style={{ padding: '4px 0 0' }}><button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact }); }} disabled={profileSaving}>Cancel</button><button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>{profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}</button></div>
+                            <div className="modal-actions" style={{ padding: '4px 0 0' }}><button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button><button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>{profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}</button></div>
                         </div>
                     ) : (
                         <div className="detail-grid" style={{ marginTop: 4 }}>
@@ -1119,6 +1033,7 @@ function ProfileTab() {
                             <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name</span><span className="detail-value">{profileForm.lastName || '—'}</span></div>
                             <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name</span><span className="detail-value">{profileForm.middleName || '—'}</span></div>
                             {profileForm.suffix && <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Suffix</span><span className="detail-value">{profileForm.suffix}</span></div>}
+                            <div className="detail-item"><span className="detail-label"><Mail size={11} style={{ display: 'inline', marginRight: 4 }} />Email</span><span className="detail-value">{profileForm.email || '—'}</span></div>
                             <div className="detail-item"><span className="detail-label"><Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role</span><span className="detail-value">System Admin</span></div>
                             <div className="detail-item"><span className="detail-label"><Phone size={11} style={{ display: 'inline', marginRight: 4 }} />Contact</span><span className="detail-value">{displayContact || '—'}</span></div>
                         </div>
@@ -1450,10 +1365,27 @@ export default function Dashboard() {
         fetchLeaveRequests(1, { status: 'pending', role: '', search: '' });
         fetchOverrides(1, { status: 'Pending', search: '' });
         const token = localStorage.getItem('authToken');
-        fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` } })
-            .then(res => { if (!res.ok) return []; return res.json(); })
-            .then(data => setActivityLogs(Array.isArray(data) ? data : []))
-            .catch(() => setActivityLogs([]));
+        fetch('/api/activity-logs/recent', {
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
+        })
+            .then(async res => {
+                if (!res.ok) return [];
+                const text = await res.text();
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Failed to parse JSON. Response was:', text);
+                    throw e;
+                }
+            })
+            .then(data => {
+                if (Array.isArray(data)) setActivityLogs(data);
+                else if (data && Array.isArray(data.data)) setActivityLogs(data.data);
+                else if (data && Array.isArray(data.$values)) setActivityLogs(data.$values);
+                else setActivityLogs([]);
+            })
+            .catch((err) => { console.error('Activity logs fetch error:', err); setActivityLogs([]); });
     }, []);
 
     const handleLogout = async () => {
@@ -1570,23 +1502,66 @@ export default function Dashboard() {
                         overrideTotalPages={overrideTotalPages}
                         onPageChange={fetchOverrides}
                         onOverrideUpdated={handleOverrideUpdated}
-                        overrideCounts={overrideCounts} 
+                        overrideCounts={overrideCounts}
                     />
                 )}
 
                 {activeTab === 'activity_logs' && (
                     <div className="dashboard-content">
-                        <div className="card">
-                            <div className="card-header"><h3>System Activity Logs</h3></div>
-                            {activityLogs.length === 0 ? <div className="empty-state" style={{ padding: 48 }}><Activity size={32} /><p>No activity logs found.</p></div>
-                                : <div className="data-table-wrap"><table className="data-table"><thead><tr><th>DESCRIPTION</th><th>TIMESTAMP</th></tr></thead><tbody>{activityLogs.map(log => <tr key={log.id}><td className="cell-name">{log.description}</td><td className="cell-muted">{new Date(log.timestamp).toLocaleString()}</td></tr>)}</tbody></table></div>}
+                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                            <div className="card-header" style={{ padding: '24px 36px', borderBottom: '1px solid rgba(241, 245, 249, 1)', background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
+                                <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <Activity size={20} color="#4f46e5" /> System Activity Logs
+                                </h3>
+                            </div>
+                            {activityLogs.length === 0 ? (
+                                <div className="empty-state" style={{ padding: '60px 20px' }}>
+                                    <Activity size={40} color="#cbd5e1" style={{ marginBottom: '12px' }} />
+                                    <p style={{ fontSize: '15px', color: '#64748b' }}>No activity logs found in the system.</p>
+                                </div>
+                            ) : (
+                                <div className="global-timeline">
+                                    {activityLogs.map((log, index) => (
+                                        <div key={log.id} className="global-timeline-item">
+                                            <div className="global-timeline-line">
+                                                <div className="global-timeline-dot" />
+                                                {index < activityLogs.length - 1 && <div className="global-timeline-connector" />}
+                                            </div>
+                                            <div className="global-timeline-content">
+                                                <div className="global-timeline-desc">{log.description}</div>
+                                                <div className="global-timeline-time">
+                                                    <Clock size={12} />
+                                                    {new Date(log.timestamp).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
             </main>
 
             {showAddModal && (
-                <AddEmployeeModal onClose={() => setShowAddModal(false)} onSuccess={newEmp => { setEmployees(prev => [newEmp, ...prev]); setRecentEmployees(prev => [newEmp, ...prev]); }} />
+                <AddEmployeeModal onClose={() => setShowAddModal(false)} onSuccess={newEmp => {
+                    setEmployees(prev => [newEmp, ...prev]);
+                    setRecentEmployees(prev => [newEmp, ...prev]);
+                    // [Code Addition] Refetch activity logs dynamically from the backend when a new account is successfully created, keeping the dashboard current without a full page reload.
+                    const token = localStorage.getItem('authToken');
+                    fetch('/api/activity-logs/recent', {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        cache: 'no-store'
+                    })
+                        .then(res => { if (!res.ok) return []; return res.json(); })
+                        .then(data => {
+                            if (Array.isArray(data)) setActivityLogs(data);
+                            else if (data && Array.isArray(data.data)) setActivityLogs(data.data);
+                            else if (data && Array.isArray(data.$values)) setActivityLogs(data.$values);
+                            else setActivityLogs([]);
+                        })
+                        .catch((err) => { console.error('Activity logs fetch error:', err); });
+                }} />
             )}
             {selectedEmployee && (
                 <EmployeeDetailModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} onUpdated={handleEmployeeUpdated} />

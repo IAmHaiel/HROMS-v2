@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs.Notification.Responses;
@@ -13,7 +13,7 @@ namespace OTMS.Controllers
     public class notificationController(INotificationService notificationService) : ControllerBase
     {
         // Get Notifications
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize]
         [HttpGet("my-notifications")]
         public async Task<
             ActionResult<PaginationResponseDTO<NotificationResponseDTO>>> GetMyNotifications([FromQuery] PaginationDTO request)
@@ -33,7 +33,7 @@ namespace OTMS.Controllers
         }
 
         // Mark as Read
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize]
         [HttpPatch("{notificationId}/read")]
         public async Task<IActionResult> MarkAsRead(Guid notificationId)
         {

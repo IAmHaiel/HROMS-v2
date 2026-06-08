@@ -8,6 +8,7 @@ namespace OTMS.Entities.DTOs.Profile.Responses
         public string LastName { get; set; } = string.Empty;
         public string? Suffix { get; set; } = null;
         public string ContactNumber { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }

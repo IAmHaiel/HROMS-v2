@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     User,
     Phone,
@@ -317,7 +317,8 @@ export default function EmployeeDetailPanel({
         const token = localStorage.getItem('authToken');
         setLoadingLogs(true);
         fetch(`/api/activity-logs/employee/${encodeURIComponent(profile.employeeNumber)}`, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
         })
             .then(res => (res.ok ? res.json() : []))
             .then(data => setActivityLogs(Array.isArray(data) ? data : []))

@@ -724,6 +724,7 @@ export default function EmployeeDetail() {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
+                cache: 'no-store'
             }
         )
             .then(res => {

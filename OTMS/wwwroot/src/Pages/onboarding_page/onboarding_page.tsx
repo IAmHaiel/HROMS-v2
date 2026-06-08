@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, User, Lock } from 'lucide-react';
 
@@ -38,7 +38,11 @@ export default function OnboardingPage() {
                 if (!value.trim()) return `${key === 'firstName' ? 'First' : 'Last'} name is required.`;
                 if (value.trim().length < 2) return 'Must be at least 2 characters.';
                 if (value.trim().length > 50) return 'Must not exceed 50 characters.';
-                if (!NAME_REGEX.test(value.trim())) return 'Letters, spaces, hyphens, and apostrophes only.';
+                if (key === 'firstName') {
+                    if (!/^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'\-.]+$/.test(value.trim())) return 'Letters, numbers, spaces, hyphens, and apostrophes only.';
+                } else {
+                    if (!NAME_REGEX.test(value.trim())) return 'Letters, spaces, hyphens, and apostrophes only.';
+                }
                 return '';
             case 'middleName':
                 if (!value.trim()) return '';
@@ -270,7 +274,7 @@ export default function OnboardingPage() {
                                             />
                                             {profileErrors[key]
                                                 ? <span style={{ fontSize: 11, color: '#ee5d50', display: 'flex', alignItems: 'center', gap: 4 }}><AlertCircle size={11} />{profileErrors[key]}</span>
-                                                : <span style={{ fontSize: 11, color: '#8a95b0' }}>Letters, hyphens, apostrophes only</span>
+                                                : <span style={{ fontSize: 11, color: '#8a95b0' }}>{key === 'firstName' ? 'Letters, numbers, hyphens, apostrophes only' : 'Letters, hyphens, apostrophes only'}</span>
                                             }
                                         </div>
                                     ))}

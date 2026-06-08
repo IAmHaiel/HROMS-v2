@@ -67,7 +67,7 @@ export default function Login() {
     useEffect(() => {
         ['authToken', 'refreshToken', 'employeeId', 'employeeName',
             'firstName', 'middleName', 'lastName', 'suffix',
-            'contactNumber', 'role', 'isPasswordChanged', 'userRole']
+            'contactNumber', 'email', 'role', 'isPasswordChanged', 'userRole']
             .forEach(k => localStorage.removeItem(k));
     }, []);
 
@@ -168,6 +168,7 @@ export default function Login() {
             localStorage.setItem('employeeId', employeeId.trim());
             localStorage.setItem('isPasswordChanged', data.isPasswordChanged.toString());
             localStorage.setItem('contactNumber', data.contactNumber ?? data.contact ?? data.phoneNumber ?? '');
+            localStorage.setItem('email', data.email ?? '');
 
             // Save name parts
             localStorage.setItem('firstName', data.firstName ?? '');

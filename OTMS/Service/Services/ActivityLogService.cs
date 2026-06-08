@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
 using OTMS.Entities.Models;
@@ -108,6 +108,38 @@ namespace OTMS.Service.Services
                 Description = activityLog.Description,
                 CreatedAt = activityLog.CreatedAt
             };
+        }
+
+        public async Task<IEnumerable<object>> GetRecentActivityLogsAsync(int count = 50)
+        {
+            return await context.ActivityLogs
+                .OrderByDescending(al => al.CreatedAt)
+                .Take(count)
+                .Select(al => new
+                {
+                    id = al.ActivityLogId,
+                    description = al.Description,
+                    timestamp = al.CreatedAt
+                })
+                .ToListAsync();
+        }
+
+        // [Code Addition] Dedicated method to fetch activity logs for a specific employee number, primarily utilized by EmployeeDetailPanel.
+        public async Task<IEnumerable<object>> GetEmployeeActivityLogsAsync(string employeeNumber)
+        {
+            var employee = await context.Employees.Include(e => e.Account).FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+            if (employee == null || employee.Account == null) return new List<object>();
+
+            return await context.ActivityLogs
+                .Where(al => al.AccountId == employee.Account.AccountId) // [Code Addition] Filtering logs tied explicitly to the queried employee
+                .OrderByDescending(al => al.CreatedAt)
+                .Select(al => new
+                {
+                    id = al.ActivityLogId,
+                    description = al.Description,
+                    timestamp = al.CreatedAt
+                })
+                .ToListAsync();
         }
     }
 }

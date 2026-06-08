@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,7 @@ using System.Text;
 
 namespace OTMS.Service.Services
 {
-    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService) : IAuthService
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService, IHttpContextAccessor httpContextAccessor) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
         static string? GeneratedPassword = String.Empty;
@@ -169,7 +169,6 @@ namespace OTMS.Service.Services
                 return null;
 
             request.EmployeeNumber = request.EmployeeNumber.ToUpper().Trim();
-            request.ContactNumber = ContactNumberFormatter(request.ContactNumber); // only once
 
             var exists = await context.Employees.AnyAsync(u => u.EmployeeNumber == request.EmployeeNumber);
             if (exists)
@@ -191,11 +190,11 @@ namespace OTMS.Service.Services
             {
                 EmployeeId = Guid.NewGuid(),
                 EmployeeNumber = request.EmployeeNumber,
-                FirstName = request.FirstName.Trim(),
-                MiddleName = string.IsNullOrWhiteSpace(request.MiddleName) ? null : request.MiddleName,
-                LastName = request.LastName.Trim(),
-                Suffix = string.IsNullOrWhiteSpace(request.Suffix) ? null : request.Suffix,
-                ContactNumber = request.ContactNumber.Trim(),
+                FirstName = string.Empty,
+                MiddleName = null,
+                LastName = string.Empty,
+                Suffix = null,
+                ContactNumber = string.Empty,
                 CreatedAt = DateTime.UtcNow,
 
                 Email = request.Email.Trim(),
@@ -230,6 +229,17 @@ namespace OTMS.Service.Services
             context.Accounts.Add(account);
             await context.SaveChangesAsync();
 
+            // Extract the AccountId of the user creating this account (e.g., SystemAdmin1)
+            var currentUserIdStr = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid.TryParse(currentUserIdStr, out Guid currentUserId);
+
+            // Save Account Created Activity under the creator's account if available, fallback to the newly created account
+            await activityLogService.LogActivityAsync(
+                currentUserId != Guid.Empty ? currentUserId : account.AccountId,
+                ActivityTypes.AccountCreated,
+                $"Account for {employee.EmployeeNumber} ({account.Role}) has been created."
+            );
+
             var verificationLink =
                 $"{configuration["FrontendBaseUrl"]}/verify-email" +
                 $"?token={employee.EmailVerificationToken}";
@@ -257,11 +267,6 @@ namespace OTMS.Service.Services
             return new EmployeeRegisterResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                FirstName = employee.FirstName ?? string.Empty,
-                MiddleName = employee.MiddleName ?? null,
-                LastName = employee.LastName ?? string.Empty,
-                Suffix = employee.Suffix ?? null,
-                ContactNumber = employee.ContactNumber ?? string.Empty,
                 Role = account.Role ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
             };
@@ -389,6 +394,8 @@ namespace OTMS.Service.Services
                 MiddleName = employee.MiddleName ?? null,
                 LastName = employee.LastName ?? string.Empty,
                 Suffix = employee.Suffix ?? null,
+                ContactNumber = employee.ContactNumber ?? string.Empty,
+                Email = employee.Email ?? string.Empty,
                 IsPasswordChanged = employee.Account.IsPasswordChanged
             };
         }

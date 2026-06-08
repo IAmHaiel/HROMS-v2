@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs.ActivityLogs.Responses;
@@ -6,7 +6,7 @@ using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/activity-logs")]
     [ApiController]
     public class activity_logsController(IActivityLogService activityLogService) : ControllerBase
     {
@@ -44,6 +44,39 @@ namespace OTMS.Controllers
                 return NotFound(new {message = ex.Message});
             }
         }
+        /// <summary>
+        /// Get recent activity logs for System Admins.
+        /// </summary>
+        [Authorize(Policy = "SystemAdminAccess")]
+        [HttpGet("recent")]
+        public async Task<IActionResult> GetRecentActivityLogs()
+        {
+            try
+            {
+                var logs = await activityLogService.GetRecentActivityLogsAsync();
+                return Ok(logs);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+        /// <summary>
+        /// Get activity logs for a specific employee.
+        /// </summary>
+        [Authorize(Policy = "SystemAdminAccess")]
+        [HttpGet("employee/{employeeNumber}")]
+        public async Task<IActionResult> GetEmployeeActivityLogs(string employeeNumber)
+        {
+            try
+            {
+                var logs = await activityLogService.GetEmployeeActivityLogsAsync(employeeNumber);
+                return Ok(logs);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
     }
-
 }

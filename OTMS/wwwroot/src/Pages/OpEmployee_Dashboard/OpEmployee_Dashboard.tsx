@@ -30,6 +30,7 @@ import {
     ChevronLeft,
     RefreshCw,
     LogOut,
+    Mail,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -75,6 +76,7 @@ interface UserProfile {
     employeeId: string;
     fullName: string;
     phone: string;
+    email: string;
     role: string;
     accountStatus: string;
     presenceStatus?: string;
@@ -956,7 +958,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
     const [editMode, setEditMode] = useState(false);
     const [pwdMode, setPwdMode] = useState(false);
-    const [form, setForm] = useState({ employeeName: user.fullName, contactNumber: user.phone });
+    const [form, setForm] = useState({ 
+        firstName: localStorage.getItem('firstName') ?? '', 
+        middleName: localStorage.getItem('middleName') ?? '', 
+        lastName: localStorage.getItem('lastName') ?? '', 
+        contactNumber: localStorage.getItem('contactNumber') ?? '', 
+        email: localStorage.getItem('email') ?? '' 
+    });
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
@@ -967,13 +975,27 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const [pwdSaving, setPwdSaving] = useState(false);
 
     useEffect(() => {
-        setForm({ employeeName: user.fullName, contactNumber: user.phone });
+        setForm({ 
+            firstName: localStorage.getItem('firstName') ?? '', 
+            middleName: localStorage.getItem('middleName') ?? '', 
+            lastName: localStorage.getItem('lastName') ?? '', 
+            contactNumber: localStorage.getItem('contactNumber') ?? '', 
+            email: localStorage.getItem('email') ?? '' 
+        });
     }, [user.fullName, user.phone]);
 
     const requestSave = () => {
-        if (!form.employeeName.trim()) { setProfileError('Full name is required.'); return; }
-        if (form.contactNumber && !/^[0-9+\-\s()]{7,20}$/.test(form.contactNumber.trim())) {
-            setProfileError('Enter a valid contact number.'); return;
+        if (!form.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
+        if (form.middleName.trim() && !/^[A-Za-z\s]{1,50}$/.test(form.middleName.trim())) { setProfileError('Middle Name must contain letters only and be up to 50 characters.'); return; }
+        if (!form.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.lastName.trim())) { setProfileError('Last Name must contain letters only and be up to 50 characters.'); return; }
+        
+        const email = form.email.trim();
+        if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) { 
+            setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).'); return; 
+        }
+        
+        if (!form.contactNumber.trim() || !/^[0-9]{11}$/.test(form.contactNumber.trim())) {
+            setProfileError('Contact Number must be exactly 11 digits.'); return;
         }
         setProfileError('');
         setGatePassword('');
@@ -987,10 +1009,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setGateLoading(true);
         setGateError('');
         try {
-            const verifyRes = await fetch('/api/profile/verify-password', {
+            const employeeId = localStorage.getItem('employeeId') ?? '';
+            const verifyRes = await fetch('/api/authentication/verify-password', {
                 method: 'POST',
                 headers: authHeader(),
-                body: JSON.stringify({ password: gatePassword }),
+                body: JSON.stringify({ employeeID: employeeId, password: gatePassword }),
             });
             if (!verifyRes.ok) {
                 const err = await verifyRes.json().catch(() => ({}));
@@ -1011,22 +1034,33 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setProfileError('');
         try {
             const employeeId = localStorage.getItem('employeeId') ?? '';
-            const res = await fetch('/api/profile/update-profile', {
+            const firstName = form.firstName.trim();
+            const lastName = form.lastName.trim();
+            const middleName = form.middleName.trim();
+            const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeId)}`, {
                 method: 'PUT',
                 headers: authHeader(),
                 body: JSON.stringify({
                     employeeNumber: employeeId,
-                    employeeName: form.employeeName.trim(),
+                    firstName: firstName,
+                    middleName: middleName,
+                    lastName: lastName,
                     contactNumber: form.contactNumber.trim(),
+                    email: form.email.trim(),
                 }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error((err as any).message || 'Profile update failed.');
             }
-            localStorage.setItem('employeeName', form.employeeName.trim());
+            const newFullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
+            localStorage.setItem('employeeName', newFullName);
+            localStorage.setItem('firstName', firstName);
+            localStorage.setItem('middleName', middleName);
+            localStorage.setItem('lastName', lastName);
             localStorage.setItem('contactNumber', form.contactNumber.trim());
-            onUpdateUser({ ...user, fullName: form.employeeName.trim(), phone: form.contactNumber.trim() });
+            localStorage.setItem('email', form.email.trim());
+            onUpdateUser({ ...user, fullName: newFullName, phone: form.contactNumber.trim() });
             setProfileSuccess(true);
             setEditMode(false);
             setTimeout(() => setProfileSuccess(false), 2500);
@@ -1041,7 +1075,13 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         setEditMode(false);
         setPwdMode(false);
         setProfileError('');
-        setForm({ employeeName: user.fullName, contactNumber: user.phone });
+        setForm({ 
+            firstName: localStorage.getItem('firstName') ?? '', 
+            middleName: localStorage.getItem('middleName') ?? '', 
+            lastName: localStorage.getItem('lastName') ?? '', 
+            contactNumber: user.phone, 
+            email: localStorage.getItem('email') ?? '' 
+        });
     };
 
     const setF = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1217,17 +1257,50 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                 <span className="read-only-val">{user.employeeId || '—'}</span>
                             </div>
                         </div>
-                        <div className="info-field">
-                            <label>Full Name</label>
-                            {editMode ? (
-                                <div className="if-input-wrap">
-                                    <span className="if-icon"><User size={15} /></span>
-                                    <input type="text" value={form.employeeName} onChange={setF('employeeName')} placeholder="Enter full name" />
+                        {editMode ? (
+                            <>
+                                <div className="info-field">
+                                    <label>Given Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                    <div className="if-input-wrap">
+                                        <span className="if-icon"><User size={15} /></span>
+                                        <input type="text" value={form.firstName} onChange={setF('firstName')} placeholder="Given Name" maxLength={50} />
+                                    </div>
                                 </div>
-                            ) : (
+                                <div className="info-field">
+                                    <label>Middle Name</label>
+                                    <div className="if-input-wrap">
+                                        <span className="if-icon"><User size={15} /></span>
+                                        <input type="text" value={form.middleName} onChange={setF('middleName')} placeholder="Middle Name" maxLength={50} />
+                                    </div>
+                                </div>
+                                <div className="info-field">
+                                    <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                    <div className="if-input-wrap">
+                                        <span className="if-icon"><User size={15} /></span>
+                                        <input type="text" value={form.lastName} onChange={setF('lastName')} placeholder="Last Name" maxLength={50} />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="info-field">
+                                <label>Full Name</label>
                                 <div className="if-value">
                                     <span className="if-icon"><User size={15} /></span>
                                     <span>{user.fullName || '—'}</span>
+                                </div>
+                            </div>
+                        )}
+                        <div className="info-field">
+                            <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
+                            {editMode ? (
+                                <div className="if-input-wrap">
+                                    <span className="if-icon"><Mail size={15} /></span>
+                                    <input type="email" value={form.email} onChange={setF('email')} placeholder="e.g. name@company.com" />
+                                </div>
+                            ) : (
+                                <div className="if-value">
+                                    <span className="if-icon"><Mail size={15} /></span>
+                                    <span>{form.email || '—'}</span>
                                 </div>
                             )}
                         </div>
@@ -1374,6 +1447,7 @@ export default function EmployeeDashboard() {
         employeeId: localStorage.getItem('employeeId') ?? '',
         fullName: localStorage.getItem('employeeName') ?? '',
         phone: localStorage.getItem('contactNumber') ?? '',
+        email: localStorage.getItem('email') ?? '',
         role: localStorage.getItem('role') ?? '',
         accountStatus: 'Active',
     });
@@ -1437,6 +1511,7 @@ export default function EmployeeDashboard() {
                     employeeId: data.employeeNumber ?? employeeId,
                     fullName: data.employeeName ?? localStorage.getItem('employeeName') ?? '',
                     phone: data.contactNumber ?? localStorage.getItem('contactNumber') ?? '',
+                    email: data.email ?? localStorage.getItem('email') ?? '',
                     role: data.role ?? localStorage.getItem('role') ?? '',
                     accountStatus: data.accountStatus ?? 'Active',
                     presenceStatus: data.presenceStatus ?? 'Offline',
@@ -1444,6 +1519,7 @@ export default function EmployeeDashboard() {
                 setUser(fetched);
                 localStorage.setItem('employeeName', fetched.fullName);
                 localStorage.setItem('contactNumber', fetched.phone);
+                localStorage.setItem('email', fetched.email);
                 localStorage.setItem('role', fetched.role);
             })
             .catch(err => console.warn('Could not fetch profile:', err))
