@@ -117,5 +117,45 @@ namespace OTMS.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [Authorize(Policy = "OperationalTeamAccess")]
+        [HttpPut("{emergencyOverrideId}/update")]
+        public async Task<IActionResult> UpdateEmergencyOverrideRequest (UpdateEmergencyOverrideDTO request)
+        {
+            try
+            {
+                var result = await emergencyOverrideService.UpdateEmergencyOverrideAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        [Authorize(Policy = "OperationalTeamAccess")]
+        [HttpDelete("{emergencyOverrideId}/delete")]
+        public async Task<IActionResult> DeleteEmergencyOverrideRequest([FromBody] Guid EmergencyOverrideId)
+        {
+            try
+            {
+                var result = await emergencyOverrideService.DeleteEmergencyOverrideAsync(EmergencyOverrideId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
     }
 }
