@@ -8,6 +8,7 @@ using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
+using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
@@ -389,6 +390,24 @@ namespace OTMS.Service.Services
                 request.ContactNumber = employee.ContactNumber;
             }
 
+            if (request.Email == "string" || String.IsNullOrEmpty(request.Email))
+            {
+                request.Email = employee.Email;
+            }
+
+            var contactNoExists = await context.Employees
+                .AnyAsync(e => e.ContactNumber == request.ContactNumber && e.EmployeeNumber != employee.EmployeeNumber);
+            if (contactNoExists)
+                throw new Exception("Contact Number already exists in another account.");
+
+            var emailExists = await context.Employees
+                .AnyAsync(e => e.Email == request.Email && e.EmployeeNumber != employee.EmployeeNumber);
+            if (contactNoExists)
+                throw new Exception("Email already exists in another account.");
+
+            // Format Profile Contact Number
+            request.ContactNumber = GeneralHelper.ContactNumberFormatter(request.ContactNumber);
+
             await context.Employees
                 .Where(e => e.EmployeeId == employee.EmployeeId)
                 .ExecuteUpdateAsync(s => s
@@ -398,6 +417,7 @@ namespace OTMS.Service.Services
                     .SetProperty(e => e.LastName, request.LastName)
                     .SetProperty(e => e.Suffix, request.Suffix)
                     .SetProperty(e => e.ContactNumber, request.ContactNumber)
+                    .SetProperty(e => e.Email, request.Email)
                     .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
 
             return new UpdateEmployeeResponseDTO
@@ -408,6 +428,7 @@ namespace OTMS.Service.Services
                 LastName = request.LastName ?? employee.LastName,
                 Suffix = request.Suffix ?? employee.Suffix,
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
+                Email = request.Email ?? employee.Email,
                 Success = true
             };
         }
