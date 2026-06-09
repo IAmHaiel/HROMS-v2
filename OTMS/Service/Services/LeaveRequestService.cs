@@ -342,7 +342,37 @@ namespace OTMS.Service.Services
             leaveRequest.Approved_By = profile.Account.AccountId;
             leaveRequest.Approval_Status = request.Approval_Status;
             leaveRequest.LeaveRequestNote = request.LeaveRequestNote;
+
+            if (request.Approval_Status == "Approved")
+            {
+                var employeeAccount = await context.Accounts.FirstOrDefaultAsync(a => a.AccountId == leaveRequest.AccountId);
+                if (employeeAccount != null)
+                {
+                    employeeAccount.AccountStatus = "On Leave";
+                }
+            }
+            else if (request.Approval_Status == "Declined" || request.Approval_Status == "Rejected")
+            {
+                var employeeAccount = await context.Accounts.FirstOrDefaultAsync(a => a.AccountId == leaveRequest.AccountId);
+                if (employeeAccount != null && employeeAccount.AccountStatus == "On Leave")
+                {
+                    employeeAccount.AccountStatus = "Active";
+                }
+            }
+
             await context.SaveChangesAsync();
+
+            // Explicitly load navigation properties to prevent NullReferenceException on activity logging
+            await context.Entry(leaveRequest).Reference(lr => lr.Account).LoadAsync();
+            if (leaveRequest.Account != null)
+            {
+                await context.Entry(leaveRequest.Account).Reference(a => a.Employee).LoadAsync();
+            }
+            await context.Entry(leaveRequest).Reference(lr => lr.ApprovedByAccount).LoadAsync();
+            if (leaveRequest.ApprovedByAccount != null)
+            {
+                await context.Entry(leaveRequest.ApprovedByAccount).Reference(a => a.Employee).LoadAsync();
+            }
 
             await activityLogService.LogActivityAsync(
                 leaveRequest.ApprovedByAccount.AccountId,

@@ -1102,7 +1102,6 @@ function ProfileTab() {
         lastName: lastName,
         contactNumber: employeeContact,
         email: storedEmail,
-        email: storedEmail,
     });
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');

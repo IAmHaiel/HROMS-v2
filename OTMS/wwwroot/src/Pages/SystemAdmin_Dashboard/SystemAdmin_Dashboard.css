@@ -1278,10 +1278,8 @@ body {
     background: rgba(10, 17, 40, 0.55);
     backdrop-filter: blur(6px);
     display: flex;
-    align-items: center;
-    justify-content: center;
     z-index: 200;
-    padding: 20px 16px;
+    padding: 40px 16px;
     overflow-y: auto;
 }
 

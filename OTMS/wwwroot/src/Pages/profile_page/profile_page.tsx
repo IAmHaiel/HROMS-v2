@@ -1,4 +1,5 @@
-﻿import './profile.css';
+import React, { useState } from 'react';
+import './profile.css';
 import { User, Save, Pencil } from 'lucide-react';
 
 export default function Profile() {

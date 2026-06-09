@@ -42,34 +42,51 @@ namespace OTMS.Controllers
             if (employee is null || employee.Account is null)
                 return Unauthorized(new { message = "Invalid Employee ID or password." });
 
-            if (employee.Account.AccountStatus == "Deactivated")
+            var status = employee.Account.AccountStatus;
+
+            if (status == "Deactivated" || status == "Locked" || status == "On Leave" || employee.Account.FailedLoginAttempts >= 3)
             {
-                if (employee.Account.FailedLoginAttempts >= 3)
+                var fullName = string.Join(" ", new[]
+                {
+                    employee.FirstName,
+                    employee.MiddleName,
+                    employee.LastName,
+                    employee.Suffix
+                }.Where(n => !string.IsNullOrEmpty(n)));
+
+                if (status == "On Leave")
+                {
+                    var activeLeave = await context.LeaveRequests
+                        .FirstOrDefaultAsync(lr =>
+                            lr.AccountId == employee.Account.AccountId &&
+                            lr.Approval_Status == "Approved");
+
+                    return Unauthorized(new
+                    {
+                        message = "Your account is currently on leave and cannot be accessed.",
+                        employeeName = fullName,
+                        accountId = employee.Account.AccountId,
+                        leaveId = activeLeave?.LeaveId ?? Guid.Empty
+                    });
+                }
+
+                if (status == "Locked" || employee.Account.FailedLoginAttempts >= 3)
                     return Unauthorized(new
                     {
                         message = "Your account has been locked due to 3 consecutive failed login attempts. Please contact your administrator.",
-                        firstName = employee.FirstName,
-                        middleName = employee.MiddleName,
-                        lastName = employee.LastName,
-                        suffix = employee.Suffix
+                        employeeName = fullName
                     });
 
                 return Unauthorized(new
                 {
                     message = "Your account has been deactivated by the System Administrator. Please contact your administrator.",
-                    firstName = employee.FirstName,
-                    middleName = employee.MiddleName,
-                    lastName = employee.LastName,
-                    suffix = employee.Suffix
+                    employeeName = fullName
                 });
             }
 
-            bool isOnLeave = employee.Account.AccountStatus == "On Leave";
-
             try
             {
-                if (!isOnLeave)
-                    await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
+                await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
 
                 var result = await authService.LoginAsync(request);
                 if (result is null)
@@ -82,7 +99,7 @@ namespace OTMS.Controllers
                 return Unauthorized(new
                 {
                     message = "Your account is currently on leave and cannot be accessed.",
-                    employeeName = ex.EmployeeName, // Separated Names are already joined to one string at this point.
+                    employeeName = ex.EmployeeName,
                     accountId = ex.AccountId,
                     leaveId = ex.LeaveId
                 });

@@ -586,33 +586,174 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
-                <div className="modal-header">
-                    <div><h3>{isApprove ? 'Approve Leave Request' : 'Decline Leave Request'}</h3><p className="modal-subtitle">{isApprove ? 'Confirm approval for this leave request.' : 'Provide a reason for declining this request.'}</p></div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-                <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                        <div className="emp-avatar" style={{ flexShrink: 0 }}>{request.employeeName.charAt(0).toUpperCase()}</div>
-                        <div><div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{request.employeeName}</div><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{toDisplayRole(request.role)}</div></div>
+            <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>
+                <div className="modal-header" style={{ marginBottom: 20 }}>
+                    <div>
+                        <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                            {isApprove ? 'Approve Leave Request' : 'Decline Leave Request'}
+                        </h3>
+                        <p className="modal-subtitle" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                            {isApprove ? 'Confirm approval for this leave request.' : 'Provide a reason for declining this request.'}
+                        </p>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: 12 }}>
-                        <div><span style={{ color: 'var(--text-secondary)' }}>Type</span><br /><strong>{LEAVE_TYPE_LABELS[request.leaveType]}</strong></div>
-                        <div><span style={{ color: 'var(--text-secondary)' }}>Duration</span><br /><strong>{days} {days === 1 ? 'day' : 'days'}</strong></div>
-                        <div><span style={{ color: 'var(--text-secondary)' }}>From</span><br /><strong>{fmtDate(request.startDate)}</strong></div>
-                        <div><span style={{ color: 'var(--text-secondary)' }}>To</span><br /><strong>{fmtDate(request.endDate)}</strong></div>
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 12 }}><span style={{ color: 'var(--text-secondary)' }}>Reason</span><br /><span style={{ color: 'var(--text-primary)' }}>{request.reason}</span></div>
+                    <button className="icon-btn" onClick={onClose} style={{ borderRadius: '50%', width: 32, height: 32 }}>
+                        <X size={15} />
+                    </button>
                 </div>
-                <div className="field">
-                    <label>{isApprove ? 'Note (optional)' : 'Reason for declining'}</label>
-                    <textarea rows={3} maxLength={300} placeholder={isApprove ? 'Add a message for the employee (optional)…' : 'Explain why this request is being declined…'} value={note} onChange={e => setNote(e.target.value)} style={{ width: '100%', resize: 'vertical', borderRadius: 8, border: '1px solid var(--border)', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg-primary)', color: 'var(--text-primary)' }} />
+
+                <div style={{ 
+                    background: '#f8fafc', 
+                    borderRadius: 14, 
+                    padding: '20px', 
+                    marginBottom: 20, 
+                    border: '1px solid #eef2f6' 
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                        <div className="emp-avatar" style={{ 
+                            flexShrink: 0, 
+                            width: 44, 
+                            height: 44, 
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #4318ff, #868cff)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: 16,
+                            boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)'
+                        }}>{request.employeeName.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{request.employeeName}</div>
+                            <span style={{ 
+                                fontSize: 11, 
+                                fontWeight: 600, 
+                                color: '#4318ff', 
+                                background: 'rgba(67, 24, 255, 0.08)', 
+                                padding: '2px 8px', 
+                                borderRadius: 6,
+                                marginTop: 3,
+                                display: 'inline-block'
+                            }}>{toDisplayRole(request.role)}</span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: 'rgba(67, 24, 255, 0.08)', color: '#4318ff', padding: 6, borderRadius: 8, display: 'flex' }}>
+                                <CalendarRange size={14} />
+                            </div>
+                            <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>TYPE</span>
+                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{LEAVE_TYPE_LABELS[request.leaveType]}</strong>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: 'rgba(255, 181, 71, 0.1)', color: '#ffb547', padding: 6, borderRadius: 8, display: 'flex' }}>
+                                <Clock size={14} />
+                            </div>
+                            <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>DURATION</span>
+                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{days} {days === 1 ? 'day' : 'days'}</strong>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', padding: 6, borderRadius: 8, display: 'flex' }}>
+                                <CalendarDays size={14} />
+                            </div>
+                            <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>FROM</span>
+                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{fmtDate(request.startDate)}</strong>
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', padding: 6, borderRadius: 8, display: 'flex' }}>
+                                <CalendarDays size={14} />
+                            </div>
+                            <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>TO</span>
+                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{fmtDate(request.endDate)}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ 
+                        marginTop: 14, 
+                        background: 'rgba(255, 181, 71, 0.04)', 
+                        borderLeft: '3px solid #ffb547', 
+                        borderRadius: '0 8px 8px 0', 
+                        padding: '12px 14px' 
+                    }}>
+                        <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+                            REASON FOR REQUEST
+                        </span>
+                        <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                            {request.reason}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="field" style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                        {isApprove ? 'Note (Optional)' : 'Reason for declining *'}
+                    </label>
+                    <textarea 
+                        rows={3} 
+                        maxLength={300} 
+                        placeholder={isApprove ? 'Add a message for the employee (optional)…' : 'Explain why this request is being declined…'} 
+                        value={note} 
+                        onChange={e => setNote(e.target.value)} 
+                        style={{ 
+                            width: '100%', 
+                            resize: 'vertical', 
+                            borderRadius: 10, 
+                            border: '1px solid #e0e5f2', 
+                            padding: '10px 12px', 
+                            fontSize: 13, 
+                            fontFamily: 'inherit', 
+                            background: 'var(--bg-primary, #fff)', 
+                            color: 'var(--text-primary)',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)',
+                            boxSizing: 'border-box'
+                        }} 
+                    />
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right', marginTop: 3 }}>{note.length} / 300</div>
                 </div>
-                <div className="modal-actions">
-                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
-                    <button className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={submitting || (!isApprove && !note.trim())}>
-                        {submitting ? <><Loader2 size={13} className="spin" /> Processing…</> : isApprove ? <><CheckCircle2 size={13} /> Approve</> : <><X size={13} /> Decline</>}
+
+                <div className="modal-actions" style={{ marginTop: 16 }}>
+                    <button 
+                        className="btn" 
+                        onClick={onClose} 
+                        disabled={submitting}
+                        style={{ 
+                            background: '#f4f7fe', 
+                            border: 'none', 
+                            color: 'var(--text-secondary)', 
+                            fontWeight: 600, 
+                            padding: '10px 20px', 
+                            borderRadius: 10 
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} 
+                        onClick={handleConfirm} 
+                        disabled={submitting || (!isApprove && !note.trim())}
+                        style={{
+                            fontWeight: 600,
+                            padding: '10px 24px',
+                            borderRadius: 10,
+                            border: 'none',
+                            background: isApprove ? '#05cd99' : '#ee5d50',
+                            color: 'white',
+                            boxShadow: isApprove ? '0 4px 14px rgba(5, 205, 153, 0.25)' : '0 4px 14px rgba(238, 93, 80, 0.25)'
+                        }}
+                    >
+                        {submitting ? <><Loader2 size={14} className="spin" /> Processing…</> : isApprove ? <><CheckCircle2 size={14} /> Approve Request</> : <><X size={14} /> Decline Request</>}
                     </button>
                 </div>
             </div>
@@ -913,20 +1054,128 @@ function ManageEmployeesTab({
 
                         {detailModal && (
                             <div className="modal-overlay" onClick={() => setDetailModal(null)}>
-                                <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
-                                    <div className="modal-header"><div><h3>Leave Request Detail</h3><p className="modal-subtitle">Full details for this request</p></div><button className="icon-btn" onClick={() => setDetailModal(null)}><X size={16} /></button></div>
-                                    <div className="employee-detail-avatar" style={{ marginBottom: 16 }}><div className="avatar-circle large">{detailModal.employeeName.charAt(0).toUpperCase()}</div><div className="avatar-info"><h4>{detailModal.employeeName}</h4><div className="avatar-meta" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{detailModal.employeeNumber} · {toDisplayRole(detailModal.role)}</div></div></div>
-                                    <div className="detail-grid">
-                                        {[{ label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType] }, { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days` }, { label: 'Start Date', value: fmtDate(detailModal.startDate) }, { label: 'End Date', value: fmtDate(detailModal.endDate) }, { label: 'Submitted', value: fmtDate(detailModal.submittedAt) }, { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label }].map(({ label, value }) => (
-                                            <div key={label} className="detail-item"><span className="detail-label">{label}</span><span className="detail-value">{value}</span></div>
+                                <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>
+                                    <div className="modal-header" style={{ marginBottom: 20 }}>
+                                        <div>
+                                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Leave Request Detail</h3>
+                                            <p className="modal-subtitle" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Full details for this request</p>
+                                        </div>
+                                        <button className="icon-btn" onClick={() => setDetailModal(null)} style={{ borderRadius: '50%', width: 32, height: 32 }}>
+                                            <X size={15} />
+                                        </button>
+                                    </div>
+
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                                        <div className="avatar-circle large" style={{ 
+                                            width: 46, 
+                                            height: 46, 
+                                            borderRadius: '50%',
+                                            background: 'linear-gradient(135deg, #4318ff, #868cff)',
+                                            color: 'white',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 700,
+                                            fontSize: 16,
+                                            boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)'
+                                        }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
+                                        <div>
+                                            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailModal.employeeName}</h4>
+                                            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                                                {detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: '#4318ff' }}>{toDisplayRole(detailModal.role)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                        {[
+                                            { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
+                                            { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547' },
+                                            { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
+                                            { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
+                                            { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
+                                            { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? '#05cd99' : detailModal.status === 'declined' ? '#ee5d50' : '#ffb547' }
+                                        ].map(({ label, value, icon, bg, color }) => (
+                                            <div key={label} style={{ background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div style={{ background: bg, color: color, padding: 6, borderRadius: 8, display: 'flex' }}>
+                                                    {icon}
+                                                </div>
+                                                <div>
+                                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span>
+                                                    <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong>
+                                                </div>
+                                            </div>
                                         ))}
                                     </div>
-                                    <div className="detail-item" style={{ margin: '12px 0' }}><span className="detail-label">Reason</span><span className="detail-value" style={{ whiteSpace: 'pre-wrap' }}>{detailModal.reason}</span></div>
-                                    {detailModal.reviewNote && <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : 'rgba(238,93,80,0.08)', border: `1px solid ${detailModal.status === 'approved' ? 'rgba(5,205,153,0.25)' : 'rgba(238,93,80,0.25)'}`, borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}><strong>Review Note:</strong> {detailModal.reviewNote}</div>}
-                                    <div className="modal-actions">
+
+                                    <div style={{ 
+                                        background: 'rgba(255, 181, 71, 0.04)', 
+                                        borderLeft: '3px solid #ffb547', 
+                                        borderRadius: '0 8px 8px 0', 
+                                        padding: '12px 14px',
+                                        marginBottom: 16
+                                    }}>
+                                        <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+                                            REASON FOR REQUEST
+                                        </span>
+                                        <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                                            {detailModal.reason}
+                                        </p>
+                                    </div>
+
+                                    {detailModal.reviewNote && (
+                                        <div style={{ 
+                                            background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', 
+                                            borderLeft: `3px solid ${detailModal.status === 'approved' ? '#05cd99' : '#ee5d50'}`, 
+                                            borderRadius: '0 8px 8px 0', 
+                                            padding: '12px 14px',
+                                            fontSize: 13, 
+                                            color: 'var(--text-primary)', 
+                                            marginBottom: 16 
+                                        }}>
+                                            <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+                                                REVIEW NOTE
+                                            </span>
+                                            <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>
+                                                {detailModal.reviewNote}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="modal-actions" style={{ marginTop: 16 }}>
                                         {detailModal.status === 'pending' ? (
-                                            <><button className="btn btn-danger" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }}><X size={13} /> Decline</button><button className="btn btn-primary" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }}><CheckCircle2 size={13} /> Approve</button></>
-                                        ) : <button className="btn" onClick={() => setDetailModal(null)}>Close</button>}
+                                            <>
+                                                <button 
+                                                    className="btn btn-danger" 
+                                                    onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }}
+                                                    style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}
+                                                >
+                                                    <X size={13} /> Decline
+                                                </button>
+                                                <button 
+                                                    className="btn btn-primary" 
+                                                    onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }}
+                                                    style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}
+                                                >
+                                                    <CheckCircle2 size={13} /> Approve
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button 
+                                                className="btn" 
+                                                onClick={() => setDetailModal(null)}
+                                                style={{ 
+                                                    background: '#f4f7fe', 
+                                                    border: 'none', 
+                                                    color: 'var(--text-secondary)', 
+                                                    fontWeight: 600, 
+                                                    padding: '10px 24px', 
+                                                    borderRadius: 10 
+                                                }}
+                                            >
+                                                Close
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1279,6 +1528,7 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
 
 export default function Dashboard() {
     const navigate = useNavigate();
+    const { success } = useToast();
     const storedFirst = localStorage.getItem('firstName') ?? '';
     const storedMiddle = localStorage.getItem('middleName') ?? '';
     const storedLast = localStorage.getItem('lastName') ?? '';
@@ -1364,20 +1614,28 @@ export default function Dashboard() {
             .then((result: any) => {
                 // Handle both array response and paginated envelope
                 const raw: any[] = Array.isArray(result) ? result : (Array.isArray(result.data) ? result.data : []);
-                const list: LeaveRequest[] = raw.map(r => ({
-                    id: r.leaveId,
-                    employeeNumber: r.employeeNumber ?? '',
-                    employeeName: r.employeeName ?? '',
-                    role: r.role ?? '',
-                    leaveType: ((r.leave_Type ?? r.leaveType ?? 'other') as string).toLowerCase() as LeaveType,
-                    startDate: (r.start_Date ?? r.startDate ?? '').split('T')[0],
-                    endDate: (r.end_Date ?? r.endDate ?? '').split('T')[0],
-                    reason: r.reason ?? '',
-                    status: ((r.approval_Status ?? r.approvalStatus ?? 'pending') as string).toLowerCase() as LeaveStatus,
-                    submittedAt: (r.submittedAt ?? r.start_Date ?? '').split('T')[0],
-                    reviewedBy: r.reviewedBy ?? undefined,
-                    reviewNote: r.leaveRequestNote ?? r.reviewNote ?? undefined,
-                }));
+                const list: LeaveRequest[] = raw.map(r => {
+                    const fullName = buildDisplayName(
+                        r.firstName ?? '',
+                        r.middleName ?? '',
+                        r.lastName ?? '',
+                        r.suffix ?? ''
+                    );
+                    return {
+                        id: r.leaveId,
+                        employeeNumber: r.employeeNumber ?? '',
+                        employeeName: fullName || r.employeeName || '',
+                        role: r.role ?? '',
+                        leaveType: ((r.leave_Type ?? r.leaveType ?? 'other') as string).toLowerCase() as LeaveType,
+                        startDate: (r.start_Date ?? r.startDate ?? '').split('T')[0],
+                        endDate: (r.end_Date ?? r.endDate ?? '').split('T')[0],
+                        reason: r.reason ?? '',
+                        status: ((r.approval_Status ?? r.approvalStatus ?? 'pending') as string).toLowerCase() as LeaveStatus,
+                        submittedAt: (r.submittedAt ?? r.start_Date ?? '').split('T')[0],
+                        reviewedBy: r.reviewedBy ?? undefined,
+                        reviewNote: r.leaveRequestNote ?? r.reviewNote ?? undefined,
+                    };
+                });
                 setLeaveRequests(list);
                 setLeaveTotalPages(result.totalPages ?? 1);
                 setLeavePage(page);
@@ -1469,13 +1727,26 @@ export default function Dashboard() {
             setRecentEmployees(prev => prev.map(e => e.employeeNumber === updated.employeeNumber ? updated : e));
         }
     };
-
     const handleLeaveConfirm = (id: number, action: 'approve' | 'decline', note: string) => {
+        const req = leaveRequests.find(r => r.id === id);
+
         setLeaveRequests(prev => prev.map(r =>
             r.id === id ? { ...r, status: action === 'approve' ? 'approved' : 'declined', reviewedBy: localStorage.getItem('employeeName') ?? 'Admin', reviewNote: note || undefined } : r
         ));
-    };
 
+        if (req && req.employeeNumber) {
+            const nextStatus = action === 'approve' ? 'On Leave' : 'Active';
+            setEmployees(prev => prev.map(e =>
+                e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e
+            ));
+            setRecentEmployees(prev => prev.map(e =>
+                e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e
+            ));
+        }
+
+        success(`Leave request has been ${action === 'approve' ? 'approved' : 'declined'} successfully.`);
+        fetchEmployees(empPage);
+    };
     const handleOverrideUpdated = (id: string, status: OverrideStatus, until?: string) => {
         setOverrides(prev => prev.map(o => o.emergencyOverrideId === id ? { ...o, status, overrideUntil: until } : o));
     };

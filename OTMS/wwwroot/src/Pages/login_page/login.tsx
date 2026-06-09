@@ -128,7 +128,7 @@ export default function Login() {
                     const message = data?.message?.toLowerCase() ?? '';
 
                     // on leave gets its own block FIRST
-                    if (message.includes('on leave')) {
+                    if (message.includes('on leave') || message.includes('onleave')) {
                         navigate('/account_locked', {
                             state: {
                                 employeeNumber: employeeId.trim(),
