@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.EmergencyOverrideRequest;
@@ -6,10 +7,11 @@ using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
-    public class EmergencyOverrideService(IHttpContextAccessor httpContextAccessor, OTMSDbContext context, INotificationService notificationService) : IEmergencyOverrideService
+    public class EmergencyOverrideService(IHttpContextAccessor httpContextAccessor, OTMSDbContext context, INotificationService notificationService, IActivityLogService activityLogService) : IEmergencyOverrideService
     {
         public async Task<EmergencyOverrideResponseDTO> ApproveOverrideAsync(ApproveEmergencyOverrideDTO request)
         {
@@ -36,9 +38,20 @@ namespace OTMS.Service.Services
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
             emergencyOverride.OverrideUntil = request.OverrideUntil;
 
+            var approverAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == request.ApproverAccountId);
+            emergencyOverride.ApprovedBy = approverAccount;
+
             emergencyOverride.RequestedBy.AccountStatus = "Emergency Overriden";
 
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                request.ApproverAccountId,
+                ActivityTypes.EmergencyOverrideUpdated,
+                $"{string.Join(" ", new[]
+                    {approverAccount.Employee.FirstName, approverAccount.Employee.MiddleName, approverAccount.Employee.LastName, approverAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Emergency Override Request Status to {emergencyOverride.Status} at {DateTime.Now:hh:mm tt}");
 
             return new EmergencyOverrideResponseDTO
             {
@@ -83,7 +96,18 @@ namespace OTMS.Service.Services
             emergencyOverride.ApprovedById = request.ApproverAccountId;
             emergencyOverride.ApprovedAt = DateTime.UtcNow;
 
+            var approverAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == request.ApproverAccountId);
+            emergencyOverride.ApprovedBy = approverAccount;
+
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                request.ApproverAccountId,
+                ActivityTypes.EmergencyOverrideUpdated,
+                $"{string.Join(" ", new[]
+                    {approverAccount.Employee.FirstName, approverAccount.Employee.MiddleName, approverAccount.Employee.LastName, approverAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Emergency Override Request Status to {emergencyOverride.Status} at {DateTime.Now:hh:mm tt}");
 
             return new EmergencyOverrideResponseDTO
             {
@@ -156,6 +180,11 @@ namespace OTMS.Service.Services
             if (existingPendingRequest)
                 throw new InvalidOperationException("An emergency override request for this leave is already pending.");
 
+            var reasonFiltered = request.Reason.Length > 500
+                ? request.Reason.Substring(0, 500)
+                : request.Reason;
+
+
             var emergencyOverride = new EmergencyOverrideRequest
             {
                 EmergencyOverrideId = Guid.NewGuid(),
@@ -168,6 +197,12 @@ namespace OTMS.Service.Services
 
             context.EmergencyOverrideRequests.Add(emergencyOverride);
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                emergencyOverride.RequestedById,
+                ActivityTypes.EmergencyOverrideRequested,
+                $"{string.Join(" ", new[]
+                    {emergencyOverride.RequestedBy.Employee.FirstName, emergencyOverride.RequestedBy.Employee.MiddleName, emergencyOverride.RequestedBy.Employee.LastName, emergencyOverride.RequestedBy.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted an Emergency Override at {DateTime.Now:hh:mm tt}");
 
             // Send Notification
             await notificationService.CreateEmergencyOverrideNotificationAsync(emergencyOverride);
@@ -203,6 +238,12 @@ namespace OTMS.Service.Services
             emergencyOverrideRequest.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                emergencyOverrideRequest.RequestedById,
+                ActivityTypes.EmergencyOverrideUpdated,
+                $"{string.Join(" ", new[]
+                    {emergencyOverrideRequest.RequestedBy.Employee.FirstName, emergencyOverrideRequest.RequestedBy.Employee.MiddleName, emergencyOverrideRequest.RequestedBy.Employee.LastName, emergencyOverrideRequest.RequestedBy.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Emergency Override Request"); 
 
             return new UpdateEmergencyOverrideDTO
             {
