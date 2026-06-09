@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client;
 using Microsoft.IdentityModel.Tokens;
 using NETCore.MailKit.Core;
 using OTMS.Common;
@@ -66,6 +67,12 @@ namespace OTMS.Service.Services
                     .FirstOrDefaultAsync(lr =>
                         lr.AccountId == employee.Account.AccountId &&
                         lr.Approval_Status == "Approved");
+
+                await activityLogService.LogActivityAsync(
+                employee.Account.AccountId,
+                ActivityTypes.AccessDenied,
+                $"On Leave Employee {string.Join(" ", new[]
+                    {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} tried to log in at {DateTime.Now:hh:mm tt}. Access Denied.");
 
                 throw new OnLeaveException(
                     employee.Account?.AccountId ?? Guid.Empty

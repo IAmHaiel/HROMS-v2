@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
+using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.LeaveRequest;
@@ -9,13 +10,15 @@ using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Security.Principal;
 
 namespace OTMS.Service.Services
 {
     public class LeaveRequestService(
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        INotificationService notificationService
+        INotificationService notificationService,
+        IActivityLogService activityLogService
         ) : ILeaveRequest
     {
         public async Task<LeaveRequestResponseDTO> CreateLeaveRequestAsync(CreateLeaveRequestDTO request)
@@ -61,6 +64,12 @@ namespace OTMS.Service.Services
 
             // Send Notification
             await notificationService.CreateLeaveRequestNotificationAsync(leaveRequest);
+
+            await activityLogService.LogActivityAsync(
+                leaveRequest.Account.AccountId,
+                ActivityTypes.LeaveRequestSubmitted,
+                $"{string.Join(" ", new[]
+                    {leaveRequest.Account.Employee.FirstName, leaveRequest.Account.Employee.MiddleName, leaveRequest.Account.Employee.LastName, leaveRequest.Account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted a Leave Request at {DateTime.Now:hh:mm tt}");
 
             return new LeaveRequestResponseDTO
             {
@@ -326,10 +335,21 @@ namespace OTMS.Service.Services
             if (profile is null || profile.Account is null)
                 return false;
 
+            var searchFiltered = request.LeaveRequestNote.Length > 500
+                ? request.LeaveRequestNote.Substring(0, 150)
+                : request.LeaveRequestNote;
+
             leaveRequest.Approved_By = profile.Account.AccountId;
             leaveRequest.Approval_Status = request.Approval_Status;
             leaveRequest.LeaveRequestNote = request.LeaveRequestNote;
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                leaveRequest.ApprovedByAccount.AccountId,
+                ActivityTypes.LeaveStatusUpdated,
+                $"{string.Join(" ", new[]
+                    {leaveRequest.ApprovedByAccount.Employee.FirstName, leaveRequest.ApprovedByAccount.Employee.MiddleName, leaveRequest.ApprovedByAccount.Employee.LastName, leaveRequest.ApprovedByAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Leave Status of {string.Join(" ", new[]
+                    {leaveRequest.Account.Employee.FirstName, leaveRequest.Account.Employee.MiddleName, leaveRequest.Account.Employee.LastName, leaveRequest.Account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} to {leaveRequest.Approval_Status} at {DateTime.Now:hh:mm tt}");
 
             return true;
         }

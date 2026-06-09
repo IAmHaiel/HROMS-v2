@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Pagination;
@@ -61,12 +62,22 @@ namespace OTMS.Service.Services
 
             if (exactDuplicateExists)
             {
+                await activityLogService.LogActivityAsync(
+                creatorId,
+                ActivityTypes.TaskDuplicateDetected,
+                $"Duplicated Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
+
                 throw new Exception(
                     "A task with the same title and description already exists.");
             }
 
             if (similarTaskExists)
             {
+                await activityLogService.LogActivityAsync(
+                creatorId,
+                ActivityTypes.TaskSimilarityDetected,
+                $"Similar Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
+
                 throw new Exception(
                     "A similar task already exists.");
             }
@@ -96,6 +107,12 @@ namespace OTMS.Service.Services
             // Integrate Notification
             await notificationService
                 .CreateTaskAssignedNotificationAsync(task);
+
+            await activityLogService.LogActivityAsync(
+                creatorId,
+                ActivityTypes.TaskCreated,
+                $"{string.Join(" ", new[]
+                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created the task {request.TaskTitle} at {DateTime.Now:hh:mm tt}");
 
             return new TaskResponseDTO
             {
@@ -151,6 +168,12 @@ namespace OTMS.Service.Services
             await notificationService
                 .CreateTaskUpdateNotificationAsync(task);
 
+            await activityLogService.LogActivityAsync(
+                task.CreatedBy,
+                ActivityTypes.TaskUpdated,
+                $"{string.Join(" ", new[]
+                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Task '{task.TaskTitle}' at {DateTime.Now:hh:mm tt}");
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
@@ -200,6 +223,12 @@ namespace OTMS.Service.Services
             task.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                            task.CreatedBy,
+                            ActivityTypes.ReopenedTask,
+                            $"{string.Join(" ", new[]
+                                {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} reopened the Task '{task.TaskTitle}' at {DateTime.Now:hh:mm tt}");
 
             return new TaskResponseDTO
             {
@@ -307,6 +336,12 @@ namespace OTMS.Service.Services
                 await notificationService
                     .CreateEmployeeTaskUpdateNotificationAsync(task);
             }
+
+            await activityLogService.LogActivityAsync(
+                task.AssignedTo,
+                ActivityTypes.TaskUpdated,
+                $"{string.Join(" ", new[]
+                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
 
             // Activity Log
             await activityLogService.LogActivityAsync(
