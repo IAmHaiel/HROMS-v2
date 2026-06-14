@@ -14,11 +14,10 @@ namespace OTMS.Service.Services
             if (file == null || file.Length == 0)
                 throw new ArgumentException("File is empty.");
 
-            long minSize = 30L * 1024 * 1024; // 30 MB
             long maxSize = 100L * 1024 * 1024; // 100 MB
 
-            if (file.Length < minSize || file.Length > maxSize)
-                throw new ArgumentException($"File size must be between 30MB and 100MB. Current size is {file.Length / (1024 * 1024.0):F2}MB.");
+            if (file.Length > maxSize)
+                throw new ArgumentException($"File size must be less than 100MB. Current size is {file.Length / (1024 * 1024.0):F2}MB.");
 
             // Create uploads directory if it doesn't exist
             var uploadsFolder = Path.Combine(environment.WebRootPath, "uploads", "attachments");

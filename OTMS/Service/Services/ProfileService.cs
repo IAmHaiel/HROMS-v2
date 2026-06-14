@@ -159,7 +159,7 @@ namespace OTMS.Service.Services
                 foreach (var file in request.Attachments)
                 {
                     var attachment = await fileService.SaveFileAsync(file, profile.EmployeeId);
-                    profile.Attachments.Add(attachment);
+                    context.EmployeeAttachments.Add(attachment);
                 }
             }
 

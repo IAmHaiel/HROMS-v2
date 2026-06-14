@@ -486,11 +486,10 @@ namespace OTMS.Service.Services
                 foreach (var file in request.Attachments)
                 {
                     var attachment = await fileService.SaveFileAsync(file, employee.EmployeeId);
-                    employee.Attachments.Add(attachment);
+                    context.EmployeeAttachments.Add(attachment);
                 }
                 await context.SaveChangesAsync();
             }
-
             return new UpdateEmployeeResponseDTO
             {
                 EmployeeNumber = request.EmployeeNumber,
