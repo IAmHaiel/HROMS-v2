@@ -12,5 +12,6 @@ namespace OTMS.Entities.DTOs.AccountManagement.Responses
         public string AccountStatus { get; set; } = string.Empty;
         public string PresenceStatus { get; set; } = "Offline";
         public bool Success { get; set; }
+        public List<EmployeeAttachmentDTO>? Attachments { get; set; }
     }
 }
