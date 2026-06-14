@@ -81,7 +81,7 @@ namespace OTMS.Service.Services
                 .Include(e => e.Account)
                     .ThenInclude(a => a.Role)
                 .FirstOrDefault(e => e.EmployeeNumber == request.EmployeeNumber);
-            
+
             if (exist is null || exist.Account is null)
             {
                 throw new InvalidOperationException("Employee or account not found.");
@@ -134,7 +134,7 @@ namespace OTMS.Service.Services
 
             // Prevent deactivation of System Admin accounts
             var systemAdminAccount = exist.Account.Role?.Name;
-            
+
             if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
                 throw new InvalidOperationException("Cannot deactivate a System Admin account.");
@@ -144,7 +144,7 @@ namespace OTMS.Service.Services
             // Account status check to prevent deactivation
             var accountStatus = exist.Account.AccountStatus;
 
-            if(accountStatus == "Deactivated")
+            if (accountStatus == "Deactivated")
             {
                 throw new InvalidOperationException("Account is already deactivated.");
             }
@@ -214,7 +214,7 @@ namespace OTMS.Service.Services
                 .Include(e => e.Attachments)
                 .Where(e => e.Account != null &&
                             e.Account.AccountStatus == request.Status);
-            
+
             var totalEmployees = await query.CountAsync();
 
             var employees = await query
@@ -239,12 +239,12 @@ namespace OTMS.Service.Services
                 return new SearchAccountStatusResponseDTO
                 {
                     EmployeeNumber = e.EmployeeNumber,
-                    
+
                     FirstName = e.FirstName,
                     MiddleName = e.MiddleName,
                     LastName = e.LastName,
                     Suffix = e.Suffix,
-                    
+
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role?.Name ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
@@ -338,7 +338,7 @@ namespace OTMS.Service.Services
 
                     ContactNumber = e.ContactNumber,
                     Email = e.Email,
-                    Role = e.Account?.Role ?? "No Account",
+                    Role = e.Account?.Role?.Name ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Attachments = e.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
@@ -437,22 +437,22 @@ namespace OTMS.Service.Services
                 request.EmployeeNumber = employee.EmployeeNumber;
             }
 
-            if(request.FirstName == "string" || String.IsNullOrEmpty(request.FirstName))
+            if (request.FirstName == "string" || String.IsNullOrEmpty(request.FirstName))
             {
                 request.FirstName = employee.FirstName;
             }
-            
-            if(request.MiddleName == "string" || String.IsNullOrEmpty(request.MiddleName))
+
+            if (request.MiddleName == "string" || String.IsNullOrEmpty(request.MiddleName))
             {
                 request.MiddleName = employee.MiddleName;
             }
-            
-            if(request.LastName == "string" || String.IsNullOrEmpty(request.LastName))
+
+            if (request.LastName == "string" || String.IsNullOrEmpty(request.LastName))
             {
                 request.LastName = employee.LastName;
             }
-            
-            if(request.Suffix == "string" || String.IsNullOrEmpty(request.Suffix))
+
+            if (request.Suffix == "string" || String.IsNullOrEmpty(request.Suffix))
             {
                 request.Suffix = employee.Suffix;
             }
