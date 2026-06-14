@@ -246,7 +246,7 @@ namespace OTMS.Service.Services
                     Suffix = e.Suffix,
                     
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account?.Role ?? "No Account",
+                    Role = e.Account?.Role?.Name ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Success = true,
@@ -292,7 +292,7 @@ namespace OTMS.Service.Services
 
             if (!string.IsNullOrEmpty(role))
             {
-                query = query.Where(e => e.Account != null && e.Account.Role == role);
+                query = query.Where(e => e.Account != null && e.Account.Role != null && e.Account.Role.Name == role);
             }
 
             if (!string.IsNullOrEmpty(search))
@@ -337,7 +337,7 @@ namespace OTMS.Service.Services
                     Suffix = e.Suffix,
 
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account?.Role ?? "No Account",
+                    Role = e.Account?.Role?.Name ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Attachments = e.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
@@ -380,7 +380,7 @@ namespace OTMS.Service.Services
                     e.LastName.Contains(searchFiltered) ||
                     e.Suffix.Contains(searchFiltered) ||
                     e.EmployeeNumber.Contains(searchFiltered) ||
-                    e.Account.Role.Contains(searchFiltered)
+                    (e.Account.Role != null && e.Account.Role.Name.Contains(searchFiltered))
                     );
 
             if (employee is null || employee.Account is null)
@@ -406,7 +406,7 @@ namespace OTMS.Service.Services
                 MiddleName = employee.MiddleName,
                 LastName = employee.LastName,
                 Suffix = employee.Suffix,
-                Role = employee.Account.Role,
+                Role = employee.Account.Role?.Name ?? string.Empty,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
                 Success = true,

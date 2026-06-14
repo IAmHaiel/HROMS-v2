@@ -228,7 +228,7 @@ namespace OTMS.Service.Services
                 ContactNumber = profile.ContactNumber,
                 Email = profile.Email,
                 AccountStatus = profile.Account.AccountStatus,
-                Role = profile.Account.Role,
+                Role = profile.Account.Role?.Name ?? string.Empty,
                 PresenceStatus = presenceStatus,
                 CreatedAt = profile.CreatedAt,
                 UpdatedAt = profile.UpdatedAt ?? profile.CreatedAt,

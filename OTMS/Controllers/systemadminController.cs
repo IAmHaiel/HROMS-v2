@@ -120,7 +120,7 @@ namespace OTMS.Controllers
                 var query = context.Accounts
                     .Include(a => a.Employee)
                     .Include(a => a.ActivityLogs)
-                    .Where(a => a.Role == Common.Constraints.Roles.Encoder || a.Role == Common.Constraints.Roles.Coordinator)
+                    .Where(a => a.Role != null && (a.Role.Name == Common.Constraints.Roles.Encoder || a.Role.Name == Common.Constraints.Roles.Coordinator))
                     .OrderByDescending(a =>
                         a.Employee.FirstName.Contains(NameFilter)
                         || a.Employee.MiddleName.Contains(NameFilter)
