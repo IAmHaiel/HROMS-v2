@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Security.Principal;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Client;
 using OTMS.Common.Constraints;
@@ -9,8 +11,6 @@ using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
-using System.Security.Claims;
-using System.Security.Principal;
 
 namespace OTMS.Service.Services
 {
@@ -55,7 +55,7 @@ namespace OTMS.Service.Services
                 End_Date = request.End_Date,
                 Reason = request.Reason,
                 Approval_Status = "Pending",
-                SubmittedAt = DateTime.UtcNow,  
+                SubmittedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 

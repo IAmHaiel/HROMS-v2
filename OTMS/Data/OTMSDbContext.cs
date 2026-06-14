@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Entities.Models;
 using System;
 
@@ -15,6 +15,7 @@ namespace OTMS.Data
         public DbSet<ActivityLog> ActivityLogs { get; set; }
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<EmergencyOverrideRequest> EmergencyOverrideRequests { get; set; }
+        public DbSet<EmployeeAttachment> EmployeeAttachments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +26,13 @@ namespace OTMS.Data
                 .HasOne(e => e.Account)
                 .WithOne(a => a.Employee)
                 .HasForeignKey<Account>(a => a.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Employee-EmployeeAttachment one-to-many relationship
+            modelBuilder.Entity<EmployeeAttachment>()
+                .HasOne(ea => ea.Employee)
+                .WithMany(e => e.Attachments)
+                .HasForeignKey(ea => ea.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Task Relationships

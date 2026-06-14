@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.Models
+namespace OTMS.Entities.Models
 {
     public class Employee
     {
@@ -25,5 +25,6 @@
         // Navigation properties
         public Account? Account { get; set; }
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
+        public ICollection<EmployeeAttachment> Attachments { get; set; } = new List<EmployeeAttachment>();
     }
 }
