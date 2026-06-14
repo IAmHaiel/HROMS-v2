@@ -23,7 +23,7 @@ using System.Text;
 
 namespace OTMS.Service.Services
 {
-    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService, IHttpContextAccessor httpContextAccessor) : IAuthService
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService, IHttpContextAccessor httpContextAccessor, IFileService fileService) : IAuthService
     {
         static int MaxFailedLoginAttempts = 3;
         static string? GeneratedPassword = String.Empty;
@@ -234,6 +234,16 @@ namespace OTMS.Service.Services
 
             context.Employees.Add(employee);
             context.Accounts.Add(account);
+
+            if (request.Attachments != null && request.Attachments.Any())
+            {
+                foreach (var file in request.Attachments)
+                {
+                    var attachment = await fileService.SaveFileAsync(file, employee.EmployeeId);
+                    employee.Attachments.Add(attachment);
+                }
+            }
+
             await context.SaveChangesAsync();
 
             // Extract the AccountId of the user creating this account (e.g., SystemAdmin1)

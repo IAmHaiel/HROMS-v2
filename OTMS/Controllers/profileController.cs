@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Profile;
+using OTMS.Entities.DTOs.Profile.Responses;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Controllers
@@ -21,9 +22,9 @@ namespace OTMS.Controllers
             var result = await profileService.ViewProfile();
             if (result is null)
             {
-                return NotFound(new { Message = "Employee not found." });
+                return NotFound(new ApiResponseDTO<object> { IsSuccess = false, Message = "Employee not found.", Data = null });
             }
-            return Ok(result);
+            return Ok(new ApiResponseDTO<ViewProfileResponseDTO> { IsSuccess = true, Message = "Profile retrieved successfully.", Data = result });
         }
 
         /// <summary>
@@ -31,13 +32,13 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "ManagementAccess")]
         [HttpPut("update-profile")]
-        public async Task<IActionResult> UpdateProfile(UpdateInformationDTO request)
+        public async Task<IActionResult> UpdateProfile([FromForm] UpdateInformationDTO request)
         {
 
             try
             {
                 var result = await profileService.UpdateBasicInformation(request);
-                return Ok(result);
+                return Ok(new ApiResponseDTO<UpdateInformationResponseDTO> { IsSuccess = true, Message = "Profile updated successfully.", Data = result });
             }
             catch(Exception ex)
             {
@@ -61,13 +62,13 @@ namespace OTMS.Controllers
             var result = await profileService.ChangePassword(request);
             if (result is null)
             {
-                return NotFound(new { Message = "Employee not found." });
+                return NotFound(new ApiResponseDTO<object> { IsSuccess = false, Message = "Employee not found.", Data = null });
             }
             if (!result.Success)
             {
-                return BadRequest(new { Message = "Current password is incorrect or Current password is still the same as the new password." });
+                return BadRequest(new ApiResponseDTO<object> { IsSuccess = false, Message = "Current password is incorrect or Current password is still the same as the new password.", Data = null });
             }
-            return Ok(result);
+            return Ok(new ApiResponseDTO<ChangePasswordResponseDTO> { IsSuccess = true, Message = "Password changed successfully.", Data = result });
         }
     }
 }

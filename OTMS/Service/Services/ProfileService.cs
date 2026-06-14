@@ -14,7 +14,8 @@ namespace OTMS.Service.Services
     public class ProfileService(
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        IActivityLogService activityLogService
+        IActivityLogService activityLogService,
+        IFileService fileService
         ) : IProfileService
     {
         public async Task<ChangePasswordResponseDTO?> ChangePassword(ChangePasswordDTO request)
@@ -153,6 +154,15 @@ namespace OTMS.Service.Services
             profile.Email = request.Email;
             profile.UpdatedAt = DateTime.UtcNow;
 
+            if (request.Attachments != null && request.Attachments.Any())
+            {
+                foreach (var file in request.Attachments)
+                {
+                    var attachment = await fileService.SaveFileAsync(file, profile.EmployeeId);
+                    context.EmployeeAttachments.Add(attachment);
+                }
+            }
+
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(
@@ -191,6 +201,7 @@ namespace OTMS.Service.Services
             var profile = await context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
+                .Include(e => e.Attachments)
                 .FirstOrDefaultAsync(e => e.Account.AccountId.ToString() == claimProfile);
 
             if (profile is null && profile.Account is null)
@@ -220,7 +231,16 @@ namespace OTMS.Service.Services
                 Role = profile.Account.Role,
                 PresenceStatus = presenceStatus,
                 CreatedAt = profile.CreatedAt,
-                UpdatedAt = profile.UpdatedAt ?? profile.CreatedAt
+                UpdatedAt = profile.UpdatedAt ?? profile.CreatedAt,
+                Attachments = profile.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = a.EmployeeAttachmentId,
+                    FileName = a.FileName,
+                    FileUrl = a.FilePath,
+                    ContentType = a.ContentType,
+                    FileSize = a.FileSize,
+                    Version = a.Version
+                }).ToList()
             };
         }
     }

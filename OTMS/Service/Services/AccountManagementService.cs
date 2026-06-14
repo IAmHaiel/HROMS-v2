@@ -14,7 +14,8 @@ using OTMS.Service.Interfaces;
 namespace OTMS.Service.Services
 {
     public class AccountManagementService(
-        OTMSDbContext context
+        OTMSDbContext context,
+        IFileService fileService
         ) : IAccountManagementService
     {
 
@@ -200,6 +201,7 @@ namespace OTMS.Service.Services
             var query = context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
+                .Include(e => e.Attachments)
                 .Where(e => e.Account != null &&
                             e.Account.AccountStatus == request.Status);
             
@@ -237,7 +239,16 @@ namespace OTMS.Service.Services
                     Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
-                    Success = true
+                    Success = true,
+                    Attachments = e.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                    {
+                        EmployeeAttachmentId = a.EmployeeAttachmentId,
+                        FileName = a.FileName,
+                        FileUrl = a.FilePath,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        Version = a.Version
+                    }).ToList()
                 };
             }).ToList();
 
@@ -258,6 +269,7 @@ namespace OTMS.Service.Services
             var query = context.Employees
                  .Include(e => e.Account)
                      .ThenInclude(a => a.ActivityLogs)
+                 .Include(e => e.Attachments)
                  .AsQueryable();
 
             // Exclude deleted accounts
@@ -317,7 +329,16 @@ namespace OTMS.Service.Services
                     ContactNumber = e.ContactNumber,
                     Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
-                    PresenceStatus = presenceStatus
+                    PresenceStatus = presenceStatus,
+                    Attachments = e.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                    {
+                        EmployeeAttachmentId = a.EmployeeAttachmentId,
+                        FileName = a.FileName,
+                        FileUrl = a.FilePath,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        Version = a.Version
+                    }).ToList()
                 };
             }).ToList();
 
@@ -342,6 +363,7 @@ namespace OTMS.Service.Services
             var employee = await context.Employees
                 .Include(e => e.Account)
                     .ThenInclude(a => a.ActivityLogs)
+                .Include(e => e.Attachments)
                 .FirstOrDefaultAsync(e =>
                     e.FirstName.Contains(searchFiltered) ||
                     e.MiddleName.Contains(searchFiltered) ||
@@ -377,7 +399,16 @@ namespace OTMS.Service.Services
                 Role = employee.Account.Role,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
-                Success = true
+                Success = true,
+                Attachments = employee.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = a.EmployeeAttachmentId,
+                    FileName = a.FileName,
+                    FileUrl = a.FilePath,
+                    ContentType = a.ContentType,
+                    FileSize = a.FileSize,
+                    Version = a.Version
+                }).ToList()
             };
 
         }
@@ -385,6 +416,7 @@ namespace OTMS.Service.Services
         public async Task<UpdateEmployeeResponseDTO?> UpdateEmployee(string employeeNumber, UpdateEmployeeDTO request)
         {
             var employee = await context.Employees
+                .Include(e => e.Attachments)
                 .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
 
             if (employee == null) return null;
@@ -449,6 +481,15 @@ namespace OTMS.Service.Services
                     .SetProperty(e => e.Email, request.Email)
                     .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
 
+            if (request.Attachments != null && request.Attachments.Any())
+            {
+                foreach (var file in request.Attachments)
+                {
+                    var attachment = await fileService.SaveFileAsync(file, employee.EmployeeId);
+                    context.EmployeeAttachments.Add(attachment);
+                }
+                await context.SaveChangesAsync();
+            }
             return new UpdateEmployeeResponseDTO
             {
                 EmployeeNumber = request.EmployeeNumber,

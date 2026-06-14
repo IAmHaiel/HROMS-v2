@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs;
@@ -66,12 +66,17 @@ namespace OTMS.Controllers
         [ProducesResponseType(401)]
         [ProducesResponseType(403)]
         [ProducesResponseType(500)]
-        public async Task<IActionResult> Register(EmployeeRegisterDTO request)
+        public async Task<IActionResult> Register([FromForm] EmployeeRegisterDTO request)
         {
             try
             {
                 var result = await authService.RegisterAsync(request);
-                return Ok(result);
+                return Ok(new ApiResponseDTO<EmployeeRegisterResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Employee registered successfully.",
+                    Data = result
+                });
             }
             catch(Exception ex)
             {

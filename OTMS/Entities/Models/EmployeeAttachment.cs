@@ -9,6 +9,7 @@ namespace OTMS.Entities.Models
         public string FilePath { get; set; } = string.Empty; // URL or local path
         public string ContentType { get; set; } = string.Empty; // e.g., application/pdf, image/jpeg
         public long FileSize { get; set; } // Size in bytes
+        public int Version { get; set; } = 1; // File version
 
         public DateTime UploadedAt { get; set; }
 

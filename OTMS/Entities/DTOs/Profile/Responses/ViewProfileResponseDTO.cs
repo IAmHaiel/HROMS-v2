@@ -16,5 +16,6 @@ namespace OTMS.Entities.DTOs.Profile.Responses
         public string Role { get; set; } = string.Empty;
         public string AccountStatus { get; set; } = string.Empty;
         public string PresenceStatus { get; set; } = "Offline";
+        public List<EmployeeAttachmentDTO>? Attachments { get; set; }
     }
 }
