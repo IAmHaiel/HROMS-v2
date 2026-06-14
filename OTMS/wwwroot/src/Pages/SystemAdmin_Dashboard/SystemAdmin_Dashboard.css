@@ -555,15 +555,15 @@ body {
     box-shadow: var(--shadow-md);
 }
 
-/* ─── CARD HEADER ─────────────────────────────────────────────────────────── */
-.card-header {
+/* ─── CARD HEADER LAYOUT ───────────────────────────────────────────────────── */
+.card-header-layout {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 14px;
 }
 
-.card-header h3 {
+.card-header-layout h3 {
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-primary);
@@ -606,151 +606,6 @@ body {
     gap: 20px;
 }
 
-/* ─── STAT CARD ───────────────────────────────────────────── */
-.stat-card {
-    position: relative;
-    overflow: hidden;
-    padding: 18px 18px 16px;
-    border-radius: 20px;
-    background: #ffffff;
-    border: 1px solid #edf1f7;
-    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
-    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-.stat-card:hover {
-    transform: translateY(-3px);
-    border-color: #dde5f1;
-    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
-}
-
-/* subtle top glow */
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: -55px;
-    right: -55px;
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    opacity: 0.05;
-    pointer-events: none;
-}
-
-.stat-card.accent-primary::before {
-    background: var(--primary);
-}
-
-.stat-card.accent-success::before {
-    background: var(--success);
-}
-
-.stat-card.accent-danger::before {
-    background: var(--danger);
-}
-
-.stat-card.accent-warning::before {
-    background: var(--warning);
-}
-
-/* ─── BOTTOM LINE EXACT STYLE ───────────────────────────── */
-.stat-card::after {
-    content: '';
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    bottom: 0;
-    height: 3px;
-    border-radius: 999px;
-}
-
-/* flat soft colors like screenshot */
-.stat-card.accent-primary::after {
-    background: #5b34ff;
-}
-
-.stat-card.accent-success::after {
-    background: #13c7b0;
-}
-
-.stat-card.accent-danger::after {
-    background: #ff6a5f;
-}
-
-.stat-card.accent-warning::after {
-    background: #ffbf57;
-}
-
-/* ─── TOP ROW ───────────────────────────────────────────── */
-.stat-card-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* icon box */
-.stat-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-/* labels */
-.stat-label {
-    font-size: 0.63rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #a1abc5;
-}
-
-/* main value */
-.stat-value {
-    font-size: 2rem;
-    font-weight: 800;
-    line-height: 1;
-    color: #172b75;
-    letter-spacing: -0.04em;
-    margin-top: 14px;
-}
-
-/* subtext */
-.stat-subtext {
-    margin-top: 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #a1abc5;
-    line-height: 1.4;
-}
-
-/* ─── ICON COLORS ───────────────────────────────────────── */
-.bg-primary {
-    background: rgba(91, 52, 255, 0.10);
-    color: #5b34ff;
-}
-
-.bg-success {
-    background: rgba(19, 199, 176, 0.10);
-    color: #13c7b0;
-}
-
-.bg-danger {
-    background: rgba(255, 106, 95, 0.10);
-    color: #ff6a5f;
-}
-
-.bg-warning {
-    background: rgba(255, 191, 87, 0.12);
-    color: #ffbf57;
-}
 
 /* ─── GRID ────────────────────────────────────────────────────────────────── */
 .dashboard-grid {
@@ -1804,3 +1659,415 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* ─── ROLE MANAGEMENT TAB STYLES ─────────────────────────────────────────── */
+.roles-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.section-subtitle {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.role-card {
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    min-height: 230px;
+}
+
+.role-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(112, 144, 176, 0.18);
+    border-color: var(--border-hover);
+}
+
+.role-card::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+}
+
+.role-card.system-defined::after {
+    background: var(--primary-dark);
+}
+
+.role-card.custom-defined::after {
+    background: var(--primary);
+}
+
+.role-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.role-info-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.role-icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.role-card.system-defined .role-icon-box {
+    background: rgba(27, 37, 75, 0.08);
+    color: var(--primary-dark);
+}
+
+.role-card.custom-defined .role-icon-box {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.role-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.badge-system {
+    background: rgba(27, 37, 75, 0.08);
+    color: var(--primary-dark);
+}
+
+.badge-custom {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.role-card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.role-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.role-action-btn:hover {
+    background: #f8fafc;
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.role-action-btn.delete-btn:hover {
+    background: rgba(227, 26, 26, 0.08);
+    color: var(--status-failed);
+    border-color: rgba(227, 26, 26, 0.2);
+}
+
+.role-desc {
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    margin-bottom: 20px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    height: 38px;
+}
+
+.role-perms-summary {
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+    margin-top: auto;
+}
+
+.summary-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+}
+
+.perms-count {
+    color: var(--text-secondary);
+}
+
+.perms-count strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.expand-toggle-btn {
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-size: 0.78rem;
+    padding: 0;
+}
+
+.expand-toggle-btn:hover {
+    text-decoration: underline;
+}
+
+.perms-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    max-height: 120px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.perm-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+.no-perms-text {
+    font-size: 0.78rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+/* ─── MODAL EXTENSIONS ───────────────────────────────────────────────────── */
+.modal-card-large {
+    max-width: 860px;
+    width: 90%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 30px;
+}
+
+.modal-form-scrollable {
+    overflow-y: auto;
+    flex: 1;
+    padding-right: 6px;
+    margin-right: -6px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.modal-form-scrollable::-webkit-scrollbar {
+    width: 5px;
+}
+
+.permissions-selector-section {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    margin-top: 8px;
+}
+
+.section-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.perms-selected-badge {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+}
+
+.permissions-groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.perm-category-box {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: #f8fafc;
+    overflow: hidden;
+}
+
+.perm-category-header {
+    background: #edf2f7;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+}
+
+.perm-category-body {
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.checkbox-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-wrap input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.category-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.perm-item-label {
+    font-size: 0.8rem;
+    color: #334155;
+    padding: 4px 0;
+}
+
+.perm-checkbox-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.perm-friendly-name {
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.perm-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.sticky-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-card);
+    padding-top: 14px;
+    margin-top: auto;
+    border-top: 1px solid var(--border);
+    z-index: 10;
+}
+
+.req {
+    color: var(--status-failed);
+    margin-left: 2px;
+}
+
+.loading-state, .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    text-align: center;
+    gap: 12px;
+    min-height: 240px;
+}
+
+.loading-state p {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.error-state h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.error-state p {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    max-width: 400px;
+    margin: 0 auto 8px;
+}
+
+@media (max-width: 768px) {
+    .permissions-groups-grid {
+        grid-template-columns: 1fr;
+    }
+}

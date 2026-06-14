@@ -44,6 +44,9 @@ import { useToast } from '../../components/Toast/Toast';
 import EmployeeDetailPanel from './EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import RoleManagementTab from './RoleManagementTab';
+import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
+import StatCard from '../../components/StatCard/StatCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +56,7 @@ type NavTab =
     | 'delivery'
     | 'analytics'
     | 'settings'
+    | 'roles'
     | 'activity_logs'
     | 'emergency_override'
     | 'profile';
@@ -186,6 +190,7 @@ const NAV_GROUPS = [
         label: 'SYSTEM',
         items: [
             { tab: 'settings' as NavTab, icon: Settings, label: 'Settings' },
+            { tab: 'roles' as NavTab, icon: Shield, label: 'Role Management' },
             { tab: 'activity_logs' as NavTab, icon: Activity, label: 'Activity Logs' },
         ],
     },
@@ -834,31 +839,37 @@ interface DashboardTabProps {
     loading: boolean;
     onSelectEmployee: (emp: RecentEmployee) => void;
     onViewAll: () => void;
+    onAddEmployee: () => void;
 }
 
-function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll }: DashboardTabProps) {
+function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee }: DashboardTabProps) {
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
     return (
         <div className="dashboard-content">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                <div className="header-search-wrap" style={{ margin: 0, width: 300 }}>
+                    <Search size={14} className="header-search-icon" />
+                    <input type="text" className="header-search-input" placeholder="Search employee, task…" />
+                </div>
+                <button className="quick-action-btn-header" onClick={onAddEmployee} style={{ height: 46 }}>
+                    <Users size={18} /> Add Employee
+                </button>
+            </div>
             <div className="stats-row">
                 {[
-                    { icon: Users, bg: 'bg-primary', accent: 'accent-primary', label: 'TOTAL EMPLOYEES', value: employees.length, sub: 'All registered staff' },
-                    { icon: CheckCircle2, bg: 'bg-success', accent: 'accent-success', label: 'ACTIVE', value: activeCount, sub: 'Currently active accounts' },
-                    { icon: AlertCircle, bg: 'bg-danger', accent: 'accent-danger', label: 'DEACTIVATED', value: deactivatedCount, sub: 'Accounts needing review' },
-                    { icon: Shield, bg: 'bg-warning', accent: 'accent-warning', label: 'ROLES', value: ROLES.length, sub: 'Available role types' },
-                ].map(({ icon: Icon, bg, accent, label, value, sub }) => (
-                    <div key={label} className={`stat-card ${accent}`}>
-                        <div className="stat-card-top"><div className={`stat-icon ${bg}`}><Icon size={20} strokeWidth={2.3} /></div><div className="stat-text"><span className="stat-label">{label}</span></div></div>
-                        <h3 className="stat-value">{value}</h3>
-                        <div className="stat-subtext">{sub}</div>
-                    </div>
+                    { icon: <Users size={20} strokeWidth={2.3} />, variant: 'primary', label: 'TOTAL EMPLOYEES', value: employees.length, subtext: 'All registered staff' },
+                    { icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', label: 'ACTIVE', value: activeCount, subtext: 'Currently active accounts' },
+                    { icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', label: 'DEACTIVATED', value: deactivatedCount, subtext: 'Accounts needing review' },
+                    { icon: <Shield size={20} strokeWidth={2.3} />, variant: 'warning', label: 'ROLES', value: ROLES.length, subtext: 'Available role types' },
+                ].map(({ icon, variant, label, value, subtext }) => (
+                    <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
             </div>
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header"><button className="text-link">Recent Employees</button><button className="view-all-link" onClick={onViewAll}>View more →</button></div>
+                    <div className="card-header-layout"><button className="text-link">Recent Employees</button><button className="view-all-link" onClick={onViewAll}>View more →</button></div>
                     <div className="data-table-wrap">
                         <table className="data-table">
                             <thead><tr><th>NAME</th><th>EMPLOYEE NO.</th><th>ROLE</th><th>STATUS</th></tr></thead>
@@ -891,7 +902,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     </div>
                 </div>
                 <div className="card activity-card">
-                    <div className="card-header"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
+                    <div className="card-header-layout"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
                     <div className="activity-feed-list">
                         {loading
                             ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
@@ -1006,6 +1017,9 @@ function ManageEmployeesTab({
                                 <div className="search-input-wrap"><Search size={14} className="search-icon" /><input type="text" placeholder="Search by name or ID…" value={search} onChange={e => setSearch(e.target.value)} className="search-input" /></div>
                                 <select value={filterRole} onChange={e => setFilterRole(e.target.value)}><option value="">All Roles</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
                                 <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="">All Statuses</option><option value="Active">Active</option><option value="Deactivated">Deactivated</option></select>
+                                <button className="btn btn-primary" onClick={onAddEmployee} style={{ marginLeft: 'auto' }}>
+                                    <Users size={14} /> Add Employee
+                                </button>
                             </div>
                         </div>
                         <div className="data-table-wrap">
@@ -1443,7 +1457,7 @@ function ProfileTab() {
         <div className="dashboard-content">
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>My Profile</h3>
                         {!editingProfile && (
                             <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={requestEditProfile}>
@@ -1503,7 +1517,7 @@ function ProfileTab() {
                     )}
                 </div>
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>Security Settings</h3>
                         {!editingPassword && (
                             <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={() => setEditingPassword(true)}>
@@ -1536,7 +1550,7 @@ function ProfileTab() {
                 </div>
             </div>
             <div className="card">
-                <div className="card-header"><h3>Account Overview</h3></div>
+                <div className="card-header-layout"><h3>Account Overview</h3></div>
                 <div className="system-status-list">
                     {[
                         { icon: Users, bg: 'bg-primary', name: 'Manage Employees', detail: 'Register, edit, and deactivate accounts' },
@@ -1688,19 +1702,16 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
         <div className="dashboard-content">
             <div className="stats-row" style={{ marginBottom: 20 }}>
                 {[
-                    { icon: Clock, bg: 'bg-warning', label: 'PENDING', value: pendingCount, sub: 'Awaiting review' },
-                    { icon: CheckCircle2, bg: 'bg-success', label: 'APPROVED', value: approvedCount, sub: 'Access granted' },
-                    { icon: AlertCircle, bg: 'bg-danger', label: 'REJECTED', value: rejectedCount, sub: 'Access denied' },
-                    { icon: ShieldAlert, bg: 'bg-primary', label: 'TOTAL', value: overrides.length, sub: 'This page' },
-                ].map(({ icon: Icon, bg, label, value, sub }) => (
-                    <div key={label} className="stat-card">
-                        <div className={`stat-icon ${bg}`}><Icon size={18} /></div>
-                        <div className="stat-text"><p className="stat-label">{label}</p><h3 className="stat-value">{value}</h3><small>{sub}</small></div>
-                    </div>
+                    { icon: <Clock size={20} strokeWidth={2.3} />, variant: 'warning', label: 'PENDING', value: pendingCount, subtext: 'Awaiting review' },
+                    { icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', label: 'APPROVED', value: approvedCount, subtext: 'Access granted' },
+                    { icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', label: 'REJECTED', value: rejectedCount, subtext: 'Access denied' },
+                    { icon: <ShieldAlert size={20} strokeWidth={2.3} />, variant: 'primary', label: 'TOTAL', value: overrides.length, subtext: 'This page' },
+                ].map(({ icon, variant, label, value, subtext }) => (
+                    <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
             </div>
             <div className="card employees-table-card" style={{ minHeight: 520 }}>
-                <div className="card-header"><h3>Emergency Override Requests</h3></div>
+                <div className="card-header-layout"><h3>Emergency Override Requests</h3></div>
                 <div className="filter-bar">
                     <div className="search-input-wrap"><Search size={14} className="search-icon" /><input type="text" placeholder="Search by name or ID…" value={search} onChange={e => setSearch(e.target.value)} className="search-input" /></div>
                     <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}>
@@ -1992,7 +2003,7 @@ export default function Dashboard() {
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
         delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
-        activity_logs: 'Activity Logs', profile: 'My Profile',
+        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile',
     };
 
     return (
@@ -2023,21 +2034,24 @@ export default function Dashboard() {
 
             <main className="main-viewport">
                 {!(activeTab === 'employees' && selectedPanelEmployee) && (
-                    <div className="dashboard-header">
-                        <div className="header-title">
-                            <h2>{pageTitles[activeTab]}</h2>
-                            <p>Speedex Courier Inc. — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        </div>
-                        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div className="header-search-wrap"><Search size={14} className="header-search-icon" /><input type="text" className="header-search-input" placeholder="Search employee, task…" /></div>
-                            {(activeTab === 'dashboard' || activeTab === 'employees') && <button className="quick-action-btn-header" onClick={() => setShowAddModal(true)}><Users size={18} /> Add Employee</button>}
-                            <NotificationBell apiEndpoint="/api/notification/my-notifications" />
-                        </div>
-                    </div>
+                    <DashboardHeader
+                        title={pageTitles[activeTab]}
+                        userInitials={getInitials(employeeName)}
+                        onSettingsClick={() => setActiveTab('settings')}
+                        onLogout={handleLogout}
+                    />
                 )}
 
                 {activeTab === 'dashboard' && (
-                    <DashboardTab employees={employees} recentEmployees={recentEmployees} activityLogs={activityLogs} loading={empLoading} onSelectEmployee={emp => setSelectedEmployee(emp)} onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }} />
+                    <DashboardTab
+                        employees={employees}
+                        recentEmployees={recentEmployees}
+                        activityLogs={activityLogs}
+                        loading={empLoading}
+                        onSelectEmployee={emp => setSelectedEmployee(emp)}
+                        onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }}
+                        onAddEmployee={() => setShowAddModal(true)}
+                    />
                 )}
 
                 {activeTab === 'employees' && (
@@ -2060,6 +2074,8 @@ export default function Dashboard() {
 
                 {(activeTab === 'profile' || activeTab === 'settings') && <ProfileTab />}
 
+                {activeTab === 'roles' && <RoleManagementTab />}
+
                 {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><Truck size={32} /><p>Delivery module coming soon.</p></div></div></div>}
                 {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><BarChart3 size={32} /><p>Analytics module coming soon.</p></div></div></div>}
 
@@ -2076,7 +2092,7 @@ export default function Dashboard() {
                 {activeTab === 'activity_logs' && (
                     <div className="dashboard-content">
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div className="card-header" style={{ padding: '24px 36px', borderBottom: '1px solid rgba(241, 245, 249, 1)', background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
+                            <div className="card-header-layout" style={{ padding: '24px 36px', borderBottom: '1px solid rgba(241, 245, 249, 1)', background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
                                 <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}><Activity size={20} color="#4f46e5" /> System Activity Logs</h3>
                             </div>
                             {activityLogs.length === 0 ? (

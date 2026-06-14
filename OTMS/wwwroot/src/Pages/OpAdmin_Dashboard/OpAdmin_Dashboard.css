@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
 
 /* ─── CSS Variables (matches provided design system) ─────────────────────── */
 :root {
@@ -437,14 +437,14 @@
         transform: translateY(-2px);
     }
 
-.card-header {
+.card-header-layout {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 14px;
 }
 
-    .card-header h3, .card > h3 {
+    .card-header-layout h3, .card > h3 {
         font-size: 1rem;
         font-weight: 600;
         color: var(--text-primary);
@@ -479,61 +479,6 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--gap);
-}
-
-.stat-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-    .stat-card p {
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: var(--text-secondary);
-        letter-spacing: 0.04em;
-    }
-
-    .stat-card h3 {
-        font-size: 1.4rem;
-        font-weight: 700;
-        margin: 3px 0;
-        color: var(--text-primary);
-    }
-
-    .stat-card small {
-        font-size: 0.7rem;
-        color: var(--text-muted);
-    }
-
-.stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.bg-primary {
-    background: var(--status-transit-bg);
-    color: var(--primary);
-}
-
-.bg-success {
-    background: var(--status-active-bg);
-    color: var(--status-active);
-}
-
-.bg-warning {
-    background: var(--status-pending-bg);
-    color: var(--status-pending);
-}
-
-.bg-danger {
-    background: var(--status-failed-bg);
-    color: var(--status-failed);
 }
 
 /* ─── Grids ──────────────────────────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-﻿/* ─── CSS Variables ───────────────────────────────────────────────────────── */
+/* ─── CSS Variables ───────────────────────────────────────────────────────── */
 :root {
     --primary: #4318ff;
     --bg-main: #f4f7fe;
@@ -321,7 +321,7 @@ body {
     box-shadow: var(--shadow);
 }
 
-.card-header {
+.card-header-layout {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -330,7 +330,7 @@ body {
     gap: 12px;
 }
 
-    .card-header h3 {
+    .card-header-layout h3 {
         font-size: 0.95rem;
         font-weight: 600;
         color: var(--text-primary);
@@ -520,42 +520,6 @@ body {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 18px;
-}
-
-.stat-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.bg-primary {
-    background: var(--status-transit-bg);
-    color: var(--primary);
-}
-
-.bg-success {
-    background: var(--status-active-bg);
-    color: var(--status-active);
-}
-
-.bg-warning {
-    background: var(--status-pending-bg);
-    color: var(--status-pending);
-}
-
-.bg-danger {
-    background: var(--status-failed-bg);
-    color: var(--status-failed);
 }
 
 /* ─── Welcome Banner ─────────────────────────────────────────────────────── */

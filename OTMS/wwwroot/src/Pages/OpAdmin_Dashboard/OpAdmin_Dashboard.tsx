@@ -41,6 +41,8 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
+import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
+import StatCard from '../../components/StatCard/StatCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -642,19 +644,12 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
                 {/* Stat Cards */}
                 <div className="stats-row">
                     {[
-                        { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All active tasks' },
-                        { label: 'IN PROGRESS', value: inProg, icon: <Truck size={18} />, cls: 'bg-warning', sub: 'Assigned & running' },
-                        { label: 'COMPLETED', value: done, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
-                        { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Past deadline' },
+                        { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'All active tasks' },
+                        { label: 'IN PROGRESS', value: inProg, icon: <Truck size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Assigned & running' },
+                        { label: 'COMPLETED', value: done, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'This period' },
+                        { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Past deadline' },
                     ].map(s => (
-                        <div key={s.label} className="stat-card">
-                            <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                            <div className="stat-text">
-                                <p className="stat-label">{s.label}</p>
-                                <h3 className="stat-value">{s.value}</h3>
-                                <small>{s.sub}</small>
-                            </div>
-                        </div>
+                        <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                     ))}
                 </div>
 
@@ -662,7 +657,7 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
                 <div className="dashboard-grid">
                     {/* Recent Tasks */}
                     <div className="card">
-                        <div className="card-header">
+                        <div className="card-header-layout">
                             <h3>Recent Tasks</h3>
                             <span className="view-all-link">View all <ChevronRight size={12} /></span>
                         </div>
@@ -675,7 +670,7 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
 
                     {/* Priority Breakdown */}
                     <div className="card">
-                        <div className="card-header">
+                        <div className="card-header-layout">
                             <h3>Priority Breakdown</h3>
                         </div>
                         <div className="perf-bars">
@@ -706,7 +701,7 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
                 {/* Bottom Row */}
                 <div className="dashboard-bottom-row">
                     <div className="card" style={{ flex: 2 }}>
-                        <div className="card-header">
+                        <div className="card-header-layout">
                             <h3>Delivery Performance</h3>
                             <span className="badge-week">This Week</span>
                         </div>
@@ -913,7 +908,7 @@ const TeamTab: React.FC<{
         <div className="dashboard-content">
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header"><h3>Team Members</h3></div>
+                    <div className="card-header-layout"><h3>Team Members</h3></div>
                     {teamMembers.length === 0 ? (
                         <div className="empty-state"><Users size={20} /><p>No team members found</p></div>
                     ) : teamMembers.map(m => {
@@ -937,7 +932,7 @@ const TeamTab: React.FC<{
                     })}
                 </div>
                 <div className="card">
-                    <div className="card-header"><h3>Workload Distribution</h3></div>
+                    <div className="card-header-layout"><h3>Workload Distribution</h3></div>
                     <div className="perf-bars">
                         {teamMembers.map(m => {
                             const cnt = tasks.filter(t => t.assignedEmployee === m.employeeName).length;
@@ -955,7 +950,7 @@ const TeamTab: React.FC<{
                 </div>
             </div>
             <div className="card">
-                <div className="card-header">
+                <div className="card-header-layout">
                     <h3>{teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName}'s Tasks</h3>
                 </div>
                 {tasks.filter(t => t.assignedEmployee === teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName).length === 0
@@ -995,25 +990,18 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
         <div className="dashboard-content">
             <div className="stats-row">
                 {[
-                    { label: 'COMPLETION RATE', value: `${rate}%`, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'Tasks finished on time' },
-                    { label: 'HIGH PRIORITY DONE', value: hiDone, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Critical tasks resolved' },
-                    { label: 'AVG TASKS / MEMBER', value: avg, icon: <Users size={18} />, cls: 'bg-primary', sub: 'Workload balance' },
-                    { label: 'ON-TIME RATE', value: `${ontimeRate}%`, icon: <BarChart3 size={18} />, cls: 'bg-warning', sub: 'Completed before deadline' },
+                    { label: 'COMPLETION RATE', value: `${rate}%`, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'Tasks finished on time' },
+                    { label: 'HIGH PRIORITY DONE', value: hiDone, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Critical tasks resolved' },
+                    { label: 'AVG TASKS / MEMBER', value: avg, icon: <Users size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'Workload balance' },
+                    { label: 'ON-TIME RATE', value: `${ontimeRate}%`, icon: <BarChart3 size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Completed before deadline' },
                 ].map(s => (
-                    <div key={s.label} className="stat-card">
-                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div className="stat-text">
-                            <p className="stat-label">{s.label}</p>
-                            <h3 className="stat-value">{s.value}</h3>
-                            <small>{s.sub}</small>
-                        </div>
-                    </div>
+                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                 ))}
             </div>
 
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header"><h3>Task Status Distribution</h3></div>
+                    <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
                     <div className="perf-bars" style={{ marginTop: 8 }}>
                         {statuses.map(s => {
                             const cnt = tasks.filter(t => t.taskStatus === s).length;
@@ -1030,7 +1018,7 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
                     </div>
                 </div>
                 <div className="card">
-                    <div className="card-header"><h3>Team Performance</h3></div>
+                    <div className="card-header-layout"><h3>Team Performance</h3></div>
                     <div className="perf-bars" style={{ marginTop: 8 }}>
                         {teamMembers.map(m => {
                             const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
@@ -1051,7 +1039,7 @@ const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ ta
             </div>
 
             <div className="card">
-                <div className="card-header"><h3>Full Task Report</h3></div>
+                <div className="card-header-layout"><h3>Full Task Report</h3></div>
                 <div style={{ overflowX: 'auto' }}>
                     <table className="data-table">
                         <thead>
@@ -1417,7 +1405,7 @@ function ProfileTab() {
 
                 {/* ── Profile Card ─────────────────────────────────────────── */}
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>My Profile</h3>
                         {!editingProfile && (
                             <button
@@ -1619,7 +1607,7 @@ function ProfileTab() {
 
                 {/* ── Security Card ─────────────────────────────────────────── */}
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>Security Settings</h3>
                         {!editingPassword && (
                             <button
@@ -1792,7 +1780,7 @@ function ProfileTab() {
 
             {/* ── Account Overview ─────────────────────────────────────────── */}
             <div className="card">
-                <div className="card-header"><h3>Account Overview</h3></div>
+                <div className="card-header-layout"><h3>Account Overview</h3></div>
                 <div className="system-status-list">
                     {[
                         { icon: Users, bg: 'bg-primary', name: 'Manage Employees', detail: 'Register, edit, and deactivate accounts' },
@@ -1882,21 +1870,18 @@ const LeaveTab: React.FC<{
             {/* Stat cards */}
             <div className="stats-row" style={{ marginBottom: 16 }}>
                 {[
-                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
-                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
-                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
-                    { label: 'DECLINED', value: declinedCount, icon: <X size={18} />, cls: 'bg-danger', sub: 'Not approved' },
+                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'All submitted' },
+                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Awaiting review' },
+                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'This period' },
+                    { label: 'DECLINED', value: declinedCount, icon: <X size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Not approved' },
                 ].map(s => (
-                    <div key={s.label} className="card stat-card">
-                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div><p>{s.label}</p><h3>{s.value}</h3><small>{s.sub}</small></div>
-                    </div>
+                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                 ))}
             </div>
 
             {/* History card */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="card-header" style={{ padding: '16px 20px 14px' }}>
+                <div className="card-header-layout" style={{ padding: '16px 20px 14px' }}>
                     <h3>My Leave History</h3>
                 </div>
 
@@ -2443,13 +2428,15 @@ export default function OpsAdminDashboard() {
 
             {/* ── Main ── */}
             <main className="main-viewport">
-                <div className="dashboard-header">
-                    <div className="header-title">
-                        <h2>{pageTitles[activeTab]}</h2>
-                        <p>Operations Admin — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                    </div>
+                <DashboardHeader
+                    title={pageTitles[activeTab]}
+                    notificationApi="/api/notification/my-notifications"
+                    userInitials={getInitials(employeeName || 'Operation Admin')}
+                    onSettingsClick={() => setActiveTab('profile')}
+                    onLogout={handleLogout}
+                >
                     {activeTab !== 'profile' && activeTab !== 'leave' && (
-                        <div className="header-actions">
+                        <>
                             <div className="header-search">
                                 <Search size={15} />
                                 <input
@@ -2462,10 +2449,9 @@ export default function OpsAdminDashboard() {
                             <button className="quick-action-btn-header" onClick={() => setShowNew(true)}>
                                 <Plus size={18} /> New Task
                             </button>
-                            <NotificationBell apiEndpoint="/api/notification/my-notifications" />
-                        </div>
+                        </>
                     )}
-                </div>
+                </DashboardHeader>
 
                 {activeTab === 'dashboard' && (
                     <DashboardTab

@@ -41,6 +41,8 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
+import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
+import StatCard from '../../components/StatCard/StatCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -514,21 +516,18 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
 
             <div className="stats-row">
                 {[
-                    { label: 'My Tasks', val: total, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'Assigned to me' },
-                    { label: 'In Progress', val: inProg, icon: <Loader2 size={18} />, cls: 'bg-warning', sub: 'Currently active' },
-                    { label: 'Completed', val: done, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'Finished tasks' },
-                    { label: 'Overdue', val: overdue, icon: <AlertCircle size={18} />, cls: 'bg-danger', sub: 'Needs attention' },
+                    { label: 'My Tasks', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'Assigned to me' },
+                    { label: 'In Progress', value: inProg, icon: <Loader2 size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Currently active' },
+                    { label: 'Completed', value: done, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'Finished tasks' },
+                    { label: 'Overdue', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Needs attention' },
                 ].map(s => (
-                    <div key={s.label} className="card stat-card">
-                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div><p>{s.label}</p><h3>{s.val}</h3><small>{s.sub}</small></div>
-                    </div>
+                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                 ))}
             </div>
 
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>High Priority Tasks</h3>
                         <button className="link-btn" onClick={onGoTasks}>All tasks <ChevronRight size={13} /></button>
                     </div>
@@ -561,7 +560,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                 </div>
 
                 <div className="card">
-                    <div className="card-header"><h3>My Progress</h3></div>
+                    <div className="card-header-layout"><h3>My Progress</h3></div>
                     <div className="progress-summary">
                         {tasks.map(t => (
                             <div key={t.id} className="ps-item" onClick={() => onView(t.id)}>
@@ -828,21 +827,18 @@ const LeaveTab: React.FC<{
             {/* Stat cards */}
             <div className="stats-row" style={{ marginBottom: 16 }}>
                 {[
-                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={18} />, cls: 'bg-primary', sub: 'All submitted' },
-                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={18} />, cls: 'bg-warning', sub: 'Awaiting review' },
-                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={18} />, cls: 'bg-success', sub: 'This period' },
-                    { label: 'DECLINED', value: declinedCount, icon: <X size={18} />, cls: 'bg-danger', sub: 'Not approved' },
+                    { label: 'TOTAL REQUESTS', value: records.length, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'All submitted' },
+                    { label: 'PENDING', value: pendingCount, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Awaiting review' },
+                    { label: 'APPROVED', value: approvedCount, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'This period' },
+                    { label: 'DECLINED', value: declinedCount, icon: <X size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Not approved' },
                 ].map(s => (
-                    <div key={s.label} className="card stat-card">
-                        <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
-                        <div><p>{s.label}</p><h3>{s.value}</h3><small>{s.sub}</small></div>
-                    </div>
+                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                 ))}
             </div>
 
             {/* History card */}
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="card-header" style={{ padding: '16px 20px 14px' }}>
+                <div className="card-header-layout" style={{ padding: '16px 20px 14px' }}>
                     <h3>My Leave History</h3>
                 </div>
 
@@ -1258,7 +1254,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
             <div className="profile-grid">
                 {/* Basic Information */}
                 <div className="card">
-                    <div className="card-header">
+                    <div className="card-header-layout">
                         <h3>Basic Information</h3>
                         {editMode && (
                             <button className="btn btn-primary" onClick={requestSave} disabled={profileSaving}>
@@ -1357,7 +1353,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
                 {/* Account & Security */}
                 <div className="card">
-                    <div className="card-header"><h3>Account & Security</h3></div>
+                    <div className="card-header-layout"><h3>Account & Security</h3></div>
                     <div className="account-info">
                         <div className="info-field">
                             <label>Role</label>
@@ -1672,13 +1668,13 @@ export default function EmployeeDashboard() {
 
             {/* ── Main ── */}
             <main className="main-viewport">
-                <div className="dashboard-header">
-                    <div>
-                        <h2>{pageTitles[activeTab]}</h2>
-                        <p>Dashboard — {today}</p>
-                    </div>
-                    <NotificationBell apiEndpoint="/api/notification/my-notifications" />
-                </div>
+                <DashboardHeader
+                    title={pageTitles[activeTab]}
+                    notificationApi="/api/notification/my-notifications"
+                    userInitials={initials}
+                    onSettingsClick={() => setActiveTab('profile')}
+                    onLogout={handleLogout}
+                />
 
                 {activeTab === 'dashboard' && (
                     <DashboardTab
