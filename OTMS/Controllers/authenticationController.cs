@@ -42,6 +42,16 @@ namespace OTMS.Controllers
             if (employee is null || employee.Account is null)
                 return Unauthorized(new { message = "Invalid Employee ID or password." });
 
+            // Automatically update and restore employee availability statuses (leave expiration/overrides)
+            try
+            {
+                await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating availability statuses: {ex.Message}");
+            }
+
             var status = employee.Account.AccountStatus;
 
             if (status == "Deactivated" || status == "Locked" || status == "On Leave" || employee.Account.FailedLoginAttempts >= 3)
@@ -66,7 +76,8 @@ namespace OTMS.Controllers
                         message = "Your account is currently on leave and cannot be accessed.",
                         employeeName = fullName,
                         accountId = employee.Account.AccountId,
-                        leaveId = activeLeave?.LeaveId ?? Guid.Empty
+                        leaveId = activeLeave?.LeaveId ?? Guid.Empty,
+                        overrideToken = authService.CreateToken(employee)
                     });
                 }
 
@@ -86,8 +97,6 @@ namespace OTMS.Controllers
 
             try
             {
-                await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
-
                 var result = await authService.LoginAsync(request);
                 if (result is null)
                     return Unauthorized(new { message = "Invalid Employee ID or password." });
@@ -101,7 +110,8 @@ namespace OTMS.Controllers
                     message = "Your account is currently on leave and cannot be accessed.",
                     employeeName = ex.EmployeeName,
                     accountId = ex.AccountId,
-                    leaveId = ex.LeaveId
+                    leaveId = ex.LeaveId,
+                    overrideToken = ex.OverrideToken
                 });
             }
 

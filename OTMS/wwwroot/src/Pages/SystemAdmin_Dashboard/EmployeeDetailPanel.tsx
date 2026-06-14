@@ -19,6 +19,7 @@ import {
     Calendar,
     Clock,
     ChevronLeft,
+    Mail,
 } from 'lucide-react';
 import '../employee_details/employee_detail.css';
 import { useToast } from '../../components/Toast/Toast';
@@ -31,6 +32,7 @@ interface RecentEmployee {
     contactNumber: string;
     role: string;
     accountStatus: string;
+    email?: string;
 }
 
 interface DeliveryRecord {
@@ -112,6 +114,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
         contactNumber: profile.contactNumber,
         role: toDisplayRole(profile.role),
         accountStatus: profile.accountStatus,
+        email: profile.email ?? '',
     });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
@@ -142,8 +145,8 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                     },
                     body: JSON.stringify({
                         employeeNumber: profile.employeeNumber,
-                        employeeName: form.employeeName,
                         contactNumber: form.contactNumber,
+                        email: form.email.trim(),
                     }),
                 }
             );
@@ -198,6 +201,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                 contactNumber: form.contactNumber,
                 role: toBackendRole(form.role),
                 accountStatus: form.accountStatus,
+                email: form.email.trim(),
             });
             success('Employee details updated successfully!');
             onClose();
@@ -233,6 +237,10 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                     <div className="ed-field">
                         <label>Full Name</label>
                         <input type="text" value={form.employeeName} onChange={set('employeeName')} />
+                    </div>
+                    <div className="ed-field">
+                        <label>Email</label>
+                        <input type="email" value={form.email} onChange={set('email')} />
                     </div>
                     <div className="ed-field">
                         <label>Contact Number</label>
@@ -447,6 +455,9 @@ export default function EmployeeDetailPanel({
                                 <Hash size={13} /> {profile.employeeNumber}
                             </span>
                             <span>
+                                <Mail size={13} /> {profile.email || '—'}
+                            </span>
+                            <span>
                                 <Shield size={13} /> {toDisplayRole(profile.role)}
                             </span>
                             <span>
@@ -506,6 +517,7 @@ export default function EmployeeDetailPanel({
                                 {[
                                     { label: 'Employee Number', value: profile.employeeNumber, icon: Hash },
                                     { label: 'Full Name', value: profile.employeeName, icon: User },
+                                    { label: 'Email', value: profile.email || '—', icon: Mail },
                                     { label: 'Contact Number', value: profile.contactNumber || '—', icon: Phone },
                                     { label: 'Role', value: toDisplayRole(profile.role), icon: Shield },
                                     { label: 'Account Status', value: profile.accountStatus, icon: CheckCircle2 },

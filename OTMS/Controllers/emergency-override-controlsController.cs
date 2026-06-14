@@ -9,6 +9,7 @@ using OTMS.Entities.DTOs.EmergencyOverrideRequest.Responses;
 using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Service.Interfaces;
+using System.Security.Claims;
 
 namespace OTMS.Controllers
 {
@@ -16,11 +17,19 @@ namespace OTMS.Controllers
     [ApiController]
     public class emergency_override_controlsController(IEmergencyOverrideService emergencyOverrideService) : ControllerBase
     {
+        [Authorize]
         [HttpPost("request")]
         public async Task<IActionResult> RequestEmergencyOverride(CreateEmergencyOverrideRequestDTO request)
         {
             try
             {
+                var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(accountIdStr))
+                {
+                    return Unauthorized(new { message = "User is not authenticated." });
+                }
+                request.AccountId = Guid.Parse(accountIdStr);
+
                 var result = await emergencyOverrideService.RequestOverrideAsync(request);
                 return Ok(result);
             }
@@ -123,6 +132,13 @@ namespace OTMS.Controllers
         {
             try
             {
+                var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(accountIdStr))
+                {
+                    return Unauthorized(new { message = "User is not authenticated." });
+                }
+                request.ApproverAccountId = Guid.Parse(accountIdStr);
+
                 var result = await emergencyOverrideService.ApproveOverrideAsync(request);
                 return Ok(result);
             }
@@ -141,6 +157,13 @@ namespace OTMS.Controllers
         {
             try
             {
+                var accountIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(accountIdStr))
+                {
+                    return Unauthorized(new { message = "User is not authenticated." });
+                }
+                request.ApproverAccountId = Guid.Parse(accountIdStr);
+
                 var result = await emergencyOverrideService.DeclineOverrideAsync(request);
                 return Ok(result);
             }

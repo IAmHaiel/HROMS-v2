@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, User, Lock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, User, Lock, Upload, FileText, Trash2, ShieldCheck } from 'lucide-react';
 
-type Step = 'welcome' | 'profile' | 'password' | 'done';
+type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'done';
+
+interface UploadedFile {
+    name: string;
+    size: string;
+    status: 'idle' | 'uploading' | 'done' | 'error';
+    error?: string;
+}
+
 
 const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-.]+$/;
 const SUFFIX_REGEX = /^[A-Za-z.\s]+$/;
@@ -27,10 +35,324 @@ export default function OnboardingPage() {
     const [showConfirm, setShowConfirm] = useState(false);
 
     const token = localStorage.getItem('authToken') ?? '';
-    const steps: Step[] = ['welcome', 'profile', 'password', 'done'];
+    const steps: Step[] = ['welcome', 'profile', 'password', 'documents', 'done'];
     const stepIndex = steps.indexOf(step);
 
+    const [uploadedDocs, setUploadedDocs] = useState<Record<string, UploadedFile>>({
+        biodata: {
+            name: 'biodata_juan_delacruz.pdf',
+            size: '1.2 MB',
+            status: 'done',
+        },
+        medical: {
+            name: 'invalid_file.iso',
+            size: '4.8 MB',
+            status: 'error',
+            error: 'File type not allowed. Upload a PDF or image.',
+        },
+        govId: { name: '', size: '', status: 'idle' },
+        nbi: { name: '', size: '', status: 'idle' },
+        education: { name: '', size: '', status: 'idle' },
+    });
+
+    const formatFileSize = (bytes: number): string => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = 1;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    };
+
+    const handleFileChange = (key: string, file: File | null) => {
+        if (!file) return;
+
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const sizeStr = formatFileSize(file.size);
+
+        const validExtensionsMap: Record<string, string[]> = {
+            biodata: ['pdf', 'docx'],
+            medical: ['pdf', 'jpg', 'jpeg', 'png'],
+            govId: ['pdf', 'jpg', 'jpeg', 'png'],
+            nbi: ['pdf', 'jpg', 'jpeg', 'png'],
+            education: ['pdf', 'jpg', 'jpeg', 'png'],
+        };
+
+        const validExts = validExtensionsMap[key] || [];
+
+        if (file.size > 10 * 1024 * 1024) {
+            setUploadedDocs(prev => ({
+                ...prev,
+                [key]: {
+                    name: file.name,
+                    size: sizeStr,
+                    status: 'error',
+                    error: 'File size exceeds 10MB limit.',
+                }
+            }));
+            return;
+        }
+
+        if (!validExts.includes(ext)) {
+            let errorMsg = 'File type not allowed.';
+            if (key === 'biodata') {
+                errorMsg = 'File type not allowed. Upload a PDF or DOCX.';
+            } else {
+                errorMsg = 'File type not allowed. Upload a PDF or image.';
+            }
+            setUploadedDocs(prev => ({
+                ...prev,
+                [key]: {
+                    name: file.name,
+                    size: sizeStr,
+                    status: 'error',
+                    error: errorMsg,
+                }
+            }));
+            return;
+        }
+
+        setUploadedDocs(prev => ({
+            ...prev,
+            [key]: {
+                name: file.name,
+                size: sizeStr,
+                status: 'uploading',
+            }
+        }));
+
+        setTimeout(() => {
+            setUploadedDocs(prev => {
+                if (prev[key]?.status === 'uploading') {
+                    return {
+                        ...prev,
+                        [key]: {
+                            ...prev[key],
+                            status: 'done',
+                        }
+                    };
+                }
+                return prev;
+            });
+        }, 1500);
+    };
+
+    const handleFileClear = (key: string) => {
+        setUploadedDocs(prev => ({
+            ...prev,
+            [key]: {
+                name: '',
+                size: '',
+                status: 'idle',
+            }
+        }));
+    };
+
+    const requiredKeys = ['biodata', 'medical', 'govId'];
+    const pendingRequiredCount = requiredKeys.filter(k => uploadedDocs[k]?.status !== 'done').length;
+    const isSubmitDisabled = pendingRequiredCount > 0;
+
+    const renderUploadSlot = (key: string, label: string, specs: string, required: boolean) => {
+        const fileState = uploadedDocs[key];
+        const status = fileState.status;
+
+        let cardStyle: React.CSSProperties = {
+            display: 'flex',
+            alignItems: 'center',
+            padding: '12px 16px',
+            borderRadius: 12,
+            cursor: 'pointer',
+            position: 'relative',
+        };
+
+        if (status === 'idle') {
+            cardStyle = {
+                ...cardStyle,
+                background: '#f8fafc',
+                border: '1.5px dashed #cbd5e1',
+            };
+        } else if (status === 'uploading') {
+            cardStyle = {
+                ...cardStyle,
+                background: '#f8fafc',
+                border: '1.5px solid #cbd5e1',
+                cursor: 'default',
+            };
+        } else if (status === 'done') {
+            cardStyle = {
+                ...cardStyle,
+                background: 'rgba(5,205,153,0.03)',
+                border: '1.5px solid rgba(5,205,153,0.18)',
+                cursor: 'default',
+            };
+        } else if (status === 'error') {
+            cardStyle = {
+                ...cardStyle,
+                background: 'rgba(238,93,80,0.03)',
+                border: '1.5px solid rgba(238,93,80,0.18)',
+            };
+        }
+
+        const handleCardClick = () => {
+            if (status === 'idle' || status === 'error') {
+                document.getElementById(`file-input-${key}`)?.click();
+            }
+        };
+
+        return (
+            <div key={key}>
+                <input
+                    type="file"
+                    id={`file-input-${key}`}
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        handleFileChange(key, file);
+                        e.target.value = '';
+                    }}
+                    accept={key === 'biodata' ? '.pdf,.docx' : '.pdf,.jpg,.jpeg,.png'}
+                />
+                
+                <div 
+                    className={status === 'idle' || status === 'error' ? 'upload-slot-card' : ''} 
+                    style={cardStyle}
+                    onClick={handleCardClick}
+                >
+                    <div style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        marginRight: 14,
+                        background: status === 'done' 
+                            ? 'rgba(5,205,153,0.08)' 
+                            : status === 'error' 
+                                ? 'rgba(238,93,80,0.08)' 
+                                : 'rgba(67,24,255,0.05)',
+                    }}>
+                        {status === 'idle' && <Upload size={16} color="#4318ff" />}
+                        {status === 'uploading' && <Loader2 size={16} color="#4318ff" className="spin-icon" />}
+                        {status === 'done' && <CheckCircle2 size={16} color="#05cd99" />}
+                        {status === 'error' && <AlertCircle size={16} color="#ee5d50" />}
+                    </div>
+
+                    <div style={{ flexGrow: 1, minWidth: 0, marginRight: 12 }}>
+                        {status === 'idle' && (
+                            <>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    {label} {required && <span style={{ color: '#ee5d50' }}>*</span>}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#8a95b0', marginTop: 2 }}>
+                                    {specs}
+                                </div>
+                            </>
+                        )}
+
+                        {status === 'uploading' && (
+                            <>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#4318ff' }}>
+                                    Uploading...
+                                </div>
+                                <div style={{ fontSize: 11, color: '#8a95b0', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {fileState.name} ({fileState.size})
+                                </div>
+                            </>
+                        )}
+
+                        {status === 'done' && (
+                            <>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>
+                                    {label} {required && <span style={{ color: '#ee5d50' }}>*</span>}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#05cd99', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <FileText size={12} /> {fileState.name} ({fileState.size})
+                                </div>
+                            </>
+                        )}
+
+                        {status === 'error' && (
+                            <>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>
+                                    {label} {required && <span style={{ color: '#ee5d50' }}>*</span>}
+                                </div>
+                                <div style={{ fontSize: 11, color: '#ee5d50', fontWeight: 600, marginTop: 2 }}>
+                                    {fileState.error || 'Upload failed.'}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div style={{ flexShrink: 0 }}>
+                        {status === 'idle' && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#4318ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Browse
+                            </span>
+                        )}
+                        {status === 'uploading' && null}
+                        {status === 'done' && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleFileClear(key);
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 6,
+                                    cursor: 'pointer',
+                                    color: '#8a95b0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: 6,
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#ee5d50')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#8a95b0')}
+                            >
+                                <Trash2 size={15} />
+                            </button>
+                        )}
+                        {status === 'error' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#ee5d50', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4 }}>
+                                    Retry
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleFileClear(key);
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        padding: 6,
+                                        cursor: 'pointer',
+                                        color: '#8a95b0',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        borderRadius: 6,
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ee5d50')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = '#8a95b0')}
+                                >
+                                    <Trash2 size={15} />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // ── Per-field validators ──
+
     const validateField = (key: string, value: string): string => {
         switch (key) {
             case 'firstName':
@@ -122,7 +444,12 @@ export default function OnboardingPage() {
             localStorage.setItem('contactNumber', profile.contactNumber.trim());
             setStep('password');
         } catch (err: any) {
-            setProfileApiError(err.message ?? 'Something went wrong.');
+            const errMsg = err.message ?? 'Something went wrong.';
+            if (errMsg.toLowerCase().includes('contact number')) {
+                setProfileErrors(prev => ({ ...prev, contactNumber: errMsg }));
+            } else {
+                setProfileApiError(errMsg);
+            }
         } finally {
             setProfileSaving(false);
         }
@@ -148,7 +475,7 @@ export default function OnboardingPage() {
                 throw new Error((err as any).message || 'Password update failed.');
             }
             localStorage.setItem('isPasswordChanged', 'true');
-            setStep('done');
+            setStep('documents');
         } catch (err: any) {
             setPwApiError(err.message ?? 'Something went wrong.');
         } finally {
@@ -174,7 +501,23 @@ export default function OnboardingPage() {
 
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0c1527 0%, #1a2540 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Montserrat', sans-serif", padding: '24px 16px' }}>
+            <style>{`
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                .spin-icon {
+                    animation: spin 1s linear infinite;
+                }
+                .upload-slot-card {
+                    transition: all 0.2s ease;
+                }
+                .upload-slot-card:hover {
+                    border-color: #4318ff !important;
+                    background-color: #f8fafc !important;
+                }
+            `}</style>
             <div style={{ width: '100%', maxWidth: 520 }}>
+
 
                 <div style={{ textAlign: 'center', marginBottom: 32 }}>
                     <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex" style={{ height: 40, objectFit: 'contain' }} />
@@ -183,17 +526,18 @@ export default function OnboardingPage() {
                 {step !== 'welcome' && step !== 'done' && (
                     <div style={{ marginBottom: 24 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            {['Profile Setup', 'Set Password'].map((label, i) => (
+                            {['Profile Setup', 'Set Password', 'Upload Documents'].map((label, i) => (
                                 <span key={label} style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: stepIndex - 1 >= i ? '#05cd99' : 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
                                     {stepIndex - 1 > i ? '✓ ' : ''}{label}
                                 </span>
                             ))}
                         </div>
                         <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #05cd99, #4318ff)', width: step === 'profile' ? '50%' : '100%', transition: 'width 0.4s ease' }} />
+                            <div style={{ height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, #05cd99, #4318ff)', width: step === 'profile' ? '33.3%' : step === 'password' ? '66.6%' : '100%', transition: 'width 0.4s ease' }} />
                         </div>
                     </div>
                 )}
+
 
                 <div style={{ background: 'white', borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
 
@@ -448,8 +792,108 @@ export default function OnboardingPage() {
                                 </div>
 
                                 <button onClick={handlePasswordSave} disabled={pwSaving} style={{ width: '100%', height: 44, border: 'none', borderRadius: 10, background: pwSaving ? '#a78bfa' : 'linear-gradient(135deg, #4318ff, #6a5cff)', color: 'white', fontSize: 13, fontWeight: 700, cursor: pwSaving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', marginTop: 4 }}>
-                                    {pwSaving ? <><Loader2 size={14} /> Saving…</> : <>Set Password & Finish <ArrowRight size={14} /></>}
+                                    {pwSaving ? <><Loader2 size={14} /> Saving…</> : <>Set Password & Continue <ArrowRight size={14} /></>}
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── UPLOAD DOCUMENTS ── */}
+                    {step === 'documents' && (
+                        <div>
+                            <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid #edf2f7' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(67,24,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Upload size={16} color="#4318ff" />
+                                    </div>
+                                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Upload Documents</h3>
+                                </div>
+                                <p style={{ margin: 0, fontSize: 12, color: '#94a3b8', marginLeft: 42 }}>Please upload the required personal files to complete your onboarding.</p>
+                            </div>
+
+                            <div style={{ padding: '24px 32px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                {/* Required Section */}
+                                <div>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+                                        Required Documents <span style={{ color: '#ee5d50' }}>*</span>
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        {renderUploadSlot('biodata', 'Biodata / Resume', 'PDF or DOCX up to 10MB', true)}
+                                        {renderUploadSlot('medical', 'Medical Certificate', 'PDF, JPG, or PNG up to 10MB', true)}
+                                        {renderUploadSlot('govId', 'Government-issued ID', 'JPG, PNG, or PDF up to 10MB', true)}
+                                    </div>
+                                </div>
+
+                                {/* Optional Section */}
+                                <div style={{ marginTop: 8 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+                                        Optional Documents
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        {renderUploadSlot('nbi', 'NBI / Police Clearance', 'JPG, PNG, or PDF up to 10MB', false)}
+                                        {renderUploadSlot('education', 'Educational Documents', 'PDF, JPG, or PNG up to 10MB', false)}
+                                    </div>
+                                </div>
+
+                                {/* Security Banner */}
+                                <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.1)', borderRadius: 10, marginTop: 8, alignItems: 'flex-start' }}>
+                                    <ShieldCheck size={18} color="#4318ff" style={{ flexShrink: 0, marginTop: 1 }} />
+                                    <span style={{ fontSize: 11, color: '#1e293b', lineHeight: 1.4 }}>
+                                        Your files are encrypted and securely stored. Only authorized HR personnel can access them.
+                                    </span>
+                                </div>
+
+                                {/* Actions Area */}
+                                <div style={{ marginTop: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+                                        <button 
+                                            onClick={() => setStep('done')}
+                                            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: '8px 4px' }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.color = '#334155')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+                                        >
+                                            Skip for now
+                                        </button>
+
+                                        <button
+                                            disabled={isSubmitDisabled}
+                                            onClick={() => setStep('done')}
+                                            style={{
+                                                height: 44,
+                                                padding: '0 24px',
+                                                border: 'none',
+                                                borderRadius: 10,
+                                                background: isSubmitDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #4318ff, #6a5cff)',
+                                                color: isSubmitDisabled ? '#94a3b8' : 'white',
+                                                fontSize: 13,
+                                                fontWeight: 700,
+                                                cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 8,
+                                                fontFamily: 'inherit',
+                                                boxShadow: isSubmitDisabled ? 'none' : '0 8px 20px rgba(67,24,255,0.25)',
+                                                transition: 'all 0.2s ease',
+                                            }}
+                                        >
+                                            Submit & Finish <ArrowRight size={14} />
+                                        </button>
+                                    </div>
+
+                                    {/* Pending Validation Alert */}
+                                    <div style={{ marginTop: 12, textAlign: 'center' }}>
+                                        {pendingRequiredCount > 0 ? (
+                                            <span style={{ fontSize: 11, color: '#ee5d50', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                <AlertCircle size={12} /> {pendingRequiredCount} required {pendingRequiredCount === 1 ? 'document' : 'documents'} still pending
+                                            </span>
+                                        ) : (
+                                            <span style={{ fontSize: 11, color: '#05cd99', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                <CheckCircle2 size={12} /> All required documents uploaded
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -1,4 +1,4 @@
-﻿using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.PasswordVerification;
 using OTMS.Entities.DTOs.PasswordVerification.Response;
 using OTMS.Entities.DTOs.ResetPassword;
@@ -15,5 +15,6 @@ namespace OTMS.Service.Interfaces
         Task<PasswordVerificationResponseDTO> VerifyPasswordAsync(PasswordVerificationDTO request);
         Task<ApiResponseDTO<object>> ForgotPasswordAsync(ForgotPasswordDTO request);
         Task<ApiResponseDTO<object>> ResetPasswordAsync(ResetPasswordDTO request);
+        string CreateToken(Employee employee);
     }
 }
