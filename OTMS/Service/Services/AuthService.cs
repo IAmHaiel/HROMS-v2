@@ -54,7 +54,7 @@ namespace OTMS.Service.Services
 
             if (!employee.IsEmailVerified)
             {
-                throw new ArgumentException(
+                throw new Exception(
                     "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support."
                 );
             }
@@ -77,6 +77,8 @@ namespace OTMS.Service.Services
                 $"On Leave Employee {string.Join(" ", new[]
                     {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} tried to log in at {DateTime.Now:hh:mm tt}. Access Denied.");
 
+                var overrideToken = CreateToken(employee);
+
                 throw new OnLeaveException(
                     employee.Account?.AccountId ?? Guid.Empty
                     , activeLeave?.LeaveId ?? Guid.Empty
@@ -86,7 +88,8 @@ namespace OTMS.Service.Services
                             employee.MiddleName ?? string.Empty,
                             employee.LastName ?? string.Empty,
                             employee.Suffix ?? string.Empty
-                        }.Where(x => !string.IsNullOrWhiteSpace(x))));
+                        }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                    , overrideToken);
             }
 
             var verificationResult =
@@ -456,7 +459,7 @@ namespace OTMS.Service.Services
             return Convert.ToBase64String(randomNumber);
         }
 
-        private string CreateToken(Employee employee)
+        public string CreateToken(Employee employee)
         {
 
             if (employee.Account is null)

@@ -122,37 +122,34 @@ export default function Login() {
                 throw new Error('Invalid server response');
             }
 
-            // ← CHECK FOR ERRORS FIRST
             if (!response.ok) {
-                if (response.status === 401) {
-                    const message = data?.message?.toLowerCase() ?? '';
+                const message = data?.message?.toLowerCase() ?? '';
 
-                    // on leave gets its own block FIRST
-                    if (message.includes('on leave') || message.includes('onleave')) {
-                        navigate('/account_locked', {
-                            state: {
-                                employeeNumber: employeeId.trim(),
-                                employeeName: data?.employeeName ?? data?.EmployeeName ?? '',
-                                reason: data?.message ?? data?.Message ?? '',
-                                overrideToken: data?.overrideToken,
-                                leaveId: data?.leaveId,
-                            }
-                        });
-                        return;
-                    }
-
-                    // deactivated/locked go here
-                    if (message.includes('deactivated') || message.includes('locked')) {
-                        navigate('/account_locked', {
-                            state: {
-                                employeeNumber: employeeId.trim(),
-                                employeeName: data?.employeeName ?? data?.EmployeeName ?? '',
-                                reason: data?.message ?? data?.Message ?? '',
-                            }
-                        });
-                        return;
-                    }
+                if (message.includes('on leave') || message.includes('onleave')) {
+                    navigate('/account_locked', {
+                        state: {
+                            employeeNumber: employeeId.trim(),
+                            employeeName: data?.employeeName ?? data?.EmployeeName ?? '',
+                            reason: data?.message ?? data?.Message ?? '',
+                            overrideToken: data?.overrideToken,
+                            leaveId: data?.leaveId,
+                        }
+                    });
+                    return;
                 }
+
+                if (message.includes('deactivated') || message.includes('locked')) {
+                    navigate('/account_locked', {
+                        state: {
+                            employeeNumber: employeeId.trim(),
+                            employeeName: data?.employeeName ?? data?.EmployeeName ?? '',
+                            reason: data?.message ?? data?.Message ?? '',
+                        }
+                    });
+                    return;
+                }
+
+                // Catches unverified email (ArgumentException → 400) and any other error
                 updateStatus(data?.message || 'Invalid Employee ID or password.', 'error');
                 return;
             }

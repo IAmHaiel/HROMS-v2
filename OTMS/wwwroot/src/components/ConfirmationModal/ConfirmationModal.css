@@ -1,0 +1,444 @@
+﻿/* ConfirmationModal.css */
+
+/* ── Overlay ─────────────────────────────────────────────── */
+.cm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(10, 15, 30, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: cm-fade-in 0.15s ease;
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.cm-card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 1.75rem 1.75rem 1.25rem;
+    width: 100%;
+    max-width: 420px;
+    animation: cm-slide-up 0.18s ease;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.cm-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 1.25rem;
+}
+
+.cm-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 20px;
+}
+
+.cm-header-text {
+    flex: 1;
+}
+
+.cm-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 5px;
+    line-height: 1.4;
+}
+
+.cm-desc {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ── Notice callout ──────────────────────────────────────── */
+.cm-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    padding: 10px 14px;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.cm-notice-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── Actions ─────────────────────────────────────────────── */
+.cm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.cm-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+    line-height: 1;
+}
+
+    .cm-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+
+    .cm-btn:active:not(:disabled) {
+        transform: scale(0.97);
+    }
+
+.cm-btn-cancel {
+    background: transparent;
+    color: #374151;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+    .cm-btn-cancel:hover:not(:disabled) {
+        background: #f3f4f6;
+    }
+
+.cm-btn-confirm {
+    border: none;
+}
+
+/* ── Variant: icon circles ───────────────────────────────── */
+.cm-icon-danger {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.cm-icon-warning {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.cm-icon-info {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.cm-icon-success {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.cm-icon-neutral {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+/* ── Variant: confirm buttons ────────────────────────────── */
+.cm-btn-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.cm-btn-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cm-btn-info {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.cm-btn-success {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.cm-btn-neutral {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.cm-btn-danger:hover:not(:disabled) {
+    background: #fecaca;
+}
+
+.cm-btn-warning:hover:not(:disabled) {
+    background: #fde68a;
+}
+
+.cm-btn-info:hover:not(:disabled) {
+    background: #bfdbfe;
+}
+
+.cm-btn-success:hover:not(:disabled) {
+    background: #bbf7d0;
+}
+
+.cm-btn-neutral:hover:not(:disabled) {
+    background: #e5e7eb;
+}
+
+/* ── Variant: notice callouts ────────────────────────────── */
+.cm-notice-danger {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #7f1d1d;
+}
+
+    .cm-notice-danger .cm-notice-icon {
+        color: #dc2626;
+    }
+
+.cm-notice-warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #78350f;
+}
+
+    .cm-notice-warning .cm-notice-icon {
+        color: #d97706;
+    }
+
+.cm-notice-info {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1e3a8a;
+}
+
+    .cm-notice-info .cm-notice-icon {
+        color: #2563eb;
+    }
+
+.cm-notice-success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #14532d;
+}
+
+    .cm-notice-success .cm-notice-icon {
+        color: #16a34a;
+    }
+
+.cm-notice-neutral {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    color: #374151;
+}
+
+    .cm-notice-neutral .cm-notice-icon {
+        color: #6b7280;
+    }
+
+/* ── Spinner ─────────────────────────────────────────────── */
+@keyframes cm-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.cm-spin {
+    display: inline-block;
+    animation: cm-spin 0.7s linear infinite;
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes cm-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes cm-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Dark mode ───────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+    .cm-overlay {
+        background: rgba(0, 0, 0, 0.65);
+    }
+
+    .cm-card {
+        background: #1f2937;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .cm-title {
+        color: #f9fafb;
+    }
+
+    .cm-desc {
+        color: #9ca3af;
+    }
+
+    .cm-btn-cancel {
+        color: #d1d5db;
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+        .cm-btn-cancel:hover:not(:disabled) {
+            background: #374151;
+        }
+
+    .cm-icon-danger {
+        background: #450a0a;
+        color: #fca5a5;
+    }
+
+    .cm-icon-warning {
+        background: #451a03;
+        color: #fcd34d;
+    }
+
+    .cm-icon-info {
+        background: #1e3a8a;
+        color: #93c5fd;
+    }
+
+    .cm-icon-success {
+        background: #052e16;
+        color: #86efac;
+    }
+
+    .cm-icon-neutral {
+        background: #374151;
+        color: #9ca3af;
+    }
+
+    .cm-btn-danger {
+        background: #450a0a;
+        color: #fca5a5;
+    }
+
+    .cm-btn-warning {
+        background: #451a03;
+        color: #fcd34d;
+    }
+
+    .cm-btn-info {
+        background: #1e3a8a;
+        color: #93c5fd;
+    }
+
+    .cm-btn-success {
+        background: #052e16;
+        color: #86efac;
+    }
+
+    .cm-btn-neutral {
+        background: #374151;
+        color: #d1d5db;
+    }
+
+    .cm-btn-danger:hover:not(:disabled) {
+        background: #7f1d1d;
+    }
+
+    .cm-btn-warning:hover:not(:disabled) {
+        background: #78350f;
+    }
+
+    .cm-btn-info:hover:not(:disabled) {
+        background: #1d4ed8;
+    }
+
+    .cm-btn-success:hover:not(:disabled) {
+        background: #14532d;
+    }
+
+    .cm-btn-neutral:hover:not(:disabled) {
+        background: #4b5563;
+    }
+
+    .cm-notice-danger {
+        background: #450a0a;
+        border-color: #7f1d1d;
+        color: #fca5a5;
+    }
+
+        .cm-notice-danger .cm-notice-icon {
+            color: #f87171;
+        }
+
+    .cm-notice-warning {
+        background: #451a03;
+        border-color: #78350f;
+        color: #fcd34d;
+    }
+
+        .cm-notice-warning .cm-notice-icon {
+            color: #fbbf24;
+        }
+
+    .cm-notice-info {
+        background: #1e3a8a;
+        border-color: #1d4ed8;
+        color: #93c5fd;
+    }
+
+        .cm-notice-info .cm-notice-icon {
+            color: #60a5fa;
+        }
+
+    .cm-notice-success {
+        background: #052e16;
+        border-color: #14532d;
+        color: #86efac;
+    }
+
+        .cm-notice-success .cm-notice-icon {
+            color: #4ade80;
+        }
+
+    .cm-notice-neutral {
+        background: #374151;
+        border-color: #4b5563;
+        color: #d1d5db;
+    }
+
+        .cm-notice-neutral .cm-notice-icon {
+            color: #9ca3af;
+        }
+}
+
+/* ── Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .cm-overlay, .cm-card {
+        animation: none;
+    }
+
+    .cm-spin {
+        animation: none;
+    }
+}

@@ -337,7 +337,8 @@ namespace OTMS.Service.Services
                     Suffix = e.Suffix,
 
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account?.Role?.Name ?? "No Account",
+                    Email = e.Email,
+                    Role = e.Account?.Role ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Attachments = e.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
@@ -473,7 +474,7 @@ namespace OTMS.Service.Services
 
             var emailExists = await context.Employees
                 .AnyAsync(e => e.Email == request.Email && e.EmployeeNumber != employee.EmployeeNumber);
-            if (contactNoExists)
+            if (emailExists)
                 throw new Exception("Email already exists in another account.");
 
             // Format Profile Contact Number

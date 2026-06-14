@@ -43,6 +43,7 @@ import NotificationBell from '../../components/NotificationBell/NotificationBell
 import { useToast } from '../../components/Toast/Toast';
 import EmployeeDetailPanel from './EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
+import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ interface RecentEmployee {
     role: string;
     accountStatus: string;
     presenceStatus?: string;
+    email?: string;
 }
 
 type LeaveType = 'vacation' | 'sick' | 'emergency' | 'personal' | 'maternity' | 'other';
@@ -128,6 +130,29 @@ interface EmergencyOverride {
     overrideUntil?: string;
 }
 
+// ─── ConfirmModal state shape ─────────────────────────────────────────────────
+
+interface ConfirmModalState {
+    isOpen: boolean;
+    variant: 'danger' | 'warning' | 'info' | 'success' | 'neutral';
+    icon?: string;
+    title: string;
+    description: React.ReactNode;
+    notice?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    isLoading?: boolean;
+    onConfirm: () => void;
+}
+
+const CONFIRM_CLOSED: ConfirmModalState = {
+    isOpen: false,
+    variant: 'neutral',
+    title: '',
+    description: '',
+    onConfirm: () => { },
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROLES = [
@@ -146,7 +171,7 @@ const NAV_GROUPS = [
         label: 'MAIN MENU',
         items: [
             { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
-            { tab: 'employees' as NavTab, icon: Users, label: 'Employees' },
+            { tab: 'employees' as NavTab, icon: Users, label: 'Manage Employee' },
             { tab: 'emergency_override' as NavTab, icon: FileText, label: 'Emergency Override' },
         ],
     },
@@ -198,19 +223,14 @@ const EMPTY_FORM: FormState = {
     email: '',
 };
 
-const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-.]+$/;
-
 function validate(form: FormState): FieldError {
     const errs: FieldError = {};
-
     if (!form.role) { errs.role = 'Please select a role.'; }
     else if (!ROLES.includes(form.role)) { errs.role = 'Selected role is not valid.'; }
-
     const email = form.email.trim();
     if (!email) { errs.email = 'Email address is required.'; }
     else if (email.length > 100) { errs.email = 'Email must not exceed 100 characters.'; }
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errs.email = 'Enter a valid email address.'; }
-
     return errs;
 }
 
@@ -365,6 +385,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 contactNumber: '',
                 role: data.role,
                 accountStatus: 'Active',
+                email: form.email.trim(),
             });
         } catch (err: any) {
             setApiError(err.message ?? 'Something went wrong. Please try again.');
@@ -457,102 +478,250 @@ interface EmployeeDetailModalProps {
 
 function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailModalProps) {
     const [isEditing, setIsEditing] = useState(false);
-    const [form, setForm] = useState({ firstName: employee.firstName ?? '', middleName: employee.middleName ?? '', lastName: employee.lastName ?? '', suffix: employee.suffix ?? '', contactNumber: employee.contactNumber, role: toDisplayRole(employee.role), accountStatus: employee.accountStatus });
+    const [form, setForm] = useState({
+        firstName: employee.firstName ?? '',
+        middleName: employee.middleName ?? '',
+        lastName: employee.lastName ?? '',
+        suffix: employee.suffix ?? '',
+        contactNumber: employee.contactNumber,
+        role: toDisplayRole(employee.role),
+        accountStatus: employee.accountStatus,
+        email: employee.email ?? '',
+    });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
-    const { confirm, success, error } = useToast();
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
+    const { success, error } = useToast();
     const displayName = getEmployeeDisplayName(employee);
 
-    const handleChange = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setForm(prev => ({ ...prev, [key]: e.target.value })); setApiError(''); };
-
-    const handleSave = async () => {
-        setSubmitting(true); setApiError('');
-        try {
-            const token = localStorage.getItem('authToken');
-            const builtName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
-            const updateRes = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employee.employeeNumber)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber, firstName: form.firstName.trim(), middleName: form.middleName.trim(), lastName: form.lastName.trim(), suffix: form.suffix.trim(), contactNumber: form.contactNumber }) });
-            if (!updateRes.ok) { const err = await updateRes.json().catch(() => ({})); throw new Error(err.message || `Error ${updateRes.status}: Update failed`); }
-            if (toBackendRole(form.role) !== employee.role) {
-                const roleRes = await fetch('/api/systemadmin/assign-role', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber, roleName: toBackendRole(form.role) }) });
-                if (!roleRes.ok) { const err = await roleRes.json().catch(() => ({})); throw new Error(err.message || `Error ${roleRes.status}: Role update failed`); }
-            }
-            if (form.accountStatus !== employee.accountStatus) {
-                const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
-                const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${displayName}?`);
-                if (!isConfirmed) { setSubmitting(false); return; }
-
-                const statusEndpoint = form.accountStatus === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
-                const statusRes = await fetch(statusEndpoint, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber }) });
-                if (!statusRes.ok) { const err = await statusRes.json().catch(() => ({})); throw new Error(err.message || `Error ${statusRes.status}: Status update failed`); }
-            }
-            onUpdated({ ...employee, firstName: form.firstName.trim(), middleName: form.middleName.trim(), lastName: form.lastName.trim(), suffix: form.suffix.trim(), employeeName: builtName, contactNumber: form.contactNumber, role: toBackendRole(form.role), accountStatus: form.accountStatus });
-            setIsEditing(false);
-            success('Employee details updated successfully!');
-            onClose();
-        } catch (err: any) { error(err.message ?? 'Something went wrong. Please try again.'); setApiError(err.message ?? 'Something went wrong. Please try again.'); }
-        finally { setSubmitting(false); }
+    const handleChange = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setForm(prev => ({ ...prev, [key]: e.target.value }));
+        setApiError('');
     };
 
-    const handleDelete = async () => {
-        const isConfirmed = await confirm(`Are you sure you want to permanently delete ${displayName}?`);
-        if (!isConfirmed) return;
-        setSubmitting(true); setApiError('');
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/systemadmin/delete-user', { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employee.employeeNumber }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || `Error ${res.status}: Delete failed`); }
-            success(`${displayName} has been deleted.`);
-            onUpdated({ ...employee, accountStatus: '__deleted__' });
-            onClose();
-        } catch (err: any) { setApiError(err.message ?? 'Something went wrong. Please try again.'); }
-        finally { setSubmitting(false); }
+    // ── Save (with status-change confirmation) ────────────────────────────────
+    const handleSave = async () => {
+        const doSave = async () => {
+            setSubmitting(true);
+            setApiError('');
+            try {
+                const token = localStorage.getItem('authToken');
+                const builtName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
+                const updateRes = await fetch(
+                    `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employee.employeeNumber)}`,
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            employeeNumber: employee.employeeNumber,
+                            firstName: form.firstName.trim(),
+                            middleName: form.middleName.trim(),
+                            lastName: form.lastName.trim(),
+                            suffix: form.suffix.trim(),
+                            contactNumber: form.contactNumber,
+                            email: form.email.trim(),
+                        }),
+                    }
+                );
+                if (!updateRes.ok) {
+                    const err = await updateRes.json().catch(() => ({}));
+                    throw new Error(err.message || `Error ${updateRes.status}: Update failed`);
+                }
+                if (toBackendRole(form.role) !== employee.role) {
+                    const roleRes = await fetch('/api/systemadmin/assign-role', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ employeeNumber: employee.employeeNumber, roleName: toBackendRole(form.role) }),
+                    });
+                    if (!roleRes.ok) {
+                        const err = await roleRes.json().catch(() => ({}));
+                        throw new Error(err.message || `Error ${roleRes.status}: Role update failed`);
+                    }
+                }
+                if (form.accountStatus !== employee.accountStatus) {
+                    const statusEndpoint = form.accountStatus === 'Active'
+                        ? '/api/systemadmin/activate-user'
+                        : '/api/systemadmin/deactivate-user';
+                    const statusRes = await fetch(statusEndpoint, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ employeeNumber: employee.employeeNumber }),
+                    });
+                    if (!statusRes.ok) {
+                        const err = await statusRes.json().catch(() => ({}));
+                        throw new Error(err.message || `Error ${statusRes.status}: Status update failed`);
+                    }
+                }
+                onUpdated({
+                    ...employee,
+                    firstName: form.firstName.trim(),
+                    middleName: form.middleName.trim(),
+                    lastName: form.lastName.trim(),
+                    suffix: form.suffix.trim(),
+                    employeeName: builtName,
+                    contactNumber: form.contactNumber,
+                    role: toBackendRole(form.role),
+                    accountStatus: form.accountStatus,
+                    email: form.email.trim(),
+                });
+                setIsEditing(false);
+                success('Employee details updated successfully!');
+                onClose();
+            } catch (err: any) {
+                error(err.message ?? 'Something went wrong. Please try again.');
+                setApiError(err.message ?? 'Something went wrong. Please try again.');
+            } finally {
+                setSubmitting(false);
+                setConfirmModal(CONFIRM_CLOSED);
+            }
+        };
+
+        // If status changed, show confirmation first
+        if (form.accountStatus !== employee.accountStatus) {
+            const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
+            const isActivating = form.accountStatus === 'Active';
+            setConfirmModal({
+                isOpen: true,
+                variant: isActivating ? 'success' : 'warning',
+                icon: isActivating ? 'ti-user-check' : 'ti-user-off',
+                title: `${isActivating ? 'Activate' : 'Deactivate'} employee account?`,
+                description: (
+                    <>
+                        You are about to <strong>{actionText}</strong> the account of{' '}
+                        <strong>{displayName}</strong>. This will{' '}
+                        {isActivating
+                            ? 'restore their access to the system.'
+                            : 'revoke their access until reactivated.'}
+                    </>
+                ),
+                confirmLabel: isActivating ? 'Activate account' : 'Deactivate account',
+                onConfirm: doSave,
+            });
+        } else {
+            await doSave();
+        }
+    };
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+    const handleDelete = () => {
+        setConfirmModal({
+            isOpen: true,
+            variant: 'danger',
+            icon: 'ti-trash',
+            title: 'Delete employee record?',
+            description: (
+                <>
+                    This will permanently remove <strong>{displayName}</strong> and all associated
+                    data. This action cannot be undone.
+                </>
+            ),
+            notice: 'All leave records, tasks, and activity logs for this employee will also be deleted.',
+            confirmLabel: 'Delete employee',
+            onConfirm: async () => {
+                setSubmitting(true);
+                setApiError('');
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch('/api/systemadmin/delete-user', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ employeeNumber: employee.employeeNumber }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || `Error ${res.status}: Delete failed`);
+                    }
+                    success(`${displayName} has been deleted.`);
+                    onUpdated({ ...employee, accountStatus: '__deleted__' });
+                    onClose();
+                } catch (err: any) {
+                    setApiError(err.message ?? 'Something went wrong. Please try again.');
+                } finally {
+                    setSubmitting(false);
+                    setConfirmModal(CONFIRM_CLOSED);
+                }
+            },
+        });
     };
 
     const editDisplayName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
+
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div><h3>Employee Details</h3><p className="modal-subtitle">{isEditing ? 'Editing profile' : 'Viewing profile'} of {displayName}</p></div>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
-                </div>
-                {apiError && <div className="form-api-error"><AlertCircle size={14} /><span>{apiError}</span></div>}
-                <div className="modal-form">
-                    <div className="employee-detail-avatar">
-                        <div className="avatar-circle large">{(displayName || '?').charAt(0).toUpperCase()}</div>
-                        <div className="avatar-info">
-                            <h4>{isEditing ? editDisplayName || '—' : displayName}</h4>
-                            <div className="avatar-meta">
-                                {isEditing ? (
-                                    <select value={form.accountStatus} onChange={handleChange('accountStatus')} className="detail-input status-select">
-                                        <option value="Active">Active</option>
-                                        <option value="Deactivated">Deactivated</option>
-                                        {employee.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
-                                        {employee.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
-                                    </select>
-                                ) : <span className={`status-badge ${(form.accountStatus ?? 'active').toLowerCase()}`}>{form.accountStatus ?? 'Active'}</span>}
+        <>
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-card" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <div>
+                            <h3>Employee Details</h3>
+                            <p className="modal-subtitle">{isEditing ? 'Editing profile' : 'Viewing profile'} of {displayName}</p>
+                        </div>
+                        <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
+                    </div>
+                    {apiError && <div className="form-api-error"><AlertCircle size={14} /><span>{apiError}</span></div>}
+                    <div className="modal-form">
+                        <div className="employee-detail-avatar">
+                            <div className="avatar-circle large">{(displayName || '?').charAt(0).toUpperCase()}</div>
+                            <div className="avatar-info">
+                                <h4>{isEditing ? editDisplayName || '—' : displayName}</h4>
+                                <div className="avatar-meta">
+                                    {isEditing ? (
+                                        <select value={form.accountStatus} onChange={handleChange('accountStatus')} className="detail-input status-select">
+                                            <option value="Active">Active</option>
+                                            <option value="Deactivated">Deactivated</option>
+                                            {employee.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
+                                            {employee.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
+                                        </select>
+                                    ) : (
+                                        <span className={`status-badge ${(form.accountStatus ?? 'active').toLowerCase()}`}>
+                                            {form.accountStatus ?? 'Active'}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
+                        <div className="detail-grid">
+                            <div className="detail-item"><span className="detail-label">Employee Number</span><span className="detail-value">{employee.employeeNumber}</span></div>
+                            <div className="detail-item"><span className="detail-label">Role</span>{isEditing ? <select value={form.role} onChange={handleChange('role')} className="detail-input">{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select> : <span className="detail-value">{form.role || '—'}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">First Name</span>{isEditing ? <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.firstName || '—'}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">Last Name</span>{isEditing ? <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.lastName || '—'}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="detail-input" maxLength={50} placeholder="None" /> : <span className="detail-value">{form.middleName || '—'}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.suffix} onChange={handleChange('suffix')} className="detail-input" maxLength={10} placeholder="None" /> : <span className="detail-value">{form.suffix || '—'}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">Contact Number</span>{isEditing ? <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="detail-input" /> : <span className="detail-value">{form.contactNumber}</span>}</div>
+                            <div className="detail-item"><span className="detail-label">Email</span>{isEditing ? <input type="email" value={form.email} onChange={handleChange('email')} className="detail-input" maxLength={100} /> : <span className="detail-value">{form.email || '—'}</span>}</div>
+                        </div>
                     </div>
-                    <div className="detail-grid">
-                        <div className="detail-item"><span className="detail-label">Employee Number</span><span className="detail-value">{employee.employeeNumber}</span></div>
-                        <div className="detail-item"><span className="detail-label">Role</span>{isEditing ? <select value={form.role} onChange={handleChange('role')} className="detail-input">{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select> : <span className="detail-value">{form.role || '—'}</span>}</div>
-                        <div className="detail-item"><span className="detail-label">First Name</span>{isEditing ? <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.firstName || '—'}</span>}</div>
-                        <div className="detail-item"><span className="detail-label">Last Name</span>{isEditing ? <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.lastName || '—'}</span>}</div>
-                        <div className="detail-item"><span className="detail-label">Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="detail-input" maxLength={50} placeholder="None" /> : <span className="detail-value">{form.middleName || '—'}</span>}</div>
-                        <div className="detail-item"><span className="detail-label">Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.suffix} onChange={handleChange('suffix')} className="detail-input" maxLength={10} placeholder="None" /> : <span className="detail-value">{form.suffix || '—'}</span>}</div>
-                        <div className="detail-item"><span className="detail-label">Contact Number</span>{isEditing ? <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="detail-input" /> : <span className="detail-value">{form.contactNumber}</span>}</div>
+                    <div className="modal-actions">
+                        {isEditing ? (
+                            <>
+                                <button className="btn" onClick={() => { setIsEditing(false); setApiError(''); }} disabled={submitting}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
+                                    {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button className="btn btn-danger" onClick={handleDelete} disabled={submitting}>Delete</button>
+                                <button className="btn btn-primary" onClick={() => setIsEditing(true)}>Edit</button>
+                            </>
+                        )}
                     </div>
-                </div>
-                <div className="modal-actions">
-                    {isEditing ? (
-                        <><button className="btn" onClick={() => { setIsEditing(false); setApiError(''); }} disabled={submitting}>Cancel</button><button className="btn btn-primary" onClick={handleSave} disabled={submitting}>{submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}</button></>
-                    ) : (
-                        <><button className="btn btn-danger" onClick={handleDelete} disabled={submitting}>Delete</button><button className="btn btn-primary" onClick={() => setIsEditing(true)}>Edit</button></>
-                    )}
                 </div>
             </div>
-        </div>
+
+            {/* ── Confirmation Modal ── */}
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                icon={confirmModal.icon}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                notice={confirmModal.notice}
+                confirmLabel={confirmModal.confirmLabel}
+                isLoading={submitting}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
+        </>
     );
 }
 
@@ -571,17 +740,26 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
     const isApprove = action === 'approve';
     const days = calcDays(request.startDate, request.endDate);
 
-
     const handleConfirm = async () => {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch(`/api/leaverequest/${request.id}/status`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ approval_Status: isApprove ? 'Approved' : 'Declined', leaveRequestNote: note.trim() }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || `Failed to ${action} leave request.`); }
+            const res = await fetch(`/api/leaverequest/${request.id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ approval_Status: isApprove ? 'Approved' : 'Declined', leaveRequestNote: note.trim() }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || `Failed to ${action} leave request.`);
+            }
             onConfirm(request.id, action, note.trim());
             onClose();
-        } catch (err: any) { alert(err.message ?? 'Something went wrong.'); }
-        finally { setSubmitting(false); }
+        } catch (err: any) {
+            alert(err.message ?? 'Something went wrong.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -601,98 +779,30 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
                     </button>
                 </div>
 
-                <div style={{ 
-                    background: '#f8fafc', 
-                    borderRadius: 14, 
-                    padding: '20px', 
-                    marginBottom: 20, 
-                    border: '1px solid #eef2f6' 
-                }}>
+                <div style={{ background: '#f8fafc', borderRadius: 14, padding: '20px', marginBottom: 20, border: '1px solid #eef2f6' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                        <div className="emp-avatar" style={{ 
-                            flexShrink: 0, 
-                            width: 44, 
-                            height: 44, 
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #4318ff, #868cff)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            fontSize: 16,
-                            boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)'
-                        }}>{request.employeeName.charAt(0).toUpperCase()}</div>
+                        <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #4318ff, #868cff)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)' }}>{request.employeeName.charAt(0).toUpperCase()}</div>
                         <div>
                             <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{request.employeeName}</div>
-                            <span style={{ 
-                                fontSize: 11, 
-                                fontWeight: 600, 
-                                color: '#4318ff', 
-                                background: 'rgba(67, 24, 255, 0.08)', 
-                                padding: '2px 8px', 
-                                borderRadius: 6,
-                                marginTop: 3,
-                                display: 'inline-block'
-                            }}>{toDisplayRole(request.role)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#4318ff', background: 'rgba(67, 24, 255, 0.08)', padding: '2px 8px', borderRadius: 6, marginTop: 3, display: 'inline-block' }}>{toDisplayRole(request.role)}</span>
                         </div>
                     </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ background: 'rgba(67, 24, 255, 0.08)', color: '#4318ff', padding: 6, borderRadius: 8, display: 'flex' }}>
-                                <CalendarRange size={14} />
+                        {[
+                            { icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff', label: 'TYPE', value: LEAVE_TYPE_LABELS[request.leaveType] },
+                            { icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547', label: 'DURATION', value: `${days} ${days === 1 ? 'day' : 'days'}` },
+                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', label: 'FROM', value: fmtDate(request.startDate) },
+                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', label: 'TO', value: fmtDate(request.endDate) },
+                        ].map(({ icon, bg, color, label, value }) => (
+                            <div key={label} style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ background: bg, color, padding: 6, borderRadius: 8, display: 'flex' }}>{icon}</div>
+                                <div><span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>{label}</span><strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong></div>
                             </div>
-                            <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>TYPE</span>
-                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{LEAVE_TYPE_LABELS[request.leaveType]}</strong>
-                            </div>
-                        </div>
-
-                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ background: 'rgba(255, 181, 71, 0.1)', color: '#ffb547', padding: 6, borderRadius: 8, display: 'flex' }}>
-                                <Clock size={14} />
-                            </div>
-                            <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>DURATION</span>
-                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{days} {days === 1 ? 'day' : 'days'}</strong>
-                            </div>
-                        </div>
-
-                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ background: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', padding: 6, borderRadius: 8, display: 'flex' }}>
-                                <CalendarDays size={14} />
-                            </div>
-                            <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>FROM</span>
-                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{fmtDate(request.startDate)}</strong>
-                            </div>
-                        </div>
-
-                        <div style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div style={{ background: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', padding: 6, borderRadius: 8, display: 'flex' }}>
-                                <CalendarDays size={14} />
-                            </div>
-                            <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600 }}>TO</span>
-                                <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{fmtDate(request.endDate)}</strong>
-                            </div>
-                        </div>
+                        ))}
                     </div>
-
-                    <div style={{ 
-                        marginTop: 14, 
-                        background: 'rgba(255, 181, 71, 0.04)', 
-                        borderLeft: '3px solid #ffb547', 
-                        borderRadius: '0 8px 8px 0', 
-                        padding: '12px 14px' 
-                    }}>
-                        <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
-                            REASON FOR REQUEST
-                        </span>
-                        <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                            {request.reason}
-                        </p>
+                    <div style={{ marginTop: 14, background: 'rgba(255, 181, 71, 0.04)', borderLeft: '3px solid #ffb547', borderRadius: '0 8px 8px 0', padding: '12px 14px' }}>
+                        <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REASON FOR REQUEST</span>
+                        <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{request.reason}</p>
                     </div>
                 </div>
 
@@ -700,59 +810,13 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
                         {isApprove ? 'Note (Optional)' : 'Reason for declining *'}
                     </label>
-                    <textarea 
-                        rows={3} 
-                        maxLength={300} 
-                        placeholder={isApprove ? 'Add a message for the employee (optional)…' : 'Explain why this request is being declined…'} 
-                        value={note} 
-                        onChange={e => setNote(e.target.value)} 
-                        style={{ 
-                            width: '100%', 
-                            resize: 'vertical', 
-                            borderRadius: 10, 
-                            border: '1px solid #e0e5f2', 
-                            padding: '10px 12px', 
-                            fontSize: 13, 
-                            fontFamily: 'inherit', 
-                            background: 'var(--bg-primary, #fff)', 
-                            color: 'var(--text-primary)',
-                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)',
-                            boxSizing: 'border-box'
-                        }} 
-                    />
+                    <textarea rows={3} maxLength={300} placeholder={isApprove ? 'Add a message for the employee (optional)…' : 'Explain why this request is being declined…'} value={note} onChange={e => setNote(e.target.value)} style={{ width: '100%', resize: 'vertical', borderRadius: 10, border: '1px solid #e0e5f2', padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.01)', boxSizing: 'border-box' }} />
                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right', marginTop: 3 }}>{note.length} / 300</div>
                 </div>
 
                 <div className="modal-actions" style={{ marginTop: 16 }}>
-                    <button 
-                        className="btn" 
-                        onClick={onClose} 
-                        disabled={submitting}
-                        style={{ 
-                            background: '#f4f7fe', 
-                            border: 'none', 
-                            color: 'var(--text-secondary)', 
-                            fontWeight: 600, 
-                            padding: '10px 20px', 
-                            borderRadius: 10 
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button 
-                        className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} 
-                        onClick={handleConfirm} 
-                        disabled={submitting || (!isApprove && !note.trim())}
-                        style={{
-                            fontWeight: 600,
-                            padding: '10px 24px',
-                            borderRadius: 10,
-                            border: 'none',
-                            background: isApprove ? '#05cd99' : '#ee5d50',
-                            color: 'white',
-                            boxShadow: isApprove ? '0 4px 14px rgba(5, 205, 153, 0.25)' : '0 4px 14px rgba(238, 93, 80, 0.25)'
-                        }}
-                    >
+                    <button className="btn" onClick={onClose} disabled={submitting} style={{ background: '#f4f7fe', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}>Cancel</button>
+                    <button className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={submitting || (!isApprove && !note.trim())} style={{ fontWeight: 600, padding: '10px 24px', borderRadius: 10, border: 'none', background: isApprove ? '#05cd99' : '#ee5d50', color: 'white', boxShadow: isApprove ? '0 4px 14px rgba(5, 205, 153, 0.25)' : '0 4px 14px rgba(238, 93, 80, 0.25)' }}>
                         {submitting ? <><Loader2 size={14} className="spin" /> Processing…</> : isApprove ? <><CheckCircle2 size={14} /> Approve Request</> : <><X size={14} /> Decline Request</>}
                     </button>
                 </div>
@@ -799,13 +863,23 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                         <table className="data-table">
                             <thead><tr><th>NAME</th><th>EMPLOYEE NO.</th><th>ROLE</th><th>STATUS</th></tr></thead>
                             <tbody>
-                                {loading ? <tr><td colSpan={4}><div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div></td></tr>
-                                    : recentEmployees.length === 0 ? <tr><td colSpan={4}><div className="empty-state"><Package size={22} /><p>No data available</p></div></td></tr>
+                                {loading
+                                    ? <tr><td colSpan={4}><div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div></td></tr>
+                                    : recentEmployees.length === 0
+                                        ? <tr><td colSpan={4}><div className="empty-state"><Package size={22} /><p>No data available</p></div></td></tr>
                                         : recentEmployees.slice(0, 7).map(emp => {
                                             const name = getEmployeeDisplayName(emp);
                                             return (
                                                 <tr key={emp.employeeNumber} onClick={() => onSelectEmployee(emp)} className="clickable-row">
-                                                    <td><div className="emp-name-cell"><div style={{ position: 'relative', display: 'inline-block' }}><div className="emp-avatar">{name.charAt(0).toUpperCase()}</div><span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} /></div><span className="cell-name">{name}</span></div></td>
+                                                    <td>
+                                                        <div className="emp-name-cell">
+                                                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                                <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
+                                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
+                                                            </div>
+                                                            <span className="cell-name">{name}</span>
+                                                        </div>
+                                                    </td>
                                                     <td className="cell-id">{emp.employeeNumber}</td>
                                                     <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
                                                     <td><span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>{emp.accountStatus ?? 'Active'}</span></td>
@@ -819,28 +893,20 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                 <div className="card activity-card">
                     <div className="card-header"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
                     <div className="activity-feed-list">
-                        {loading ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
-                            : activityLogs.length === 0 ? <div className="empty-state"><ClipboardList size={22} /><p>No recent activity</p></div>
+                        {loading
+                            ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
+                            : activityLogs.length === 0
+                                ? <div className="empty-state"><ClipboardList size={22} /><p>No recent activity</p></div>
                                 : activityLogs.slice(0, 8).map((log, index) => {
-                                    let dotColor = '#4318FF'; // primary
+                                    let dotColor = '#4318FF';
                                     let ringColor = 'rgba(67, 24, 255, 0.15)';
                                     if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
                                     else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
                                     else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
-
                                     return (
                                         <div key={log.activityLogId} className="activity-feed-item" style={{ display: 'flex', gap: 16, marginBottom: 20, position: 'relative' }}>
-                                            {index < Math.min(activityLogs.length, 8) - 1 && (
-                                                <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: '#e2e8f0', zIndex: 0 }} />
-                                            )}
-
-                                            <div style={{
-                                                width: 10, height: 10, borderRadius: '50%',
-                                                background: dotColor,
-                                                boxShadow: `0 0 0 4px ${ringColor}`,
-                                                zIndex: 1, flexShrink: 0, marginTop: 4
-                                            }} />
-
+                                            {index < Math.min(activityLogs.length, 8) - 1 && <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: '#e2e8f0', zIndex: 0 }} />}
+                                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, boxShadow: `0 0 0 4px ${ringColor}`, zIndex: 1, flexShrink: 0, marginTop: 4 }} />
                                             <div className="activity-feed-content" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                 <span className="activity-feed-text" style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 13 }}>{log.description}</span>
                                                 <span className="activity-feed-time" style={{ color: 'var(--text-secondary)', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -867,11 +933,9 @@ interface ManageEmployeesTabProps {
     loading: boolean;
     onSelectEmployee: (emp: RecentEmployee) => void;
     onAddEmployee: () => void;
-    // ── Employee server-side pagination ──
     empPage: number;
     empTotalPages: number;
     onEmpPageChange: (page: number, filters: { search: string; role: string; status: string }) => void;
-    // ── Leave server-side pagination ──
     leaveRequests: LeaveRequest[];
     leaveLoading: boolean;
     leavePage: number;
@@ -894,28 +958,19 @@ function ManageEmployeesTab({
     onLeavePageChange, onLeaveConfirm,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
-
-    // ── Employee filters ──
     const [search, setSearch] = useState('');
     const [filterRole, setFilterRole] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
-
-    // ── Leave filters (server-side) ──
     const [leaveFilterStatus, setLeaveFilterStatus] = useState<'all' | LeaveStatus>('pending');
     const [leaveFilterRole, setLeaveFilterRole] = useState('');
     const [leaveSearch, setLeaveSearch] = useState('');
-
     const [actionModal, setActionModal] = useState<{ request: LeaveRequest; action: 'approve' | 'decline' } | null>(null);
     const [detailModal, setDetailModal] = useState<LeaveRequest | null>(null);
 
-    const adminName = localStorage.getItem('employeeName') ?? 'System Admin';
-
-    // Debounce/Trigger: re-fetch when employee filters change
     useEffect(() => {
         onEmpPageChange(1, { search, role: filterRole, status: filterStatus });
     }, [search, filterRole, filterStatus]);
 
-    // Debounce: re-fetch when leave filters change
     useEffect(() => {
         onLeavePageChange(1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch });
     }, [leaveFilterStatus, leaveFilterRole, leaveSearch]);
@@ -923,7 +978,6 @@ function ManageEmployeesTab({
     return (
         <div className="dashboard-content">
             <div className="card employees-table-card" style={{ minHeight: 520, padding: 0, overflow: 'hidden' }}>
-                {/* ── Subtab Bar ── */}
                 <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 20px' }}>
                     {([
                         { key: 'employees' as EmployeeSubTab, label: 'All Employees', icon: <Users size={14} />, badge: undefined },
@@ -958,8 +1012,10 @@ function ManageEmployeesTab({
                             <table className="data-table">
                                 <thead><tr><th>NAME</th><th>EMPLOYEE NO</th><th>ROLE</th><th>CONTACT</th><th>STATUS</th><th>ACTION</th></tr></thead>
                                 <tbody>
-                                    {loading ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading employees…</p></div></td></tr>
-                                        : employees.length === 0 ? <tr><td colSpan={6}><div className="empty-state"><Package size={20} /><p>No employees match your filters</p></div></td></tr>
+                                    {loading
+                                        ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading employees…</p></div></td></tr>
+                                        : employees.length === 0
+                                            ? <tr><td colSpan={6}><div className="empty-state"><Package size={20} /><p>No employees match your filters</p></div></td></tr>
                                             : employees.map(emp => {
                                                 const name = getEmployeeDisplayName(emp);
                                                 return (
@@ -1010,8 +1066,10 @@ function ManageEmployeesTab({
                             <table className="data-table">
                                 <thead><tr><th>EMPLOYEE</th><th>LEAVE TYPE</th><th>DATES</th><th>DURATION</th><th>SUBMITTED</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
                                 <tbody>
-                                    {leaveLoading ? <tr><td colSpan={7}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
-                                        : leaveRequests.length === 0 ? <tr><td colSpan={7}><div className="empty-state"><Package size={20} /><p>No leave requests match your filters</p></div></td></tr>
+                                    {leaveLoading
+                                        ? <tr><td colSpan={7}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
+                                        : leaveRequests.length === 0
+                                            ? <tr><td colSpan={7}><div className="empty-state"><Package size={20} /><p>No leave requests match your filters</p></div></td></tr>
                                             : leaveRequests.map(r => {
                                                 const days = calcDays(r.startDate, r.endDate);
                                                 const meta = LEAVE_STATUS_META[r.status];
@@ -1029,7 +1087,9 @@ function ManageEmployeesTab({
                                                                     <button className="btn btn-xs" style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }} onClick={() => setActionModal({ request: r, action: 'approve' })}><CheckCircle2 size={11} /> Approve</button>
                                                                     <button className="btn btn-xs btn-danger" onClick={() => setActionModal({ request: r, action: 'decline' })}><X size={11} /> Decline</button>
                                                                 </div>
-                                                            ) : <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>}
+                                                            ) : (
+                                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 );
@@ -1037,7 +1097,6 @@ function ManageEmployeesTab({
                                 </tbody>
                             </table>
                         </div>
-                        {/* ✅ Server-side leave pagination */}
                         {!leaveLoading && leaveTotalPages > 1 && (
                             <div className="pagination-bar">
                                 <span className="pagination-info">Page {leavePage} of {leaveTotalPages}</span>
@@ -1052,138 +1111,74 @@ function ManageEmployeesTab({
                             </div>
                         )}
 
-                        {detailModal && (
-                            <div className="modal-overlay" onClick={() => setDetailModal(null)}>
-                                <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>
-                                    <div className="modal-header" style={{ marginBottom: 20 }}>
-                                        <div>
-                                            <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Leave Request Detail</h3>
-                                            <p className="modal-subtitle" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Full details for this request</p>
-                                        </div>
-                                        <button className="icon-btn" onClick={() => setDetailModal(null)} style={{ borderRadius: '50%', width: 32, height: 32 }}>
-                                            <X size={15} />
-                                        </button>
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                                        <div className="avatar-circle large" style={{ 
-                                            width: 46, 
-                                            height: 46, 
-                                            borderRadius: '50%',
-                                            background: 'linear-gradient(135deg, #4318ff, #868cff)',
-                                            color: 'white',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontWeight: 700,
-                                            fontSize: 16,
-                                            boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)'
-                                        }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
-                                        <div>
-                                            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailModal.employeeName}</h4>
-                                            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                                                {detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: '#4318ff' }}>{toDisplayRole(detailModal.role)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                                        {[
-                                            { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
-                                            { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547' },
-                                            { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
-                                            { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
-                                            { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
-                                            { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? '#05cd99' : detailModal.status === 'declined' ? '#ee5d50' : '#ffb547' }
-                                        ].map(({ label, value, icon, bg, color }) => (
-                                            <div key={label} style={{ background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <div style={{ background: bg, color: color, padding: 6, borderRadius: 8, display: 'flex' }}>
-                                                    {icon}
-                                                </div>
-                                                <div>
-                                                    <span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span>
-                                                    <strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div style={{ 
-                                        background: 'rgba(255, 181, 71, 0.04)', 
-                                        borderLeft: '3px solid #ffb547', 
-                                        borderRadius: '0 8px 8px 0', 
-                                        padding: '12px 14px',
-                                        marginBottom: 16
-                                    }}>
-                                        <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
-                                            REASON FOR REQUEST
-                                        </span>
-                                        <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                                            {detailModal.reason}
-                                        </p>
-                                    </div>
-
-                                    {detailModal.reviewNote && (
-                                        <div style={{ 
-                                            background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', 
-                                            borderLeft: `3px solid ${detailModal.status === 'approved' ? '#05cd99' : '#ee5d50'}`, 
-                                            borderRadius: '0 8px 8px 0', 
-                                            padding: '12px 14px',
-                                            fontSize: 13, 
-                                            color: 'var(--text-primary)', 
-                                            marginBottom: 16 
-                                        }}>
-                                            <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
-                                                REVIEW NOTE
-                                            </span>
-                                            <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>
-                                                {detailModal.reviewNote}
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    <div className="modal-actions" style={{ marginTop: 16 }}>
-                                        {detailModal.status === 'pending' ? (
-                                            <>
-                                                <button 
-                                                    className="btn btn-danger" 
-                                                    onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }}
-                                                    style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}
-                                                >
-                                                    <X size={13} /> Decline
-                                                </button>
-                                                <button 
-                                                    className="btn btn-primary" 
-                                                    onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }}
-                                                    style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}
-                                                >
-                                                    <CheckCircle2 size={13} /> Approve
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <button 
-                                                className="btn" 
-                                                onClick={() => setDetailModal(null)}
-                                                style={{ 
-                                                    background: '#f4f7fe', 
-                                                    border: 'none', 
-                                                    color: 'var(--text-secondary)', 
-                                                    fontWeight: 600, 
-                                                    padding: '10px 24px', 
-                                                    borderRadius: 10 
-                                                }}
-                                            >
-                                                Close
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {actionModal && <LeaveActionModal request={actionModal.request} action={actionModal.action} onClose={() => setActionModal(null)} onConfirm={(id, action, note) => { onLeaveConfirm(id, action, note); setActionModal(null); }} />}
                     </>
                 )}
             </div>
+
+            {/* Leave Detail Modal */}
+            {detailModal && (
+                <div className="modal-overlay" onClick={() => setDetailModal(null)}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>
+                        <div className="modal-header" style={{ marginBottom: 20 }}>
+                            <div>
+                                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Leave Request Detail</h3>
+                                <p className="modal-subtitle" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Full details for this request</p>
+                            </div>
+                            <button className="icon-btn" onClick={() => setDetailModal(null)} style={{ borderRadius: '50%', width: 32, height: 32 }}><X size={15} /></button>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                            <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #4318ff, #868cff)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)' }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
+                            <div>
+                                <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailModal.employeeName}</h4>
+                                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: '#4318ff' }}>{toDisplayRole(detailModal.role)}</span></div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                            {[
+                                { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
+                                { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547' },
+                                { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
+                                { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
+                                { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
+                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? '#05cd99' : detailModal.status === 'declined' ? '#ee5d50' : '#ffb547' },
+                            ].map(({ label, value, icon, bg, color }) => (
+                                <div key={label} style={{ background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ background: bg, color, padding: 6, borderRadius: 8, display: 'flex' }}>{icon}</div>
+                                    <div><span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span><strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong></div>
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ background: 'rgba(255, 181, 71, 0.04)', borderLeft: '3px solid #ffb547', borderRadius: '0 8px 8px 0', padding: '12px 14px', marginBottom: 16 }}>
+                            <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REASON FOR REQUEST</span>
+                            <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{detailModal.reason}</p>
+                        </div>
+                        {detailModal.reviewNote && (
+                            <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', borderLeft: `3px solid ${detailModal.status === 'approved' ? '#05cd99' : '#ee5d50'}`, borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 16 }}>
+                                <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REVIEW NOTE</span>
+                                <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>{detailModal.reviewNote}</p>
+                            </div>
+                        )}
+                        <div className="modal-actions" style={{ marginTop: 16 }}>
+                            {detailModal.status === 'pending' ? (
+                                <>
+                                    <button className="btn btn-danger" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }} style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}><X size={13} /> Decline</button>
+                                    <button className="btn btn-primary" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }} style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}><CheckCircle2 size={13} /> Approve</button>
+                                </>
+                            ) : (
+                                <button className="btn" onClick={() => setDetailModal(null)} style={{ background: '#f4f7fe', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, padding: '10px 24px', borderRadius: 10 }}>Close</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            {actionModal && (
+                <LeaveActionModal
+                    request={actionModal.request}
+                    action={actionModal.action}
+                    onClose={() => setActionModal(null)}
+                    onConfirm={(id, action, note) => { onLeaveConfirm(id, action, note); setActionModal(null); }}
+                />
+            )}
         </div>
     );
 }
@@ -1200,18 +1195,27 @@ function ProfileTab() {
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
     const storedEmail = localStorage.getItem('email') ?? '';
 
-    const [passwordGate, setPasswordGate] = useState(false);
+    // ── Password Gate (now via ConfirmationModal) ──────────────────────────────
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
     const [gateLoading, setGateLoading] = useState(false);
     const [showGatePassword, setShowGatePassword] = useState(false);
-    const [pendingEdit, setPendingEdit] = useState<'profile' | null>(null);
+
     const [editingProfile, setEditingProfile] = useState(false);
-    const [profileForm, setProfileForm] = useState({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail });
+    const [profileForm, setProfileForm] = useState({
+        firstName: storedFirstName,
+        middleName: storedMiddleName,
+        lastName: storedLastName,
+        suffix: storedSuffix,
+        contactNumber: employeeContact,
+        email: storedEmail,
+    });
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
+
     const [editingPassword, setEditingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
     const [pwError, setPwError] = useState('');
@@ -1244,29 +1248,123 @@ function ProfileTab() {
         ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
     };
 
-    const handleGateConfirm = async () => {
-        if (!gatePassword) { setGateError('Please enter your password.'); return; }
-        setGateLoading(true); setGateError('');
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/authentication/verify-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeID: employeeId, password: gatePassword }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password. Please try again.'); }
+    // ── Profile Save → password gate via ConfirmationModal ────────────────────
+    const handleProfileSave = () => {
+        if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
+        if (profileForm.middleName?.trim() && !/^[A-Za-z\s]{1,50}$/.test(profileForm.middleName.trim())) { setProfileError('Middle Name must contain letters only and be up to 50 characters.'); return; }
+        if (!profileForm.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.lastName.trim())) { setProfileError('Last Name must contain letters only and be up to 50 characters.'); return; }
+        const email = profileForm.email.trim();
+        if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) { setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).'); return; }
+        if (!profileForm.contactNumber.trim() || !/^[0-9]{11}$/.test(profileForm.contactNumber.trim())) { setProfileError('Contact Number must be exactly 11 digits.'); return; }
+        setProfileError('');
 
-            if (pendingEdit === 'profile') {
-                const saveRes = await fetch(`/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: employeeId, firstName: profileForm.firstName.trim(), middleName: profileForm.middleName.trim(), lastName: profileForm.lastName.trim(), suffix: profileForm.suffix.trim(), contactNumber: profileForm.contactNumber.trim(), email: profileForm.email.trim() }) });
-                if (!saveRes.ok) { const err = await saveRes.json().catch(() => ({})); throw new Error(err.message || 'Profile update failed.'); }
-                localStorage.setItem('firstName', profileForm.firstName.trim());
-                localStorage.setItem('middleName', profileForm.middleName.trim());
-                localStorage.setItem('lastName', profileForm.lastName.trim());
-                localStorage.setItem('suffix', profileForm.suffix.trim());
-                localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
-                localStorage.setItem('email', profileForm.email.trim());
-                localStorage.setItem('employeeName', buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix));
-                setProfileSuccess(true); setEditingProfile(false);
-            }
-            setPasswordGate(false); setGatePassword('');
-        } catch (err: any) { setGateError(err.message ?? 'Incorrect password. Please try again.'); }
-        finally { setGateLoading(false); }
+        // Open password-gate confirmation modal
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setConfirmModal({
+            isOpen: true,
+            variant: 'success',
+            icon: 'ti-lock',
+            title: 'Confirm your identity',
+            description: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                        Enter your password to save profile changes.
+                    </p>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            id="gate-pw-input"
+                            type={showGatePassword ? 'text' : 'password'}
+                            placeholder="Enter your current password"
+                            style={{ width: '100%', paddingRight: 40, boxSizing: 'border-box' }}
+                            autoFocus
+                            onChange={e => {
+                                setGatePassword(e.target.value);
+                                setGateError('');
+                            }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    const btn = document.getElementById('gate-confirm-btn');
+                                    btn?.click();
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowGatePassword(p => !p)}
+                            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}
+                            tabIndex={-1}
+                        >
+                            {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                    </div>
+                    {gateError && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-danger)' }}>
+                            <AlertCircle size={12} />{gateError}
+                        </div>
+                    )}
+                </div>
+            ),
+            notice: 'For your security, identity verification is required before saving any profile changes.',
+            confirmLabel: 'Verify & save',
+            cancelLabel: 'Cancel',
+            onConfirm: async () => {
+                const pw = (document.getElementById('gate-pw-input') as HTMLInputElement)?.value ?? gatePassword;
+                if (!pw) { setGateError('Please enter your password.'); return; }
+                setGateLoading(true);
+                setGateError('');
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch('/api/authentication/verify-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ employeeID: employeeId, password: pw }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Incorrect password. Please try again.');
+                    }
+                    // Verified — now save
+                    setProfileSaving(true);
+                    const saveRes = await fetch(
+                        `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`,
+                        {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({
+                                employeeNumber: employeeId,
+                                firstName: profileForm.firstName.trim(),
+                                middleName: profileForm.middleName.trim(),
+                                lastName: profileForm.lastName.trim(),
+                                suffix: profileForm.suffix.trim(),
+                                contactNumber: profileForm.contactNumber.trim(),
+                                email: profileForm.email.trim(),
+                            }),
+                        }
+                    );
+                    if (!saveRes.ok) {
+                        const err = await saveRes.json().catch(() => ({}));
+                        throw new Error(err.message || 'Profile update failed.');
+                    }
+                    localStorage.setItem('firstName', profileForm.firstName.trim());
+                    localStorage.setItem('middleName', profileForm.middleName.trim());
+                    localStorage.setItem('lastName', profileForm.lastName.trim());
+                    localStorage.setItem('suffix', profileForm.suffix.trim());
+                    localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
+                    localStorage.setItem('email', profileForm.email.trim());
+                    localStorage.setItem('employeeName', buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix));
+                    setProfileSuccess(true);
+                    setEditingProfile(false);
+                    setConfirmModal(CONFIRM_CLOSED);
+                } catch (err: any) {
+                    setGateError(err.message ?? 'Incorrect password. Please try again.');
+                } finally {
+                    setGateLoading(false);
+                    setProfileSaving(false);
+                }
+            },
+        });
     };
 
     const handleProfileChange = (key: keyof typeof profileForm) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1277,67 +1375,119 @@ function ProfileTab() {
         setProfileSuccess(false);
     };
 
-    const handleProfileSave = () => {
-        if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
-        if (profileForm.middleName?.trim() && !/^[A-Za-z\s]{1,50}$/.test(profileForm.middleName.trim())) { setProfileError('Middle Name must contain letters only and be up to 50 characters.'); return; }
-        if (!profileForm.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.lastName.trim())) { setProfileError('Last Name must contain letters only and be up to 50 characters.'); return; }
-        const email = profileForm.email.trim();
-        if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) { setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).'); return; }
-        if (!profileForm.contactNumber.trim() || !/^[0-9]{11}$/.test(profileForm.contactNumber.trim())) { setProfileError('Contact Number must be exactly 11 digits.'); return; }
-        setProfileError('');
-        setGatePassword(''); setGateError(''); setShowGatePassword(false); setPendingEdit('profile'); setPasswordGate(true);
+    // ── Password Change ────────────────────────────────────────────────────────
+    const handlePwChange = (key: keyof typeof pwForm) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        setPwForm(prev => ({ ...prev, [key]: e.target.value }));
+        setPwError('');
     };
 
-    const handlePwChange = (key: keyof typeof pwForm) => (e: React.ChangeEvent<HTMLInputElement>) => { setPwForm(prev => ({ ...prev, [key]: e.target.value })); setPwError(''); };
-
-    const handlePwSave = async () => {
+    const handlePwSave = () => {
         if (!pwForm.current) { setPwError('Current password is required.'); return; }
         if (pwForm.next.length < 6) { setPwError('New password must be at least 6 characters.'); return; }
         if (pwForm.next !== pwForm.confirm) { setPwError('Passwords do not match.'); return; }
-        setPwSaving(true);
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/systemadmin/change-password', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Password update failed.'); }
-            alert('Password changed successfully!');
-            setEditingPassword(false);
-            setPwForm({ current: '', next: '', confirm: '' });
-        } catch (err: any) { setPwError(err.message ?? 'Something went wrong.'); }
-        finally { setPwSaving(false); }
+
+        setConfirmModal({
+            isOpen: true,
+            variant: 'warning',
+            icon: 'ti-lock',
+            title: 'Change your password?',
+            description: 'You are about to update your login password. You will continue to be logged in after the change.',
+            notice: 'Make sure you remember the new password before confirming.',
+            confirmLabel: 'Update password',
+            onConfirm: async () => {
+                setPwSaving(true);
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch('/api/systemadmin/change-password', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Password update failed.');
+                    }
+                    setEditingPassword(false);
+                    setPwForm({ current: '', next: '', confirm: '' });
+                    setConfirmModal(CONFIRM_CLOSED);
+                    // Show success state via a new modal
+                    setConfirmModal({
+                        isOpen: true,
+                        variant: 'success',
+                        icon: 'ti-check',
+                        title: 'Password updated',
+                        description: 'Your password has been changed successfully. Use your new password the next time you log in.',
+                        confirmLabel: 'Got it',
+                        cancelLabel: '',
+                        onConfirm: () => setConfirmModal(CONFIRM_CLOSED),
+                    });
+                } catch (err: any) {
+                    setPwError(err.message ?? 'Something went wrong.');
+                    setConfirmModal(CONFIRM_CLOSED);
+                } finally {
+                    setPwSaving(false);
+                }
+            },
+        });
     };
 
-    const displayName = buildDisplayName(profileForm.firstName || storedFirstName, profileForm.middleName || storedMiddleName, profileForm.lastName || storedLastName, profileForm.suffix || storedSuffix) || legacyName || 'System Admin';
+    const displayName = buildDisplayName(
+        profileForm.firstName || storedFirstName,
+        profileForm.middleName || storedMiddleName,
+        profileForm.lastName || storedLastName,
+        profileForm.suffix || storedSuffix
+    ) || legacyName || 'System Admin';
     const displayContact = profileForm.contactNumber || employeeContact;
 
     return (
         <div className="dashboard-content">
-            {passwordGate && (
-                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-                        <div className="modal-header"><div><h3>Confirm Your Identity</h3><p className="modal-subtitle">Enter your password to edit your profile.</p></div><button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close"><X size={16} /></button></div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}><div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(67,24,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={22} color="var(--primary)" /></div><p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>For your security, please verify your identity before making changes.</p></div>
-                        {gateError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{gateError}</span></div>}
-                        <div className="field" style={{ marginBottom: 20 }}>
-                            <label>Password</label>
-                            <div style={{ position: 'relative' }}><input type={showGatePassword ? 'text' : 'password'} value={gatePassword} onChange={e => { setGatePassword(e.target.value); setGateError(''); }} onKeyDown={e => e.key === 'Enter' && handleGateConfirm()} placeholder="Enter your current password" style={{ paddingRight: 40, width: '100%' }} autoFocus /><button type="button" onClick={() => setShowGatePassword(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>
-                        </div>
-                        <div className="modal-actions"><button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button><button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>{gateLoading ? <><Loader2 size={13} className="spin" /> Verifying…</> : <><Shield size={13} /> Confirm</>}</button></div>
-                    </div>
-                </div>
-            )}
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
                 <div className="card">
-                    <div className="card-header"><h3>My Profile</h3>{!editingProfile && <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={requestEditProfile}><Pencil size={12} /> Edit Profile</button>}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 16px', gap: 10 }}><div className="avatar-circle large" style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}>{displayName.charAt(0).toUpperCase()}</div><div style={{ textAlign: 'center' }}><h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</h4><span className="status-badge active" style={{ marginTop: 6, display: 'inline-block' }}>Active</span></div></div>
-                    {profileSuccess && <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: '#05cd99', fontWeight: 600 }}><CheckCircle2 size={14} /> Profile updated successfully!</div>}
+                    <div className="card-header">
+                        <h3>My Profile</h3>
+                        {!editingProfile && (
+                            <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={requestEditProfile}>
+                                <Pencil size={12} /> Edit Profile
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 16px', gap: 10 }}>
+                        <div className="avatar-circle large" style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}>{displayName.charAt(0).toUpperCase()}</div>
+                        <div style={{ textAlign: 'center' }}>
+                            <h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</h4>
+                            <span className="status-badge active" style={{ marginTop: 6, display: 'inline-block' }}>Active</span>
+                        </div>
+                    </div>
+                    {profileSuccess && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: '#05cd99', fontWeight: 600 }}>
+                            <CheckCircle2 size={14} /> Profile updated successfully!
+                        </div>
+                    )}
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {profileError && <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>}
-                            <div className="field-row"><div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}</div><div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}</div></div>
-                            <div className="field-row"><div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}</div><div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div></div>
-                            <div className="field-row"><div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}</div><div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. 09170000000" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}</div></div>
-                            <div className="detail-grid" style={{ marginTop: 4 }}><div className="detail-item"><span className="detail-label">Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div><div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">System Admin</span></div></div>
-                            <div className="modal-actions" style={{ padding: '4px 0 0' }}><button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button><button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>{profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}</button></div>
+                            <div className="field-row">
+                                <div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}</div>
+                                <div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}</div>
+                            </div>
+                            <div className="field-row">
+                                <div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}</div>
+                                <div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div>
+                            </div>
+                            <div className="field-row">
+                                <div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}</div>
+                                <div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. 09170000000" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}</div>
+                            </div>
+                            <div className="detail-grid" style={{ marginTop: 4 }}>
+                                <div className="detail-item"><span className="detail-label">Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div>
+                                <div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">System Admin</span></div>
+                            </div>
+                            <div className="modal-actions" style={{ padding: '4px 0 0' }}>
+                                <button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>
+                                    {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="detail-grid" style={{ marginTop: 4 }}>
@@ -1353,7 +1503,14 @@ function ProfileTab() {
                     )}
                 </div>
                 <div className="card">
-                    <div className="card-header"><h3>Security Settings</h3>{!editingPassword && <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={() => setEditingPassword(true)}><Lock size={12} /> Change Password</button>}</div>
+                    <div className="card-header">
+                        <h3>Security Settings</h3>
+                        {!editingPassword && (
+                            <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={() => setEditingPassword(true)}>
+                                <Lock size={12} /> Change Password
+                            </button>
+                        )}
+                    </div>
                     {!editingPassword ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
                             <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-success"><CheckCircle2 size={16} /></div><div className="system-info"><span className="system-name">Password</span><span className="system-detail">Last updated recently</span></div><span style={{ fontSize: 12, fontWeight: 600, color: '#05cd99', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Secure</span></div>
@@ -1368,12 +1525,47 @@ function ProfileTab() {
                             <div className="field"><label>Current Password</label><div style={{ position: 'relative' }}><input type={showCurrent ? 'text' : 'password'} value={pwForm.current} onChange={handlePwChange('current')} placeholder="Enter current password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowCurrent(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
                             <div className="field"><label>New Password</label><div style={{ position: 'relative' }}><input type={showNext ? 'text' : 'password'} value={pwForm.next} onChange={handlePwChange('next')} placeholder="At least 6 characters" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowNext(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showNext ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.next.length > 0 && <div style={{ marginTop: 6 }}><div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3].map(level => <div key={level} style={{ flex: 1, height: 4, borderRadius: 2, background: pwForm.next.length >= level * 4 ? level === 1 ? '#ee5d50' : level === 2 ? '#ffb547' : '#05cd99' : '#e9edf7', transition: 'background 0.2s' }} />)}</div><span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>{pwForm.next.length < 4 ? 'Weak' : pwForm.next.length < 8 ? 'Fair' : 'Strong'}</span></div>}</div>
                             <div className="field"><label>Confirm New Password</label><div style={{ position: 'relative' }}><input type={showConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={handlePwChange('confirm')} placeholder="Re-enter new password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>}{pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Passwords match</span>}</div>
-                            <div className="modal-actions" style={{ padding: '4px 0 0' }}><button className="btn" onClick={() => { setEditingPassword(false); setPwError(''); setPwForm({ current: '', next: '', confirm: '' }); }} disabled={pwSaving}>Cancel</button><button className="btn btn-primary" onClick={handlePwSave} disabled={pwSaving}>{pwSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Update Password</>}</button></div>
+                            <div className="modal-actions" style={{ padding: '4px 0 0' }}>
+                                <button className="btn" onClick={() => { setEditingPassword(false); setPwError(''); setPwForm({ current: '', next: '', confirm: '' }); }} disabled={pwSaving}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handlePwSave} disabled={pwSaving}>
+                                    {pwSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Update Password</>}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
-            <div className="card"><div className="card-header"><h3>Account Overview</h3></div><div className="system-status-list">{[{ icon: Users, bg: 'bg-primary', name: 'Manage Employees', detail: 'Register, edit, and deactivate accounts' }, { icon: Truck, bg: 'bg-warning', name: 'Delivery Oversight', detail: 'View and manage all deliveries' }, { icon: BarChart3, bg: 'bg-success', name: 'Analytics & Reports', detail: 'Access system-wide reports' }].map(({ icon: Icon, bg, name, detail }) => (<div key={name} className="system-status-item"><div className={`system-icon ${bg}`}><Icon size={16} /></div><div className="system-info"><span className="system-name">{name}</span><span className="system-detail">{detail}</span></div><span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Full Access</span></div>))}</div></div>
+            <div className="card">
+                <div className="card-header"><h3>Account Overview</h3></div>
+                <div className="system-status-list">
+                    {[
+                        { icon: Users, bg: 'bg-primary', name: 'Manage Employees', detail: 'Register, edit, and deactivate accounts' },
+                        { icon: Truck, bg: 'bg-warning', name: 'Delivery Oversight', detail: 'View and manage all deliveries' },
+                        { icon: BarChart3, bg: 'bg-success', name: 'Analytics & Reports', detail: 'Access system-wide reports' },
+                    ].map(({ icon: Icon, bg, name, detail }) => (
+                        <div key={name} className="system-status-item">
+                            <div className={`system-icon ${bg}`}><Icon size={16} /></div>
+                            <div className="system-info"><span className="system-name">{name}</span><span className="system-detail">{detail}</span></div>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Full Access</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Profile/Password Confirmation Modal ── */}
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                icon={confirmModal.icon}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                notice={confirmModal.notice}
+                confirmLabel={confirmModal.confirmLabel}
+                cancelLabel={confirmModal.cancelLabel}
+                isLoading={gateLoading || pwSaving}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
         </div>
     );
 }
@@ -1400,34 +1592,90 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
     const [search, setSearch] = useState('');
     const [actionModal, setActionModal] = useState<{ override: EmergencyOverride; action: 'Approved' | 'Rejected' } | null>(null);
     const [overrideUntil, setOverrideUntil] = useState('');
-    const [note, setNote] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [actionError, setActionError] = useState('');
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
 
-    // Re-fetch when filters change
     useEffect(() => {
         onPageChange(1, { status: filterStatus, search });
     }, [filterStatus, search]);
 
     const { pending: pendingCount, approved: approvedCount, rejected: rejectedCount } = overrideCounts;
 
-    const handleAction = async () => {
-        if (!actionModal) return;
-        if (actionModal.action === 'Approved' && !overrideUntil) { setActionError('Please set an override expiry date and time.'); return; }
-        setSubmitting(true); setActionError('');
-        try {
-            const token = localStorage.getItem('authToken');
-            const isApprove = actionModal.action === 'Approved';
-            const endpoint = isApprove ? '/api/emergency_override_controls/approve' : '/api/emergency_override_controls/decline';
-            const body = isApprove
-                ? { emergencyOverrideId: actionModal.override.emergencyOverrideId, status: actionModal.action, overrideUntil: new Date(overrideUntil).toISOString() }
-                : { emergencyOverrideId: actionModal.override.emergencyOverrideId };
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Action failed.'); }
-            onOverrideUpdated(actionModal.override.emergencyOverrideId, actionModal.action, overrideUntil || undefined);
-            setActionModal(null); setOverrideUntil(''); setNote('');
-        } catch (err: any) { setActionError(err.message ?? 'Something went wrong.'); }
-        finally { setSubmitting(false); }
+    // ── Open approve/reject via ConfirmationModal ─────────────────────────────
+    const openAction = (override: EmergencyOverride, action: 'Approved' | 'Rejected') => {
+        setOverrideUntil('');
+        const isApprove = action === 'Approved';
+
+        setConfirmModal({
+            isOpen: true,
+            variant: isApprove ? 'success' : 'danger',
+            icon: isApprove ? 'ti-shield-check' : 'ti-shield-off',
+            title: isApprove ? 'Approve emergency override?' : 'Reject override request?',
+            description: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                        Employee: <strong style={{ color: 'var(--color-text-primary)' }}>{override.employeeName}</strong>
+                        {' '}({override.employeeNumber})
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                        Reason: <em>{override.reason}</em>
+                    </p>
+                    {isApprove && (
+                        <div className="field" style={{ margin: 0 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600 }}>Override access until <span style={{ color: 'var(--color-text-danger)' }}>*</span></label>
+                            <input
+                                id="override-until-input"
+                                type="datetime-local"
+                                min={new Date().toISOString().slice(0, 16)}
+                                onChange={e => setOverrideUntil(e.target.value)}
+                                style={{ marginTop: 4 }}
+                            />
+                            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 4, display: 'block' }}>
+                                Access will automatically expire at this time.
+                            </span>
+                        </div>
+                    )}
+                </div>
+            ),
+            notice: isApprove
+                ? "Approving will temporarily restore the employee's system access until the set expiry."
+                : "Rejecting will deny this override request. The employee will remain on leave.",
+            confirmLabel: isApprove ? 'Approve access' : 'Reject request',
+            onConfirm: async () => {
+                const until = (document.getElementById('override-until-input') as HTMLInputElement)?.value ?? overrideUntil;
+                if (isApprove && !until) {
+                    // Can't close modal here, but we can just return — user must set the date
+                    return;
+                }
+                setSubmitting(true);
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const endpoint = isApprove
+                        ? '/api/emergency_override_controls/approve'
+                        : '/api/emergency_override_controls/decline';
+                    const body = isApprove
+                        ? { emergencyOverrideId: override.emergencyOverrideId, status: action, overrideUntil: new Date(until).toISOString() }
+                        : { emergencyOverrideId: override.emergencyOverrideId };
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(body),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Action failed.');
+                    }
+                    onOverrideUpdated(override.emergencyOverrideId, action, until || undefined);
+                    setConfirmModal(CONFIRM_CLOSED);
+                } catch (err: any) {
+                    // Re-open with error — simplest: just alert for now
+                    alert(err.message ?? 'Something went wrong.');
+                    setConfirmModal(CONFIRM_CLOSED);
+                } finally {
+                    setSubmitting(false);
+                }
+            },
+        });
     };
 
     const statusMeta: Record<OverrideStatus, { label: string; cls: string; icon: React.ReactNode }> = {
@@ -1445,7 +1693,10 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                     { icon: AlertCircle, bg: 'bg-danger', label: 'REJECTED', value: rejectedCount, sub: 'Access denied' },
                     { icon: ShieldAlert, bg: 'bg-primary', label: 'TOTAL', value: overrides.length, sub: 'This page' },
                 ].map(({ icon: Icon, bg, label, value, sub }) => (
-                    <div key={label} className="stat-card"><div className={`stat-icon ${bg}`}><Icon size={18} /></div><div className="stat-text"><p className="stat-label">{label}</p><h3 className="stat-value">{value}</h3><small>{sub}</small></div></div>
+                    <div key={label} className="stat-card">
+                        <div className={`stat-icon ${bg}`}><Icon size={18} /></div>
+                        <div className="stat-text"><p className="stat-label">{label}</p><h3 className="stat-value">{value}</h3><small>{sub}</small></div>
+                    </div>
                 ))}
             </div>
             <div className="card employees-table-card" style={{ minHeight: 520 }}>
@@ -1460,8 +1711,10 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                     <table className="data-table">
                         <thead><tr><th>EMPLOYEE</th><th>REASON</th><th>REQUESTED</th><th>OVERRIDE UNTIL</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
                         <tbody>
-                            {loading ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
-                                : overrides.length === 0 ? <tr><td colSpan={6}><div className="empty-state"><ShieldAlert size={20} /><p>No override requests match your filters</p></div></td></tr>
+                            {loading
+                                ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
+                                : overrides.length === 0
+                                    ? <tr><td colSpan={6}><div className="empty-state"><ShieldAlert size={20} /><p>No override requests match your filters</p></div></td></tr>
                                     : overrides.map(o => {
                                         const meta = statusMeta[o.status];
                                         return (
@@ -1474,10 +1727,12 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                                                 <td>
                                                     {o.status === 'Pending' ? (
                                                         <div style={{ display: 'flex', gap: 6 }}>
-                                                            <button className="btn btn-xs" style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }} onClick={() => { setActionModal({ override: o, action: 'Approved' }); setOverrideUntil(''); setNote(''); setActionError(''); }}><CheckCircle2 size={11} /> Approve</button>
-                                                            <button className="btn btn-xs btn-danger" onClick={() => { setActionModal({ override: o, action: 'Rejected' }); setOverrideUntil(''); setNote(''); setActionError(''); }}><X size={11} /> Reject</button>
+                                                            <button className="btn btn-xs" style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }} onClick={() => openAction(o, 'Approved')}><CheckCircle2 size={11} /> Approve</button>
+                                                            <button className="btn btn-xs btn-danger" onClick={() => openAction(o, 'Rejected')}><X size={11} /> Reject</button>
                                                         </div>
-                                                    ) : <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{o.status === 'Approved' ? 'Access granted' : 'Access denied'}</span>}
+                                                    ) : (
+                                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{o.status === 'Approved' ? 'Access granted' : 'Access denied'}</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -1485,7 +1740,6 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                         </tbody>
                     </table>
                 </div>
-                {/* ✅ Server-side override pagination */}
                 {!loading && overrideTotalPages > 1 && (
                     <div className="pagination-bar">
                         <span className="pagination-info">Page {overridePage} of {overrideTotalPages}</span>
@@ -1500,26 +1754,20 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                     </div>
                 )}
             </div>
-            {actionModal && (
-                <div className="modal-overlay" onClick={() => setActionModal(null)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
-                        <div className="modal-header"><div><h3>{actionModal.action === 'Approved' ? 'Approve Override Request' : 'Reject Override Request'}</h3><p className="modal-subtitle">{actionModal.action === 'Approved' ? 'Set how long the employee can access the system.' : 'Confirm rejection of this emergency override request.'}</p></div><button className="icon-btn" onClick={() => setActionModal(null)}><X size={16} /></button></div>
-                        <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, border: '1px solid var(--border)', fontSize: 13 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ color: 'var(--text-secondary)' }}>Employee</span><strong>{actionModal.override.employeeName}</strong></div>
-                            <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-secondary)' }}>Reason</span><span style={{ maxWidth: 260, textAlign: 'right' }}>{actionModal.override.reason}</span></div>
-                        </div>
-                        {actionModal.action === 'Approved' && <div className="field" style={{ marginBottom: 16 }}><label>Override Access Until</label><input type="datetime-local" value={overrideUntil} onChange={e => { setOverrideUntil(e.target.value); setActionError(''); }} min={new Date().toISOString().slice(0, 16)} /><span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, display: 'block' }}>The employee's access will automatically expire at this time.</span></div>}
-                        {actionError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{actionError}</span></div>}
-                        <div className="modal-actions">
-                            <button className="btn" onClick={() => setActionModal(null)} disabled={submitting}>Cancel</button>
-                            <button className={`btn ${actionModal.action === 'Approved' ? 'btn-primary' : 'btn-danger'}`} onClick={handleAction} disabled={submitting}>
-                                {submitting ? <><Loader2 size={13} className="spin" /> Processing…</> : actionModal.action === 'Approved' ? <><CheckCircle2 size={13} /> Approve Access</> : <><X size={13} /> Reject Request</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+
+            {/* ── Override Confirmation Modal ── */}
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                icon={confirmModal.icon}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                notice={confirmModal.notice}
+                confirmLabel={confirmModal.confirmLabel}
+                isLoading={submitting}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
         </div>
     );
 }
@@ -1541,6 +1789,8 @@ export default function Dashboard() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<RecentEmployee | null>(null);
     const [selectedPanelEmployee, setSelectedPanelEmployee] = useState<RecentEmployee | null>(null);
+    const [logoutConfirm, setLogoutConfirm] = useState(false);
+    const [logoutLoading, setLogoutLoading] = useState(false);
 
     // ── Employees ──
     const [employees, setEmployees] = useState<RecentEmployee[]>([]);
@@ -1569,12 +1819,10 @@ export default function Dashboard() {
     const fetchEmployees = (page: number = 1, filters: { search: string; role: string; status: string } = { search: '', role: '', status: '' }) => {
         const token = localStorage.getItem('authToken');
         setEmpLoading(true);
-
         const params = new URLSearchParams({ PageNumber: String(page), PageSize: String(PAGE_SIZE) });
         if (filters.search) params.append('search', filters.search);
         if (filters.role) params.append('role', toBackendRole(filters.role));
         if (filters.status) params.append('status', filters.status);
-
         fetch(`/api/systemadmin/recent-employees?${params}`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
             .then(result => {
@@ -1591,6 +1839,7 @@ export default function Dashboard() {
                     role: e.role,
                     accountStatus: e.accountStatus ?? 'Unknown',
                     presenceStatus: e.presenceStatus ?? 'Offline',
+                    email: e.email ?? '',
                 })).filter((e: RecentEmployee) => e.accountStatus !== 'Deleted' && e.employeeNumber !== currentEmployeeId);
                 setEmployees(list);
                 setRecentEmployees(list);
@@ -1601,7 +1850,6 @@ export default function Dashboard() {
             .finally(() => setEmpLoading(false));
     };
 
-    // ── Fetch Leave Requests (server-side) ──
     const fetchLeaveRequests = (page: number = 1, filters: LeaveFilters = { status: 'pending', role: '', search: '' }) => {
         const token = localStorage.getItem('authToken');
         setLeaveLoading(true);
@@ -1612,15 +1860,9 @@ export default function Dashboard() {
         fetch(`/api/leaverequest/get-all-leave-requests?${params}`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
             .then((result: any) => {
-                // Handle both array response and paginated envelope
                 const raw: any[] = Array.isArray(result) ? result : (Array.isArray(result.data) ? result.data : []);
                 const list: LeaveRequest[] = raw.map(r => {
-                    const fullName = buildDisplayName(
-                        r.firstName ?? '',
-                        r.middleName ?? '',
-                        r.lastName ?? '',
-                        r.suffix ?? ''
-                    );
+                    const fullName = buildDisplayName(r.firstName ?? '', r.middleName ?? '', r.lastName ?? '', r.suffix ?? '');
                     return {
                         id: r.leaveId,
                         employeeNumber: r.employeeNumber ?? '',
@@ -1639,7 +1881,6 @@ export default function Dashboard() {
                 setLeaveRequests(list);
                 setLeaveTotalPages(result.totalPages ?? 1);
                 setLeavePage(page);
-                // Count pending for badge — re-fetch without filter only on first load
                 if (filters.status === 'pending' && page === 1) {
                     setLeavePendingCount(result.totalCount ?? list.filter(r => r.status === 'pending').length);
                 }
@@ -1648,7 +1889,6 @@ export default function Dashboard() {
             .finally(() => setLeaveLoading(false));
     };
 
-    // ── Fetch Emergency Overrides (server-side) ──
     const fetchOverrides = (page: number = 1, filters: OverrideFilters = { status: 'Pending', search: '' }) => {
         const token = localStorage.getItem('authToken');
         setOverrideLoading(true);
@@ -1673,11 +1913,7 @@ export default function Dashboard() {
                 })));
                 setOverrideTotalPages(result.totalPages ?? 1);
                 setOverridePage(page);
-                setOverrideCounts({
-                    pending: result.totalPending ?? 0,
-                    approved: result.totalApproved ?? 0,
-                    rejected: result.totalRejected ?? 0,
-                });
+                setOverrideCounts({ pending: result.totalPending ?? 0, approved: result.totalApproved ?? 0, rejected: result.totalRejected ?? 0 });
             })
             .catch(() => setOverrides([]))
             .finally(() => setOverrideLoading(false));
@@ -1688,19 +1924,11 @@ export default function Dashboard() {
         fetchLeaveRequests(1, { status: 'pending', role: '', search: '' });
         fetchOverrides(1, { status: 'Pending', search: '' });
         const token = localStorage.getItem('authToken');
-        fetch('/api/activity-logs/recent', {
-            headers: { 'Authorization': `Bearer ${token}` },
-            cache: 'no-store'
-        })
+        fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
             .then(async res => {
                 if (!res.ok) return [];
                 const text = await res.text();
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error('Failed to parse JSON. Response was:', text);
-                    throw e;
-                }
+                try { return JSON.parse(text); } catch (e) { console.error('Failed to parse JSON. Response was:', text); throw e; }
             })
             .then(data => {
                 if (Array.isArray(data)) setActivityLogs(data);
@@ -1711,11 +1939,25 @@ export default function Dashboard() {
             .catch((err) => { console.error('Activity logs fetch error:', err); setActivityLogs([]); });
     }, []);
 
-    const handleLogout = async () => {
-        const token = localStorage.getItem('authToken');
-        if (token) { await fetch('/api/authentication/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } }).catch(() => { }); }
-        ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'firstName', 'middleName', 'lastName', 'suffix', 'contactNumber', 'role'].forEach(k => localStorage.removeItem(k));
-        navigate('/');
+    // ── Logout ────────────────────────────────────────────────────────────────
+    const handleLogout = () => setLogoutConfirm(true);
+
+    const doLogout = async () => {
+        setLogoutLoading(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                await fetch('/api/authentication/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                }).catch(() => { });
+            }
+            ['employeeId', 'refreshToken', 'authToken', 'employeeName', 'firstName', 'middleName', 'lastName', 'suffix', 'contactNumber', 'role'].forEach(k => localStorage.removeItem(k));
+            navigate('/');
+        } finally {
+            setLogoutLoading(false);
+            setLogoutConfirm(false);
+        }
     };
 
     const handleEmployeeUpdated = (updated: RecentEmployee) => {
@@ -1727,32 +1969,28 @@ export default function Dashboard() {
             setRecentEmployees(prev => prev.map(e => e.employeeNumber === updated.employeeNumber ? updated : e));
         }
     };
+
     const handleLeaveConfirm = (id: number, action: 'approve' | 'decline', note: string) => {
         const req = leaveRequests.find(r => r.id === id);
-
         setLeaveRequests(prev => prev.map(r =>
             r.id === id ? { ...r, status: action === 'approve' ? 'approved' : 'declined', reviewedBy: localStorage.getItem('employeeName') ?? 'Admin', reviewNote: note || undefined } : r
         ));
-
         if (req && req.employeeNumber) {
             const nextStatus = action === 'approve' ? 'On Leave' : 'Active';
-            setEmployees(prev => prev.map(e =>
-                e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e
-            ));
-            setRecentEmployees(prev => prev.map(e =>
-                e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e
-            ));
+            setEmployees(prev => prev.map(e => e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e));
+            setRecentEmployees(prev => prev.map(e => e.employeeNumber === req.employeeNumber ? { ...e, accountStatus: nextStatus } : e));
         }
-
         success(`Leave request has been ${action === 'approve' ? 'approved' : 'declined'} successfully.`);
         fetchEmployees(empPage);
     };
+
     const handleOverrideUpdated = (id: string, status: OverrideStatus, until?: string) => {
         setOverrides(prev => prev.map(o => o.emergencyOverrideId === id ? { ...o, status, overrideUntil: until } : o));
+        fetchEmployees(empPage);
     };
 
     const pageTitles: Record<NavTab, string> = {
-        dashboard: 'Dashboard', employees: 'Employees', emergency_override: 'Emergency Override',
+        dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
         delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
         activity_logs: 'Activity Logs', profile: 'My Profile',
     };
@@ -1807,17 +2045,12 @@ export default function Dashboard() {
                         <EmployeeDetailPanel employee={selectedPanelEmployee} onBack={() => setSelectedPanelEmployee(null)} onEmployeeUpdated={updated => { handleEmployeeUpdated(updated); if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null); else setSelectedPanelEmployee(updated); }} />
                     ) : (
                         <ManageEmployeesTab
-                            employees={employees}
-                            loading={empLoading}
+                            employees={employees} loading={empLoading}
                             onSelectEmployee={emp => setSelectedPanelEmployee(emp)}
                             onAddEmployee={() => setShowAddModal(true)}
-                            empPage={empPage}
-                            empTotalPages={empTotalPages}
-                            onEmpPageChange={fetchEmployees}
-                            leaveRequests={leaveRequests}
-                            leaveLoading={leaveLoading}
-                            leavePage={leavePage}
-                            leaveTotalPages={leaveTotalPages}
+                            empPage={empPage} empTotalPages={empTotalPages} onEmpPageChange={fetchEmployees}
+                            leaveRequests={leaveRequests} leaveLoading={leaveLoading}
+                            leavePage={leavePage} leaveTotalPages={leaveTotalPages}
                             leavePendingCount={leavePendingCount}
                             onLeavePageChange={fetchLeaveRequests}
                             onLeaveConfirm={handleLeaveConfirm}
@@ -1832,10 +2065,8 @@ export default function Dashboard() {
 
                 {activeTab === 'emergency_override' && (
                     <EmergencyOverridesTab
-                        overrides={overrides}
-                        loading={overrideLoading}
-                        overridePage={overridePage}
-                        overrideTotalPages={overrideTotalPages}
+                        overrides={overrides} loading={overrideLoading}
+                        overridePage={overridePage} overrideTotalPages={overrideTotalPages}
                         onPageChange={fetchOverrides}
                         onOverrideUpdated={handleOverrideUpdated}
                         overrideCounts={overrideCounts}
@@ -1846,61 +2077,26 @@ export default function Dashboard() {
                     <div className="dashboard-content">
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                             <div className="card-header" style={{ padding: '24px 36px', borderBottom: '1px solid rgba(241, 245, 249, 1)', background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
-                                <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <Activity size={20} color="#4f46e5" /> System Activity Logs
-                                </h3>
+                                <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}><Activity size={20} color="#4f46e5" /> System Activity Logs</h3>
                             </div>
                             {activityLogs.length === 0 ? (
-                                <div className="empty-state" style={{ padding: '60px 20px' }}>
-                                    <Activity size={40} color="#cbd5e1" style={{ marginBottom: '12px' }} />
-                                    <p style={{ fontSize: '15px', color: '#64748b' }}>No activity logs found in the system.</p>
-                                </div>
+                                <div className="empty-state" style={{ padding: '60px 20px' }}><Activity size={40} color="#cbd5e1" style={{ marginBottom: '12px' }} /><p style={{ fontSize: '15px', color: '#64748b' }}>No activity logs found in the system.</p></div>
                             ) : (
                                 <div className="global-timeline" style={{ padding: '24px 36px' }}>
                                     {activityLogs.map((log, index) => {
-                                        let dotColor = '#4318FF'; // primary (blue/purple)
+                                        let dotColor = '#4318FF';
                                         let ringColor = 'rgba(67, 24, 255, 0.15)';
-
-                                        if (log.activityType === 'Login') {
-                                            dotColor = '#05CD99'; // green
-                                            ringColor = 'rgba(5, 205, 153, 0.15)';
-                                        } else if (log.activityType === 'Logout') {
-                                            dotColor = '#FFCE20'; // yellow
-                                            ringColor = 'rgba(255, 206, 32, 0.15)';
-                                        } else if (log.activityType === 'Profile Update') {
-                                            dotColor = '#39B8FF'; // light blue
-                                            ringColor = 'rgba(57, 184, 255, 0.15)';
-                                        }
-
+                                        if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
+                                        else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
+                                        else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
                                         return (
                                             <div key={log.activityLogId} className="global-timeline-item" style={{ display: 'flex', gap: 24, marginBottom: 32, position: 'relative' }}>
-                                                {/* Connecting Line */}
-                                                {index < activityLogs.length - 1 && (
-                                                    <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: '#e2e8f0', zIndex: 0 }} />
-                                                )}
-
-                                                {/* Timeline Dot */}
-                                                <div style={{
-                                                    width: 10, height: 10, borderRadius: '50%',
-                                                    background: dotColor,
-                                                    boxShadow: `0 0 0 6px ${ringColor}`,
-                                                    zIndex: 1, flexShrink: 0, marginTop: 4, marginLeft: 0
-                                                }} />
-
-                                                {/* Content */}
+                                                {index < activityLogs.length - 1 && <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: '#e2e8f0', zIndex: 0 }} />}
+                                                <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, boxShadow: `0 0 0 6px ${ringColor}`, zIndex: 1, flexShrink: 0, marginTop: 4 }} />
                                                 <div className="global-timeline-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>
-                                                        {log.description}
-                                                    </div>
-                                                    <div style={{
-                                                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                                                        background: '#f8fafc', color: '#64748b',
-                                                        padding: '6px 12px', borderRadius: 999,
-                                                        fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
-                                                        border: '1px solid #e2e8f0'
-                                                    }}>
-                                                        <Clock size={13} />
-                                                        {new Date(log.createdAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{log.description}</div>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', color: '#64748b', padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 500, alignSelf: 'flex-start', border: '1px solid #e2e8f0' }}>
+                                                        <Clock size={13} />{new Date(log.createdAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1917,12 +2113,8 @@ export default function Dashboard() {
                 <AddEmployeeModal onClose={() => setShowAddModal(false)} onSuccess={newEmp => {
                     setEmployees(prev => [newEmp, ...prev]);
                     setRecentEmployees(prev => [newEmp, ...prev]);
-                    // [Code Addition] Refetch activity logs dynamically from the backend when a new account is successfully created, keeping the dashboard current without a full page reload.
                     const token = localStorage.getItem('authToken');
-                    fetch('/api/activity-logs/recent', {
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        cache: 'no-store'
-                    })
+                    fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
                         .then(res => { if (!res.ok) return []; return res.json(); })
                         .then(data => {
                             if (Array.isArray(data)) setActivityLogs(data);
@@ -1933,9 +2125,24 @@ export default function Dashboard() {
                         .catch((err) => { console.error('Activity logs fetch error:', err); });
                 }} />
             )}
+
             {selectedEmployee && (
                 <EmployeeDetailModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} onUpdated={handleEmployeeUpdated} />
             )}
+
+            {/* ── Logout Confirmation Modal ── */}
+            <ConfirmationModal
+                isOpen={logoutConfirm}
+                variant="neutral"
+                icon="ti-logout"
+                title="Log out of OTMS?"
+                description="You will be signed out of your current session. Any unsaved changes will be lost."
+                confirmLabel="Log out"
+                cancelLabel="Stay"
+                isLoading={logoutLoading}
+                onConfirm={doLogout}
+                onCancel={() => setLogoutConfirm(false)}
+            />
         </div>
     );
 }
