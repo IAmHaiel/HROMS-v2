@@ -16,6 +16,12 @@ namespace OTMS.Data
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<EmergencyOverrideRequest> EmergencyOverrideRequests { get; set; }
         public DbSet<EmployeeAttachment> EmployeeAttachments { get; set; }
+        
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<JobPosition> JobPositions { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +39,48 @@ namespace OTMS.Data
                 .HasOne(ea => ea.Employee)
                 .WithMany(e => e.Attachments)
                 .HasForeignKey(ea => ea.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Department Relationships
+            modelBuilder.Entity<Department>()
+                .HasMany(d => d.JobPositions)
+                .WithOne(jp => jp.Department)
+                .HasForeignKey(jp => jp.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Department>()
+                .HasMany(d => d.Employees)
+                .WithOne(e => e.Department)
+                .HasForeignKey(e => e.DepartmentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // JobPosition Relationships
+            modelBuilder.Entity<JobPosition>()
+                .HasMany(jp => jp.Employees)
+                .WithOne(e => e.JobPosition)
+                .HasForeignKey(e => e.JobPositionId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Role Relationships
+            modelBuilder.Entity<Account>()
+                .HasOne(a => a.Role)
+                .WithMany(r => r.Accounts)
+                .HasForeignKey(a => a.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Role)
+                .WithMany(r => r.RolePermissions)
+                .HasForeignKey(rp => rp.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<RolePermission>()
+                .HasOne(rp => rp.Permission)
+                .WithMany(p => p.RolePermissions)
+                .HasForeignKey(rp => rp.PermissionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Task Relationships

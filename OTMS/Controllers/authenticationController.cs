@@ -227,7 +227,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "ManagementAccess")]
+        [Authorize]
         [HttpPost("verify-password")]
         public async Task<ActionResult<PasswordVerificationResponseDTO>> VerifyPassword(PasswordVerificationDTO request)
         {

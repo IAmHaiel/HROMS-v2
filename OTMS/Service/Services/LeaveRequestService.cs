@@ -123,7 +123,7 @@ namespace OTMS.Service.Services
 
             if (!string.IsNullOrEmpty(role))
             {
-                query = query.Where(lr => lr.Account != null && lr.Account.Role.ToLower() == role.ToLower());
+                query = query.Where(lr => lr.Account != null && lr.Account.Role != null && lr.Account.Role.Name.ToLower() == role.ToLower());
             }
 
             if (!string.IsNullOrEmpty(search))
@@ -151,7 +151,7 @@ namespace OTMS.Service.Services
                     MiddleName = lr.Account.Employee.MiddleName,
                     LastName = lr.Account.Employee.LastName,
                     Suffix = lr.Account.Employee.Suffix,
-                    Role = lr.Account.Role,
+                    Role = lr.Account.Role != null ? lr.Account.Role.Name : string.Empty,
                     Start_Date = lr.Start_Date,
                     End_Date = lr.End_Date,
                     Leave_Type = lr.Leave_Type,
@@ -298,7 +298,7 @@ namespace OTMS.Service.Services
                 MiddleName = profile.MiddleName,
                 LastName = profile.LastName,
                 Suffix = profile.Suffix,
-                Role = profile.Account.Role,
+                Role = profile.Account.Role?.Name ?? string.Empty,
                 Start_Date = request.StartDate,
                 End_Date = request.EndDate,
                 Leave_Type = request.LeaveType,

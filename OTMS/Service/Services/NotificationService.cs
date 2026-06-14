@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -272,7 +272,8 @@ namespace OTMS.Service.Services
 
             var sysAdmin = await context.Accounts
                 .Include(a => a.Employee)
-                .FirstOrDefaultAsync(a => a.Role == Roles.SystemAdmin);
+                .Include(a => a.Role)
+                .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == Roles.SystemAdmin);
 
             if (sysAdmin == null)
                 throw new Exception("sysAdmin is not existing, cannot proceed.");
@@ -311,7 +312,8 @@ namespace OTMS.Service.Services
         {
             var sysAdmin = await context.Accounts
                .Include(a => a.Employee)
-               .FirstOrDefaultAsync(a => a.Role == Roles.SystemAdmin);
+               .Include(a => a.Role)
+               .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == Roles.SystemAdmin);
 
             if (sysAdmin == null)
                 throw new Exception("sysAdmin is not existing, cannot proceed.");

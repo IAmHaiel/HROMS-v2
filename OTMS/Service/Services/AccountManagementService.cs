@@ -25,6 +25,7 @@ namespace OTMS.Service.Services
         {
             var exist = context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
                 .FirstOrDefault(e => e.EmployeeNumber == request.EmployeeNumber);
 
             if (exist is null || exist.Account is null)
@@ -32,7 +33,7 @@ namespace OTMS.Service.Services
                 return null;
             }
 
-            var systemAdminAccount = exist.Account.Role;
+            var systemAdminAccount = exist.Account.Role?.Name;
 
             if (systemAdminAccount is not null && systemAdminAccount == "SystemAdmin")
             {
@@ -78,6 +79,7 @@ namespace OTMS.Service.Services
 
             var exist = context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
                 .FirstOrDefault(e => e.EmployeeNumber == request.EmployeeNumber);
             
             if (exist is null || exist.Account is null)
@@ -90,7 +92,13 @@ namespace OTMS.Service.Services
                 throw new InvalidOperationException("Cannot modify the role of a this System Admin account.");
             }
 
-            if (exist.Account.Role == request.RoleName)
+            var newRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == request.RoleName);
+            if (newRole == null)
+            {
+                throw new InvalidOperationException("The requested role does not exist.");
+            }
+
+            if (exist.Account.Role?.Name == request.RoleName)
             {
                 throw new InvalidOperationException("The account already has the specified role.");
             }
@@ -98,7 +106,7 @@ namespace OTMS.Service.Services
             await context.Accounts
                 .Where(e => e.EmployeeId == exist.EmployeeId)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(e => e.Role, request.RoleName)
+                    .SetProperty(e => e.RoleId, newRole.RoleId)
                     .SetProperty(e => e.UpdatedAt, DateTime.UtcNow));
 
             return new AssignUserRoleResponseDTO
@@ -115,6 +123,7 @@ namespace OTMS.Service.Services
             // Get the employee by employee number
             var exist = await context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
                 .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeNumber);
 
             // Check if the employee exists
@@ -124,7 +133,7 @@ namespace OTMS.Service.Services
             }
 
             // Prevent deactivation of System Admin accounts
-            var systemAdminAccount = exist.Account.Role;
+            var systemAdminAccount = exist.Account.Role?.Name;
             
             if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
@@ -166,6 +175,7 @@ namespace OTMS.Service.Services
             // Get the employee by employee number
             var exist = await context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
                 .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeNumber);
 
             // Check if the employee exists
@@ -175,7 +185,7 @@ namespace OTMS.Service.Services
             }
 
             // Check if the account belongs to a System Admin and prevent deletion if it does
-            var systemAdminAccount = exist.Account.Role;
+            var systemAdminAccount = exist.Account.Role?.Name;
 
             if (string.IsNullOrEmpty(systemAdminAccount) || systemAdminAccount == Common.Constraints.Roles.SystemAdmin)
             {
@@ -236,7 +246,7 @@ namespace OTMS.Service.Services
                     Suffix = e.Suffix,
                     
                     ContactNumber = e.ContactNumber,
-                    Role = e.Account?.Role ?? "No Account",
+                    Role = e.Account?.Role?.Name ?? "No Account",
                     AccountStatus = e.Account?.AccountStatus ?? "No Account",
                     PresenceStatus = presenceStatus,
                     Success = true,
@@ -282,7 +292,7 @@ namespace OTMS.Service.Services
 
             if (!string.IsNullOrEmpty(role))
             {
-                query = query.Where(e => e.Account != null && e.Account.Role == role);
+                query = query.Where(e => e.Account != null && e.Account.Role != null && e.Account.Role.Name == role);
             }
 
             if (!string.IsNullOrEmpty(search))
@@ -371,7 +381,7 @@ namespace OTMS.Service.Services
                     e.LastName.Contains(searchFiltered) ||
                     e.Suffix.Contains(searchFiltered) ||
                     e.EmployeeNumber.Contains(searchFiltered) ||
-                    e.Account.Role.Contains(searchFiltered)
+                    (e.Account.Role != null && e.Account.Role.Name.Contains(searchFiltered))
                     );
 
             if (employee is null || employee.Account is null)
@@ -397,7 +407,7 @@ namespace OTMS.Service.Services
                 MiddleName = employee.MiddleName,
                 LastName = employee.LastName,
                 Suffix = employee.Suffix,
-                Role = employee.Account.Role,
+                Role = employee.Account.Role?.Name ?? string.Empty,
                 AccountStatus = employee.Account.AccountStatus,
                 PresenceStatus = presenceStatus,
                 Success = true,

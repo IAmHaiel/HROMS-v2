@@ -1,11 +1,12 @@
-﻿namespace OTMS.Entities.Models
+namespace OTMS.Entities.Models
 {
     public class Account
     {
         public Guid AccountId { get; set; }
         public Guid EmployeeId { get; set; }
 
-        public string Role { get; set; } = string.Empty;
+        public Guid RoleId { get; set; }
+        public Role Role { get; set; } = null!;
         public string PasswordHash { get; set; } = string.Empty;
         public string AccountStatus { get; set; } = "Active";
         public int FailedLoginAttempts { get; set; }

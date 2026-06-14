@@ -41,7 +41,7 @@ namespace OTMS.Controllers
         /// <response code="401">User is not authorized.</response>
         /// <response code="403">User is not the "Admin".</response>
         /// <response code="500">Unexpected server error.</response>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpGet("admin-only")]
         [ProducesResponseType(200)]
         [ProducesResponseType(401)]
@@ -60,7 +60,7 @@ namespace OTMS.Controllers
         /// <response code="401">User is not authorized.</response>
         /// <response code="403">User is not the "SystemAdmin".</response>
         /// <response code="500">Unexpected server error.</response>
-        [Authorize(Policy = "SystemAdminAccess")]
+        [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]
         [HttpPost("systemadmin/register")]
         [ProducesResponseType(typeof(EmployeeRegisterDTO), 200)]
         [ProducesResponseType(401)]

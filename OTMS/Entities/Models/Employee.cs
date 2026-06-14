@@ -23,6 +23,12 @@ namespace OTMS.Entities.Models
         public DateTime? EmailVerificationTokenExpiry { get; set; }
 
         // Navigation properties
+        public Guid? DepartmentId { get; set; }
+        public Department? Department { get; set; }
+
+        public Guid? JobPositionId { get; set; }
+        public JobPosition? JobPosition { get; set; }
+
         public Account? Account { get; set; }
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
         public ICollection<EmployeeAttachment> Attachments { get; set; } = new List<EmployeeAttachment>();

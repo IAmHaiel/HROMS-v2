@@ -13,7 +13,7 @@ namespace OTMS.Controllers
         /// <summary>   
         /// Get the presence status of an employee based on their recent activity logs. The presence status is determined by the last activity timestamp, indicating whether the employee is currently online or offline. System Admins can only access this endpoint.
         /// </summary>
-        [Authorize(Policy = "SystemAdminAccess")]
+        [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]
         [HttpGet("presence/{employeeId}")]
         public async Task<ActionResult<PresenceResponseDTO>> GetPresence(Guid employeeId)
         {
@@ -30,7 +30,7 @@ namespace OTMS.Controllers
         /// <summary>   
         /// Get the online activity (Online|Offline) of an Account, it can be accessed under Operational Team.
         /// </summary>
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize]
         [HttpGet("online-activity/{employeeId}")]
         public async Task<ActionResult<string>> GetEmployeeOnlineActivity(Guid employeeId)
         {
@@ -47,7 +47,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Get recent activity logs for System Admins.
         /// </summary>
-        [Authorize(Policy = "SystemAdminAccess")]
+        [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]
         [HttpGet("recent")]
         public async Task<IActionResult> GetRecentActivityLogs()
         {
@@ -64,7 +64,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Get activity logs for a specific employee.
         /// </summary>
-        [Authorize(Policy = "SystemAdminAccess")]
+        [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]
         [HttpGet("employee/{employeeNumber}")]
         public async Task<IActionResult> GetEmployeeActivityLogs(string employeeNumber)
         {
