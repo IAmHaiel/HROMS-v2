@@ -35,6 +35,9 @@ namespace OTMS.Service.Services
 
             var employee = await context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
                 .FirstOrDefaultAsync(
                     u => u.EmployeeNumber == request.EmployeeNumber
                 );
@@ -97,7 +100,7 @@ namespace OTMS.Service.Services
             // If the Password is incorrect, return null to indicate failed login
             if (verificationResult == PasswordVerificationResult.Failed)
             {
-                if (employee.Account.Role != "SystemAdmin")
+                if (employee.Account.Role.Name != "SystemAdmin")
                 {
                     employee.Account.FailedLoginAttempts++;
 
@@ -219,11 +222,15 @@ namespace OTMS.Service.Services
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1)
             };
 
+            var targetRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == request.Role.Trim());
+            if (targetRole == null) throw new InvalidOperationException($"Role {request.Role} does not exist.");
+
             var account = new Account
             {
                 AccountId = Guid.NewGuid(),
                 EmployeeId = employee.EmployeeId,
-                Role = request.Role.Trim(),
+                RoleId = targetRole.RoleId,
+                Role = targetRole,
                 AccountStatus = "Pending Verification",
                 CreatedAt = DateTime.UtcNow,
                 IsPasswordChanged = false
@@ -254,7 +261,7 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 currentUserId != Guid.Empty ? currentUserId : account.AccountId,
                 ActivityTypes.AccountCreated,
-                $"Account for {employee.EmployeeNumber} ({account.Role}) has been created."
+                $"Account for {employee.EmployeeNumber} ({account.Role?.Name}) has been created."
             );
 
             var verificationLink =
@@ -284,7 +291,7 @@ namespace OTMS.Service.Services
             return new EmployeeRegisterResponseDTO
             {
                 EmployeeNumber = employee.EmployeeNumber,
-                Role = account.Role ?? string.Empty,
+                Role = account.Role?.Name ?? string.Empty,
                 GeneratedPassword = generatedUserPassword
             };
         }
@@ -406,7 +413,7 @@ namespace OTMS.Service.Services
                 AccessToken = CreateToken(employee),
                 EmployeeNumber = employee.EmployeeNumber,
                 RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
-                Role = employee.Account.Role ?? string.Empty,
+                Role = employee.Account.Role?.Name ?? string.Empty,
                 FirstName = employee.FirstName ?? string.Empty,
                 MiddleName = employee.MiddleName ?? null,
                 LastName = employee.LastName ?? string.Empty,
@@ -471,9 +478,21 @@ namespace OTMS.Service.Services
                 ),
                 new Claim(
                     ClaimTypes.Role,
-                    (employee.Account.Role ?? string.Empty).Replace(" ", "")
+                    (employee.Account.Role?.Name ?? string.Empty).Replace(" ", "")
                 )
             };
+
+            // Add dynamic permission claims
+            if (employee.Account.Role != null && employee.Account.Role.RolePermissions != null)
+            {
+                foreach (var rp in employee.Account.Role.RolePermissions)
+                {
+                    if (rp.Permission != null)
+                    {
+                        claims.Add(new Claim("Permission", rp.Permission.Name));
+                    }
+                }
+            }
 
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(
@@ -511,6 +530,9 @@ namespace OTMS.Service.Services
         {
             var user = await context.Employees
                 .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
                 .FirstOrDefaultAsync(e => e.Account != null && e.Account.AccountId == userId);
 
             if (user is null || user.Account is null)

@@ -33,7 +33,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Gets all Emergency Override Requests. Only accessible to users with the "SystemAdmin" role.
         /// </summary>
-        [Authorize(Policy = "HigherRankAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpGet("all-requests")]
         public async Task<IActionResult> GetEmergencyOverrideRequests([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination, [FromQuery] string? status, [FromQuery] string? search)
         {
@@ -117,7 +117,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "HigherRankAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpPost("approve")]
         public async Task<IActionResult> ApproveEmergencyOverride(ApproveEmergencyOverrideDTO request)
         {
@@ -135,7 +135,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Declines an Emergency Override Request. Only accessible to users with the "HigherRankAccess" policy.
         /// </summary>
-        [Authorize(Policy = "HigherRankAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpPost("decline")]
         public async Task<IActionResult> DeclineEmergencyOverride(DeclineEmergencyOverrideDTO request)
         {
@@ -150,7 +150,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpPut("{emergencyOverrideId}/update")]
         public async Task<IActionResult> UpdateEmergencyOverrideRequest (UpdateEmergencyOverrideDTO request)
         {
@@ -170,7 +170,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpDelete("{emergencyOverrideId}/delete")]
         public async Task<IActionResult> DeleteEmergencyOverrideRequest([FromBody] Guid EmergencyOverrideId)
         {

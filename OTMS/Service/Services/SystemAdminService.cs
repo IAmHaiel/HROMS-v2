@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NETCore.MailKit.Core;
 using OTMS.Common.Constraints;
@@ -15,7 +15,8 @@ namespace OTMS.Service.Services
         public async System.Threading.Tasks.Task CheckSystemAdminExistence()
         {
             var exist = await context.Accounts
-                .FirstOrDefaultAsync(a => a.Role == Roles.SystemAdmin);
+                .Include(a => a.Role)
+                .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == "SystemAdmin");
 
             if (exist != null)
                 throw new Exception("System Admin is already created.");
@@ -64,11 +65,18 @@ namespace OTMS.Service.Services
                 EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1)
             };
 
+            var systemAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SystemAdmin");
+
+            if (systemAdminRole == null)
+            {
+                throw new InvalidOperationException("SystemAdmin role is not seeded in the database.");
+            }
+
             var account = new Account
             {
                 AccountId = Guid.NewGuid(),
                 EmployeeId = employee.EmployeeId,
-                Role = Roles.SystemAdmin,
+                RoleId = systemAdminRole.RoleId,
                 AccountStatus = "Pending Verification",
                 CreatedAt = DateTime.UtcNow,
                 IsPasswordChanged = false

@@ -18,7 +18,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// The system shall allow Operational Team members to submit a formal time-off request by specifying the start date, end date, and reason.
         /// </summary>
-        [Authorize(Policy = "ManagementAccess")]
+        [Authorize]
         [HttpPost("create-leave-request")]
         public async Task<IActionResult> CreateLeaveRequest([FromBody] CreateLeaveRequestDTO request)
         {
@@ -36,7 +36,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// The system shall allow Operational Team members to view their own leave requests.
         /// </summary>
-        [Authorize(Policy = "ManagementAccess")]
+        [Authorize]
         [HttpPost("my-leave-requests")]
         public async Task<IActionResult> GetMyLeaveRequests(PaginationDTO pagination)
         {
@@ -51,7 +51,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Gets a list of all leave requests in the system. This endpoint is restricted to users with the "OperationAdmin" role, ensuring that only authorized personnel can access this sensitive information.
         /// </summary>
-        [Authorize(Policy = "HigherRankAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpGet("get-all-leave-requests")]
         public async Task<IActionResult> GetAllLeaveRequests([FromQuery] PaginationDTO request, [FromQuery] string? status, [FromQuery] string? role, [FromQuery] string? search)
         {
@@ -62,7 +62,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Update Leave Status of the leave request. This endpoint is restricted to users with the "OperationAdmin" role, ensuring that only authorized personnel can update the status of leave requests.
         /// </summary>
-        [Authorize(Policy = "HigherRankAccess")]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [HttpPut("{leaveId}/status")]
         public async Task<IActionResult> UpdateLeaveStatus(Guid leaveId, [FromBody] UpdateLeaveStatusDTO request)
         {
@@ -74,7 +74,7 @@ namespace OTMS.Controllers
             return Ok("Leave Request status updated successfully.");
         }
 
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpPut("{leaveId}/update")]
         public async Task<IActionResult> UpdateLeaveRequest(UpdateLeaveRequestDTO request)
         {
@@ -94,7 +94,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpDelete("{leaveId}/delete")]
         public async Task<IActionResult> DeleteLeaveRequest([FromBody] Guid leaveId)
         {

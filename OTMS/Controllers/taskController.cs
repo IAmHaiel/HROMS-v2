@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +21,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Creates a new task and assigns it to an employee. Only OperationsAdmin users can create tasks.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPost("create-task")]
         public async Task<ActionResult<TaskResponseDTO>> CreateTask(
             CreateTaskDTO request)
@@ -44,7 +44,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Updates an existing task's details. Only authenticated users can update tasks, and only if they have the "OperationsAdmin" role.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPut("update-task/{taskId}")]
         public async Task<ActionResult<TaskResponseDTO>> UpdateTask(Guid taskId, UpdateTaskDTO request)
         {
@@ -68,7 +68,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Reopens a completed or closed task, changing its status back to "Pending". Only authenticated users with the "OperationsAdmin" role can reopen tasks.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPatch("{taskId}/reopen")]
         public async Task<ActionResult<TaskResponseDTO>> ReopenTask(Guid taskId)
         {
@@ -90,7 +90,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Updates the progress of a task, allowing the assigned employee to change the task's status and add remarks. Only authenticated users with the "OperationsAdmin", "Encoder", or "Coordinator" roles can update task progress, and they can only update tasks that are assigned to them.
         /// </summary>
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpPatch("{taskId}/progress")]
         public async Task<ActionResult<TaskResponseDTO>> UpdateTaskProgress(Guid taskId, UpdateTaskProgressDTO request)
         {
@@ -119,7 +119,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Gets a list of tasks that are assigned to the currently authenticated user. Only authenticated users with the "OperationsAdmin", "Encoder", or "Coordinator" roles can access this endpoint, and they will only see tasks that are assigned to them.
         /// </summary>
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("my-tasks")]
         public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks(PaginationDTO request)
         {
@@ -148,7 +148,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Gets all tasks. Only accessible to OperationAdmin.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpGet("all-tasks")]
         public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
         {
@@ -209,7 +209,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Deletes a task by its ID. Only authenticated users with the "OperationsAdmin" role can delete tasks. The endpoint will return a success message if the task is deleted, or a not found message if the task does not exist. If an error occurs during deletion, it will return a bad request with the error message.
         /// </summary>
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpDelete("{taskId}/delete-task")]
         public async Task<IActionResult> DeleteTask(Guid taskId)
         {
@@ -231,7 +231,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPost("{taskId}/restore-task")]
         public async Task<IActionResult> RestoreTask(Guid taskId)
         {
@@ -251,7 +251,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationalTeamAccess")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("bin-records/{employeeId}")]
         public async Task<IActionResult> BinRecords(string employeeId, PaginationDTO pagination)
         {
@@ -271,7 +271,7 @@ namespace OTMS.Controllers
             }
         }
 
-        [Authorize(Policy = "OperationAdminAccess")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpDelete("empty-bin/{employeeId}")]
         public async Task<IActionResult> EmptyBin(string employeeId)
         {
