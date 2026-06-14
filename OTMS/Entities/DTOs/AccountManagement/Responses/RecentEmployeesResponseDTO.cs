@@ -15,6 +15,7 @@ namespace OTMS.Entities.DTOs.AccountManagement.Responses
         public string PresenceStatus { get; set; } = "Offline";
         public string Email { get; set; } = string.Empty;
         public PaginationDTO Pagination { get; set; } = new PaginationDTO();
+        public List<EmployeeAttachmentDTO>? Attachments { get; set; }
 
     }
 }

@@ -87,9 +87,9 @@ namespace OTMS.Controllers
             var result = await accountManagementService.SearchUser(employeeNumber);
             if(result is null)
             {
-                return NotFound(new { Message = "Employee not found." });
+                return NotFound(new ApiResponseDTO<object> { IsSuccess = false, Message = "Employee not found.", Data = null });
             }
-            return Ok(result);
+            return Ok(new ApiResponseDTO<SearchUserResponseDTO> { IsSuccess = true, Message = "Employee found successfully.", Data = result });
         }
 
         /// <summary>
@@ -177,13 +177,13 @@ namespace OTMS.Controllers
         [Authorize(Policy = "SystemAdminAccess")]
         [ProducesResponseType(typeof(UpdateEmployeeResponseDTO), 200)]
         [HttpPut("update-user")]
-        public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, UpdateEmployeeDTO request)
+        public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, [FromForm] UpdateEmployeeDTO request)
         {
 
             try
             {
                 var result = await accountManagementService.UpdateEmployee(employeeNumber, request);
-                return Ok(result);
+                return Ok(new ApiResponseDTO<UpdateEmployeeResponseDTO> { IsSuccess = true, Message = "Employee updated successfully.", Data = result });
             }
             catch(Exception ex)
             {

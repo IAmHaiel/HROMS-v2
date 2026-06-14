@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.DTOs.AccountManagement
+namespace OTMS.Entities.DTOs.AccountManagement
 {
     public class UpdateEmployeeDTO
     {
@@ -9,5 +9,6 @@
         public string? Suffix { get; set; } = String.Empty;
         public string ContactNumber { get; set; } = String.Empty;
         public string Email {  get; set; } = String.Empty;
+        public List<Microsoft.AspNetCore.Http.IFormFile>? Attachments { get; set; }
     }
 }
