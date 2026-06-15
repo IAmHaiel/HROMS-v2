@@ -12,6 +12,7 @@ namespace OTMS.Entities.Models
         public string? Suffix { get; set; } = string.Empty;
 
         public string ContactNumber { get; set; } = string.Empty;
+        public string EmploymentStatus { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

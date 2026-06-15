@@ -212,6 +212,9 @@ namespace OTMS.Service.Services
 
                 Email = request.Email.Trim(),
                 IsEmailVerified = false,
+                DepartmentId = request.DepartmentId,
+                JobPositionId = request.JobPositionId,
+                EmploymentStatus = request.EmploymentStatus,
 
                 // Based on OWASP "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/09-Testing_for_Weak_Password_Change_or_Reset_Functionalities"
                 /*
