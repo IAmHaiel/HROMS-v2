@@ -7,7 +7,7 @@ namespace OTMS.Entities.DTOs.Task
         public string? TaskCategory { get; set; }
         public string Priority { get; set; } = "Normal";
         public DateTime? DueAt { get; set; }
-        public Guid AssignedTo { get; set; }
+        public Guid? AssignedTo { get; set; }
         public string? TaskRemarks { get; set; }
     }
 }

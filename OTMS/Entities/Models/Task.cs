@@ -1,12 +1,14 @@
+using System;
+using System.Collections.Generic;
+
 namespace OTMS.Entities.Models
 {
     public class Task
     {
-
         public Guid TaskId { get; set; }
 
         public Guid CreatedBy { get; set; }
-        public Guid AssignedTo { get; set; }
+        public Guid? AssignedTo { get; set; }
         public Guid? EvaluatedBy { get; set; }
 
         public string TaskTitle { get; set; } = string.Empty;
@@ -18,7 +20,7 @@ namespace OTMS.Entities.Models
         public bool PermanentlyDeleted { get; set; } = false;
 
         public string? TaskRemarks { get; set; }
-        public string TaskStatus { get; set; } = "Pending";
+        public string TaskStatus { get; set; } = "Draft";
 
         public string? ProgressNotes { get; set; }
         public string? ProgressEvidenceUrl { get; set; }
@@ -28,10 +30,12 @@ namespace OTMS.Entities.Models
 
         // Navigation properties
         public Account Creator { get; set; } = null!;
-        public Account Assignee { get; set; } = null!;
+        public Account? Assignee { get; set; }
         public Account? Evaluator { get; set; }
 
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
-
+        public ICollection<TaskReopenRequest> ReopenRequests { get; set; } = new List<TaskReopenRequest>();
+        public ICollection<TaskStatusRecord> StatusRecords { get; set; } = new List<TaskStatusRecord>();
+        public ICollection<AdminOverrideRecord> OverrideRecords { get; set; } = new List<AdminOverrideRecord>();
     }
 }
