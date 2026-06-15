@@ -35,6 +35,7 @@ import {
     Activity,
     FileText,
     Mail,
+    Download,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './SystemAdmin_Dashboard.css';
@@ -142,6 +143,23 @@ interface EmergencyOverride {
     requestedAt: string;
     approvedAt?: string;
     overrideUntil?: string;
+}
+
+interface EmploymentContract {
+    employeeAttachmentId: string;
+    fileName: string;
+    fileUrl: string;
+    contentType: string;
+    fileSize: number;
+    version: number;
+    documentType: string;
+    isArchived: boolean;
+    uploadedAt: string;
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    departmentName?: string;
+    jobPositionTitle?: string;
 }
 
 // ─── ConfirmModal state shape ─────────────────────────────────────────────────
@@ -259,6 +277,15 @@ const fmtDate = (d: string): string => {
 
 const calcDays = (start: string, end: string): number =>
     Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1;
+
+const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = 2;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
 
 const LEAVE_TYPE_LABELS: Record<LeaveType, string> = {
     vacation: 'Vacation',
@@ -1132,7 +1159,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
 
 // ─── Manage Employees Tab ─────────────────────────────────────────────────────
 
-type EmployeeSubTab = 'employees' | 'leave';
+type EmployeeSubTab = 'employees' | 'leave' | 'documents';
 
 interface ManageEmployeesTabProps {
     employees: RecentEmployee[];
@@ -1153,6 +1180,11 @@ interface ManageEmployeesTabProps {
     onDeleteEmployee: (emp: RecentEmployee) => void;
     onViewEmployee: (emp: RecentEmployee) => void;
     onOpenDigital201: (emp: RecentEmployee) => void;
+    contracts: EmploymentContract[];
+    contractsLoading: boolean;
+    contractsPage: number;
+    contractsTotalPages: number;
+    onContractsPageChange: (page: number, filters: { search: string; isArchived: boolean }) => void;
 }
 
 export interface LeaveFilters {
@@ -1167,6 +1199,7 @@ function ManageEmployeesTab({
     leaveRequests, leaveLoading, leavePage, leaveTotalPages, leavePendingCount,
     onLeavePageChange, onLeaveConfirm,
     onEditEmployee, onDeleteEmployee, onViewEmployee, onOpenDigital201,
+    contracts, contractsLoading, contractsPage, contractsTotalPages, onContractsPageChange,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
     const [search, setSearch] = useState('');
@@ -1175,6 +1208,9 @@ function ManageEmployeesTab({
     const [leaveFilterStatus, setLeaveFilterStatus] = useState<'all' | LeaveStatus>('pending');
     const [leaveFilterRole, setLeaveFilterRole] = useState('');
     const [leaveSearch, setLeaveSearch] = useState('');
+    const [docSearch, setDocSearch] = useState('');
+    const [docShowArchived, setDocShowArchived] = useState(false);
+    const [filterDocType, setFilterDocType] = useState('');
     const [actionModal, setActionModal] = useState<{ request: LeaveRequest; action: 'approve' | 'decline' } | null>(null);
     const [detailModal, setDetailModal] = useState<LeaveRequest | null>(null);
 
@@ -1186,61 +1222,121 @@ function ManageEmployeesTab({
         onLeavePageChange(1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch });
     }, [leaveFilterStatus, leaveFilterRole, leaveSearch]);
 
+    useEffect(() => {
+        onContractsPageChange(1, { search: docSearch, isArchived: docShowArchived });
+    }, [docSearch, docShowArchived]);
+
+    const filteredContracts = contracts.filter(doc => {
+        if (!filterDocType) return true;
+        if (filterDocType === 'Other') {
+            return doc.documentType !== 'Employment Contract' && doc.documentType !== 'NDA' && doc.documentType !== 'Job Description';
+        }
+        return doc.documentType === filterDocType;
+    });
+
     return (
         <div className="dashboard-content">
             <TableCard
                 tabs={[
                     { key: 'employees', label: 'All Employees', icon: <Users size={14} /> },
                     { key: 'leave', label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: leavePendingCount },
+                    { key: 'documents', label: 'Employee Documents', icon: <FileText size={14} /> },
                 ]}
                 activeTab={subTab}
                 onTabChange={key => setSubTab(key as EmployeeSubTab)}
-                searchQuery={subTab === 'employees' ? search : leaveSearch}
-                setSearchQuery={subTab === 'employees' ? setSearch : setLeaveSearch}
-                searchPlaceholder="Search by name or ID…"
-                totalResults={subTab === 'employees' ? employees.length : leaveRequests.length}
-                filterElements={subTab === 'employees' ? (
-                    <>
-                        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-                            <option value="">All Roles</option>
-                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                            <option value="">All Statuses</option>
-                            <option value="Active">Active</option>
-                            <option value="Deactivated">Deactivated</option>
-                        </select>
-                    </>
-                ) : (
-                    <>
-                        <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}>
-                            <option value="pending">Pending</option>
-                            <option value="all">All Statuses</option>
-                            <option value="approved">Approved</option>
-                            <option value="declined">Declined</option>
-                        </select>
-                        <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
-                            <option value="">All Roles</option>
-                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                    </>
-                )}
+                searchQuery={
+                    subTab === 'employees' ? search :
+                        subTab === 'leave' ? leaveSearch : docSearch
+                }
+                setSearchQuery={
+                    subTab === 'employees' ? setSearch :
+                        subTab === 'leave' ? setLeaveSearch : setDocSearch
+                }
+                searchPlaceholder={
+                    subTab === 'employees' ? "Search by name or ID…" :
+                        subTab === 'leave' ? "Search leave requests…" : "Search documents or employees…"
+                }
+                totalResults={
+                    subTab === 'employees' ? employees.length :
+                        subTab === 'leave' ? leaveRequests.length : filteredContracts.length
+                }
+                filterElements={
+                    subTab === 'employees' ? (
+                        <>
+                            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+                                <option value="">All Roles</option>
+                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                                <option value="">All Statuses</option>
+                                <option value="Active">Active</option>
+                                <option value="Deactivated">Deactivated</option>
+                            </select>
+                        </>
+                    ) : subTab === 'leave' ? (
+                        <>
+                            <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}>
+                                <option value="pending">Pending</option>
+                                <option value="all">All Statuses</option>
+                                <option value="approved">Approved</option>
+                                <option value="declined">Declined</option>
+                            </select>
+                            <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
+                                <option value="">All Roles</option>
+                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                        </>
+                    ) : (
+                        <>
+                            <select value={filterDocType} onChange={e => setFilterDocType(e.target.value)}>
+                                <option value="">All Document Types</option>
+                                <option value="Employment Contract">Employment Contract</option>
+                                <option value="NDA">NDA</option>
+                                <option value="Job Description">Job Description</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', marginLeft: 'auto' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={docShowArchived}
+                                    onChange={(e) => setDocShowArchived(e.target.checked)}
+                                    style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                />
+                                Show Archived Documents
+                            </label>
+                        </>
+                    )
+                }
                 actionButton={subTab === 'employees' ? {
                     label: 'Add Employee',
                     icon: <Users size={14} />,
                     onClick: onAddEmployee
                 } : undefined}
-                headers={subTab === 'employees'
-                    ? ['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']
-                    : ['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']
+                headers={
+                    subTab === 'employees' ? ['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION'] :
+                        subTab === 'leave' ? ['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS'] :
+                            ['EMPLOYEE', 'DOCUMENT TYPE', 'FILE NAME', 'SIZE', 'VERSION', 'UPLOADED AT', 'ACTIONS']
                 }
-                loading={subTab === 'employees' ? loading : leaveLoading}
-                emptyMessage={subTab === 'employees' ? 'No employees match your filters' : 'No leave requests match your filters'}
-                currentPage={subTab === 'employees' ? empPage : leavePage}
-                totalPages={subTab === 'employees' ? empTotalPages : leaveTotalPages}
-                onPageChange={subTab === 'employees'
-                    ? (page) => onEmpPageChange(page, { search, role: filterRole, status: filterStatus })
-                    : (page) => onLeavePageChange(page, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })
+                loading={
+                    subTab === 'employees' ? loading :
+                        subTab === 'leave' ? leaveLoading : contractsLoading
+                }
+                emptyMessage={
+                    subTab === 'employees' ? 'No employees match your filters' :
+                        subTab === 'leave' ? 'No leave requests match your filters' : 'No documents match your filters'
+                }
+                currentPage={
+                    subTab === 'employees' ? empPage :
+                        subTab === 'leave' ? leavePage : contractsPage
+                }
+                totalPages={
+                    subTab === 'employees' ? empTotalPages :
+                        subTab === 'leave' ? leaveTotalPages : contractsTotalPages
+                }
+                onPageChange={
+                    subTab === 'employees' ? (page) => onEmpPageChange(page, { search, role: filterRole, status: filterStatus }) :
+                        subTab === 'leave' ? (page) => onLeavePageChange(page, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch }) :
+                            (page) => onContractsPageChange(page, { search: docSearch, isArchived: docShowArchived })
                 }
             >
                 {subTab === 'employees' ? (
@@ -1283,7 +1379,7 @@ function ManageEmployeesTab({
                             </tr>
                         );
                     })
-                ) : (
+                ) : subTab === 'leave' ? (
                     leaveRequests.map(r => {
                         const days = calcDays(r.startDate, r.endDate);
                         const meta = LEAVE_STATUS_META[r.status];
@@ -1321,6 +1417,68 @@ function ManageEmployeesTab({
                                     ) : (
                                         <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>
                                     )}
+                                </td>
+                            </tr>
+                        );
+                    })
+                ) : (
+                    filteredContracts.map(doc => {
+                        const empName = buildDisplayName(doc.firstName, '', doc.lastName, '');
+                        return (
+                            <tr key={doc.employeeAttachmentId} className="clickable-row">
+                                <td>
+                                    <div className="emp-name-cell">
+                                        <div className="emp-avatar">{empName.charAt(0).toUpperCase()}</div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{empName}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{doc.employeeNumber}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style={{ fontSize: 13 }}>{doc.documentType}</td>
+                                <td style={{ fontSize: 13 }} title={doc.fileName}>
+                                    <div style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {doc.fileName}
+                                    </div>
+                                </td>
+                                <td style={{ fontSize: 13 }}>{formatBytes(doc.fileSize)}</td>
+                                <td>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(67,24,255,0.08)', color: '#4318ff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>v{doc.version}</span>
+                                </td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                    {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td onClick={e => e.stopPropagation()}>
+                                    <ActionsDropdown
+                                        actions={[
+                                            {
+                                                label: 'Download File',
+                                                icon: <Download size={12} />,
+                                                onClick: () => window.open(doc.fileUrl, '_blank')
+                                            },
+                                            {
+                                                label: 'View Digital 201',
+                                                icon: <Eye size={12} />,
+                                                onClick: () => {
+                                                    const matchedEmp = employees.find(e => e.employeeNumber === doc.employeeNumber);
+                                                    if (matchedEmp) {
+                                                        onViewEmployee(matchedEmp);
+                                                        onOpenDigital201(matchedEmp);
+                                                    } else {
+                                                        onOpenDigital201({
+                                                            employeeNumber: doc.employeeNumber,
+                                                            employeeName: empName,
+                                                            firstName: doc.firstName,
+                                                            lastName: doc.lastName,
+                                                            contactNumber: '',
+                                                            role: doc.jobPositionTitle || '',
+                                                            accountStatus: 'Active'
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                        ]}
+                                    />
                                 </td>
                             </tr>
                         );
@@ -2081,6 +2239,12 @@ export default function Dashboard() {
     // ── Activity Logs ──
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
+    // ── Employment Contracts / Documents ──
+    const [contracts, setContracts] = useState<EmploymentContract[]>([]);
+    const [contractsLoading, setContractsLoading] = useState(true);
+    const [contractsPage, setContractsPage] = useState(1);
+    const [contractsTotalPages, setContractsTotalPages] = useState(1);
+
     const fetchEmployees = (page: number = 1, filters: { search: string; role: string; status: string } = { search: '', role: '', status: '' }) => {
         const token = localStorage.getItem('authToken');
         setEmpLoading(true);
@@ -2189,10 +2353,40 @@ export default function Dashboard() {
             .finally(() => setOverrideLoading(false));
     };
 
+    const fetchContracts = (page: number = 1, filters: { search: string; isArchived?: boolean } = { search: '', isArchived: false }) => {
+        const token = localStorage.getItem('authToken');
+        setContractsLoading(true);
+        const params = new URLSearchParams({ PageNumber: String(page), PageSize: String(PAGE_SIZE) });
+        if (filters.search) params.append('search', filters.search);
+        if (filters.isArchived !== undefined) params.append('isArchived', String(filters.isArchived));
+
+        fetch(`/api/systemadmin/contracts?${params}`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
+            .then((result: any) => {
+                if (result.isSuccess && result.data) {
+                    const raw: any[] = Array.isArray(result.data.data) ? result.data.data : [];
+                    setContracts(raw);
+                    setContractsTotalPages(result.data.totalPages ?? 1);
+                    setContractsPage(page);
+                } else {
+                    setContracts([]);
+                    setContractsTotalPages(1);
+                    setContractsPage(1);
+                }
+            })
+            .catch(() => {
+                setContracts([]);
+                setContractsTotalPages(1);
+                setContractsPage(1);
+            })
+            .finally(() => setContractsLoading(false));
+    };
+
     useEffect(() => {
         fetchEmployees(1);
         fetchLeaveRequests(1, { status: 'pending', role: '', search: '' });
         fetchOverrides(1, { status: 'Pending', search: '' });
+        fetchContracts(1, { search: '', isArchived: false });
         const token = localStorage.getItem('authToken');
 
         // Fetch profile to sync name/contact info to localStorage
@@ -2340,15 +2534,15 @@ export default function Dashboard() {
 
                 {activeTab === 'employees' && (
                     selectedPanelEmployee ? (
-                        <EmployeeDetailPanel 
-                            employee={selectedPanelEmployee} 
+                        <EmployeeDetailPanel
+                            employee={selectedPanelEmployee}
                             initialSection={detailPanelInitialSection}
-                            onBack={() => setSelectedPanelEmployee(null)} 
-                            onEmployeeUpdated={updated => { 
-                                handleEmployeeUpdated(updated); 
-                                if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null); 
-                                else setSelectedPanelEmployee(updated); 
-                            }} 
+                            onBack={() => setSelectedPanelEmployee(null)}
+                            onEmployeeUpdated={updated => {
+                                handleEmployeeUpdated(updated);
+                                if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null);
+                                else setSelectedPanelEmployee(updated);
+                            }}
                         />
                     ) : (
                         <ManageEmployeesTab
@@ -2365,6 +2559,11 @@ export default function Dashboard() {
                             onDeleteEmployee={emp => setDeleteConfirmEmp(emp)}
                             onViewEmployee={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('overview'); }}
                             onOpenDigital201={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('digital_201'); }}
+                            contracts={contracts}
+                            contractsLoading={contractsLoading}
+                            contractsPage={contractsPage}
+                            contractsTotalPages={contractsTotalPages}
+                            onContractsPageChange={fetchContracts}
                         />
                     )
                 )}
