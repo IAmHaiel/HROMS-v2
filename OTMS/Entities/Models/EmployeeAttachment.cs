@@ -14,6 +14,11 @@ namespace OTMS.Entities.Models
         public string DocumentType { get; set; } = string.Empty; // e.g., Resume, Contract, Government, Certificate, Performance, Disciplinary
         public bool IsArchived { get; set; } = false;
 
+        public string DocumentTitle { get; set; } = string.Empty;
+        public DateTime IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public string? Remarks { get; set; }
+
         public DateTime UploadedAt { get; set; }
 
         // Navigation property
