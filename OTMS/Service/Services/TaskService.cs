@@ -13,7 +13,7 @@ using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
 {
-    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService) : ITaskService
+    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService, IFileService fileService) : ITaskService
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
@@ -253,7 +253,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<TaskResponseDTO> ReopenTaskAsync(Guid taskId)
+        public async Task<TaskResponseDTO> RequestReopenTaskAsync(Guid taskId, RequestReopenDTO request)
         {
             var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(accountIdClaim))
@@ -280,34 +280,61 @@ namespace OTMS.Service.Services
                 throw new Exception("Only completed tasks can be reopened.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.Reason))
+            {
+                throw new Exception("Reopening reason is required.");
+            }
+
             bool canManageTasks = permissions.Contains("Permissions.Tasks.Manage");
             bool canViewTasks = permissions.Contains("Permissions.Tasks.View");
 
             if (!canManageTasks && !canViewTasks)
             {
-                throw new UnauthorizedAccessException("You are not authorized to reopen tasks.");
+                throw new UnauthorizedAccessException("You are not authorized to request task reopening.");
             }
 
             if (!canManageTasks && canViewTasks)
             {
                 if (task.AssignedTo != loggedInAccountId)
                 {
-                    throw new UnauthorizedAccessException("You can only reopen tasks assigned to you.");
+                    throw new UnauthorizedAccessException("You can only request reopening of tasks assigned to you.");
                 }
             }
 
-            // Reopen Task
-            task.TaskStatus = "In Progress";
+            string? evidenceUrl = null;
+            if (request.SupportingEvidence != null)
+            {
+                evidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
+            }
 
-            task.UpdatedAt = DateTime.UtcNow;
+            var reopenRequest = new TaskReopenRequest
+            {
+                RequestId = Guid.NewGuid(),
+                TaskId = taskId,
+                RequestedById = loggedInAccountId,
+                Reason = request.Reason,
+                EvidenceUrl = evidenceUrl,
+                Status = "Pending",
+                CreatedAt = DateTime.UtcNow
+            };
 
+            await context.TaskReopenRequests.AddAsync(reopenRequest);
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(
-                            task.CreatedBy,
-                            ActivityTypes.ReopenedTask,
-                            $"{string.Join(" ", new[]
-                                {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} reopened the Task '{task.TaskTitle}' at {DateTime.Now:hh:mm tt}");
+                loggedInAccountId,
+                "Task Reopen Requested",
+                $"Reopen requested for Task '{task.TaskTitle}'. Reason: {request.Reason}");
+
+            // Notify Operations Admin
+            var admins = await context.Accounts
+                .Where(a => a.Role != null && a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.Manage"))
+                .ToListAsync();
+
+            foreach (var admin in admins)
+            {
+                await notificationService.CreateGeneralNotificationAsync(admin.AccountId, "Task Reopen Request", $"A reopen request was submitted for Task '{task.TaskTitle}'.");
+            }
 
             return new TaskResponseDTO
             {
@@ -317,15 +344,87 @@ namespace OTMS.Service.Services
                 Priority = task.Priority,
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
-
-                AssignedEmployee = string.Join(" ", new[]
-                                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-
-                CreatedByEmployee = string.Join(" ", new[]
-                                    {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-
+                AssignedEmployee = string.Join(" ", new[] { task.Assignee.Employee.FirstName, task.Assignee.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { task.Creator.Employee.FirstName, task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
+            };
+        }
+
+        public async Task<TaskResponseDTO> ReviewReopenRequestAsync(Guid requestId, ReviewReopenDTO request)
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
+
+            if (!permissions.Contains("Permissions.Tasks.Manage"))
+            {
+                throw new UnauthorizedAccessException("Only Operations Admin can review reopen requests.");
+            }
+
+            var reopenReq = await context.TaskReopenRequests
+                .Include(r => r.Task)
+                    .ThenInclude(t => t.Assignee)
+                        .ThenInclude(a => a.Employee)
+                .Include(r => r.Task)
+                    .ThenInclude(t => t.Creator)
+                        .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(r => r.RequestId == requestId);
+
+            if (reopenReq == null)
+            {
+                throw new Exception("Reopen request not found.");
+            }
+
+            if (reopenReq.Status != "Pending")
+            {
+                throw new Exception($"Request has already been {reopenReq.Status.ToLower()}.");
+            }
+
+            if (request.ApprovalDecision != "Approve" && request.ApprovalDecision != "Reject")
+            {
+                throw new Exception("Decision must be either 'Approve' or 'Reject'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.AdminRemarks))
+            {
+                throw new Exception("Admin remarks are required.");
+            }
+
+            reopenReq.Status = request.ApprovalDecision;
+            reopenReq.AdminRemarks = request.AdminRemarks;
+
+            if (request.ApprovalDecision == "Approve")
+            {
+                reopenReq.Task.TaskStatus = "In Progress";
+                reopenReq.Task.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                loggedInAccountId,
+                "Task Reopen Reviewed",
+                $"Reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed. Remarks: {request.AdminRemarks}");
+
+            await notificationService.CreateGeneralNotificationAsync(reopenReq.RequestedById, "Task Reopen Decision", $"Your reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed.");
+
+            return new TaskResponseDTO
+            {
+                TaskId = reopenReq.Task.TaskId,
+                TaskTitle = reopenReq.Task.TaskTitle,
+                TaskDescription = reopenReq.Task.TaskDescription,
+                Priority = reopenReq.Task.Priority,
+                DueAt = reopenReq.Task.DueAt,
+                TaskStatus = reopenReq.Task.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[] { reopenReq.Task.Assignee.Employee.FirstName, reopenReq.Task.Assignee.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { reopenReq.Task.Creator.Employee.FirstName, reopenReq.Task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = reopenReq.Task.CreatedAt,
+                IsDeleted = reopenReq.Task.Deleted
             };
         }
 
@@ -381,12 +480,16 @@ namespace OTMS.Service.Services
             }
 
             // Validate Status
-            var validStatuses = new[]
-            {"Pending", "In Progress", "Completed"};
+            var validStatuses = new[] { "Pending", "In Progress", "Done", "Completed" };
 
             if (!validStatuses.Contains(request.TaskStatus))
             {
                 throw new Exception("Invalid task status.");
+            }
+
+            if (request.TaskStatus == "Completed")
+            {
+                throw new Exception("Users are not allowed to mark tasks as Completed.");
             }
 
             // Update Progress
@@ -395,6 +498,16 @@ namespace OTMS.Service.Services
             if (!string.IsNullOrWhiteSpace(request.TaskRemarks))
             {
                 task.TaskRemarks = request.TaskRemarks;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ProgressNotes))
+            {
+                task.ProgressNotes = request.ProgressNotes;
+            }
+
+            if (request.SupportingEvidence != null)
+            {
+                task.ProgressEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
             task.UpdatedAt = DateTime.UtcNow;
@@ -765,6 +878,106 @@ namespace OTMS.Service.Services
                     PageSize = pagination.PageSize,
                     TotalRecords = totalRecords,
                     TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> SearchTasksAsync(TaskSearchDTO request)
+        {
+            var query = context.Tasks
+                .Include(t => t.Assignee).ThenInclude(a => a.Employee)
+                .Include(t => t.Creator).ThenInclude(c => c.Employee)
+                .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(request.TaskTitle))
+            {
+                query = query.Where(t => t.TaskTitle.Contains(request.TaskTitle));
+            }
+
+            if (request.AssignedEmployee.HasValue)
+            {
+                query = query.Where(t => t.AssignedTo == request.AssignedEmployee.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.TaskStatus))
+            {
+                query = query.Where(t => t.TaskStatus == request.TaskStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.PriorityLevel))
+            {
+                query = query.Where(t => t.Priority == request.PriorityLevel);
+            }
+
+            if (request.DeadlineDate.HasValue)
+            {
+                query = query.Where(t => t.DueAt.HasValue && t.DueAt.Value.Date == request.DeadlineDate.Value.Date);
+            }
+
+            bool isDescending = string.Equals(request.SortOrder, "Descending", StringComparison.OrdinalIgnoreCase);
+
+            switch (request.SortBy?.ToLower())
+            {
+                case "task title":
+                    query = isDescending ? query.OrderByDescending(t => t.TaskTitle) : query.OrderBy(t => t.TaskTitle);
+                    break;
+                case "deadline":
+                    query = isDescending ? query.OrderByDescending(t => t.DueAt) : query.OrderBy(t => t.DueAt);
+                    break;
+                case "priority level":
+                    query = isDescending ? query.OrderByDescending(t => t.Priority) : query.OrderBy(t => t.Priority);
+                    break;
+                case "status":
+                    query = isDescending ? query.OrderByDescending(t => t.TaskStatus) : query.OrderBy(t => t.TaskStatus);
+                    break;
+                case "assigned employee":
+                    query = isDescending ? query.OrderByDescending(t => t.Assignee.Employee.FirstName) : query.OrderBy(t => t.Assignee.Employee.FirstName);
+                    break;
+                default:
+                    query = query.OrderByDescending(t => t.CreatedAt);
+                    break;
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .Select(t => new TaskResponseDTO
+                {
+                    TaskId = t.TaskId,
+                    TaskTitle = t.TaskTitle,
+                    TaskDescription = t.TaskDescription,
+                    Priority = t.Priority,
+                    DueAt = t.DueAt,
+                    TaskStatus = t.TaskStatus,
+                    AssignedEmployee = string.Join(" ", new[] { t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
+                    CreatedByEmployee = string.Join(" ", new[] { t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
+                    CreatedAt = t.CreatedAt
+                }).ToListAsync();
+
+            if (!data.Any())
+            {
+                return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
+                {
+                    IsSuccess = false,
+                    Message = "No matching task records found.",
+                    Data = null
+                };
+            }
+
+            return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Matching records displayed.",
+                Data = new PaginationResponseDTO<TaskResponseDTO>
+                {
+                    Data = data,
+                    PageNumber = request.PageNumber,
+                    PageSize = request.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
                 }
             };
         }

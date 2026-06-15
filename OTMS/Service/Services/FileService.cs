@@ -59,6 +59,34 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<string> UploadFileAsync(IFormFile file, string subfolder)
+        {
+            if (file == null || file.Length == 0)
+                throw new ArgumentException("File is empty.");
+
+            long maxSize = 20L * 1024 * 1024; // 20 MB as requested by tasks
+            if (file.Length > maxSize)
+                throw new ArgumentException($"File size must be less than 20MB. Current size is {file.Length / (1024 * 1024.0):F2}MB.");
+
+            var uploadsFolder = Path.Combine(environment.WebRootPath, "uploads", subfolder);
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            var uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var request = httpContextAccessor.HttpContext?.Request;
+            var baseUrl = $"{request?.Scheme}://{request?.Host}";
+            return $"{baseUrl}/uploads/{subfolder}/{uniqueFileName}";
+        }
+
         public void DeleteFile(string fileUrl)
         {
             if (string.IsNullOrEmpty(fileUrl)) return;

@@ -66,15 +66,37 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
-        /// Reopens a completed or closed task, changing its status back to "In Progress". Employees can reopen their own completed tasks, and OperationAdmins can reopen any completed task.
+        /// Requests reopening of a completed task.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.View")]
-        [HttpPatch("{taskId}/reopen")]
-        public async Task<ActionResult<TaskResponseDTO>> ReopenTask(Guid taskId)
+        [HttpPost("{taskId}/reopen-request")]
+        public async Task<ActionResult<TaskResponseDTO>> RequestReopenTask(Guid taskId, [FromForm] RequestReopenDTO request)
         {
             try
             {
-                var result = await taskService.ReopenTaskAsync(taskId);
+                var result = await taskService.RequestReopenTaskAsync(taskId, request);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Reviews a task reopen request (Approve/Reject).
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpPatch("reopen-requests/{requestId}/review")]
+        public async Task<ActionResult<TaskResponseDTO>> ReviewReopenRequest(Guid requestId, ReviewReopenDTO request)
+        {
+            try
+            {
+                var result = await taskService.ReviewReopenRequestAsync(requestId, request);
 
                 return Ok(result);
             }
@@ -92,7 +114,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpPatch("{taskId}/progress")]
-        public async Task<ActionResult<TaskResponseDTO>> UpdateTaskProgress(Guid taskId, UpdateTaskProgressDTO request)
+        public async Task<ActionResult<TaskResponseDTO>> UpdateTaskProgress(Guid taskId, [FromForm] UpdateTaskProgressDTO request)
         {
             try
             {
@@ -194,6 +216,35 @@ namespace OTMS.Controllers
                 });
 
 
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
+
+        /// <summary>
+        /// Searches, filters, and sorts tasks dynamically.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpGet("search")]
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> SearchTasks([FromQuery] TaskSearchDTO request)
+        {
+            try
+            {
+                var result = await taskService.SearchTasksAsync(request);
+
+                if (result.IsSuccess)
+                {
+                    return Ok(result.Data);
+                }
+                
+                return BadRequest(new { message = result.Message });
             }
             catch (Exception ex)
             {

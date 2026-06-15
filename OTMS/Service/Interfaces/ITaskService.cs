@@ -10,7 +10,9 @@ namespace OTMS.Service.Interfaces
     {
         Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request);
         Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request);
-        Task<TaskResponseDTO> ReopenTaskAsync(Guid taskId);
+        Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> SearchTasksAsync(TaskSearchDTO request);
+        Task<TaskResponseDTO> RequestReopenTaskAsync(Guid taskId, RequestReopenDTO request);
+        Task<TaskResponseDTO> ReviewReopenRequestAsync(Guid requestId, ReviewReopenDTO request);
         Task<TaskResponseDTO> UpdateTaskProgressAsync(Guid taskId, UpdateTaskProgressDTO request);
         Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request);
         Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId);
