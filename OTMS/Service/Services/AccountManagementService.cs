@@ -671,5 +671,71 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>> GetAllEmploymentContracts(PaginationDTO request, string? search, bool? isArchived)
+        {
+            var query = context.EmployeeAttachments
+                .Include(ea => ea.Employee)
+                    .ThenInclude(e => e.Department)
+                .Include(ea => ea.Employee)
+                    .ThenInclude(e => e.JobPosition)
+                .Where(ea => ea.DocumentType == "Employment Contracts" || ea.DocumentType == "Contract" || ea.DocumentType.Contains("Contract"));
+
+            if (isArchived.HasValue)
+            {
+                query = query.Where(ea => ea.IsArchived == isArchived.Value);
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(ea => ea.FileName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.FirstName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.LastName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.EmployeeNumber.ToLower().Contains(lowerSearch));
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            var records = await query
+                .OrderByDescending(ea => ea.UploadedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var data = records.Select(ea => new EmploymentContractResponseDTO
+            {
+                EmployeeAttachmentId = ea.EmployeeAttachmentId,
+                FileName = ea.FileName,
+                FileUrl = ea.FilePath,
+                ContentType = ea.ContentType,
+                FileSize = ea.FileSize,
+                Version = ea.Version,
+                DocumentType = ea.DocumentType,
+                IsArchived = ea.IsArchived,
+                UploadedAt = ea.UploadedAt,
+                EmployeeNumber = ea.Employee.EmployeeNumber,
+                FirstName = ea.Employee.FirstName,
+                LastName = ea.Employee.LastName,
+                DepartmentName = ea.Employee.Department?.Name,
+                JobPositionTitle = ea.Employee.JobPosition?.Title
+            }).ToList();
+
+            return new ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Employment contracts retrieved successfully.",
+                Data = new PaginationResponseDTO<EmploymentContractResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Employment contracts retrieved successfully.",
+                    Data = data,
+                    PageNumber = request.PageNumber,
+                    PageSize = request.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+                }
+            };
+        }
+
     }
 }
