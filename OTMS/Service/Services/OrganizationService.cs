@@ -10,12 +10,21 @@ namespace OTMS.Service.Services
     {
         public async Task<List<DepartmentResponseDTO>> GetAllDepartmentsAsync()
         {
-            var depts = await context.Departments.ToListAsync();
+            var depts = await context.Departments
+                .Include(d => d.HeadEmployee)
+                .Include(d => d.Employees)
+                .ToListAsync();
             return depts.Select(d => new DepartmentResponseDTO
             {
                 DepartmentId = d.DepartmentId,
                 Name = d.Name,
-                Description = d.Description
+                Description = d.Description,
+                Code = d.Code,
+                IsActive = d.IsActive,
+                EffectiveDate = d.EffectiveDate,
+                HeadEmployeeId = d.HeadEmployeeId,
+                HeadEmployeeName = d.HeadEmployee != null ? $"{d.HeadEmployee.FirstName} {d.HeadEmployee.LastName}".Trim() : null,
+                EmployeeCount = d.Employees.Count
             }).ToList();
         }
 
@@ -28,23 +37,41 @@ namespace OTMS.Service.Services
             {
                 DepartmentId = Guid.NewGuid(),
                 Name = request.Name,
-                Description = request.Description
+                Description = request.Description,
+                Code = request.Code,
+                IsActive = request.IsActive,
+                EffectiveDate = request.EffectiveDate,
+                HeadEmployeeId = request.HeadEmployeeId
             };
 
             context.Departments.Add(dept);
             await context.SaveChangesAsync();
 
+            if (dept.HeadEmployeeId.HasValue)
+            {
+                await context.Entry(dept).Reference(d => d.HeadEmployee).LoadAsync();
+            }
+
             return new DepartmentResponseDTO
             {
                 DepartmentId = dept.DepartmentId,
                 Name = dept.Name,
-                Description = dept.Description
+                Description = dept.Description,
+                Code = dept.Code,
+                IsActive = dept.IsActive,
+                EffectiveDate = dept.EffectiveDate,
+                HeadEmployeeId = dept.HeadEmployeeId,
+                HeadEmployeeName = dept.HeadEmployee != null ? $"{dept.HeadEmployee.FirstName} {dept.HeadEmployee.LastName}".Trim() : null,
+                EmployeeCount = 0
             };
         }
 
         public async Task<DepartmentResponseDTO> UpdateDepartmentAsync(Guid id, CreateDepartmentDTO request)
         {
-            var dept = await context.Departments.FindAsync(id);
+            var dept = await context.Departments
+                .Include(d => d.HeadEmployee)
+                .Include(d => d.Employees)
+                .FirstOrDefaultAsync(d => d.DepartmentId == id);
             if (dept == null) throw new KeyNotFoundException("Department not found.");
 
             if (dept.Name != request.Name && await context.Departments.AnyAsync(d => d.Name == request.Name))
@@ -52,14 +79,29 @@ namespace OTMS.Service.Services
 
             dept.Name = request.Name;
             dept.Description = request.Description;
+            dept.Code = request.Code;
+            dept.IsActive = request.IsActive;
+            dept.EffectiveDate = request.EffectiveDate;
+            dept.HeadEmployeeId = request.HeadEmployeeId;
 
             await context.SaveChangesAsync();
+
+            if (dept.HeadEmployeeId.HasValue && dept.HeadEmployee == null)
+            {
+                await context.Entry(dept).Reference(d => d.HeadEmployee).LoadAsync();
+            }
 
             return new DepartmentResponseDTO
             {
                 DepartmentId = dept.DepartmentId,
                 Name = dept.Name,
-                Description = dept.Description
+                Description = dept.Description,
+                Code = dept.Code,
+                IsActive = dept.IsActive,
+                EffectiveDate = dept.EffectiveDate,
+                HeadEmployeeId = dept.HeadEmployeeId,
+                HeadEmployeeName = dept.HeadEmployee != null ? $"{dept.HeadEmployee.FirstName} {dept.HeadEmployee.LastName}".Trim() : null,
+                EmployeeCount = dept.Employees.Count
             };
         }
 
@@ -78,14 +120,24 @@ namespace OTMS.Service.Services
 
         public async Task<List<JobPositionResponseDTO>> GetAllJobPositionsAsync()
         {
-            var positions = await context.JobPositions.Include(jp => jp.Department).ToListAsync();
+            var positions = await context.JobPositions
+                .Include(jp => jp.Department)
+                .Include(jp => jp.ReportsTo)
+                .ToListAsync();
             return positions.Select(p => new JobPositionResponseDTO
             {
                 JobPositionId = p.JobPositionId,
                 Name = p.Title,
                 Description = p.Description,
                 DepartmentId = p.DepartmentId,
-                DepartmentName = p.Department?.Name ?? string.Empty
+                DepartmentName = p.Department?.Name ?? string.Empty,
+                Code = p.Code,
+                IsActive = p.IsActive,
+                ReportsToId = p.ReportsToId,
+                ReportsToName = p.ReportsTo?.Title,
+                EmploymentType = p.EmploymentType,
+                PositionLevel = p.PositionLevel,
+                EffectiveDate = p.EffectiveDate
             }).ToList();
         }
 
@@ -93,6 +145,7 @@ namespace OTMS.Service.Services
         {
             var positions = await context.JobPositions
                 .Include(jp => jp.Department)
+                .Include(jp => jp.ReportsTo)
                 .Where(jp => jp.DepartmentId == departmentId)
                 .ToListAsync();
 
@@ -102,7 +155,14 @@ namespace OTMS.Service.Services
                 Name = p.Title,
                 Description = p.Description,
                 DepartmentId = p.DepartmentId,
-                DepartmentName = p.Department?.Name ?? string.Empty
+                DepartmentName = p.Department?.Name ?? string.Empty,
+                Code = p.Code,
+                IsActive = p.IsActive,
+                ReportsToId = p.ReportsToId,
+                ReportsToName = p.ReportsTo?.Title,
+                EmploymentType = p.EmploymentType,
+                PositionLevel = p.PositionLevel,
+                EffectiveDate = p.EffectiveDate
             }).ToList();
         }
 
@@ -119,11 +179,22 @@ namespace OTMS.Service.Services
                 JobPositionId = Guid.NewGuid(),
                 Title = request.Name,
                 Description = request.Description,
-                DepartmentId = request.DepartmentId
+                DepartmentId = request.DepartmentId,
+                Code = request.Code,
+                IsActive = request.IsActive,
+                ReportsToId = request.ReportsToId,
+                EmploymentType = request.EmploymentType,
+                PositionLevel = request.PositionLevel,
+                EffectiveDate = request.EffectiveDate
             };
 
             context.JobPositions.Add(position);
             await context.SaveChangesAsync();
+
+            if (position.ReportsToId.HasValue)
+            {
+                await context.Entry(position).Reference(jp => jp.ReportsTo).LoadAsync();
+            }
 
             return new JobPositionResponseDTO
             {
@@ -131,13 +202,23 @@ namespace OTMS.Service.Services
                 Name = position.Title,
                 Description = position.Description,
                 DepartmentId = position.DepartmentId,
-                DepartmentName = dept.Name
+                DepartmentName = dept.Name,
+                Code = position.Code,
+                IsActive = position.IsActive,
+                ReportsToId = position.ReportsToId,
+                ReportsToName = position.ReportsTo?.Title,
+                EmploymentType = position.EmploymentType,
+                PositionLevel = position.PositionLevel,
+                EffectiveDate = position.EffectiveDate
             };
         }
 
         public async Task<JobPositionResponseDTO> UpdateJobPositionAsync(Guid id, CreateJobPositionDTO request)
         {
-            var position = await context.JobPositions.Include(jp => jp.Department).FirstOrDefaultAsync(jp => jp.JobPositionId == id);
+            var position = await context.JobPositions
+                .Include(jp => jp.Department)
+                .Include(jp => jp.ReportsTo)
+                .FirstOrDefaultAsync(jp => jp.JobPositionId == id);
             if (position == null) throw new KeyNotFoundException("Job position not found.");
 
             var dept = await context.Departments.FindAsync(request.DepartmentId);
@@ -146,8 +227,19 @@ namespace OTMS.Service.Services
             position.Title = request.Name;
             position.Description = request.Description;
             position.DepartmentId = request.DepartmentId;
+            position.Code = request.Code;
+            position.IsActive = request.IsActive;
+            position.ReportsToId = request.ReportsToId;
+            position.EmploymentType = request.EmploymentType;
+            position.PositionLevel = request.PositionLevel;
+            position.EffectiveDate = request.EffectiveDate;
 
             await context.SaveChangesAsync();
+
+            if (position.ReportsToId.HasValue && position.ReportsTo == null)
+            {
+                await context.Entry(position).Reference(jp => jp.ReportsTo).LoadAsync();
+            }
 
             return new JobPositionResponseDTO
             {
@@ -155,7 +247,14 @@ namespace OTMS.Service.Services
                 Name = position.Title,
                 Description = position.Description,
                 DepartmentId = position.DepartmentId,
-                DepartmentName = dept.Name
+                DepartmentName = dept.Name,
+                Code = position.Code,
+                IsActive = position.IsActive,
+                ReportsToId = position.ReportsToId,
+                ReportsToName = position.ReportsTo?.Title,
+                EmploymentType = position.EmploymentType,
+                PositionLevel = position.PositionLevel,
+                EffectiveDate = position.EffectiveDate
             };
         }
 
