@@ -139,16 +139,17 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
-        /// Operations Admin verifies and approves the completion of a "Done" task.
+        /// Operations Admin reviews a "Pending Admin Review" task.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
-        [HttpPatch("{taskId}/approve-completion")]
-        public async Task<ActionResult<TaskResponseDTO>> ApproveTaskCompletion(Guid taskId)
+        [HttpPost("{taskId}/review")]
+        public async Task<ActionResult<TaskResponseDTO>> ReviewTask(Guid taskId, [FromBody] ReviewTaskDTO request)
         {
             try
             {
-                var result = await taskService.ApproveTaskCompletionAsync(taskId);
-                return Ok(result);
+                var result = await taskService.ReviewTaskAsync(taskId, request);
+                var message = request.AdminDecision == "Approve & Close" ? "Task officially closed and recorded." : "Task returned for rework.";
+                return Ok(new { message = message, data = result });
             }
             catch (UnauthorizedAccessException ex)
             {
