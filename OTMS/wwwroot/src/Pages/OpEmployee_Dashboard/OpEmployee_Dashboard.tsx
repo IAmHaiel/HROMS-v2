@@ -43,12 +43,13 @@ import LeaveRequestModal, {
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
+import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
-type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile';
+type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
 
 interface Task {
     id: string;
@@ -207,6 +208,7 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
     {
         label: 'PERSONAL',
         items: [
+            { tab: 'digital_201', icon: FileText, label: 'Digital 201 File' },
             { tab: 'leave', icon: CalendarDays, label: 'Leave' },
             { tab: 'profile', icon: UserCircle2, label: 'Profile' },
         ],
@@ -1034,17 +1036,21 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
             const firstName = form.firstName.trim();
             const lastName = form.lastName.trim();
             const middleName = form.middleName.trim();
+            const formData = new FormData();
+            formData.append('employeeNumber', employeeId);
+            formData.append('firstName', firstName);
+            formData.append('middleName', middleName);
+            formData.append('lastName', lastName);
+            formData.append('contactNumber', form.contactNumber.trim());
+            formData.append('email', form.email.trim());
+
+            const token = localStorage.getItem('authToken') ?? '';
             const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeId)}`, {
                 method: 'PUT',
-                headers: authHeader(),
-                body: JSON.stringify({
-                    employeeNumber: employeeId,
-                    firstName: firstName,
-                    middleName: middleName,
-                    lastName: lastName,
-                    contactNumber: form.contactNumber.trim(),
-                    email: form.email.trim(),
-                }),
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -1609,6 +1615,7 @@ export default function EmployeeDashboard() {
         'my-tasks': 'My Tasks',
         leave: 'Leave Requests',
         profile: 'My Profile',
+        digital_201: 'My Digital 201 File',
     };
 
     const today = new Date().toLocaleDateString('en-US', {
@@ -1710,6 +1717,14 @@ export default function EmployeeDashboard() {
                 )}
                 {activeTab === 'profile' && (
                     <ProfileTab user={user} onUpdateUser={setUser} />
+                )}
+                {activeTab === 'digital_201' && (
+                    <div className="tab-content" style={{ padding: '0 28px 28px' }}>
+                        <Digital201FileView
+                            employeeNumber={user.employeeId}
+                            readOnly={false}
+                        />
+                    </div>
                 )}
             </main>
 

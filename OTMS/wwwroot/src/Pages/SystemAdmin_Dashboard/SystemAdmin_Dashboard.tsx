@@ -655,20 +655,21 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             try {
                 const token = localStorage.getItem('authToken');
                 const builtName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
+                const formData = new FormData();
+                formData.append('employeeNumber', employee.employeeNumber);
+                formData.append('firstName', form.firstName.trim());
+                formData.append('middleName', form.middleName.trim());
+                formData.append('lastName', form.lastName.trim());
+                formData.append('suffix', form.suffix.trim());
+                formData.append('contactNumber', form.contactNumber);
+                formData.append('email', form.email.trim());
+
                 const updateRes = await fetch(
                     `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employee.employeeNumber)}`,
                     {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({
-                            employeeNumber: employee.employeeNumber,
-                            firstName: form.firstName.trim(),
-                            middleName: form.middleName.trim(),
-                            lastName: form.lastName.trim(),
-                            suffix: form.suffix.trim(),
-                            contactNumber: form.contactNumber,
-                            email: form.email.trim(),
-                        }),
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        body: formData,
                     }
                 );
                 if (!updateRes.ok) {
@@ -797,7 +798,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
 
     const resolvedTitle = isEditing ? 'Edit employee' : 'Employee Details';
     const resolvedSubtitle = isEditing ? 'Update details for this employee record' : `Viewing profile of ${displayName}`;
-    
+
     const infoCard = {
         avatarText: (isEditing ? editDisplayName : displayName) || '?',
         title: isEditing ? editDisplayName || '—' : displayName,
@@ -1151,6 +1152,7 @@ interface ManageEmployeesTabProps {
     onEditEmployee: (emp: RecentEmployee) => void;
     onDeleteEmployee: (emp: RecentEmployee) => void;
     onViewEmployee: (emp: RecentEmployee) => void;
+    onOpenDigital201: (emp: RecentEmployee) => void;
 }
 
 export interface LeaveFilters {
@@ -1164,7 +1166,7 @@ function ManageEmployeesTab({
     empPage, empTotalPages, onEmpPageChange,
     leaveRequests, leaveLoading, leavePage, leaveTotalPages, leavePendingCount,
     onLeavePageChange, onLeaveConfirm,
-    onEditEmployee, onDeleteEmployee, onViewEmployee,
+    onEditEmployee, onDeleteEmployee, onViewEmployee, onOpenDigital201,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
     const [search, setSearch] = useState('');
@@ -1228,7 +1230,7 @@ function ManageEmployeesTab({
                     icon: <Users size={14} />,
                     onClick: onAddEmployee
                 } : undefined}
-                headers={subTab === 'employees' 
+                headers={subTab === 'employees'
                     ? ['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']
                     : ['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']
                 }
@@ -1236,7 +1238,7 @@ function ManageEmployeesTab({
                 emptyMessage={subTab === 'employees' ? 'No employees match your filters' : 'No leave requests match your filters'}
                 currentPage={subTab === 'employees' ? empPage : leavePage}
                 totalPages={subTab === 'employees' ? empTotalPages : leaveTotalPages}
-                onPageChange={subTab === 'employees' 
+                onPageChange={subTab === 'employees'
                     ? (page) => onEmpPageChange(page, { search, role: filterRole, status: filterStatus })
                     : (page) => onLeavePageChange(page, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })
                 }
@@ -1258,6 +1260,11 @@ function ManageEmployeesTab({
                                                 label: 'View Details',
                                                 icon: <Eye size={12} />,
                                                 onClick: () => onViewEmployee(emp)
+                                            },
+                                            {
+                                                label: 'Digital 201 File',
+                                                icon: <FileText size={12} />,
+                                                onClick: () => onOpenDigital201(emp)
                                             },
                                             {
                                                 label: 'Edit',
@@ -1575,20 +1582,21 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     }
                     // Verified — now save
                     setProfileSaving(true);
+                    const formData = new FormData();
+                    formData.append('employeeNumber', employeeId);
+                    formData.append('firstName', profileForm.firstName.trim());
+                    formData.append('middleName', profileForm.middleName.trim());
+                    formData.append('lastName', profileForm.lastName.trim());
+                    formData.append('suffix', profileForm.suffix.trim());
+                    formData.append('contactNumber', profileForm.contactNumber.trim());
+                    formData.append('email', profileForm.email.trim());
+
                     const saveRes = await fetch(
                         `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`,
                         {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                            body: JSON.stringify({
-                                employeeNumber: employeeId,
-                                firstName: profileForm.firstName.trim(),
-                                middleName: profileForm.middleName.trim(),
-                                lastName: profileForm.lastName.trim(),
-                                suffix: profileForm.suffix.trim(),
-                                contactNumber: profileForm.contactNumber.trim(),
-                                email: profileForm.email.trim(),
-                            }),
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData,
                         }
                     );
                     if (!saveRes.ok) {
@@ -2045,6 +2053,7 @@ export default function Dashboard() {
     const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<RecentEmployee | null>(null);
     const [deleteSubmitting, setDeleteSubmitting] = useState(false);
     const [selectedPanelEmployee, setSelectedPanelEmployee] = useState<RecentEmployee | null>(null);
+    const [detailPanelInitialSection, setDetailPanelInitialSection] = useState<'overview' | 'digital_201'>('overview');
     const [logoutConfirm, setLogoutConfirm] = useState(false);
     const [logoutLoading, setLogoutLoading] = useState(false);
 
@@ -2331,11 +2340,20 @@ export default function Dashboard() {
 
                 {activeTab === 'employees' && (
                     selectedPanelEmployee ? (
-                        <EmployeeDetailPanel employee={selectedPanelEmployee} onBack={() => setSelectedPanelEmployee(null)} onEmployeeUpdated={updated => { handleEmployeeUpdated(updated); if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null); else setSelectedPanelEmployee(updated); }} />
+                        <EmployeeDetailPanel 
+                            employee={selectedPanelEmployee} 
+                            initialSection={detailPanelInitialSection}
+                            onBack={() => setSelectedPanelEmployee(null)} 
+                            onEmployeeUpdated={updated => { 
+                                handleEmployeeUpdated(updated); 
+                                if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null); 
+                                else setSelectedPanelEmployee(updated); 
+                            }} 
+                        />
                     ) : (
                         <ManageEmployeesTab
                             employees={employees} loading={empLoading}
-                            onSelectEmployee={emp => setSelectedPanelEmployee(emp)}
+                            onSelectEmployee={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('overview'); }}
                             onAddEmployee={() => setShowAddModal(true)}
                             empPage={empPage} empTotalPages={empTotalPages} onEmpPageChange={fetchEmployees}
                             leaveRequests={leaveRequests} leaveLoading={leaveLoading}
@@ -2345,7 +2363,8 @@ export default function Dashboard() {
                             onLeaveConfirm={handleLeaveConfirm}
                             onEditEmployee={emp => { setEmpModalEditMode(true); setSelectedEmployee(emp); }}
                             onDeleteEmployee={emp => setDeleteConfirmEmp(emp)}
-                            onViewEmployee={emp => setSelectedPanelEmployee(emp)}
+                            onViewEmployee={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('overview'); }}
+                            onOpenDigital201={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('digital_201'); }}
                         />
                     )
                 )}

@@ -26,6 +26,27 @@ import {
 import './EmployeeDetailPanel.css';
 import { useToast } from '../../components/Toast/Toast';
 import FormModal from '../../components/FormModal/FormModal';
+import Digital201FileView from './Digital201FileView';
+import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+
+interface ConfirmModalState {
+    isOpen: boolean;
+    variant: 'neutral' | 'danger' | 'warning' | 'info' | 'success';
+    title: string;
+    description: string;
+    notice?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm: () => void;
+}
+
+const CONFIRM_CLOSED: ConfirmModalState = {
+    isOpen: false,
+    variant: 'neutral',
+    title: '',
+    description: '',
+    onConfirm: () => {},
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,7 +149,8 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
     });
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
-    const { confirm, success, error } = useToast();
+    const { success, error } = useToast();
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
 
     const initialValues = {
         employeeName: profile.employeeName,
@@ -139,12 +161,20 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
     };
     const isDirty = JSON.stringify(form) !== JSON.stringify(initialValues);
 
-    const handleClose = async () => {
+    const handleClose = () => {
         if (isDirty) {
-            const confirmed = await confirm(`Discard unsaved changes? You have unsaved changes to ${profile.employeeName}'s profile. Cancelling now will discard all modifications.`);
-            if (confirmed) {
-                onClose();
-            }
+            setConfirmModal({
+                isOpen: true,
+                variant: 'warning',
+                title: 'Discard Unsaved Changes',
+                description: `Discard unsaved changes? You have unsaved changes to ${profile.employeeName}'s profile. Cancelling now will discard all modifications.`,
+                confirmLabel: 'Discard',
+                cancelLabel: 'Keep Editing',
+                onConfirm: () => {
+                    setConfirmModal(CONFIRM_CLOSED);
+                    onClose();
+                }
+            });
         } else {
             onClose();
         }
@@ -155,14 +185,61 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
         setApiError('');
     };
 
-    const handleSave = async () => {
-        if (!form.employeeName.trim()) {
-            setApiError('Full name is required.');
+    const executeSave = async (skipStatusConfirm = false) => {
+        if (form.accountStatus !== profile.accountStatus && !skipStatusConfirm) {
+            const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
+            setConfirmModal({
+                isOpen: true,
+                variant: 'warning',
+                title: `${form.accountStatus === 'Active' ? 'Activate' : 'Deactivate'} Account`,
+                description: `Are you sure you want to ${actionText} ${profile.employeeName}?`,
+                confirmLabel: form.accountStatus === 'Active' ? 'Activate' : 'Deactivate',
+                onConfirm: () => {
+                    setConfirmModal(CONFIRM_CLOSED);
+                    executeSave(true);
+                }
+            });
             return;
         }
+
         setSubmitting(true);
         try {
             const token = localStorage.getItem('authToken');
+
+            const nameParts = form.employeeName.trim().split(/\s+/);
+            let firstName = '';
+            let middleName = '';
+            let lastName = '';
+            let suffix = '';
+
+            if (nameParts.length === 1) {
+                firstName = nameParts[0];
+            } else if (nameParts.length === 2) {
+                firstName = nameParts[0];
+                lastName = nameParts[1];
+            } else if (nameParts.length >= 3) {
+                const lastPart = nameParts[nameParts.length - 1];
+                const isSuffix = ['jr', 'sr', 'ii', 'iii', 'iv', 'v'].includes(lastPart.toLowerCase().replace(/\./g, ''));
+                if (isSuffix) {
+                    suffix = lastPart;
+                    lastName = nameParts[nameParts.length - 2];
+                    firstName = nameParts[0];
+                    middleName = nameParts.slice(1, nameParts.length - 2).join(' ');
+                } else {
+                    lastName = lastPart;
+                    firstName = nameParts[0];
+                    middleName = nameParts.slice(1, nameParts.length - 1).join(' ');
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('employeeNumber', profile.employeeNumber);
+            formData.append('firstName', firstName);
+            formData.append('middleName', middleName);
+            formData.append('lastName', lastName);
+            formData.append('suffix', suffix);
+            formData.append('contactNumber', form.contactNumber);
+            formData.append('email', form.email.trim());
 
             // 1. Update personal details
             const updateRes = await fetch(
@@ -170,14 +247,9 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                 {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                     },
-                    body: JSON.stringify({
-                        employeeNumber: profile.employeeNumber,
-                        contactNumber: form.contactNumber,
-                        email: form.email.trim(),
-                    }),
+                    body: formData,
                 }
             );
             if (!updateRes.ok) throw new Error('Failed to update employee details. Please try again.');
@@ -200,13 +272,6 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
 
             // 3. Update status in database if changed
             if (form.accountStatus !== profile.accountStatus) {
-                const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
-                const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${profile.employeeName}?`);
-                if (!isConfirmed) {
-                    setSubmitting(false);
-                    return;
-                }
-
                 const statusEndpoint =
                     form.accountStatus === 'Active'
                         ? '/api/systemadmin/activate-user'
@@ -243,6 +308,14 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
         }
     };
 
+    const handleSave = () => {
+        if (!form.employeeName.trim()) {
+            setApiError('Full name is required.');
+            return;
+        }
+        executeSave();
+    };
+
     const infoCard = {
         avatarText: form.employeeName || '?',
         title: form.employeeName,
@@ -252,60 +325,73 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
     };
 
     return (
-        <FormModal
-            isOpen={true}
-            onClose={handleClose}
-            title="Edit Employee"
-            subtitle={`Update details for ${profile.employeeName}`}
-            infoCard={infoCard}
-            apiError={apiError}
-            onSubmit={handleSave}
-            isSubmitting={submitting}
-            size="md"
-        >
-            <div className="fm-section">
-                <h5 className="fm-section-title">Personal Information</h5>
-                <div className="fm-field-grid">
-                    <div className="fm-field fm-field-full">
-                        <label className="fm-label">Full Name</label>
-                        <input type="text" value={form.employeeName} onChange={set('employeeName')} className="fm-input" />
-                    </div>
-                    <div className="fm-field">
-                        <label className="fm-label">Email</label>
-                        <input type="email" value={form.email} onChange={set('email')} className="fm-input" />
-                    </div>
-                    <div className="fm-field">
-                        <label className="fm-label">Contact Number</label>
-                        <input type="tel" value={form.contactNumber} onChange={set('contactNumber')} className="fm-input" />
+        <>
+            <FormModal
+                isOpen={true}
+                onClose={handleClose}
+                title="Edit Employee"
+                subtitle={`Update details for ${profile.employeeName}`}
+                infoCard={infoCard}
+                apiError={apiError}
+                onSubmit={handleSave}
+                isSubmitting={submitting}
+                size="md"
+            >
+                <div className="fm-section">
+                    <h5 className="fm-section-title">Personal Information</h5>
+                    <div className="fm-field-grid">
+                        <div className="fm-field fm-field-full">
+                            <label className="fm-label">Full Name</label>
+                            <input type="text" value={form.employeeName} onChange={set('employeeName')} className="fm-input" />
+                        </div>
+                        <div className="fm-field">
+                            <label className="fm-label">Email</label>
+                            <input type="email" value={form.email} onChange={set('email')} className="fm-input" />
+                        </div>
+                        <div className="fm-field">
+                            <label className="fm-label">Contact Number</label>
+                            <input type="tel" value={form.contactNumber} onChange={set('contactNumber')} className="fm-input" />
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div className="fm-section">
-                <h5 className="fm-section-title">Account</h5>
-                <div className="fm-field-grid">
-                    <div className="fm-field">
-                        <label className="fm-label">Role</label>
-                        <select value={form.role} onChange={set('role')} className="fm-select">
-                            {ROLES.map(r => (
-                                <option key={r} value={r}>
-                                    {r}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="fm-field">
-                        <label className="fm-label">Account Status</label>
-                        <select value={form.accountStatus} onChange={set('accountStatus')} className="fm-select">
-                            <option value="Active">Active</option>
-                            <option value="Deactivated">Deactivated</option>
-                            {profile.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
-                            {profile.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
-                        </select>
+                <div className="fm-section">
+                    <h5 className="fm-section-title">Account</h5>
+                    <div className="fm-field-grid">
+                        <div className="fm-field">
+                            <label className="fm-label">Role</label>
+                            <select value={form.role} onChange={set('role')} className="fm-select">
+                                {ROLES.map(r => (
+                                    <option key={r} value={r}>
+                                        {r}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="fm-field">
+                            <label className="fm-label">Account Status</label>
+                            <select value={form.accountStatus} onChange={set('accountStatus')} className="fm-select">
+                                <option value="Active">Active</option>
+                                <option value="Deactivated">Deactivated</option>
+                                {profile.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
+                                {profile.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
+                            </select>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </FormModal>
+            </FormModal>
+
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                confirmLabel={confirmModal.confirmLabel}
+                cancelLabel={confirmModal.cancelLabel}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
+        </>
     );
 }
 
@@ -313,12 +399,14 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
 
 interface EmployeeDetailPanelProps {
     employee: RecentEmployee;
+    initialSection?: 'overview' | 'deliveries' | 'activity' | 'digital_201';
     onBack: () => void;
     onEmployeeUpdated: (updated: RecentEmployee) => void;
 }
 
 export default function EmployeeDetailPanel({
     employee,
+    initialSection = 'overview',
     onBack,
     onEmployeeUpdated,
 }: EmployeeDetailPanelProps) {
@@ -330,8 +418,14 @@ export default function EmployeeDetailPanel({
     const [loadingLogs, setLoadingLogs] = useState(true);
     const [showEdit, setShowEdit] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [activeSection, setActiveSection] = useState<'overview' | 'deliveries' | 'activity'>('overview');
-    const { confirm, success, error } = useToast();
+    const [activeSection, setActiveSection] = useState<'overview' | 'deliveries' | 'activity' | 'digital_201'>(initialSection);
+    const { success, error } = useToast();
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
+
+    // Sync active section if initialSection prop changes
+    useEffect(() => {
+        setActiveSection(initialSection);
+    }, [initialSection]);
 
     // Sync profile state if employee prop changes
     useEffect(() => {
@@ -366,61 +460,76 @@ export default function EmployeeDetailPanel({
     }, [profile.employeeNumber]);
 
     // Delete Employee
-    const handleDelete = async () => {
-        const isConfirmed = await confirm(`Are you sure you want to permanently delete ${profile.employeeName}?`);
-        if (!isConfirmed) return;
-        setDeleting(true);
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch('/api/systemadmin/delete-user', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
-            });
-            if (!res.ok) throw new Error();
-            success(`Successfully deleted ${profile.employeeName}.`);
-            onEmployeeUpdated({ ...profile, accountStatus: '__deleted__' });
-        } catch {
-            error('Failed to delete employee.');
-        } finally {
-            setDeleting(false);
-        }
+    const handleDelete = () => {
+        setConfirmModal({
+            isOpen: true,
+            variant: 'danger',
+            title: 'Delete Employee',
+            description: `Are you sure you want to permanently delete ${profile.employeeName}? This action cannot be undone.`,
+            confirmLabel: 'Delete',
+            onConfirm: async () => {
+                setConfirmModal(CONFIRM_CLOSED);
+                setDeleting(true);
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch('/api/systemadmin/delete-user', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
+                    });
+                    if (!res.ok) throw new Error();
+                    success(`Successfully deleted ${profile.employeeName}.`);
+                    onEmployeeUpdated({ ...profile, accountStatus: '__deleted__' });
+                } catch {
+                    error('Failed to delete employee.');
+                } finally {
+                    setDeleting(false);
+                }
+            }
+        });
     };
 
     // Toggle status (Activate/Deactivate)
-    const handleToggleStatus = async () => {
+    const handleToggleStatus = () => {
         const isActive = ['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus);
         const next = isActive ? 'Deactivated' : 'Active';
         const actionText = next === 'Deactivated' ? 'deactivate' : 'activate';
-        
-        const isConfirmed = await confirm(`Are you sure you want to ${actionText} ${profile.employeeName}?`);
-        if (!isConfirmed) return;
 
-        const endpoint =
-            next === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
+        setConfirmModal({
+            isOpen: true,
+            variant: 'warning',
+            title: `${next === 'Active' ? 'Activate' : 'Deactivate'} Employee`,
+            description: `Are you sure you want to ${actionText} ${profile.employeeName}?`,
+            confirmLabel: next === 'Active' ? 'Activate' : 'Deactivate',
+            onConfirm: async () => {
+                setConfirmModal(CONFIRM_CLOSED);
+                const endpoint =
+                    next === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
 
-        try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(endpoint, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
-            });
-            if (!res.ok) throw new Error();
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const res = await fetch(endpoint, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
+                    });
+                    if (!res.ok) throw new Error();
 
-            const updatedProfile = { ...profile, accountStatus: next };
-            setProfile(updatedProfile);
-            onEmployeeUpdated(updatedProfile);
-            success(`Successfully ${next.toLowerCase()} ${profile.employeeName}.`);
-        } catch {
-            error(`Failed to ${actionText} employee.`);
-        }
+                    const updatedProfile = { ...profile, accountStatus: next };
+                    setProfile(updatedProfile);
+                    onEmployeeUpdated(updatedProfile);
+                    success(`Successfully ${next === 'Active' ? 'activated' : 'deactivated'} ${profile.employeeName}.`);
+                } catch {
+                    error(`Failed to ${actionText} employee.`);
+                }
+            }
+        });
     };
 
     const completedCount = deliveries.filter(d => d.status?.toLowerCase() === 'delivered').length;
@@ -510,6 +619,7 @@ export default function EmployeeDetailPanel({
                     { key: 'overview', icon: User, label: 'Overview' },
                     { key: 'deliveries', icon: Truck, label: 'Delivery History' },
                     { key: 'activity', icon: ClipboardList, label: 'Activity Logs' },
+                    { key: 'digital_201', icon: FileText, label: 'Digital 201 File' },
                 ] as const).map(({ key, icon: Icon, label }) => (
                     <button
                         key={key}
@@ -732,6 +842,27 @@ export default function EmployeeDetailPanel({
                         )}
                     </div>
                 )}
+
+                {activeSection === 'digital_201' && (
+                    <Digital201FileView
+                        employeeNumber={profile.employeeNumber}
+                        readOnly={true}
+                        onAttachmentsChanged={(attachments) => {
+                            const updatedProfile = {
+                                ...profile,
+                                attachments: attachments.map(a => ({
+                                    employeeAttachmentId: a.employeeAttachmentId,
+                                    fileName: a.fileName,
+                                    fileUrl: a.fileUrl,
+                                    contentType: a.contentType,
+                                    fileSize: a.fileSize
+                                }))
+                            };
+                            setProfile(updatedProfile);
+                            onEmployeeUpdated(updatedProfile);
+                        }}
+                    />
+                )}
             </div>
 
             {showEdit && (
@@ -745,6 +876,17 @@ export default function EmployeeDetailPanel({
                     }}
                 />
             )}
+
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                confirmLabel={confirmModal.confirmLabel}
+                cancelLabel={confirmModal.cancelLabel}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
         </div>
     );
 }

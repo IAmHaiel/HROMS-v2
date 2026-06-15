@@ -45,6 +45,26 @@ import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
+import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+
+interface ConfirmModalState {
+    isOpen: boolean;
+    variant: 'neutral' | 'danger' | 'warning' | 'info' | 'success';
+    title: string;
+    description: string;
+    notice?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm: () => void;
+}
+
+const CONFIRM_CLOSED: ConfirmModalState = {
+    isOpen: false,
+    variant: 'neutral',
+    title: '',
+    description: '',
+    onConfirm: () => {},
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1965,7 +1985,8 @@ export default function OpsAdminDashboard() {
     const lastName = localStorage.getItem('lastName') ?? '';
     const middleName = localStorage.getItem('middleName') ?? '';
     const employeeName = [firstName, middleName, lastName].filter(Boolean).join(' ') || 'Op Admin';
-    const { success, error, confirm } = useToast();
+    const { success, error } = useToast();
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -2066,39 +2087,39 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    const handleEmptyBin = async () => {
-        const ok = await confirm(
-            'Permanently remove all items in the bin?',
-            {
-                confirmLabel: 'Empty Bin',
-                cancelLabel: 'Cancel',
-            }
-        );
+    const handleEmptyBin = () => {
+        setConfirmModal({
+            isOpen: true,
+            variant: 'danger',
+            title: 'Empty Trash Bin',
+            description: 'Permanently remove all items in the bin? This action cannot be undone.',
+            confirmLabel: 'Empty Bin',
+            onConfirm: async () => {
+                setConfirmModal(CONFIRM_CLOSED);
+                try {
+                    const res = await fetch(
+                        `/api/task/empty-bin/${employeeId}`,
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                Authorization: `Bearer ${token()}`,
+                            },
+                        }
+                    );
 
-        if (!ok) return;
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Failed to empty bin.');
+                    }
 
-        try {
-            const res = await fetch(
-                `/api/task/empty-bin/${employeeId}`,
-                {
-                    method: 'DELETE',
-                    headers: {
-                        Authorization: `Bearer ${token()}`,
-                    },
+                    setBinTasks([]);
+                    await fetchTasks();
+                    success('Bin emptied successfully.');
+                } catch (err: any) {
+                    error(err.message ?? 'Failed to empty bin.');
                 }
-            );
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Failed to empty bin.');
             }
-
-            setBinTasks([]);
-            await fetchTasks();
-            success('Bin emptied successfully.');
-        } catch (err: any) {
-            error(err.message ?? 'Failed to empty bin.');
-        }
+        });
     };
 
     // ── Fetch Team Members (for assignee dropdown) ──
@@ -2238,39 +2259,44 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    const handleDeleteTask = async (taskId: string) => {
-        const ok = await confirm('Delete this task? This cannot be undone.', {
+    const handleDeleteTask = (taskId: string) => {
+        setConfirmModal({
+            isOpen: true,
+            variant: 'danger',
+            title: 'Delete Task',
+            description: 'Delete this task? This cannot be undone.',
             confirmLabel: 'Delete',
             cancelLabel: 'Keep',
-        });
-        if (!ok) return;
+            onConfirm: async () => {
+                setConfirmModal(CONFIRM_CLOSED);
+                try {
+                    const res = await fetch(`/api/task/${taskId}/delete-task`, {
+                        method: 'DELETE',
+                        headers: { Authorization: `Bearer ${token()}` },
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Failed to delete task.');
+                    }
 
-        try {
-            const res = await fetch(`/api/task/${taskId}/delete-task`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token()}` },
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Failed to delete task.');
+                    // Track locally so refetches don't resurrect the task
+                    setDeletedTaskIds(prev => new Set(prev).add(taskId));
+                    setAllTasks(prev => prev.map(t =>
+                        t.taskId === taskId ? { ...t, deleted: true } : t
+                    ));
+                    setTasks(prev => prev.filter(t => t.taskId !== taskId));
+                    setEditingTask(null);
+                    setViewingTask(null);
+                    setDetailTask(null);
+                    success('Task deleted successfully.');
+
+                    await fetchBinRecords();
+
+                } catch (err: any) {
+                    error(err.message ?? 'Something went wrong.');
+                }
             }
-
-            // Track locally so refetches don't resurrect the task
-            setDeletedTaskIds(prev => new Set(prev).add(taskId));
-            setAllTasks(prev => prev.map(t =>
-                t.taskId === taskId ? { ...t, deleted: true } : t
-            ));
-            setTasks(prev => prev.filter(t => t.taskId !== taskId));
-            setEditingTask(null);
-            setViewingTask(null);
-            setDetailTask(null);
-            success('Task deleted successfully.');
-
-            await fetchBinRecords();
-
-        } catch (err: any) {
-            error(err.message ?? 'Something went wrong.');
-        }
+        });
     };
 
     const handleLogout = async () => {
@@ -2465,6 +2491,17 @@ export default function OpsAdminDashboard() {
                     onClose={() => setDetailTask(null)}
                 />
             )}
+
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                variant={confirmModal.variant}
+                title={confirmModal.title}
+                description={confirmModal.description}
+                confirmLabel={confirmModal.confirmLabel}
+                cancelLabel={confirmModal.cancelLabel}
+                onConfirm={confirmModal.onConfirm}
+                onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
         </div>
     );
 }

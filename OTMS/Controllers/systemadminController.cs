@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
@@ -17,7 +18,12 @@ namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class systemadminController(IAccountManagementService accountManagementService, ISystemAdminService systemAdminService) : ControllerBase
+    public class systemadminController(
+        IAccountManagementService accountManagementService, 
+        ISystemAdminService systemAdminService,
+        IAuthorizationService authorizationService,
+        OTMSDbContext context
+    ) : ControllerBase
     {
 
         /// <summary>
@@ -272,11 +278,29 @@ namespace OTMS.Controllers
         /// <summary>
         /// View the complete Digital 201 File of an employee.
         /// </summary>
-        [Authorize(Policy = "Permissions.Users.View")]
+        [Authorize]
         [ProducesResponseType(typeof(ApiResponseDTO<Digital201FileResponseDTO>), 200)]
         [HttpGet("digital-201-file")]
         public async Task<IActionResult> GetDigital201File([Required][FromQuery] string employeeNumber)
         {
+            var authResult = await authorizationService.AuthorizeAsync(User, "Permissions.Users.View");
+            if (!authResult.Succeeded)
+            {
+                var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(claimProfile))
+                {
+                    return Forbid();
+                }
+
+                var isOwnFile = await context.Employees
+                    .AnyAsync(e => e.Account.AccountId.ToString() == claimProfile && e.EmployeeNumber == employeeNumber);
+
+                if (!isOwnFile)
+                {
+                    return Forbid();
+                }
+            }
+
             var result = await accountManagementService.GetDigital201File(employeeNumber);
             if (!result.IsSuccess)
             {
@@ -288,11 +312,25 @@ namespace OTMS.Controllers
         /// <summary>
         /// Upload a document to an employee's Digital 201 File.
         /// </summary>
-        [Authorize(Policy = "Permissions.Users.Manage")]
+        [Authorize]
         [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
         [HttpPost("documents/upload")]
         public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request)
         {
+            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(claimProfile))
+            {
+                return Forbid();
+            }
+
+            var isOwnFile = await context.Employees
+                .AnyAsync(e => e.Account.AccountId.ToString() == claimProfile && e.EmployeeNumber == employeeNumber);
+
+            if (!isOwnFile)
+            {
+                return Forbid();
+            }
+
             var result = await accountManagementService.UploadEmployeeDocument(employeeNumber, request);
             if (!result.IsSuccess)
             {
@@ -304,11 +342,25 @@ namespace OTMS.Controllers
         /// <summary>
         /// Update a document in an employee's Digital 201 File.
         /// </summary>
-        [Authorize(Policy = "Permissions.Users.Manage")]
+        [Authorize]
         [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
         [HttpPut("documents/{attachmentId}")]
         public async Task<IActionResult> UpdateEmployeeDocument([FromRoute] Guid attachmentId, [FromForm] UpdateEmployeeDocumentDTO request)
         {
+            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(claimProfile))
+            {
+                return Forbid();
+            }
+
+            var isOwner = await context.EmployeeAttachments
+                .AnyAsync(ea => ea.EmployeeAttachmentId == attachmentId && ea.Employee.Account.AccountId.ToString() == claimProfile);
+
+            if (!isOwner)
+            {
+                return Forbid();
+            }
+
             var result = await accountManagementService.UpdateEmployeeDocument(attachmentId, request);
             if (!result.IsSuccess)
             {
@@ -320,11 +372,25 @@ namespace OTMS.Controllers
         /// <summary>
         /// Archive a document in an employee's Digital 201 File.
         /// </summary>
-        [Authorize(Policy = "Permissions.Users.Manage")]
+        [Authorize]
         [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
         [HttpPatch("documents/{attachmentId}/archive")]
         public async Task<IActionResult> ArchiveEmployeeDocument([FromRoute] Guid attachmentId)
         {
+            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(claimProfile))
+            {
+                return Forbid();
+            }
+
+            var isOwner = await context.EmployeeAttachments
+                .AnyAsync(ea => ea.EmployeeAttachmentId == attachmentId && ea.Employee.Account.AccountId.ToString() == claimProfile);
+
+            if (!isOwner)
+            {
+                return Forbid();
+            }
+
             var result = await accountManagementService.ArchiveEmployeeDocument(attachmentId);
             if (!result.IsSuccess)
             {
