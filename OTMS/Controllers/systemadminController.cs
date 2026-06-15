@@ -269,7 +269,21 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
-
+        /// <summary>
+        /// View the complete Digital 201 File of an employee.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.View")]
+        [ProducesResponseType(typeof(ApiResponseDTO<Digital201FileResponseDTO>), 200)]
+        [HttpGet("digital-201-file")]
+        public async Task<IActionResult> GetDigital201File([Required][FromQuery] string employeeNumber)
+        {
+            var result = await accountManagementService.GetDigital201File(employeeNumber);
+            if (!result.IsSuccess)
+            {
+                return NotFound(result);
+            }
+            return Ok(result);
+        }
 
     }
 }

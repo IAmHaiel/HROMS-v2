@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.HttpResults;
+using OTMS.Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
@@ -511,6 +512,58 @@ namespace OTMS.Service.Services
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Email = request.Email ?? employee.Email,
                 Success = true
+            };
+        }
+
+        public async Task<ApiResponseDTO<Digital201FileResponseDTO>> GetDigital201File(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                .Include(e => e.Department)
+                .Include(e => e.JobPosition)
+                .Include(e => e.Attachments)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<Digital201FileResponseDTO>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            return new ApiResponseDTO<Digital201FileResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Digital 201 File retrieved successfully.",
+                Data = new Digital201FileResponseDTO
+                {
+                    EmployeeNumber = employee.EmployeeNumber,
+                    FirstName = employee.FirstName,
+                    MiddleName = employee.MiddleName,
+                    LastName = employee.LastName,
+                    Suffix = employee.Suffix,
+                    ContactNumber = employee.ContactNumber,
+                    Email = employee.Email,
+                    DepartmentName = employee.Department?.Name,
+                    JobPositionTitle = employee.JobPosition?.Title,
+                    DateHired = employee.CreatedAt,
+                    Role = employee.Account?.Role?.Name ?? "No Account",
+                    AccountStatus = employee.Account?.AccountStatus ?? "No Account",
+                    Success = true,
+                    Attachments = employee.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                    {
+                        EmployeeAttachmentId = a.EmployeeAttachmentId,
+                        FileName = a.FileName,
+                        FileUrl = a.FilePath,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        Version = a.Version
+                    }).ToList()
+                }
             };
         }
 
