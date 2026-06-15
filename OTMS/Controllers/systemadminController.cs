@@ -333,5 +333,21 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieve all employment contracts across all employees (Centralized Repository).
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.View")]
+        [ProducesResponseType(typeof(ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>), 200)]
+        [HttpGet("contracts")]
+        public async Task<IActionResult> GetAllEmploymentContracts([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] bool? isArchived)
+        {
+            var result = await accountManagementService.GetAllEmploymentContracts(request, search, isArchived);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
     }
 }
