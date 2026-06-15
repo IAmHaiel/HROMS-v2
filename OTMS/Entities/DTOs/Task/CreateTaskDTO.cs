@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.DTOs.Task
+namespace OTMS.Entities.DTOs.Task
 {
     public class CreateTaskDTO
     {
@@ -7,5 +7,6 @@
         public string? TaskDescription { get; set; }
         public string Priority { get; set; } = "Normal";
         public DateTime? DueAt { get; set; }
+        public Guid? RecommendedEmployeeId { get; set; }
     }
 }

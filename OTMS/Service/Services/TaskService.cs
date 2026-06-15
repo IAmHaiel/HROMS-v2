@@ -127,6 +127,26 @@ namespace OTMS.Service.Services
                 $"{string.Join(" ", new[]
                     {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created the task {request.TaskTitle} at {DateTime.Now:hh:mm tt}");
 
+            if (request.RecommendedEmployeeId.HasValue)
+            {
+                if (request.AssignedTo == request.RecommendedEmployeeId.Value)
+                {
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
+                }
+                else
+                {
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
+                }
+            }
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
@@ -701,7 +721,9 @@ namespace OTMS.Service.Services
                     DisplayName = fullName,
                     Role = a.Role.Name,
                     ActiveTaskCount = activeTasks,
-                    IsRecommended = false
+                    IsRecommended = false,
+                    AvailabilityStatus = "Active",
+                    RecommendationReason = string.Empty
                 });
             }
 
@@ -713,6 +735,7 @@ namespace OTMS.Service.Services
                     if (emp.ActiveTaskCount == minTasks)
                     {
                         emp.IsRecommended = true;
+                        emp.RecommendationReason = $"Employee has the lowest active workload ({emp.ActiveTaskCount} tasks) and is currently Active.";
                         emp.DisplayName = $"{emp.DisplayName} ({emp.ActiveTaskCount} tasks) - Recommended";
                     }
                     else
