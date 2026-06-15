@@ -191,11 +191,28 @@ namespace OTMS.Service.Services
             if (emailExists)
                 throw new Exception("Email already exists.");
 
-            var generatedUserPassword = PasswordGenerator.Generate(); // one password only
+            string generatedUserPassword;
+            try
+            {
+                generatedUserPassword = PasswordGenerator.Generate(); // one password only
 
-            if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
-                generatedUserPassword.Length > PasswordLength.MaximumLength)
-                throw new Exception("Generated password must be at least 15 to 64 characters long.");
+                if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
+                    generatedUserPassword.Length > PasswordLength.MaximumLength)
+                    throw new Exception("Generated password must be at least 15 to 64 characters long.");
+            }
+            catch (Exception ex)
+            {
+                var currentUserIdStrForFail = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(currentUserIdStrForFail, out Guid currentUserIdForFail) && currentUserIdForFail != Guid.Empty)
+                {
+                    await activityLogService.LogActivityAsync(
+                        currentUserIdForFail,
+                        "PasswordGenerationFailed",
+                        $"Failed to generate password for Employee {request.EmployeeNumber}. Error: {ex.Message}"
+                    );
+                }
+                throw;
+            }
 
             GeneratedPassword = generatedUserPassword; // assign to static variable for email use
 
@@ -274,25 +291,37 @@ namespace OTMS.Service.Services
                 $"{configuration["FrontendBaseUrl"]}/verify-email" +
                 $"?token={employee.EmailVerificationToken}";
 
-            // Sending email verification notification
-            await emailService.SendAsync(
-                        employee.Email,
-                            "Verify your Operational Management System Account",
-                            $"""
-                            Welcome to the Operational Management System.
+            try
+            {
+                // Sending email verification notification
+                await emailService.SendAsync(
+                            employee.Email,
+                                "Verify your Operational Management System Account",
+                                $"""
+                                Welcome to the Operational Management System.
 
-                            Your login credentials are:
+                                Your login credentials are:
 
-                            Employee Number: {employee.EmployeeNumber}
-                            Password: {GeneratedPassword}
+                                Employee Number: {employee.EmployeeNumber}
+                                Password: {GeneratedPassword}
 
-                            Please verify your account by clicking the link below:
+                                Please verify your account by clicking the link below:
 
-                            {verificationLink}
+                                {verificationLink}
 
-                            After verifying your account, we recommend changing your password immediately after logging in.
-                            """
+                                After verifying your account, we recommend changing your password immediately after logging in.
+                                """
+                    );
+            }
+            catch (Exception ex)
+            {
+                await activityLogService.LogActivityAsync(
+                    currentUserId != Guid.Empty ? currentUserId : account.AccountId,
+                    "EmailFailed",
+                    $"Failed email transmission for Employee {employee.EmployeeNumber}. Error: {ex.Message}"
                 );
+                throw;
+            }
 
             return new EmployeeRegisterResponseDTO
             {
@@ -619,6 +648,12 @@ namespace OTMS.Service.Services
             account.PasswordResetTokenExpiryTime = null;
 
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                account.AccountId,
+                "PasswordReset",
+                $"Password reset activity recorded for Employee ID {account.EmployeeId}."
+            );
 
             return new ApiResponseDTO<object>
             {
