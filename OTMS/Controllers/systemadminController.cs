@@ -275,13 +275,20 @@ namespace OTMS.Controllers
         [Authorize(Policy = "Permissions.Users.View")]
         [ProducesResponseType(typeof(ApiResponseDTO<Digital201FileResponseDTO>), 200)]
         [HttpGet("digital-201-file")]
-        public async Task<IActionResult> GetDigital201File([Required][FromQuery] string employeeNumber)
+        public async Task<IActionResult> GetDigital201File([Required][FromQuery] string employeeNumber, [FromServices] IActivityLogService activityLogService)
         {
             var result = await accountManagementService.GetDigital201File(employeeNumber);
             if (!result.IsSuccess)
             {
                 return NotFound(result);
             }
+
+            var accountIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(accountIdStr, out Guid accountId))
+            {
+                await activityLogService.LogActivityAsync(accountId, "Read", $"Viewed Digital 201 File of Employee {employeeNumber}");
+            }
+
             return Ok(result);
         }
 
