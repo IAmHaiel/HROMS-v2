@@ -563,7 +563,11 @@ namespace OTMS.Service.Services
                         FileSize = a.FileSize,
                         Version = a.Version,
                         DocumentType = a.DocumentType,
-                        IsArchived = a.IsArchived
+                        IsArchived = a.IsArchived,
+                        DocumentTitle = a.DocumentTitle,
+                        IssueDate = a.IssueDate,
+                        ExpiryDate = a.ExpiryDate,
+                        Remarks = a.Remarks
                     }).ToList()
                 }
             };
@@ -575,8 +579,31 @@ namespace OTMS.Service.Services
             if (employee == null)
                 return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Employee not found." };
 
+            // 1. Validate File Format (must be PDF, JPG, or PNG)
+            var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+            if (extension != ".pdf" && extension != ".jpg" && extension != ".jpeg" && extension != ".png")
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Invalid file format. Only PDF, JPG, and PNG are allowed." };
+            }
+
+            // 2. Validate File Size (must not exceed 10MB)
+            if (request.File.Length > 10 * 1024 * 1024)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "File exceeds maximum allowable size of 10MB." };
+            }
+
+            // 3. Validate Expiry Date (not earlier than Issue Date)
+            if (request.ExpiryDate.HasValue && request.ExpiryDate.Value.Date < request.IssueDate.Date)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Expiry Date cannot be earlier than Issue Date." };
+            }
+
             var attachment = await fileService.SaveFileAsync(request.File, employee.EmployeeId);
             attachment.DocumentType = request.DocumentType;
+            attachment.DocumentTitle = request.DocumentTitle;
+            attachment.IssueDate = request.IssueDate;
+            attachment.ExpiryDate = request.ExpiryDate;
+            attachment.Remarks = request.Remarks;
             attachment.IsArchived = false;
 
             context.EmployeeAttachments.Add(attachment);
@@ -585,7 +612,7 @@ namespace OTMS.Service.Services
             return new ApiResponseDTO<EmployeeAttachmentDTO>
             {
                 IsSuccess = true,
-                Message = "Document uploaded successfully.",
+                Message = "Document uploaded and indexed successfully.",
                 Data = new EmployeeAttachmentDTO
                 {
                     EmployeeAttachmentId = attachment.EmployeeAttachmentId,
@@ -595,7 +622,11 @@ namespace OTMS.Service.Services
                     FileSize = attachment.FileSize,
                     Version = attachment.Version,
                     DocumentType = attachment.DocumentType,
-                    IsArchived = attachment.IsArchived
+                    IsArchived = attachment.IsArchived,
+                    DocumentTitle = attachment.DocumentTitle,
+                    IssueDate = attachment.IssueDate,
+                    ExpiryDate = attachment.ExpiryDate,
+                    Remarks = attachment.Remarks
                 }
             };
         }
@@ -713,6 +744,10 @@ namespace OTMS.Service.Services
                 DocumentType = ea.DocumentType,
                 IsArchived = ea.IsArchived,
                 UploadedAt = ea.UploadedAt,
+                DocumentTitle = ea.DocumentTitle,
+                IssueDate = ea.IssueDate,
+                ExpiryDate = ea.ExpiryDate,
+                Remarks = ea.Remarks,
                 EmployeeNumber = ea.Employee.EmployeeNumber,
                 FirstName = ea.Employee.FirstName,
                 LastName = ea.Employee.LastName,

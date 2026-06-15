@@ -10,5 +10,10 @@ namespace OTMS.Entities.DTOs
         public int Version { get; set; }
         public string DocumentType { get; set; } = string.Empty;
         public bool IsArchived { get; set; }
+
+        public string DocumentTitle { get; set; } = string.Empty;
+        public DateTime IssueDate { get; set; }
+        public DateTime? ExpiryDate { get; set; }
+        public string? Remarks { get; set; }
     }
 }
