@@ -17,5 +17,8 @@ namespace OTMS.Service.Interfaces
         Task<AssignUserRoleResponseDTO?> AssignUserRole(AssignUserRoleDTO request);
         Task<DeleteUserResponseDTO?> DeleteUser(DeactivateUserDTO request);
         Task<ApiResponseDTO<Digital201FileResponseDTO>> GetDigital201File(string employeeNumber);
+        Task<ApiResponseDTO<EmployeeAttachmentDTO>> UploadEmployeeDocument(string employeeNumber, UploadEmployeeDocumentDTO request);
+        Task<ApiResponseDTO<EmployeeAttachmentDTO>> UpdateEmployeeDocument(Guid attachmentId, UpdateEmployeeDocumentDTO request);
+        Task<ApiResponseDTO<object>> ArchiveEmployeeDocument(Guid attachmentId);
     }
 }

@@ -285,5 +285,53 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Upload a document to an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
+        [HttpPost("documents/upload")]
+        public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request)
+        {
+            var result = await accountManagementService.UploadEmployeeDocument(employeeNumber, request);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Update a document in an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
+        [HttpPut("documents/{attachmentId}")]
+        public async Task<IActionResult> UpdateEmployeeDocument([FromRoute] Guid attachmentId, [FromForm] UpdateEmployeeDocumentDTO request)
+        {
+            var result = await accountManagementService.UpdateEmployeeDocument(attachmentId, request);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Archive a document in an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
+        [HttpPatch("documents/{attachmentId}/archive")]
+        public async Task<IActionResult> ArchiveEmployeeDocument([FromRoute] Guid attachmentId)
+        {
+            var result = await accountManagementService.ArchiveEmployeeDocument(attachmentId);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
     }
 }
