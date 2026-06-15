@@ -10,5 +10,17 @@ namespace OTMS.Entities.DTOs.AccountManagement
 
         [Required]
         public string DocumentType { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string DocumentTitle { get; set; } = string.Empty;
+
+        [Required]
+        public DateTime IssueDate { get; set; }
+
+        public DateTime? ExpiryDate { get; set; }
+
+        [MaxLength(500)]
+        public string? Remarks { get; set; }
     }
 }

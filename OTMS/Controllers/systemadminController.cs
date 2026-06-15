@@ -322,7 +322,7 @@ namespace OTMS.Controllers
         [Authorize]
         [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
         [HttpPost("documents/upload")]
-        public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request)
+        public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request, [FromServices] IActivityLogService activityLogService)
         {
             var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(claimProfile))
@@ -343,6 +343,13 @@ namespace OTMS.Controllers
             {
                 return BadRequest(result);
             }
+
+            var accountIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(accountIdStr, out Guid accountId))
+            {
+                await activityLogService.LogActivityAsync(accountId, "Create", $"Uploaded {request.DocumentType} document for Employee {employeeNumber}");
+            }
+
             return Ok(result);
         }
 
