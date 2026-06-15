@@ -13,6 +13,7 @@ namespace OTMS.Entities.DTOs.AccountManagement.Responses
         public string DocumentType { get; set; } = string.Empty;
         public bool IsArchived { get; set; }
         public DateTime UploadedAt { get; set; }
+        public string ContractStatus { get; set; } = string.Empty;
 
         public string DocumentTitle { get; set; } = string.Empty;
         public DateTime IssueDate { get; set; }

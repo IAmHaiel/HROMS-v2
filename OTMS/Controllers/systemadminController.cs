@@ -429,5 +429,28 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Upload an employment contract to the repository.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
+        [HttpPost("contracts/upload")]
+        public async Task<IActionResult> UploadEmploymentContract([Required][FromQuery] string employeeNumber, [FromForm] UploadEmploymentContractDTO request, [FromServices] IActivityLogService activityLogService)
+        {
+            var result = await accountManagementService.UploadEmploymentContract(employeeNumber, request);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+
+            var accountIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(accountIdStr, out Guid accountId))
+            {
+                await activityLogService.LogActivityAsync(accountId, "Create", $"Uploaded {request.ContractType} contract for Employee {employeeNumber}");
+            }
+
+            return Ok(result);
+        }
+
     }
 }

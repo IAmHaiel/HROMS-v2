@@ -702,6 +702,103 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<EmployeeAttachmentDTO>> UploadEmploymentContract(string employeeNumber, UploadEmploymentContractDTO request)
+        {
+            var employee = await context.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+            if (employee == null)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Employee not found." };
+            }
+
+            var extension = System.IO.Path.GetExtension(request.File.FileName).ToLower();
+            if (extension != ".pdf" || request.File.ContentType.ToLower() != "application/pdf")
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Invalid file format. Employment contracts must be uploaded as PDF." };
+            }
+
+            if (request.File.Length > 15 * 1024 * 1024)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "File exceeds maximum allowable size of 15MB." };
+            }
+
+            if (request.EffectiveEndDate.HasValue && request.EffectiveEndDate.Value.Date < request.EffectiveStartDate.Date)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Effective End Date cannot be earlier than Start Date." };
+            }
+
+            var existingContracts = await context.EmployeeAttachments
+                .Where(a => a.EmployeeId == employee.EmployeeId && a.IsArchived == false && (a.DocumentType == "Employment Contracts" || a.DocumentType == "Contract" || a.DocumentType.Contains("Contract")))
+                .ToListAsync();
+
+            bool hasOverlap = false;
+
+            foreach (var c in existingContracts)
+            {
+                // Check if fully in the past
+                if (c.ExpiryDate.HasValue && c.ExpiryDate.Value.Date < request.EffectiveStartDate.Date)
+                {
+                    c.IsArchived = true;
+                    continue;
+                }
+
+                // Check if open-ended and starts before new contract (Supersede scenario)
+                if (!c.ExpiryDate.HasValue && c.IssueDate.Date < request.EffectiveStartDate.Date)
+                {
+                    c.ExpiryDate = request.EffectiveStartDate.Date.AddDays(-1);
+                    c.IsArchived = true;
+                    continue;
+                }
+
+                // Check overlap
+                var startC = c.IssueDate.Date;
+                var endC = c.ExpiryDate?.Date ?? DateTime.MaxValue.Date;
+                var startN = request.EffectiveStartDate.Date;
+                var endN = request.EffectiveEndDate?.Date ?? DateTime.MaxValue.Date;
+
+                if (startC <= endN && startN <= endC)
+                {
+                    hasOverlap = true;
+                    break;
+                }
+            }
+
+            if (hasOverlap)
+            {
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Overlapping active contracts detected. Please review effective dates." };
+            }
+
+            var attachment = await fileService.SaveFileAsync(request.File, employee.EmployeeId);
+            attachment.DocumentType = "Employment Contract";
+            attachment.DocumentTitle = request.ContractType;
+            attachment.IssueDate = request.EffectiveStartDate;
+            attachment.ExpiryDate = request.EffectiveEndDate;
+            attachment.IsArchived = false;
+
+            context.EmployeeAttachments.Add(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<EmployeeAttachmentDTO>
+            {
+                IsSuccess = true,
+                Message = "Contract uploaded successfully. Timeline updated.",
+                Data = new EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = attachment.EmployeeAttachmentId,
+                    FileName = attachment.FileName,
+                    FileUrl = attachment.FilePath,
+                    ContentType = attachment.ContentType,
+                    FileSize = attachment.FileSize,
+                    Version = attachment.Version,
+                    DocumentType = attachment.DocumentType,
+                    IsArchived = attachment.IsArchived,
+                    DocumentTitle = attachment.DocumentTitle,
+                    IssueDate = attachment.IssueDate,
+                    ExpiryDate = attachment.ExpiryDate,
+                    Remarks = attachment.Remarks
+                }
+            };
+        }
+
         public async Task<ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>> GetAllEmploymentContracts(PaginationDTO request, string? search, bool? isArchived)
         {
             var query = context.EmployeeAttachments
@@ -744,6 +841,11 @@ namespace OTMS.Service.Services
                 DocumentType = ea.DocumentType,
                 IsArchived = ea.IsArchived,
                 UploadedAt = ea.UploadedAt,
+                ContractStatus = ea.IsArchived 
+                    ? "Archived" 
+                    : (ea.IssueDate.Date > DateTime.UtcNow.Date 
+                        ? "Pending Activation" 
+                        : (ea.ExpiryDate.HasValue && ea.ExpiryDate.Value.Date < DateTime.UtcNow.Date ? "Archived" : "Active")),
                 DocumentTitle = ea.DocumentTitle,
                 IssueDate = ea.IssueDate,
                 ExpiryDate = ea.ExpiryDate,
