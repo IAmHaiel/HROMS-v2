@@ -115,6 +115,7 @@ builder.Services.AddScoped<IEmergencyOverrideService, EmergencyOverrideService>(
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ISystemAdminService, SystemAdminService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IReportingService, ReportingService>();
 
 builder.Services.AddMailKit(config =>
 {

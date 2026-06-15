@@ -105,6 +105,7 @@ namespace OTMS.Service.Services
 
                 TaskTitle = request.TaskTitle,
                 TaskDescription = request.TaskDescription,
+                TaskCategory = request.TaskCategory,
                 Priority = request.Priority,
                 DueAt = request.DueAt,
 
@@ -205,6 +206,7 @@ namespace OTMS.Service.Services
             // Update Fields
             task.TaskTitle = request.TaskTitle;
             task.TaskDescription = request.TaskDescription;
+            task.TaskCategory = request.TaskCategory;
             task.Priority = request.Priority;
             task.DueAt = request.DueAt;
             task.AssignedTo = request.AssignedTo;
@@ -908,6 +910,11 @@ namespace OTMS.Service.Services
             if (!string.IsNullOrWhiteSpace(request.PriorityLevel))
             {
                 query = query.Where(t => t.Priority == request.PriorityLevel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.TaskCategory))
+            {
+                query = query.Where(t => t.TaskCategory == request.TaskCategory);
             }
 
             if (request.DeadlineDate.HasValue)
