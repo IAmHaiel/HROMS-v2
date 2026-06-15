@@ -43,6 +43,8 @@ import LeaveRequestModal, {
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
+import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
+import ActionButton from '../../components/ActionButton/ActionButton';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -204,9 +206,20 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
                 <span className="task-name">{task.taskTitle}</span>
                 <span className={statusBadgeClass(effectiveStatus)}>{effectiveStatus}</span>
                 {showEditBtn && onEdit && (
-                    <button className="btn btn-xs" onClick={e => { e.stopPropagation(); onEdit(task.taskId); }}>
-                        <Pencil size={11} /> Edit
-                    </button>
+                    <ActionsDropdown
+                        actions={[
+                            {
+                                label: 'Edit',
+                                icon: <Pencil size={12} />,
+                                onClick: () => onEdit(task.taskId)
+                            },
+                            {
+                                label: 'View Details',
+                                icon: <Eye size={12} />,
+                                onClick: () => onView(task.taskId)
+                            }
+                        ]}
+                    />
                 )}
             </div>
             <div className="task-row-bottom">
@@ -730,11 +743,13 @@ const TasksTab: React.FC<{
     binTasks: Task[];
     loading: boolean;
     searchQuery: string;
+    setSearchQuery: (query: string) => void;
     onView: (id: string) => void;
     onEdit: (id: string) => void;
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
-}> = ({ tasks, allTasks, binTasks, loading, searchQuery, onView, onEdit, onRestore, onEmptyBin }) => {
+    onNewTask: () => void;
+}> = ({ tasks, allTasks, binTasks, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
@@ -749,48 +764,18 @@ const TasksTab: React.FC<{
 
     return (
         <div className="dashboard-content">
-
-            {/* ── Subtab Bar ── */}
-            <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 16, background: 'var(--bg-card)', borderRadius: '12px 12px 0 0', padding: '0 20px' }}>
-                {([
-                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, count: tasks.length },
-                    { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, count: deletedTasks.length },
-                ] as const).map(({ key, label, icon, count }) => (
-                    <button
-                        key={key}
-                        onClick={() => setSubTab(key)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            padding: '13px 16px',
-                            fontSize: 13, fontWeight: 500,
-                            border: 'none', background: 'none', cursor: 'pointer',
-                            borderBottom: `2px solid ${subTab === key ? 'var(--primary)' : 'transparent'}`,
-                            color: subTab === key ? 'var(--primary)' : 'var(--text-secondary)',
-                            marginBottom: -1,
-                        }}
-                    >
-                        {icon}
-                        {label}
-                        {count > 0 && (
-                            <span style={{
-                                fontSize: 11, fontWeight: 600,
-                                padding: '1px 7px', borderRadius: 999,
-                                background: key === 'bin'
-                                    ? 'rgba(238,93,80,0.12)'
-                                    : subTab === key ? 'rgba(67,24,255,0.1)' : 'var(--border)',
-                                color: key === 'bin' ? 'var(--status-failed)' : subTab === key ? 'var(--primary)' : 'var(--text-secondary)',
-                            }}>
-                                {count}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </div>
-
-            {/* ══ ACTIVE TASKS PANE ══ */}
-            {subTab === 'active' && (
-                <>
-                    <div className="filter-bar" style={{ marginBottom: 12 }}>
+            <TableCard
+                tabs={[
+                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.length },
+                    { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, badge: deletedTasks.length },
+                ]}
+                activeTab={subTab}
+                onTabChange={key => setSubTab(key as 'active' | 'bin')}
+                searchQuery={subTab === 'active' ? searchQuery : undefined}
+                setSearchQuery={subTab === 'active' ? setSearchQuery : undefined}
+                searchPlaceholder="Search tasks..."
+                filterElements={subTab === 'active' ? (
+                    <>
                         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                             <option value="">All Statuses</option>
                             <option value="Pending">Pending</option>
@@ -804,94 +789,78 @@ const TasksTab: React.FC<{
                             <option value="Medium">Medium</option>
                             <option value="Low">Low</option>
                         </select>
-                    </div>
-                    <div className="card">
-                        {loading ? (
-                            <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
-                        ) : filtered.length === 0 ? (
-                            <div className="empty-state"><Package size={20} /><p>No tasks match filters</p></div>
-                        ) : filtered.map(t => (
-                            <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
-                        ))}
-                    </div>
-                </>
-            )}
-
-            {/* ══ BIN PANE ══ */}
-            {subTab === 'bin' && (
-                <div className="card">
-                    {/* Bin notice */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    </>
+                ) : (
+                    deletedTasks.length > 0 ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'rgba(238,93,80,0.06)', border: '1px solid rgba(238,93,80,0.18)', borderRadius: 10, fontSize: 13, color: '#b42318', flex: 1 }}>
                             <Trash2 size={14} />
                             Items in the bin are soft-deleted. You can restore them or empty the bin.
                         </div>
-                        {deletedTasks.length > 0 && (
-                            <button
-                                className="btn btn-danger"
-                                style={{ marginLeft: 12, whiteSpace: 'nowrap' }}
-                                onClick={() => onEmptyBin()}
-                            >
-                                <Trash2 size={13} /> Empty Bin
-                            </button>
-                        )}
+                    ) : undefined
+                )}
+                actionButton={subTab === 'active' ? {
+                    label: 'New Task',
+                    icon: <Plus size={14} />,
+                    onClick: onNewTask
+                } : (
+                    deletedTasks.length > 0 ? {
+                        label: 'Empty Bin',
+                        icon: <Trash2 size={13} />,
+                        onClick: onEmptyBin
+                    } : undefined
+                )}
+                headers={subTab === 'bin' ? ['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE', 'ACTIONS'] : undefined}
+                loading={loading}
+                emptyIcon={subTab === 'bin' ? <Trash2 size={24} /> : <Package size={20} />}
+                emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No tasks match filters'}
+            >
+                {subTab === 'active' ? (
+                    <div style={{ padding: '0 20px 20px' }}>
+                        {filtered.map(t => (
+                            <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
+                        ))}
                     </div>
-
-                    {deletedTasks.length === 0 ? (
-                        <div className="empty-state">
-                            <Trash2 size={24} />
-                            <p>Bin is empty</p>
-                        </div>
-                    ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>TASK</th>
-                                    <th>ASSIGNEE</th>
-                                    <th>PRIORITY</th>
-                                    <th>DUE DATE</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {deletedTasks.map(t => (
-                                    <tr key={t.taskId} style={{ opacity: 0.75 }}>
-                                        <td>
-                                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
-                                                {t.taskTitle}
-                                            </div>
-                                            {t.taskDescription && (
-                                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {t.taskDescription}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                            {t.assignedEmployee || '—'}
-                                        </td>
-                                        <td><PrioBadge p={t.priority} /></td>
-                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                            {t.dueAt ? fmtDate(t.dueAt) : '—'}
-                                        </td>
-                                        <td>
-                                            <button
-                                                className="btn btn-xs"
-                                                style={{ background: 'rgba(5,205,153,0.1)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }}
-                                                onClick={() => onRestore(t.taskId)}
-                                            >
-                                                <CheckCircle2 size={11} /> Restore
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            )}
+                ) : (
+                    deletedTasks.map(t => (
+                        <tr key={t.taskId} style={{ opacity: 0.75 }}>
+                            <td>
+                                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
+                                    {t.taskTitle}
+                                </div>
+                                {t.taskDescription && (
+                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {t.taskDescription}
+                                    </div>
+                                )}
+                            </td>
+                            <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                                {t.assignedEmployee || '—'}
+                            </td>
+                            <td><PrioBadge p={t.priority} /></td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                {t.dueAt ? fmtDate(t.dueAt) : '—'}
+                            </td>
+                            <td>
+                                <ActionsDropdown
+                                    actions={[
+                                        {
+                                            label: 'Restore',
+                                            icon: <CheckCircle2 size={12} />,
+                                            onClick: () => onRestore(t.taskId),
+                                            variant: 'success'
+                                        }
+                                    ]}
+                                />
+                            </td>
+                        </tr>
+                    ))
+                )}
+            </TableCard>
         </div>
     );
-    };
+};
+
+
 
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
@@ -1892,97 +1861,41 @@ const LeaveTab: React.FC<{
                 ))}
             </div>
 
-            {/* History card */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="card-header-layout" style={{ padding: '16px 20px 14px' }}>
-                    <h3>My Leave History</h3>
-                </div>
-
-                {/* Filter pills */}
-                <div style={{ padding: '0 20px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {(['all', 'Pending', 'Approved', 'Declined'] as const).map(f => (
-                        <button
-                            key={f}
-                            className={`filter-pill${histFilter === f ? ' active' : ''}`}
-                            onClick={() => handleFilterChange(f)}
-                            style={{ fontSize: 12, padding: '4px 11px' }}
-                        >
-                            {f === 'all' ? 'All' : f}
-                            <span style={{
-                                marginLeft: 5, fontSize: 11, fontWeight: 600,
-                                padding: '1px 6px', borderRadius: 999,
-                                background: histFilter === f ? 'rgba(67,24,255,0.15)' : 'var(--border)',
-                                color: histFilter === f ? 'var(--primary)' : 'var(--text-secondary)',
-                            }}>
-                                {f === 'all' ? records.length : records.filter(r => r.status === f).length}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-
-                {/* Records list */}
-                <div style={{ padding: '0 20px' }}>
-                    {loading ? (
-                        <div className="empty-state" style={{ padding: '32px 0' }}>
-                            <Loader2 size={20} className="spin" /><p>Loading leave records…</p>
-                        </div>
-                    ) : paginatedRecords.length === 0 ? (
-                        <div className="empty-state" style={{ padding: '36px 0' }}>
-                            <div style={{
-                                width: 56, height: 56, borderRadius: '50%',
-                                background: 'rgba(67,24,255,0.07)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                marginBottom: 8,
-                            }}>
-                                <CalendarDays size={26} color="var(--primary)" />
-                            </div>
-                            <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                {histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`}
-                            </p>
-                            {histFilter === 'all' && (
-                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                    Click "Request Leave" to submit your first request.
+            <TableCard
+                title="My Leave History"
+                filterElements={
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {(['all', 'Pending', 'Approved', 'Declined'] as const).map(f => (
+                            <button
+                                key={f}
+                                className={`filter-pill${histFilter === f ? ' active' : ''}`}
+                                onClick={() => handleFilterChange(f)}
+                                style={{ fontSize: 12, padding: '4px 11px' }}
+                            >
+                                {f === 'all' ? 'All' : f}
+                                <span style={{
+                                    marginLeft: 5, fontSize: 11, fontWeight: 600,
+                                    padding: '1px 6px', borderRadius: 999,
+                                    background: histFilter === f ? 'rgba(67,24,255,0.15)' : 'var(--border)',
+                                    color: histFilter === f ? 'var(--primary)' : 'var(--text-secondary)',
+                                }}>
+                                    {f === 'all' ? records.length : records.filter(r => r.status === f).length}
                                 </span>
-                            )}
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
-                            {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
-                        </div>
-                    )}
-                </div>
-
-                {/* Pagination */}
-                {sortedRecords.length > PAGE_SIZE && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 20px', borderTop: '1px solid var(--border)',
-                    }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                            Showing {(currentPage - 1) * PAGE_SIZE + 1}–
-                            {Math.min(currentPage * PAGE_SIZE, sortedRecords.length)} of {sortedRecords.length}
-                        </span>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}>
-                                <ChevronLeft size={13} />
                             </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                                <button
-                                    key={page}
-                                    className={`btn btn-xs${currentPage === page ? ' btn-primary' : ''}`}
-                                    onClick={() => setCurrentPage(page)}
-                                    style={{ minWidth: 28 }}
-                                >
-                                    {page}
-                                </button>
-                            ))}
-                            <button className="btn btn-xs" onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}>
-                                <ChevronRight size={13} />
-                            </button>
-                        </div>
+                        ))}
                     </div>
-                )}
-            </div>
+                }
+                loading={loading}
+                emptyIcon={<CalendarDays size={26} color="var(--primary)" />}
+                emptyMessage={histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+            >
+                <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+                    {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
+                </div>
+            </TableCard>
 
             {showModal && (
                 <LeaveRequestModal
@@ -2457,7 +2370,7 @@ export default function OpsAdminDashboard() {
                     onSettingsClick={() => setActiveTab('profile')}
                     onLogout={handleLogout}
                 >
-                    {activeTab !== 'profile' && activeTab !== 'leave' && (
+                    {activeTab !== 'profile' && activeTab !== 'leave' && activeTab !== 'tasks' && (
                         <>
                             <div className="header-search">
                                 <Search size={15} />
@@ -2468,9 +2381,9 @@ export default function OpsAdminDashboard() {
                                     onChange={e => setSearchQuery(e.target.value)}
                                 />
                             </div>
-                            <button className="quick-action-btn-header" onClick={() => setShowNew(true)}>
-                                <Plus size={18} /> New Task
-                            </button>
+                            <ActionButton icon={<Plus size={18} />} onClick={() => setShowNew(true)}>
+                                New Task
+                            </ActionButton>
                         </>
                     )}
                 </DashboardHeader>
@@ -2490,10 +2403,12 @@ export default function OpsAdminDashboard() {
                         binTasks={binTasks}
                         loading={loadingTasks}
                         searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
                         onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
                         onEdit={id => setEditingTask(tasks.find(t => t.taskId === id) ?? null)}
                         onRestore={handleRestoreTask}
                         onEmptyBin={handleEmptyBin}
+                        onNewTask={() => setShowNew(true)}
                     />
                 )}
                 {activeTab === 'team' && (

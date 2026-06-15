@@ -1,0 +1,463 @@
+/* ─── FormModal.css ───
+   Scoped styles for the global, premium FormModal component
+*/
+
+.fm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fmFadeIn 0.2s ease-out;
+}
+
+@keyframes fmFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fm-card {
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    width: 100%;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    animation: fmSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fm-form-wrapper {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+    flex: 1;
+}
+
+.fm-modal-form-container {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    min-height: 0;
+    flex: 1;
+}
+
+@keyframes fmSlideIn {
+    from { transform: scale(0.96) translateY(12px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.fm-size-sm {
+    max-width: 480px;
+}
+
+.fm-size-md {
+    max-width: 600px;
+}
+
+.fm-size-lg {
+    max-width: 800px;
+}
+
+/* ─── Header ─── */
+.fm-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid #f1f5f9;
+    background: #ffffff;
+    flex-shrink: 0;
+}
+
+.fm-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+}
+
+.fm-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+    font-weight: 500;
+}
+
+.fm-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+    flex-shrink: 0;
+}
+
+.fm-close-btn:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+
+/* ─── Info Card ─── */
+.fm-info-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 16px 28px 8px;
+    padding: 12px 20px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+}
+
+.fm-info-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #dbeafe;
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.fm-info-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.fm-info-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 2px 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fm-info-subtext {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.fm-info-badge-container {
+    flex-shrink: 0;
+}
+
+.fm-info-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Status variants with circular dot bullets */
+.fm-info-badge.active {
+    background: #ecfdf5;
+    color: #059669;
+}
+.fm-info-badge.active .fm-badge-dot {
+    background: #10b981;
+}
+
+.fm-info-badge.deactivated {
+    background: #fef2f2;
+    color: #dc2626;
+}
+.fm-info-badge.deactivated .fm-badge-dot {
+    background: #ef4444;
+}
+
+.fm-info-badge.on-leave {
+    background: #fffbeb;
+    color: #d97706;
+}
+.fm-info-badge.on-leave .fm-badge-dot {
+    background: #f59e0b;
+}
+
+.fm-info-badge.emergency-overriden {
+    background: #f5f3ff;
+    color: #4f46e5;
+}
+.fm-info-badge.emergency-overriden .fm-badge-dot {
+    background: #6366f1;
+}
+
+.fm-info-badge.pending {
+    background: #eff6ff;
+    color: #2563eb;
+}
+.fm-info-badge.pending .fm-badge-dot {
+    background: #3b82f6;
+}
+
+.fm-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: block;
+}
+
+/* ─── Body ─── */
+.fm-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 28px 24px;
+}
+
+/* Custom premium scrollbar for modern aesthetics */
+.fm-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.fm-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fm-body::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.fm-body::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ─── API error message ─── */
+.fm-api-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 28px 0;
+    padding: 10px 18px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13.5px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid #fca5a5;
+}
+
+/* ─── Form Section Division ─── */
+.fm-section {
+    margin-bottom: 24px;
+}
+
+.fm-section:last-child {
+    margin-bottom: 0;
+}
+
+.fm-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f5f9;
+    margin: 0 0 16px 0;
+}
+
+/* ─── Form Inputs and Controls ─── */
+.fm-field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.fm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fm-field-full {
+    grid-column: span 2;
+}
+
+.fm-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.fm-label .optional {
+    font-size: 10px;
+    color: #94a3b8;
+    text-transform: lowercase;
+    font-weight: 500;
+}
+
+.fm-input,
+.fm-select {
+    padding: 8px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #1e293b;
+    background: #ffffff;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+    width: 100%;
+    font-weight: 500;
+}
+
+.fm-input:focus,
+.fm-select:focus {
+    border-color: #4318ff;
+    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.12);
+}
+
+.fm-input::placeholder {
+    color: #94a3b8;
+}
+
+/* Custom dropdown chevron styles */
+.fm-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2.5'><path stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+/* Dual input row styling if not using grid */
+.fm-field-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.fm-field-row:last-child {
+    margin-bottom: 0;
+}
+
+.fm-field-row .fm-field {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* ─── Footer ─── */
+.fm-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 12px 28px;
+    border-top: 1px solid #f1f5f9;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+
+/* ─── Footer Action Buttons ─── */
+.fm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+    user-select: none;
+}
+
+.fm-btn:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+
+.fm-btn:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.fm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.fm-btn-primary {
+    background: #4318ff;
+    border-color: #4318ff;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(67, 24, 255, 0.15);
+}
+
+.fm-btn-primary:hover:not(:disabled) {
+    background: #3310d6;
+    border-color: #3310d6;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(67, 24, 255, 0.25);
+}
+
+.fm-btn-cancel {
+    background: #ffffff;
+    color: #64748b;
+    border-color: #cbd5e1;
+}
+
+.fm-btn-cancel:hover:not(:disabled) {
+    background: #f8fafc;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.fm-btn-danger {
+    background: #ffffff;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.fm-btn-danger:hover:not(:disabled) {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #f87171;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
+/* Loader Spin */
+.fm-spin {
+    animation: fmSpin 1s linear infinite;
+}
+
+@keyframes fmSpin {
+    to { transform: rotate(360deg); }
+}

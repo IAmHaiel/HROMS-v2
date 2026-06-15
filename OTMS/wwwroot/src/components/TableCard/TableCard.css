@@ -1,0 +1,455 @@
+/* ─── TableCard Component Styles ─── */
+
+.table-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-card, #ffffff);
+    border-radius: var(--radius, 16px);
+    border: 1px solid var(--border, #e8ecf4);
+    box-shadow: var(--shadow-sm, 0 2px 12px rgba(15, 21, 53, 0.06));
+    transition: var(--transition, all 0.22s cubic-bezier(0.4, 0, 0.2, 1));
+    /* Do NOT use overflow:hidden here — it clips the actions dropdown */
+    overflow: visible;
+}
+
+.table-card:hover {
+    box-shadow: var(--shadow-md, 0 8px 32px rgba(15, 21, 53, 0.10));
+}
+
+/* ── Tabs Header ── */
+.table-card-tabs {
+    display: flex;
+    gap: 24px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border, #e8ecf4);
+    background: transparent;
+    /* Keep tab area clipped to card radius without clipping dropdown */
+    border-radius: var(--radius, 16px) var(--radius, 16px) 0 0;
+}
+
+.table-card-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-secondary, #8a95b0);
+    position: relative;
+    transition: color 0.2s ease;
+}
+
+.table-card-tab-btn:hover {
+    color: var(--text-primary, #1a2332);
+}
+
+.table-card-tab-btn.active {
+    color: var(--primary, #4318ff);
+}
+
+.table-card-tab-btn::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary, #4318ff);
+    border-radius: 99px 99px 0 0;
+    transform: scaleX(0);
+    transition: transform 0.2s ease;
+}
+
+.table-card-tab-btn.active::after {
+    transform: scaleX(1);
+}
+
+.table-card-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f4f7fe;
+    color: var(--text-secondary, #8a95b0);
+    transition: all 0.2s ease;
+}
+
+.table-card-tab-badge.active {
+    background: var(--primary-light, rgba(67, 24, 255, 0.08));
+    color: var(--primary, #4318ff);
+}
+
+/* ── Filter / Search Bar ── */
+.table-card-results-info {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #8a95b0);
+    font-weight: 500;
+}
+
+.table-card-filter-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-bottom: 14px;
+}
+
+.table-card-search-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+}
+
+.table-card-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary, #8a95b0);
+    pointer-events: none;
+}
+
+.table-card-search-input {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px 0 36px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1.5px solid var(--border, #e8ecf4);
+    background: white;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-primary, #1a2332);
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+}
+
+.table-card-search-input:focus {
+    border-color: var(--primary, #4318ff);
+    box-shadow: 0 0 0 3px var(--primary-light, rgba(67, 24, 255, 0.08));
+}
+
+/* ── Select Dropdowns Styling ── */
+.table-card-filter-bar select {
+    height: 38px;
+    padding: 0 32px 0 14px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1.5px solid var(--border, #e8ecf4);
+    background-color: white;
+    color: var(--text-primary, #1a2332);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+
+    /* Custom premium chevron arrow */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a95b0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+}
+
+.table-card-filter-bar select:hover {
+    border-color: #cbd5e1;
+    background-color: #fcfdfe;
+}
+
+.table-card-filter-bar select:focus {
+    border-color: var(--primary, #4318ff);
+    box-shadow: 0 0 0 3px var(--primary-light, rgba(67, 24, 255, 0.08));
+}
+
+/* ── Filter Pills Styling ── */
+.table-card-filter-bar .filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    height: 32px;
+    border-radius: var(--radius-full, 99px);
+    border: 1.5px solid var(--border, #e8ecf4);
+    background: white;
+    color: var(--text-secondary, #8a95b0);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.table-card-filter-bar .filter-pill:hover {
+    border-color: var(--primary, #4318ff);
+    color: var(--primary, #4318ff);
+    background: var(--primary-light, rgba(67, 24, 255, 0.03));
+}
+
+.table-card-filter-bar .filter-pill.active {
+    border-color: var(--primary, #4318ff);
+    color: var(--primary, #4318ff);
+    background: var(--primary-light, rgba(67, 24, 255, 0.08));
+    box-shadow: 0 2px 8px rgba(67, 24, 255, 0.12);
+}
+
+
+/* ── Table Wrap and Styles ── */
+.table-card-wrap {
+    overflow-x: auto;
+    /* Allow vertical overflow so the actions dropdown can escape the table bounds */
+    overflow-y: visible;
+    flex: 1;
+    width: 100%;
+}
+
+.table-card-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.table-card-data-table thead tr {
+    background: #0d1b2e;
+}
+
+.table-card-data-table th {
+    padding: 12px 18px;
+    font-size: 0.69rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 0.06em;
+    border: none;
+    text-transform: uppercase;
+}
+
+.table-card-data-table th:first-child {
+    border-radius: var(--radius-sm, 8px) 0 0 var(--radius-sm, 8px);
+}
+
+.table-card-data-table th:last-child {
+    border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
+}
+
+.table-card-data-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border, #e8ecf4);
+    font-size: 0.84rem;
+    color: var(--text-primary, #1a2332);
+    font-weight: 500;
+}
+
+.table-card-data-table tbody tr {
+    transition: background 0.15s ease;
+}
+
+.table-card-data-table tbody tr:hover {
+    background: #f7f9fd;
+}
+
+.table-card-data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── Custom Body ── */
+.table-card-custom-body {
+    flex: 1;
+    width: 100%;
+}
+
+/* ── Empty State ── */
+.table-card-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: var(--text-secondary, #8a95b0);
+    font-size: 0.88rem;
+    font-weight: 500;
+    gap: 8px;
+    text-align: center;
+}
+
+.table-card-empty-state p {
+    margin: 0;
+}
+
+/* ── Pagination ── */
+.table-card-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border, #e8ecf4);
+    margin-top: auto;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.table-card-pagination-info {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #8a95b0);
+    font-weight: 500;
+}
+
+.table-card-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.table-card-page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm, 8px);
+    border: 1.5px solid var(--border, #e8ecf4);
+    background: white;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary, #1a2332);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.22s ease;
+    font-family: inherit;
+}
+
+.table-card-page-btn:hover:not(:disabled) {
+    background: #eef2ff;
+    border-color: var(--primary, #4318ff);
+    color: var(--primary, #4318ff);
+}
+
+.table-card-page-btn.active {
+    background: var(--primary, #4318ff);
+    border-color: var(--primary, #4318ff);
+    color: white;
+    box-shadow: 0 2px 7px rgba(67, 24, 255, 0.26);
+}
+
+.table-card-page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.table-card-page-btn-nav {
+    color: var(--text-secondary, #8a95b0);
+}
+
+.table-card-page-ellipsis {
+    font-size: 0.78rem;
+    color: var(--text-secondary, #8a95b0);
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Actions Dropdown ── */
+.actions-dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+
+.actions-dropdown-trigger {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #8a95b0);
+    padding: 6px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.actions-dropdown-trigger:hover {
+    background: rgba(15, 21, 53, 0.05);
+    color: var(--text-primary, #1a2332);
+}
+
+.actions-dropdown-trigger.active {
+    background: rgba(15, 21, 53, 0.08);
+    color: var(--primary, #4318ff);
+}
+
+.actions-dropdown-menu {
+    position: fixed;
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e8ecf4);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(26, 35, 50, 0.18);
+    padding: 6px;
+    min-width: 160px;
+    /* Use a very high z-index to always appear on top */
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    transform-origin: top right;
+    animation: dropdownFadeIn 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.actions-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-primary, #1a2332);
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    width: 100%;
+}
+
+.actions-dropdown-item:hover {
+    background: rgba(15, 21, 53, 0.04);
+}
+
+.actions-dropdown-item.danger {
+    color: #ee5d50;
+}
+
+.actions-dropdown-item.danger:hover {
+    background: rgba(238, 93, 80, 0.08);
+}
+
+.actions-dropdown-item.success {
+    color: #05cd99;
+}
+
+.actions-dropdown-item.success:hover {
+    background: rgba(5, 205, 153, 0.08);
+}

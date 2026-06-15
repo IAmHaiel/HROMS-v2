@@ -218,7 +218,7 @@ export default function RoleManagementTab() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.message || `Error ${res.status}: Create role failed`);
+                throw new Error(errorData.message || 'Failed to create role. Please try again.');
             }
 
             toastSuccess('Role created successfully!');
@@ -264,7 +264,7 @@ export default function RoleManagementTab() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.message || `Error ${res.status}: Update role failed`);
+                throw new Error(errorData.message || 'Failed to update role. Please try again.');
             }
 
             toastSuccess('Role permissions updated successfully!');
@@ -304,7 +304,7 @@ export default function RoleManagementTab() {
 
                     if (!res.ok) {
                         const errorData = await res.json().catch(() => ({}));
-                        throw new Error(errorData.message || `Error ${res.status}: Delete failed`);
+                        throw new Error(errorData.message || 'Failed to delete role. Please try again.');
                     }
 
                     toastSuccess('Role deleted successfully!');
@@ -333,7 +333,6 @@ export default function RoleManagementTab() {
         <div className="dashboard-content roles-tab-content">
             <div className="roles-header-row">
                 <div>
-                    <h3 className="section-title">Roles & Access Control</h3>
                     <p className="section-subtitle">Manage system user roles, permission mappings, and access levels.</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>

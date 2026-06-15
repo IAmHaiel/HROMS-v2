@@ -1,9 +1,10 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 .login-page,
 .login-page * {
     font-family: 'Montserrat', sans-serif !important;
 }
+
 /* ─────────────────────────────────────────
    GLOBAL
 ───────────────────────────────────────── */
@@ -30,9 +31,9 @@ body {
     transition: opacity 0.3s ease;
 }
 
-    .login-page.mounted {
-        opacity: 1;
-    }
+.login-page.mounted {
+    opacity: 1;
+}
 
 /* ─────────────────────────────────────────
    LEFT PANEL
@@ -48,30 +49,30 @@ body {
     background: var(--sidebar-bg);
 }
 
-    .login-left::before,
-    .login-left::after {
-        content: '';
-        position: absolute;
-        border-radius: 50%;
-        pointer-events: none;
-        border: 1px solid rgba(255, 255, 255, 0.04);
-    }
+.login-left::before,
+.login-left::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
 
-    .login-left::before {
-        width: 300px;
-        height: 300px;
-        top: -80px;
-        right: -100px;
-        background: rgba(255, 255, 255, 0.02);
-    }
+.login-left::before {
+    width: 300px;
+    height: 300px;
+    top: -80px;
+    right: -100px;
+    background: rgba(255, 255, 255, 0.02);
+}
 
-    .login-left::after {
-        width: 200px;
-        height: 200px;
-        bottom: -60px;
-        right: -40px;
-        background: rgba(255, 255, 255, 0.02);
-    }
+.login-left::after {
+    width: 200px;
+    height: 200px;
+    bottom: -60px;
+    right: -40px;
+    background: rgba(255, 255, 255, 0.02);
+}
 
 .login-left-content {
     position: relative;
@@ -161,17 +162,17 @@ body {
     gap: 4px;
 }
 
-    .feature-item strong {
-        font-size: 0.88rem;
-        font-weight: 600;
-        color: white;
-    }
+.feature-item strong {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: white;
+}
 
-    .feature-item span {
-        font-size: 0.76rem;
-        line-height: 1.5;
-        color: var(--sidebar-text);
-    }
+.feature-item span {
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--sidebar-text);
+}
 
 /* ─────────────────────────────────────────
    RIGHT PANEL
@@ -259,23 +260,23 @@ body {
     line-height: 1.4;
 }
 
-    .status-bar.error {
-        background: #fff1f1;
-        border: 1px solid #ffcdcd;
-        color: #e31a1a;
-    }
+.status-bar.error {
+    background: #fff1f1;
+    border: 1px solid #ffcdcd;
+    color: #e31a1a;
+}
 
-    .status-bar.success {
-        background: #f0fff8;
-        border: 1px solid #a8efd4;
-        color: #0a7a45;
-    }
+.status-bar.success {
+    background: #f0fff8;
+    border: 1px solid #a8efd4;
+    color: #0a7a45;
+}
 
-    .status-bar.info {
-        background: #fff8eb;
-        border: 1px solid #ffe4a0;
-        color: #7a5e22;
-    }
+.status-bar.info {
+    background: #fff8eb;
+    border: 1px solid #ffe4a0;
+    color: #7a5e22;
+}
 
 /* ─────────────────────────────────────────
    FORM
@@ -327,9 +328,9 @@ body {
     transition: color 0.2s ease;
 }
 
-    .toggle-pw:hover {
-        color: var(--text-primary);
-    }
+.toggle-pw:hover {
+    color: var(--text-primary);
+}
 
 .field-input {
     width: 100%;
@@ -345,20 +346,20 @@ body {
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-    .field-input:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(0, 169, 157, 0.12);
-    }
+.field-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 169, 157, 0.12);
+}
 
-    .field-input:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-    }
+.field-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
 
-    .field-input::placeholder {
-        color: var(--text-secondary);
-        opacity: 0.7;
-    }
+.field-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
 
 /* ─────────────────────────────────────────
    FORM OPTIONS
@@ -387,9 +388,9 @@ body {
     text-decoration: none;
 }
 
-    .forgot-link:hover {
-        text-decoration: underline;
-    }
+.forgot-link:hover {
+    text-decoration: underline;
+}
 
 /* ─────────────────────────────────────────
    BUTTON
@@ -414,19 +415,19 @@ body {
     transition: opacity 0.2s ease, transform 0.1s ease;
 }
 
-    .submit-btn:hover:not(:disabled) {
-        opacity: 0.9;
-    }
+.submit-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
 
-    .submit-btn:active:not(:disabled) {
-        transform: scale(0.99);
-    }
+.submit-btn:active:not(:disabled) {
+    transform: scale(0.99);
+}
 
-    .submit-btn:disabled,
-    .submit-btn.loading {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
+.submit-btn:disabled,
+.submit-btn.loading {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 /* ─────────────────────────────────────────
    BUTTON SPINNER
@@ -457,15 +458,15 @@ body {
     color: var(--text-secondary);
 }
 
-    .right-footer a {
-        color: var(--primary);
-        text-decoration: none;
-        font-weight: 600;
-    }
+.right-footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+}
 
-        .right-footer a:hover {
-            text-decoration: underline;
-        }
+.right-footer a:hover {
+    text-decoration: underline;
+}
 
 /* ─────────────────────────────────────────
    RESPONSIVE
@@ -494,7 +495,8 @@ body {
 
     .login-card {
         width: 100%;
-        max-width: 360px; /* was 440px */
+        max-width: 360px;
+        /* was 440px */
         padding: 40px 32px;
         display: flex;
         flex-direction: column;
@@ -529,4 +531,28 @@ body {
     color: #05cd99;
     margin-top: 4px;
     display: block;
+}
+
+/* Terms & Conditions style */
+.login-terms {
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--text-secondary, #A3AED0);
+    text-align: center;
+    margin-top: 12px;
+}
+
+.login-terms a {
+    color: #0891b2;
+    ;
+    /* Matching the deep red login button in the screenshot */
+    text-decoration: underline;
+    font-weight: 600;
+    transition: color 0.15s ease;
+}
+
+.login-terms a:hover {
+    color: #05738f;
+    ;
 }

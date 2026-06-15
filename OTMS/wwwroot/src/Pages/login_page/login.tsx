@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useToast } from '../../components/Toast/Toast';
 import './login.css';
 
 /* ── Types ── */
@@ -51,6 +52,7 @@ const dashboardRoutes: Record<UserRole, string> = {
 ══════════════════════════════════════════ */
 export default function Login() {
     const navigate = useNavigate();
+    const { success } = useToast();
 
     const [employeeId, setEmployeeId] = useState('');
     const [password, setPassword] = useState('');
@@ -181,6 +183,7 @@ export default function Login() {
             localStorage.setItem('employeeName', fullName || data.employeeName || '');
 
             updateStatus('Login successful. Redirecting...', 'success');
+            success('Login successful! Welcome back.');
 
             if (!data.isPasswordChanged) {
                 updateStatus('Please complete your account setup.', 'info');
@@ -275,7 +278,7 @@ export default function Login() {
                         {/* Employee ID */}
                         <div className="field-group">
                             <label htmlFor="employeeId" className="field-label">
-                                Employee ID
+                                Employee ID <span style={{ color: 'var(--status-failed, #E31A1A)' }}>*</span>
                             </label>
                             <div className={`field-wrapper${employeeIdError ? ' field-error' : employeeId && !employeeIdError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
@@ -294,7 +297,8 @@ export default function Login() {
                                     disabled={isLoading}
                                     autoComplete="username"
                                     autoFocus
-                                    maxLength={20}   
+                                    maxLength={20}
+                                    required
                                 />
                             </div>
                             {employeeIdError && (
@@ -305,7 +309,7 @@ export default function Login() {
                         {/* Password */}
                         <div className="field-group">
                             <label htmlFor="password" className="field-label">
-                                Password
+                                Password <span style={{ color: 'var(--status-failed, #E31A1A)' }}>*</span>
                             </label>
                             <div className={`field-wrapper${passwordError ? ' field-error' : password && !passwordError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
@@ -324,6 +328,7 @@ export default function Login() {
                                     disabled={isLoading}
                                     autoComplete="current-password"
                                     maxLength={100}
+                                    required
                                 />
                                 <button
                                     type="button"
@@ -359,11 +364,15 @@ export default function Login() {
                         >
                             {isLoading
                                 ? <span className="btn-spinner" aria-hidden="true" />
-                                : 'Sign In'
+                                : 'LOGIN'
                             }
                         </button>
 
                     </form>
+
+                    <div className="login-terms">
+                        By using this service, you understand and agree to the PUP Online Services <a href="#" className="terms-link">Terms of Use</a> and <a href="#" className="terms-link">Privacy Statement</a>.
+                    </div>
                     {/* Add the new links here */}
 
                     <p className="right-footer">

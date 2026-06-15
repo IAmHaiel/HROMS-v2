@@ -44,9 +44,12 @@ import { useToast } from '../../components/Toast/Toast';
 import EmployeeDetailPanel from './EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import FormModal from '../../components/FormModal/FormModal';
 import RoleManagementTab from './RoleManagementTab';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
+import ActionButton from '../../components/ActionButton/ActionButton';
+import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,6 +285,13 @@ const getInitials = (name: string): string => {
     return cleanName.slice(0, 2).toUpperCase();
 };
 
+const getStatusBadgeClass = (status?: string): string => {
+    const s = (status ?? 'Active').toLowerCase();
+    if (s === 'pending verification') return 'pending-badge';
+    if (s === 'on leave' || s === 'emergency overriden' || s === 'locked') return 'locked';
+    return s;
+};
+
 // ─── Shared Pagination Helper ─────────────────────────────────────────────────
 
 function getPageNumbers(total: number, current: number): (number | '...')[] {
@@ -337,7 +347,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 let next = 1;
                 while (usedNumbers.has(next)) next++;
                 setForm(prev => ({ ...prev, employeeNumber: String(next).padStart(4, '0') }));
-            } catch {
+            } catch (err) {
+                console.error('Error generating employee number:', err);
                 setEmpNumError('Could not generate employee number. Please try again.');
             } finally {
                 setEmpNumLoading(false);
@@ -370,33 +381,37 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         setApiError('');
         try {
             const token = localStorage.getItem('authToken');
-            const payload: EmployeeRegisterDTO = {
-                employeeNumber: form.employeeNumber,
-                role: toBackendRole(form.role),
-                email: form.email.trim(),
-            };
+            const formData = new FormData();
+            formData.append('EmployeeNumber', form.employeeNumber);
+            formData.append('Role', toBackendRole(form.role));
+            formData.append('Email', form.email.trim());
+
             const res = await fetch('/api/authorization/systemadmin/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(payload),
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
             });
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.message || `Error ${res.status}: Registration failed`);
+                throw new Error(errorData.message || 'Employee registration failed. Please try again.');
             }
-            const data = await res.json();
+            const responseData = await res.json();
+            if (!responseData.isSuccess || !responseData.data) {
+                throw new Error(responseData.message || 'Registration failed');
+            }
+            const data = responseData.data;
             setSuccessData({ employeeNumber: data.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber,
-                employeeName: data.employeeName ?? form.email.trim(),
+                employeeName: form.email.trim(),
                 firstName: '',
                 middleName: '',
                 lastName: '',
                 suffix: '',
                 contactNumber: '',
                 role: data.role,
-                accountStatus: 'Active',
+                accountStatus: 'Pending Verification',
                 email: form.email.trim(),
             });
         } catch (err: any) {
@@ -407,55 +422,97 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div>
-                        <h3>Add New Employee</h3>
-                        <p className="modal-subtitle">Fill in the details to register a new employee account.</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
-                </div>
-                {apiError && <div className="form-api-error"><AlertCircle size={14} /><span>{apiError}</span></div>}
-                <div className="modal-form">
-                    <p className="modal-section-label">Account info</p>
-                    <div className="field-row">
-                        <div className="field">
-                            <label htmlFor="emp-number">Employee Number <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, background: 'rgba(67,24,255,0.1)', color: 'var(--primary)', padding: '2px 7px', borderRadius: 999, verticalAlign: 'middle' }}>AUTO</span></label>
+        <div style={{ display: 'contents' }}>
+            <FormModal
+                isOpen={true}
+                onClose={onClose}
+                title="Add New Employee"
+                subtitle="Fill in the details to register a new employee account."
+                apiError={apiError}
+                onSubmit={handleSubmit}
+                isSubmitting={submitting}
+                submitDisabled={empNumLoading || !!empNumError}
+                submitLabel="Register Employee"
+                size="md"
+            >
+                <div className="fm-section">
+                    <h5 className="fm-section-title">Account info</h5>
+                    <div className="fm-field-grid">
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-number">
+                                Employee Number <span className="optional" style={{ fontWeight: 600, background: 'rgba(67,24,255,0.1)', color: '#4318ff', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>AUTO</span>
+                            </label>
                             <div style={{ position: 'relative' }}>
-                                <input id="emp-number" type="text" value={empNumLoading ? '' : form.employeeNumber} readOnly placeholder={empNumLoading ? 'Generating…' : ''} style={{ background: 'var(--bg-secondary, #f8f9fc)', color: empNumLoading ? 'var(--text-secondary)' : 'var(--text-primary)', cursor: 'not-allowed', fontWeight: 600, letterSpacing: '0.5px', paddingRight: 36, border: empNumError ? '1px solid var(--danger)' : '1px solid var(--border)' }} />
-                                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: empNumLoading ? 'var(--text-secondary)' : '#05cd99' }}>
-                                    {empNumLoading ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+                                <input
+                                    id="emp-number"
+                                    type="text"
+                                    value={empNumLoading ? '' : form.employeeNumber}
+                                    readOnly
+                                    placeholder={empNumLoading ? 'Generating…' : ''}
+                                    className="fm-input"
+                                    style={{ background: '#f8fafc', color: empNumLoading ? '#64748b' : '#0f172a', cursor: 'not-allowed', paddingRight: 36, border: empNumError ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                                />
+                                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: empNumLoading ? '#64748b' : '#10b981' }}>
+                                    {empNumLoading ? <Loader2 size={13} className="fm-spin" /> : <CheckCircle2 size={13} />}
                                 </span>
                             </div>
-                            {empNumError ? <span className="field-error"><AlertCircle size={12} />{empNumError}</span> : !empNumLoading && <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>Assigned automatically. Cannot be changed.</span>}
+                            {empNumError ? (
+                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                                    <AlertCircle size={12} /> {empNumError}
+                                </span>
+                            ) : !empNumLoading && (
+                                <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>Assigned automatically. Cannot be changed.</span>
+                            )}
                         </div>
-                        <div className="field">
-                            <label htmlFor="emp-role">Role <span style={{ color: 'var(--danger)' }}>*</span></label>
-                            <select id="emp-role" value={form.role} onChange={handleChange('role')} className={errors.role ? 'input-error' : ''}>
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-role">Role <span style={{ color: '#ef4444' }}>*</span></label>
+                            <select
+                                id="emp-role"
+                                value={form.role}
+                                onChange={handleChange('role')}
+                                className="fm-select"
+                                style={{ border: errors.role ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                            >
                                 <option value="">Select a role</option>
                                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
-                            {errors.role && <span className="field-error"><AlertCircle size={12} />{errors.role}</span>}
+                            {errors.role && (
+                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                                    <AlertCircle size={12} /> {errors.role}
+                                </span>
+                            )}
                         </div>
                     </div>
-                    <p className="modal-section-label" style={{ marginTop: 8 }}>Contact info</p>
-                    <div className="field-row">
-                        <div className="field">
-                            <label htmlFor="emp-email">Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
-                            <input id="emp-email" type="email" placeholder="e.g. juan@speedex.com" value={form.email} onChange={handleChange('email')} className={errors.email ? 'input-error' : ''} maxLength={100} autoComplete="off" />
-                            {errors.email ? <span className="field-error"><AlertCircle size={12} />{errors.email}</span> : form.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim()) && <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Valid email</span>}
+                </div>
+
+                <div className="fm-section">
+                    <h5 className="fm-section-title">Contact info</h5>
+                    <div className="fm-field-grid">
+                        <div className="fm-field fm-field-full">
+                            <label className="fm-label" htmlFor="emp-email">Email Address <span style={{ color: '#ef4444' }}>*</span></label>
+                            <input
+                                id="emp-email"
+                                type="email"
+                                placeholder="e.g. juan@speedex.com"
+                                value={form.email}
+                                onChange={handleChange('email')}
+                                className="fm-input"
+                                style={{ border: errors.email ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                                maxLength={100}
+                                autoComplete="off"
+                            />
+                            {errors.email ? (
+                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                                    <AlertCircle size={12} /> {errors.email}
+                                </span>
+                            ) : form.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim()) && (
+                                <span style={{ fontSize: 11, color: '#10b981', marginTop: 4, display: 'block' }}>✓ Valid email</span>
+                            )}
                         </div>
                     </div>
-                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: -6 }}><AlertCircle size={11} />A verification link will be sent to this address after registration.</p>
+                    <p style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 12 }}><AlertCircle size={11} />A verification link will be sent to this address after registration.</p>
                 </div>
-                <div className="modal-actions">
-                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || empNumLoading || !!empNumError}>
-                        {submitting ? <><Loader2 size={13} className="spin" /> Registering…</> : <><Save size={13} /> Register Employee</>}
-                    </button>
-                </div>
-            </div>
+            </FormModal>
             {successData && (
                 <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
@@ -486,10 +543,11 @@ interface EmployeeDetailModalProps {
     employee: RecentEmployee;
     onClose: () => void;
     onUpdated: (updated: RecentEmployee) => void;
+    initialEditMode?: boolean;
 }
 
-function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailModalProps) {
-    const [isEditing, setIsEditing] = useState(false);
+function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = false }: EmployeeDetailModalProps) {
+    const [isEditing, setIsEditing] = useState(initialEditMode);
     const [form, setForm] = useState({
         firstName: employee.firstName ?? '',
         middleName: employee.middleName ?? '',
@@ -500,11 +558,89 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
         accountStatus: employee.accountStatus,
         email: employee.email ?? '',
     });
+    // Snapshot of form values at the moment edit mode is entered
+    const initialFormRef = useRef<typeof form | null>(
+        initialEditMode ? {
+            firstName: employee.firstName ?? '',
+            middleName: employee.middleName ?? '',
+            lastName: employee.lastName ?? '',
+            suffix: employee.suffix ?? '',
+            contactNumber: employee.contactNumber,
+            role: toDisplayRole(employee.role),
+            accountStatus: employee.accountStatus,
+            email: employee.email ?? '',
+        } : null
+    );
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
     const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
     const { success, error } = useToast();
     const displayName = getEmployeeDisplayName(employee);
+
+    // Track whether the form has unsaved changes compared to when editing started
+    const isDirty = isEditing && initialFormRef.current !== null &&
+        JSON.stringify(form) !== JSON.stringify(initialFormRef.current);
+
+    const enterEditMode = () => {
+        // Capture snapshot so we can detect changes later
+        initialFormRef.current = { ...form };
+        setIsEditing(true);
+    };
+
+    const handleCloseModal = () => {
+        if (isEditing && isDirty) {
+            setConfirmModal({
+                isOpen: true,
+                variant: 'warning',
+                icon: 'ti-alert-triangle',
+                title: 'Discard unsaved changes?',
+                description: (
+                    <>
+                        You have unsaved changes to <strong>{displayName}</strong>'s profile.
+                        Closing now will discard all modifications.
+                    </>
+                ),
+                confirmLabel: 'Discard changes',
+                onConfirm: () => {
+                    setConfirmModal(CONFIRM_CLOSED);
+                    onClose();
+                },
+            });
+        } else {
+            onClose();
+        }
+    };
+
+    const handleCancelEdit = () => {
+        if (isDirty) {
+            setConfirmModal({
+                isOpen: true,
+                variant: 'warning',
+                icon: 'ti-alert-triangle',
+                title: 'Discard unsaved changes?',
+                description: (
+                    <>
+                        You have unsaved changes to <strong>{displayName}</strong>'s profile.
+                        Cancelling now will discard all modifications.
+                    </>
+                ),
+                confirmLabel: 'Discard changes',
+                onConfirm: async () => {
+                    // Restore the form back to the snapshot
+                    if (initialFormRef.current) setForm({ ...initialFormRef.current });
+                    initialFormRef.current = null;
+                    setIsEditing(false);
+                    setApiError('');
+                    setConfirmModal(CONFIRM_CLOSED);
+                },
+            });
+        } else {
+            initialFormRef.current = null;
+            setIsEditing(false);
+            setApiError('');
+        }
+    };
+
 
     const handleChange = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm(prev => ({ ...prev, [key]: e.target.value }));
@@ -537,7 +673,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                 );
                 if (!updateRes.ok) {
                     const err = await updateRes.json().catch(() => ({}));
-                    throw new Error(err.message || `Error ${updateRes.status}: Update failed`);
+                    throw new Error(err.message || 'Failed to update employee details. Please try again.');
                 }
                 if (toBackendRole(form.role) !== employee.role) {
                     const roleRes = await fetch('/api/systemadmin/assign-role', {
@@ -547,7 +683,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     });
                     if (!roleRes.ok) {
                         const err = await roleRes.json().catch(() => ({}));
-                        throw new Error(err.message || `Error ${roleRes.status}: Role update failed`);
+                        throw new Error(err.message || 'Failed to update employee role. Please try again.');
                     }
                 }
                 if (form.accountStatus !== employee.accountStatus) {
@@ -561,7 +697,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     });
                     if (!statusRes.ok) {
                         const err = await statusRes.json().catch(() => ({}));
-                        throw new Error(err.message || `Error ${statusRes.status}: Status update failed`);
+                        throw new Error(err.message || 'Failed to update account status. Please try again.');
                     }
                 }
                 onUpdated({
@@ -576,6 +712,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     accountStatus: form.accountStatus,
                     email: form.email.trim(),
                 });
+                initialFormRef.current = null;
                 setIsEditing(false);
                 success('Employee details updated successfully!');
                 onClose();
@@ -641,7 +778,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
                     });
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
-                        throw new Error(err.message || `Error ${res.status}: Delete failed`);
+                        throw new Error(err.message || 'Failed to delete employee. Please try again.');
                     }
                     success(`${displayName} has been deleted.`);
                     onUpdated({ ...employee, accountStatus: '__deleted__' });
@@ -658,67 +795,117 @@ function EmployeeDetailModal({ employee, onClose, onUpdated }: EmployeeDetailMod
 
     const editDisplayName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
 
+    const resolvedTitle = isEditing ? 'Edit employee' : 'Employee Details';
+    const resolvedSubtitle = isEditing ? 'Update details for this employee record' : `Viewing profile of ${displayName}`;
+    
+    const infoCard = {
+        avatarText: (isEditing ? editDisplayName : displayName) || '?',
+        title: isEditing ? editDisplayName || '—' : displayName,
+        subtitle: `Employee No. ${employee.employeeNumber}`,
+        badgeText: form.accountStatus ?? 'Active',
+        badgeStatus: form.accountStatus ?? 'Active'
+    };
+
     return (
         <>
-            <div className="modal-overlay" onClick={onClose}>
-                <div className="modal-card" onClick={e => e.stopPropagation()}>
-                    <div className="modal-header">
-                        <div>
-                            <h3>Employee Details</h3>
-                            <p className="modal-subtitle">{isEditing ? 'Editing profile' : 'Viewing profile'} of {displayName}</p>
-                        </div>
-                        <button className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
-                    </div>
-                    {apiError && <div className="form-api-error"><AlertCircle size={14} /><span>{apiError}</span></div>}
-                    <div className="modal-form">
-                        <div className="employee-detail-avatar">
-                            <div className="avatar-circle large">{(displayName || '?').charAt(0).toUpperCase()}</div>
-                            <div className="avatar-info">
-                                <h4>{isEditing ? editDisplayName || '—' : displayName}</h4>
-                                <div className="avatar-meta">
-                                    {isEditing ? (
-                                        <select value={form.accountStatus} onChange={handleChange('accountStatus')} className="detail-input status-select">
-                                            <option value="Active">Active</option>
-                                            <option value="Deactivated">Deactivated</option>
-                                            {employee.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
-                                            {employee.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
-                                        </select>
-                                    ) : (
-                                        <span className={`status-badge ${(form.accountStatus ?? 'active').toLowerCase()}`}>
-                                            {form.accountStatus ?? 'Active'}
-                                        </span>
-                                    )}
+            <FormModal
+                isOpen={true}
+                onClose={handleCloseModal}
+                title={resolvedTitle}
+                subtitle={resolvedSubtitle}
+                infoCard={infoCard}
+                apiError={apiError}
+                onSubmit={isEditing ? handleSave : undefined}
+                isSubmitting={submitting}
+                size="md"
+                footer={
+                    isEditing ? (
+                        <>
+                            <button type="button" className="fm-btn fm-btn-cancel" onClick={handleCancelEdit} disabled={submitting}>Cancel</button>
+                            <button type="submit" className="fm-btn fm-btn-primary" disabled={submitting}>
+                                {submitting ? <><Loader2 size={13} className="fm-spin" /> Saving…</> : 'Save Changes'}
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button type="button" className="fm-btn fm-btn-danger" onClick={handleDelete} disabled={submitting}>Delete</button>
+                            <button type="button" className="fm-btn fm-btn-primary" onClick={enterEditMode}>Edit</button>
+                        </>
+                    )
+                }
+            >
+                {isEditing ? (
+                    <>
+                        <div className="fm-section">
+                            <h5 className="fm-section-title">Account</h5>
+                            <div className="fm-field-grid">
+                                <div className="fm-field">
+                                    <label className="fm-label">Role</label>
+                                    <select value={form.role} onChange={handleChange('role')} className="fm-select">
+                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                    </select>
+                                </div>
+                                <div className="fm-field">
+                                    <label className="fm-label">Account Status</label>
+                                    <select value={form.accountStatus} onChange={handleChange('accountStatus')} className="fm-select">
+                                        <option value="Active">Active</option>
+                                        <option value="Deactivated">Deactivated</option>
+                                        {employee.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
+                                        {employee.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
+                                    </select>
                                 </div>
                             </div>
                         </div>
-                        <div className="detail-grid">
-                            <div className="detail-item"><span className="detail-label">Employee Number</span><span className="detail-value">{employee.employeeNumber}</span></div>
-                            <div className="detail-item"><span className="detail-label">Role</span>{isEditing ? <select value={form.role} onChange={handleChange('role')} className="detail-input">{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select> : <span className="detail-value">{form.role || '—'}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">First Name</span>{isEditing ? <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.firstName || '—'}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">Last Name</span>{isEditing ? <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="detail-input" maxLength={50} /> : <span className="detail-value">{form.lastName || '—'}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="detail-input" maxLength={50} placeholder="None" /> : <span className="detail-value">{form.middleName || '—'}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></span>{isEditing ? <input type="text" value={form.suffix} onChange={handleChange('suffix')} className="detail-input" maxLength={10} placeholder="None" /> : <span className="detail-value">{form.suffix || '—'}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">Contact Number</span>{isEditing ? <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="detail-input" /> : <span className="detail-value">{form.contactNumber}</span>}</div>
-                            <div className="detail-item"><span className="detail-label">Email</span>{isEditing ? <input type="email" value={form.email} onChange={handleChange('email')} className="detail-input" maxLength={100} /> : <span className="detail-value">{form.email || '—'}</span>}</div>
+
+                        <div className="fm-section">
+                            <h5 className="fm-section-title">Personal Information</h5>
+                            <div className="fm-field-grid">
+                                <div className="fm-field">
+                                    <label className="fm-label">First Name</label>
+                                    <input type="text" value={form.firstName} onChange={handleChange('firstName')} className="fm-input" maxLength={50} />
+                                </div>
+                                <div className="fm-field">
+                                    <label className="fm-label">Last Name</label>
+                                    <input type="text" value={form.lastName} onChange={handleChange('lastName')} className="fm-input" maxLength={50} />
+                                </div>
+                                <div className="fm-field">
+                                    <label className="fm-label">Middle Name <span className="optional">optional</span></label>
+                                    <input type="text" value={form.middleName} onChange={handleChange('middleName')} className="fm-input" maxLength={50} placeholder="None" />
+                                </div>
+                                <div className="fm-field">
+                                    <label className="fm-label">Suffix <span className="optional">optional</span></label>
+                                    <input type="text" value={form.suffix} onChange={handleChange('suffix')} className="fm-input" maxLength={10} placeholder="e.g. Jr., III" />
+                                </div>
+                            </div>
                         </div>
+
+                        <div className="fm-section">
+                            <h5 className="fm-section-title">Contact</h5>
+                            <div className="fm-field-grid">
+                                <div className="fm-field">
+                                    <label className="fm-label">Contact Number</label>
+                                    <input type="tel" value={form.contactNumber} onChange={handleChange('contactNumber')} className="fm-input" />
+                                </div>
+                                <div className="fm-field">
+                                    <label className="fm-label">Email</label>
+                                    <input type="email" value={form.email} onChange={handleChange('email')} className="fm-input" maxLength={100} />
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="detail-grid">
+                        <div className="detail-item"><span className="detail-label">Employee Number</span><span className="detail-value">{employee.employeeNumber}</span></div>
+                        <div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">{form.role || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">First Name</span><span className="detail-value">{form.firstName || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Last Name</span><span className="detail-value">{form.lastName || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Middle Name</span><span className="detail-value">{form.middleName || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Suffix</span><span className="detail-value">{form.suffix || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Contact Number</span><span className="detail-value">{form.contactNumber || '—'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Email</span><span className="detail-value">{form.email || '—'}</span></div>
                     </div>
-                    <div className="modal-actions">
-                        {isEditing ? (
-                            <>
-                                <button className="btn" onClick={() => { setIsEditing(false); setApiError(''); }} disabled={submitting}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
-                                    {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <button className="btn btn-danger" onClick={handleDelete} disabled={submitting}>Delete</button>
-                                <button className="btn btn-primary" onClick={() => setIsEditing(true)}>Edit</button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            </div>
+                )}
+            </FormModal>
 
             {/* ── Confirmation Modal ── */}
             <ConfirmationModal
@@ -860,9 +1047,9 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     <Search size={14} className="header-search-icon" />
                     <input type="text" className="header-search-input" placeholder="Search employee, task…" />
                 </div>
-                <button className="quick-action-btn-header" onClick={onAddEmployee} style={{ height: 46 }}>
-                    <Users size={18} /> Add Employee
-                </button>
+                <ActionButton icon={<Users size={18} />} onClick={onAddEmployee}>
+                    Add Employee
+                </ActionButton>
             </div>
             <div className="stats-row">
                 {[
@@ -900,7 +1087,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                                     </td>
                                                     <td className="cell-id">{emp.employeeNumber}</td>
                                                     <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                                    <td><span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>{emp.accountStatus ?? 'Active'}</span></td>
+                                                    <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
                                                 </tr>
                                             );
                                         })}
@@ -961,6 +1148,9 @@ interface ManageEmployeesTabProps {
     leavePendingCount: number;
     onLeavePageChange: (page: number, filters: LeaveFilters) => void;
     onLeaveConfirm: (id: number, action: 'approve' | 'decline', note: string) => void;
+    onEditEmployee: (emp: RecentEmployee) => void;
+    onDeleteEmployee: (emp: RecentEmployee) => void;
+    onViewEmployee: (emp: RecentEmployee) => void;
 }
 
 export interface LeaveFilters {
@@ -974,6 +1164,7 @@ function ManageEmployeesTab({
     empPage, empTotalPages, onEmpPageChange,
     leaveRequests, leaveLoading, leavePage, leaveTotalPages, leavePendingCount,
     onLeavePageChange, onLeaveConfirm,
+    onEditEmployee, onDeleteEmployee, onViewEmployee,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
     const [search, setSearch] = useState('');
@@ -995,146 +1186,140 @@ function ManageEmployeesTab({
 
     return (
         <div className="dashboard-content">
-            <div className="card employees-table-card" style={{ minHeight: 520, padding: 0, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', padding: '0 20px' }}>
-                    {([
-                        { key: 'employees' as EmployeeSubTab, label: 'All Employees', icon: <Users size={14} />, badge: undefined },
-                        { key: 'leave' as EmployeeSubTab, label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: leavePendingCount },
-                    ]).map(({ key, label, icon, badge }) => (
-                        <button key={key} onClick={() => setSubTab(key)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '13px 16px', fontSize: 13, fontWeight: 500, border: 'none', background: 'none', cursor: 'pointer', borderBottom: `2px solid ${subTab === key ? 'var(--primary)' : 'transparent'}`, color: subTab === key ? 'var(--primary)' : 'var(--text-secondary)', marginBottom: -1 }}>
-                            {icon}{label}
-                            {badge !== undefined && badge > 0 && (
-                                <span style={{ background: subTab === key ? 'rgba(67,24,255,0.12)' : 'rgba(255,181,71,0.2)', color: subTab === key ? 'var(--primary)' : '#c05c00', fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 999 }}>
-                                    {badge} pending
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* ══ ALL EMPLOYEES PANE ══ */}
-                {subTab === 'employees' && (
+            <TableCard
+                tabs={[
+                    { key: 'employees', label: 'All Employees', icon: <Users size={14} /> },
+                    { key: 'leave', label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: leavePendingCount },
+                ]}
+                activeTab={subTab}
+                onTabChange={key => setSubTab(key as EmployeeSubTab)}
+                searchQuery={subTab === 'employees' ? search : leaveSearch}
+                setSearchQuery={subTab === 'employees' ? setSearch : setLeaveSearch}
+                searchPlaceholder="Search by name or ID…"
+                totalResults={subTab === 'employees' ? employees.length : leaveRequests.length}
+                filterElements={subTab === 'employees' ? (
                     <>
-                        <div style={{ padding: '16px 20px 0' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{employees.length} result{employees.length !== 1 ? 's' : ''} on this page</span>
-                            </div>
-                            <div className="filter-bar">
-                                <div className="search-input-wrap"><Search size={14} className="search-icon" /><input type="text" placeholder="Search by name or ID…" value={search} onChange={e => setSearch(e.target.value)} className="search-input" /></div>
-                                <select value={filterRole} onChange={e => setFilterRole(e.target.value)}><option value="">All Roles</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
-                                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}><option value="">All Statuses</option><option value="Active">Active</option><option value="Deactivated">Deactivated</option></select>
-                                <button className="btn btn-primary" onClick={onAddEmployee} style={{ marginLeft: 'auto' }}>
-                                    <Users size={14} /> Add Employee
-                                </button>
-                            </div>
-                        </div>
-                        <div className="data-table-wrap">
-                            <table className="data-table">
-                                <thead><tr><th>NAME</th><th>EMPLOYEE NO</th><th>ROLE</th><th>CONTACT</th><th>STATUS</th><th>ACTION</th></tr></thead>
-                                <tbody>
-                                    {loading
-                                        ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading employees…</p></div></td></tr>
-                                        : employees.length === 0
-                                            ? <tr><td colSpan={6}><div className="empty-state"><Package size={20} /><p>No employees match your filters</p></div></td></tr>
-                                            : employees.map(emp => {
-                                                const name = getEmployeeDisplayName(emp);
-                                                return (
-                                                    <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
-                                                        <td><div className="emp-name-cell"><div style={{ position: 'relative', display: 'inline-block' }}><div className="emp-avatar">{name.charAt(0).toUpperCase()}</div><span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} /></div>{name}</div></td>
-                                                        <td>{emp.employeeNumber}</td>
-                                                        <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                                        <td>{emp.contactNumber}</td>
-                                                        <td><span className={`status-badge ${(emp.accountStatus ?? 'active').toLowerCase()}`}>{emp.accountStatus ?? 'Active'}</span></td>
-                                                        <td><button className="btn btn-xs" onClick={e => { e.stopPropagation(); onSelectEmployee(emp); }}><Pencil size={11} /> Edit</button></td>
-                                                    </tr>
-                                                );
-                                            })}
-                                </tbody>
-                            </table>
-                        </div>
-                        {!loading && empTotalPages > 1 && (
-                            <div className="pagination-bar">
-                                <span className="pagination-info">Page {empPage} of {empTotalPages}</span>
-                                <div className="pagination-controls">
-                                    <button className="page-btn page-btn-nav" onClick={() => onEmpPageChange(empPage - 1, { search, role: filterRole, status: filterStatus })} disabled={empPage === 1}><ChevronLeft size={15} /></button>
-                                    {getPageNumbers(empTotalPages, empPage).map((p, i) =>
-                                        p === '...' ? <span key={`e-${i}`} className="page-ellipsis">…</span>
-                                            : <button key={p} className={`page-btn${empPage === p ? ' active' : ''}`} onClick={() => onEmpPageChange(p as number, { search, role: filterRole, status: filterStatus })}>{p}</button>
-                                    )}
-                                    <button className="page-btn page-btn-nav" onClick={() => onEmpPageChange(empPage + 1, { search, role: filterRole, status: filterStatus })} disabled={empPage === empTotalPages}><ChevronRight size={15} /></button>
-                                </div>
-                            </div>
-                        )}
+                        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+                            <option value="">All Roles</option>
+                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <option value="">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="Deactivated">Deactivated</option>
+                        </select>
+                    </>
+                ) : (
+                    <>
+                        <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}>
+                            <option value="pending">Pending</option>
+                            <option value="all">All Statuses</option>
+                            <option value="approved">Approved</option>
+                            <option value="declined">Declined</option>
+                        </select>
+                        <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
+                            <option value="">All Roles</option>
+                            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
                     </>
                 )}
-
-                {/* ══ LEAVE REQUESTS PANE ══ */}
-                {subTab === 'leave' && (
-                    <>
-                        <div style={{ padding: '16px 20px 0' }}>
-                            <div className="filter-bar">
-                                <div className="search-input-wrap"><Search size={14} className="search-icon" /><input type="text" placeholder="Search by name or ID…" value={leaveSearch} onChange={e => setLeaveSearch(e.target.value)} className="search-input" /></div>
-                                <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}>
-                                    <option value="pending">Pending</option><option value="all">All Statuses</option><option value="approved">Approved</option><option value="declined">Declined</option>
-                                </select>
-                                <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
-                                    <option value="">All Roles</option>{ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="data-table-wrap">
-                            <table className="data-table">
-                                <thead><tr><th>EMPLOYEE</th><th>LEAVE TYPE</th><th>DATES</th><th>DURATION</th><th>SUBMITTED</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                                <tbody>
-                                    {leaveLoading
-                                        ? <tr><td colSpan={7}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
-                                        : leaveRequests.length === 0
-                                            ? <tr><td colSpan={7}><div className="empty-state"><Package size={20} /><p>No leave requests match your filters</p></div></td></tr>
-                                            : leaveRequests.map(r => {
-                                                const days = calcDays(r.startDate, r.endDate);
-                                                const meta = LEAVE_STATUS_META[r.status];
-                                                return (
-                                                    <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
-                                                        <td><div className="emp-name-cell"><div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div><div><div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div></div></div></td>
-                                                        <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
-                                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
-                                                        <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
-                                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
-                                                        <td><span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{meta.icon}{meta.label}</span></td>
-                                                        <td onClick={e => e.stopPropagation()}>
-                                                            {r.status === 'pending' ? (
-                                                                <div style={{ display: 'flex', gap: 6 }}>
-                                                                    <button className="btn btn-xs" style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }} onClick={() => setActionModal({ request: r, action: 'approve' })}><CheckCircle2 size={11} /> Approve</button>
-                                                                    <button className="btn btn-xs btn-danger" onClick={() => setActionModal({ request: r, action: 'decline' })}><X size={11} /> Decline</button>
-                                                                </div>
-                                                            ) : (
-                                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                </tbody>
-                            </table>
-                        </div>
-                        {!leaveLoading && leaveTotalPages > 1 && (
-                            <div className="pagination-bar">
-                                <span className="pagination-info">Page {leavePage} of {leaveTotalPages}</span>
-                                <div className="pagination-controls">
-                                    <button className="page-btn page-btn-nav" onClick={() => onLeavePageChange(leavePage - 1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })} disabled={leavePage === 1}><ChevronLeft size={15} /></button>
-                                    {getPageNumbers(leaveTotalPages, leavePage).map((p, i) =>
-                                        p === '...' ? <span key={`l-${i}`} className="page-ellipsis">…</span>
-                                            : <button key={p} className={`page-btn${leavePage === p ? ' active' : ''}`} onClick={() => onLeavePageChange(p as number, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })}>{p}</button>
+                actionButton={subTab === 'employees' ? {
+                    label: 'Add Employee',
+                    icon: <Users size={14} />,
+                    onClick: onAddEmployee
+                } : undefined}
+                headers={subTab === 'employees' 
+                    ? ['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']
+                    : ['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']
+                }
+                loading={subTab === 'employees' ? loading : leaveLoading}
+                emptyMessage={subTab === 'employees' ? 'No employees match your filters' : 'No leave requests match your filters'}
+                currentPage={subTab === 'employees' ? empPage : leavePage}
+                totalPages={subTab === 'employees' ? empTotalPages : leaveTotalPages}
+                onPageChange={subTab === 'employees' 
+                    ? (page) => onEmpPageChange(page, { search, role: filterRole, status: filterStatus })
+                    : (page) => onLeavePageChange(page, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })
+                }
+            >
+                {subTab === 'employees' ? (
+                    employees.map(emp => {
+                        const name = getEmployeeDisplayName(emp);
+                        return (
+                            <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
+                                <td><div className="emp-name-cell"><div style={{ position: 'relative', display: 'inline-block' }}><div className="emp-avatar">{name.charAt(0).toUpperCase()}</div><span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} /></div>{name}</div></td>
+                                <td>{emp.employeeNumber}</td>
+                                <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
+                                <td>{emp.contactNumber}</td>
+                                <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
+                                <td>
+                                    <ActionsDropdown
+                                        actions={[
+                                            {
+                                                label: 'View Details',
+                                                icon: <Eye size={12} />,
+                                                onClick: () => onViewEmployee(emp)
+                                            },
+                                            {
+                                                label: 'Edit',
+                                                icon: <Pencil size={12} />,
+                                                onClick: () => onEditEmployee(emp)
+                                            },
+                                            {
+                                                label: 'Delete',
+                                                icon: <Trash2 size={12} />,
+                                                onClick: () => onDeleteEmployee(emp),
+                                                variant: 'danger'
+                                            }
+                                        ]}
+                                    />
+                                </td>
+                            </tr>
+                        );
+                    })
+                ) : (
+                    leaveRequests.map(r => {
+                        const days = calcDays(r.startDate, r.endDate);
+                        const meta = LEAVE_STATUS_META[r.status];
+                        return (
+                            <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
+                                <td><div className="emp-name-cell"><div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div><div><div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div></div></div></td>
+                                <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
+                                <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
+                                <td><span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{meta.icon}{meta.label}</span></td>
+                                <td onClick={e => e.stopPropagation()}>
+                                    {r.status === 'pending' ? (
+                                        <ActionsDropdown
+                                            actions={[
+                                                {
+                                                    label: 'Approve',
+                                                    icon: <CheckCircle2 size={12} />,
+                                                    onClick: () => setActionModal({ request: r, action: 'approve' }),
+                                                    variant: 'success'
+                                                },
+                                                {
+                                                    label: 'Decline',
+                                                    icon: <X size={12} />,
+                                                    onClick: () => setActionModal({ request: r, action: 'decline' }),
+                                                    variant: 'danger'
+                                                },
+                                                {
+                                                    label: 'View Details',
+                                                    icon: <Eye size={12} />,
+                                                    onClick: () => setDetailModal(r)
+                                                }
+                                            ]}
+                                        />
+                                    ) : (
+                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>
                                     )}
-                                    <button className="page-btn page-btn-nav" onClick={() => onLeavePageChange(leavePage + 1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })} disabled={leavePage === leaveTotalPages}><ChevronRight size={15} /></button>
-                                </div>
-                            </div>
-                        )}
-
-                    </>
+                                </td>
+                            </tr>
+                        );
+                    })
                 )}
-            </div>
+            </TableCard>
 
             {/* Leave Detail Modal */}
             {detailModal && (
@@ -1763,61 +1948,63 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                     <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
             </div>
-            <div className="card employees-table-card" style={{ minHeight: 520 }}>
-                <div className="card-header-layout"><h3>Emergency Override Requests</h3></div>
-                <div className="filter-bar">
-                    <div className="search-input-wrap"><Search size={14} className="search-icon" /><input type="text" placeholder="Search by name or ID…" value={search} onChange={e => setSearch(e.target.value)} className="search-input" /></div>
+            <TableCard
+                title="Emergency Override Requests"
+                searchQuery={search}
+                setSearchQuery={setSearch}
+                searchPlaceholder="Search by name or ID…"
+                totalResults={overrides.length}
+                filterElements={
                     <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as any)}>
-                        <option value="Pending">Pending</option><option value="All">All Statuses</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option>
+                        <option value="Pending">Pending</option>
+                        <option value="All">All Statuses</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
                     </select>
-                </div>
-                <div className="data-table-wrap">
-                    <table className="data-table">
-                        <thead><tr><th>EMPLOYEE</th><th>REASON</th><th>REQUESTED</th><th>OVERRIDE UNTIL</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                        <tbody>
-                            {loading
-                                ? <tr><td colSpan={6}><div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading requests…</p></div></td></tr>
-                                : overrides.length === 0
-                                    ? <tr><td colSpan={6}><div className="empty-state"><ShieldAlert size={20} /><p>No override requests match your filters</p></div></td></tr>
-                                    : overrides.map(o => {
-                                        const meta = statusMeta[o.status];
-                                        return (
-                                            <tr key={o.emergencyOverrideId}>
-                                                <td><div className="emp-name-cell"><div className="emp-avatar">{o.employeeName.charAt(0).toUpperCase()}</div><div><div style={{ fontWeight: 600, fontSize: 13 }}>{o.employeeName}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{o.employeeNumber}</div></div></div></td>
-                                                <td style={{ fontSize: 13, maxWidth: 200 }}><span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.reason}</span></td>
-                                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{new Date(o.requestedAt).toLocaleString()}</td>
-                                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.overrideUntil ? new Date(o.overrideUntil).toLocaleString() : '—'}</td>
-                                                <td><span className={`status-badge ${meta.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{meta.icon}{meta.label}</span></td>
-                                                <td>
-                                                    {o.status === 'Pending' ? (
-                                                        <div style={{ display: 'flex', gap: 6 }}>
-                                                            <button className="btn btn-xs" style={{ background: 'rgba(5,205,153,0.12)', color: '#05cd99', border: '1px solid rgba(5,205,153,0.3)', fontWeight: 600 }} onClick={() => openAction(o, 'Approved')}><CheckCircle2 size={11} /> Approve</button>
-                                                            <button className="btn btn-xs btn-danger" onClick={() => openAction(o, 'Rejected')}><X size={11} /> Reject</button>
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{o.status === 'Approved' ? 'Access granted' : 'Access denied'}</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                        </tbody>
-                    </table>
-                </div>
-                {!loading && overrideTotalPages > 1 && (
-                    <div className="pagination-bar">
-                        <span className="pagination-info">Page {overridePage} of {overrideTotalPages}</span>
-                        <div className="pagination-controls">
-                            <button className="page-btn page-btn-nav" onClick={() => onPageChange(overridePage - 1, { status: filterStatus, search })} disabled={overridePage === 1}><ChevronLeft size={15} /></button>
-                            {getPageNumbers(overrideTotalPages, overridePage).map((p, i) =>
-                                p === '...' ? <span key={`eo-${i}`} className="page-ellipsis">…</span>
-                                    : <button key={p} className={`page-btn${overridePage === p ? ' active' : ''}`} onClick={() => onPageChange(p as number, { status: filterStatus, search })}>{p}</button>
-                            )}
-                            <button className="page-btn page-btn-nav" onClick={() => onPageChange(overridePage + 1, { status: filterStatus, search })} disabled={overridePage === overrideTotalPages}><ChevronRight size={15} /></button>
-                        </div>
-                    </div>
-                )}
-            </div>
+                }
+                headers={['EMPLOYEE', 'REASON', 'REQUESTED', 'OVERRIDE UNTIL', 'STATUS', 'ACTIONS']}
+                loading={loading}
+                emptyIcon={<ShieldAlert size={20} />}
+                emptyMessage="No override requests match your filters"
+                currentPage={overridePage}
+                totalPages={overrideTotalPages}
+                onPageChange={(page) => onPageChange(page, { status: filterStatus, search })}
+            >
+                {overrides.map(o => {
+                    const meta = statusMeta[o.status];
+                    return (
+                        <tr key={o.emergencyOverrideId}>
+                            <td><div className="emp-name-cell"><div className="emp-avatar">{o.employeeName.charAt(0).toUpperCase()}</div><div><div style={{ fontWeight: 600, fontSize: 13 }}>{o.employeeName}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{o.employeeNumber}</div></div></div></td>
+                            <td style={{ fontSize: 13, maxWidth: 200 }}><span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{o.reason}</span></td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{new Date(o.requestedAt).toLocaleString()}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.overrideUntil ? new Date(o.overrideUntil).toLocaleString() : '—'}</td>
+                            <td><span className={`status-badge ${meta.cls}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{meta.icon}{meta.label}</span></td>
+                            <td>
+                                {o.status === 'Pending' ? (
+                                    <ActionsDropdown
+                                        actions={[
+                                            {
+                                                label: 'Approve',
+                                                icon: <CheckCircle2 size={12} />,
+                                                onClick: () => openAction(o, 'Approved'),
+                                                variant: 'success'
+                                            },
+                                            {
+                                                label: 'Reject',
+                                                icon: <X size={12} />,
+                                                onClick: () => openAction(o, 'Rejected'),
+                                                variant: 'danger'
+                                            }
+                                        ]}
+                                    />
+                                ) : (
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{o.status === 'Approved' ? 'Access granted' : 'Access denied'}</span>
+                                )}
+                            </td>
+                        </tr>
+                    );
+                })}
+            </TableCard>
 
             {/* ── Override Confirmation Modal ── */}
             <ConfirmationModal
@@ -1840,7 +2027,7 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const { success } = useToast();
+    const { success, error } = useToast();
     const [employeeName, setEmployeeName] = useState(() => {
         const storedFirst = localStorage.getItem('firstName') ?? '';
         const storedMiddle = localStorage.getItem('middleName') ?? '';
@@ -1854,6 +2041,9 @@ export default function Dashboard() {
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<RecentEmployee | null>(null);
+    const [empModalEditMode, setEmpModalEditMode] = useState(false);
+    const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<RecentEmployee | null>(null);
+    const [deleteSubmitting, setDeleteSubmitting] = useState(false);
     const [selectedPanelEmployee, setSelectedPanelEmployee] = useState<RecentEmployee | null>(null);
     const [logoutConfirm, setLogoutConfirm] = useState(false);
     const [logoutLoading, setLogoutLoading] = useState(false);
@@ -1913,7 +2103,11 @@ export default function Dashboard() {
                 setEmpTotalPages(result.totalPages ?? 1);
                 setEmpPage(page);
             })
-            .catch(() => { setEmployees([]); setRecentEmployees([]); })
+            .catch((err) => {
+                console.error('Error fetching employees:', err);
+                setEmployees([]);
+                setRecentEmployees([]);
+            })
             .finally(() => setEmpLoading(false));
     };
 
@@ -2129,7 +2323,7 @@ export default function Dashboard() {
                         recentEmployees={recentEmployees}
                         activityLogs={activityLogs}
                         loading={empLoading}
-                        onSelectEmployee={emp => setSelectedEmployee(emp)}
+                        onSelectEmployee={emp => { setEmpModalEditMode(false); setSelectedEmployee(emp); }}
                         onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }}
                         onAddEmployee={() => setShowAddModal(true)}
                     />
@@ -2149,6 +2343,9 @@ export default function Dashboard() {
                             leavePendingCount={leavePendingCount}
                             onLeavePageChange={fetchLeaveRequests}
                             onLeaveConfirm={handleLeaveConfirm}
+                            onEditEmployee={emp => { setEmpModalEditMode(true); setSelectedEmployee(emp); }}
+                            onDeleteEmployee={emp => setDeleteConfirmEmp(emp)}
+                            onViewEmployee={emp => setSelectedPanelEmployee(emp)}
                         />
                     )
                 )}
@@ -2224,8 +2421,58 @@ export default function Dashboard() {
             )}
 
             {selectedEmployee && (
-                <EmployeeDetailModal employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} onUpdated={handleEmployeeUpdated} />
+                <EmployeeDetailModal
+                    employee={selectedEmployee}
+                    onClose={() => setSelectedEmployee(null)}
+                    onUpdated={handleEmployeeUpdated}
+                    initialEditMode={empModalEditMode}
+                />
             )}
+
+            {/* ── Delete Employee Confirmation Modal ── */}
+            <ConfirmationModal
+                isOpen={!!deleteConfirmEmp}
+                variant="danger"
+                icon="ti-trash"
+                title="Delete employee record?"
+                description={
+                    deleteConfirmEmp ? (
+                        <>
+                            This will permanently remove <strong>{getEmployeeDisplayName(deleteConfirmEmp)}</strong> and all associated
+                            data. This action cannot be undone.
+                        </>
+                    ) : null
+                }
+                notice="All leave records, tasks, and activity logs for this employee will also be deleted."
+                confirmLabel="Delete employee"
+                cancelLabel="Cancel"
+                isLoading={deleteSubmitting}
+                onConfirm={async () => {
+                    if (!deleteConfirmEmp) return;
+                    setDeleteSubmitting(true);
+                    try {
+                        const token = localStorage.getItem('authToken');
+                        const res = await fetch('/api/systemadmin/delete-user', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ employeeNumber: deleteConfirmEmp.employeeNumber }),
+                        });
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.message || 'Failed to delete employee. Please try again.');
+                        }
+                        success(`${getEmployeeDisplayName(deleteConfirmEmp)} has been deleted.`);
+                        setEmployees(prev => prev.filter(e => e.employeeNumber !== deleteConfirmEmp.employeeNumber));
+                        setRecentEmployees(prev => prev.filter(e => e.employeeNumber !== deleteConfirmEmp.employeeNumber));
+                    } catch (err: any) {
+                        error(err.message ?? 'Failed to delete employee.');
+                    } finally {
+                        setDeleteSubmitting(false);
+                        setDeleteConfirmEmp(null);
+                    }
+                }}
+                onCancel={() => setDeleteConfirmEmp(null)}
+            />
 
             {/* ── Logout Confirmation Modal ── */}
             <ConfirmationModal

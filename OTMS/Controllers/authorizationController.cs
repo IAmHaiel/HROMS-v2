@@ -71,6 +71,15 @@ namespace OTMS.Controllers
             try
             {
                 var result = await authService.RegisterAsync(request);
+                if (result == null)
+                {
+                    return BadRequest(new ApiResponseDTO<object>
+                    {
+                        IsSuccess = false,
+                        Message = "Failed to register employee. The employee number is invalid or empty.",
+                        Data = null
+                    });
+                }
                 return Ok(new ApiResponseDTO<EmployeeRegisterResponseDTO>
                 {
                     IsSuccess = true,
@@ -87,7 +96,6 @@ namespace OTMS.Controllers
                     Data = null
                 });
             }
-
         }
     }
 }

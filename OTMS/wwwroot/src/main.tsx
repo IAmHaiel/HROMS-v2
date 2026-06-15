@@ -1,7 +1,8 @@
-﻿import React from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import './index.css'
+import '@tabler/icons-webfont/dist/tabler-icons.min.css'
 import LoginPage from './Pages/login_page/login'
 import SystemAdmin_Dashboard from './Pages/SystemAdmin_Dashboard/SystemAdmin_Dashboard'
 import ForgotPasswordPage from './Pages/forgotpassword_page/forgotpassword_page'
@@ -11,7 +12,6 @@ import OpEmployee_Dashboard from './Pages/OpEmployee_Dashboard/OpEmployee_Dashbo
 import AccountLocked from './Pages/account_locked/account_locked'
 import ProtectedRoute from './components/Auth/ProtectedRoute'
 import ChangePassword from './Pages/change_password/change_password'
-import EmployeeDetail from './Pages/employee_details/employee_detail'
 import EmailVerificationPage from './Pages/email_verification_page/email_verification_page'
 import { ToastProvider } from './components/Toast/Toast'
 import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
@@ -44,7 +44,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route element={<ProtectedRoute allowedRoles={['System Admin', 'SystemAdmin']} />}>
                         <Route element={<PasswordChangedGuard />}>
                             <Route path="/SystemAdmin_Dashboard" element={<SystemAdmin_Dashboard />} />
-                            <Route path="/employee_detail/:employeeNumber" element={<EmployeeDetail />} />
                         </Route>
                     </Route>
 

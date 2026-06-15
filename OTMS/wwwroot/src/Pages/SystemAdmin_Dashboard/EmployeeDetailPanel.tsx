@@ -23,8 +23,9 @@ import {
     FileText,
     Download,
 } from 'lucide-react';
-import '../employee_details/employee_detail.css';
+import './EmployeeDetailPanel.css';
 import { useToast } from '../../components/Toast/Toast';
+import FormModal from '../../components/FormModal/FormModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,26 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
     const [apiError, setApiError] = useState('');
     const { confirm, success, error } = useToast();
 
+    const initialValues = {
+        employeeName: profile.employeeName,
+        contactNumber: profile.contactNumber,
+        role: toDisplayRole(profile.role),
+        accountStatus: profile.accountStatus,
+        email: profile.email ?? '',
+    };
+    const isDirty = JSON.stringify(form) !== JSON.stringify(initialValues);
+
+    const handleClose = async () => {
+        if (isDirty) {
+            const confirmed = await confirm(`Discard unsaved changes? You have unsaved changes to ${profile.employeeName}'s profile. Cancelling now will discard all modifications.`);
+            if (confirmed) {
+                onClose();
+            }
+        } else {
+            onClose();
+        }
+    };
+
     const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm(prev => ({ ...prev, [key]: e.target.value }));
         setApiError('');
@@ -159,7 +180,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                     }),
                 }
             );
-            if (!updateRes.ok) throw new Error(`Details update failed (HTTP ${updateRes.status})`);
+            if (!updateRes.ok) throw new Error('Failed to update employee details. Please try again.');
 
             // 2. Update role if changed
             if (toBackendRole(form.role) !== profile.role) {
@@ -174,7 +195,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                         roleName: toBackendRole(form.role),
                     }),
                 });
-                if (!roleRes.ok) throw new Error(`Role update failed (HTTP ${roleRes.status})`);
+                if (!roleRes.ok) throw new Error('Failed to update employee role. Please try again.');
             }
 
             // 3. Update status in database if changed
@@ -201,7 +222,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                         employeeNumber: profile.employeeNumber,
                     }),
                 });
-                if (!statusRes.ok) throw new Error(`Status update failed (HTTP ${statusRes.status})`);
+                if (!statusRes.ok) throw new Error('Failed to update account status. Please try again.');
             }
 
             onSaved({
@@ -222,80 +243,69 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
         }
     };
 
+    const infoCard = {
+        avatarText: form.employeeName || '?',
+        title: form.employeeName,
+        subtitle: `Employee No. ${profile.employeeNumber}`,
+        badgeText: form.accountStatus ?? 'Active',
+        badgeStatus: form.accountStatus ?? 'Active'
+    };
+
     return (
-        <div className="ed-modal-overlay" onClick={onClose}>
-            <div className="ed-modal-card" onClick={e => e.stopPropagation()}>
-                <div className="ed-modal-header">
-                    <div>
-                        <h3>Edit Employee</h3>
-                        <p>Update details for {profile.employeeName}</p>
+        <FormModal
+            isOpen={true}
+            onClose={handleClose}
+            title="Edit Employee"
+            subtitle={`Update details for ${profile.employeeName}`}
+            infoCard={infoCard}
+            apiError={apiError}
+            onSubmit={handleSave}
+            isSubmitting={submitting}
+            size="md"
+        >
+            <div className="fm-section">
+                <h5 className="fm-section-title">Personal Information</h5>
+                <div className="fm-field-grid">
+                    <div className="fm-field fm-field-full">
+                        <label className="fm-label">Full Name</label>
+                        <input type="text" value={form.employeeName} onChange={set('employeeName')} className="fm-input" />
                     </div>
-                    <button className="ed-icon-btn" onClick={onClose} aria-label="Close">
-                        <X size={16} />
-                    </button>
-                </div>
-
-                {apiError && (
-                    <div className="ed-api-error">
-                        <AlertCircle size={14} />
-                        <span>{apiError}</span>
+                    <div className="fm-field">
+                        <label className="fm-label">Email</label>
+                        <input type="email" value={form.email} onChange={set('email')} className="fm-input" />
                     </div>
-                )}
-
-                <div className="ed-modal-form">
-                    <div className="ed-field">
-                        <label>Full Name</label>
-                        <input type="text" value={form.employeeName} onChange={set('employeeName')} />
+                    <div className="fm-field">
+                        <label className="fm-label">Contact Number</label>
+                        <input type="tel" value={form.contactNumber} onChange={set('contactNumber')} className="fm-input" />
                     </div>
-                    <div className="ed-field">
-                        <label>Email</label>
-                        <input type="email" value={form.email} onChange={set('email')} />
-                    </div>
-                    <div className="ed-field">
-                        <label>Contact Number</label>
-                        <input type="tel" value={form.contactNumber} onChange={set('contactNumber')} />
-                    </div>
-                    <div className="ed-field-row">
-                        <div className="ed-field">
-                            <label>Role</label>
-                            <select value={form.role} onChange={set('role')}>
-                                {ROLES.map(r => (
-                                    <option key={r} value={r}>
-                                        {r}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="ed-field">
-                            <label>Account Status</label>
-                            <select value={form.accountStatus} onChange={set('accountStatus')}>
-                                <option value="Active">Active</option>
-                                <option value="Deactivated">Deactivated</option>
-                                {profile.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
-                                {profile.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="ed-modal-actions">
-                    <button className="ed-btn" onClick={onClose} disabled={submitting}>
-                        Cancel
-                    </button>
-                    <button className="ed-btn ed-btn-primary" onClick={handleSave} disabled={submitting}>
-                        {submitting ? (
-                            <>
-                                <Loader2 size={13} className="spin" /> Saving…
-                            </>
-                        ) : (
-                            <>
-                                <Save size={13} /> Save Changes
-                            </>
-                        )}
-                    </button>
                 </div>
             </div>
-        </div>
+
+            <div className="fm-section">
+                <h5 className="fm-section-title">Account</h5>
+                <div className="fm-field-grid">
+                    <div className="fm-field">
+                        <label className="fm-label">Role</label>
+                        <select value={form.role} onChange={set('role')} className="fm-select">
+                            {ROLES.map(r => (
+                                <option key={r} value={r}>
+                                    {r}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="fm-field">
+                        <label className="fm-label">Account Status</label>
+                        <select value={form.accountStatus} onChange={set('accountStatus')} className="fm-select">
+                            <option value="Active">Active</option>
+                            <option value="Deactivated">Deactivated</option>
+                            {profile.accountStatus === 'On Leave' && <option value="On Leave">On Leave</option>}
+                            {profile.accountStatus === 'Emergency Overriden' && <option value="Emergency Overriden">Emergency Overriden</option>}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </FormModal>
     );
 }
 
@@ -455,7 +465,7 @@ export default function EmployeeDetailPanel({
                     <div className="ed-hero-info">
                         <div className="ed-hero-name-row">
                             <h1>{profile.employeeName}</h1>
-                            <span className={`ed-status-pill ${profile.accountStatus.toLowerCase()}`}>
+                            <span className={`ed-status-pill ${profile.accountStatus.toLowerCase().replace(/\s+/g, '-')}`}>
                                 {profile.accountStatus}
                             </span>
                         </div>
