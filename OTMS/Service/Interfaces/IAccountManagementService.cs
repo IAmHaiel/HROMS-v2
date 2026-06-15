@@ -1,3 +1,4 @@
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
 using OTMS.Entities.DTOs.Pagination;
@@ -15,5 +16,6 @@ namespace OTMS.Service.Interfaces
         Task<ActivateUserResponseDTO?> ActivateUser(DeactivateUserDTO request);
         Task<AssignUserRoleResponseDTO?> AssignUserRole(AssignUserRoleDTO request);
         Task<DeleteUserResponseDTO?> DeleteUser(DeactivateUserDTO request);
+        Task<ApiResponseDTO<Digital201FileResponseDTO>> GetDigital201File(string employeeNumber);
     }
 }
