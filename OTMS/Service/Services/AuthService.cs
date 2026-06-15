@@ -1,3 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,10 +20,6 @@ using OTMS.Entities.DTOs.ResetPassword;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace OTMS.Service.Services
 {
@@ -109,7 +109,7 @@ namespace OTMS.Service.Services
                 }
                 return null;
             }
-            
+
             if (employee.Account.AccountStatus == "Deactivated" || employee.Account.AccountStatus == "Locked")
             {
                 return null;
@@ -256,19 +256,20 @@ namespace OTMS.Service.Services
                         employee.Email,
                             "Verify your Operational Management System Account",
                             $"""
-                            Welcome to the Operational Management System.
+                            <p>Welcome to the Operational Management System.</p>
 
-                            Your login credentials are:
+                            <p>Your login credentials are:</p>
 
-                            Employee Number: {employee.EmployeeNumber}
-                            Password: {GeneratedPassword}
+                            <p>Employee Number: <strong>{employee.EmployeeNumber}</strong><br>
+                            Password: <strong>{GeneratedPassword}</strong></p>
 
-                            Please verify your account by clicking the link below:
+                            <p>Please verify your account by clicking the link below:</p>
 
-                            {verificationLink}
+                            <p><a href="{verificationLink}">{verificationLink}</a></p>
 
-                            After verifying your account, we recommend changing your password immediately after logging in.
-                            """
+                            <p>After verifying your account, we recommend changing your password immediately after logging in.</p>
+                            """,
+                            isHtml: true
                 );
 
             return new EmployeeRegisterResponseDTO
@@ -306,19 +307,20 @@ namespace OTMS.Service.Services
                 employee.Email,
                     "Verify your Operational Management System Account",
                     $"""
-                    Welcome to the Operational Management System.
+                    <p>Welcome to the Operational Management System.</p>
 
-                    Your login credentials are:
+                    <p>Your login credentials are:</p>
 
-                    Employee Number: {employee.EmployeeNumber}
-                    Password: {GeneratedPassword}
+                    <p>Employee Number: <strong>{employee.EmployeeNumber}</strong><br>
+                    Password: <strong>{GeneratedPassword}</strong></p>
 
-                    Please verify your account by clicking the link below:
+                    <p>Please verify your account by clicking the link below:</p>
 
-                    {verificationLink}
+                    <p><a href="{verificationLink}">{verificationLink}</a></p>
 
-                    After verifying your account, we recommend changing your password immediately after logging in.
-                    """
+                    <p>After verifying your account, we recommend changing your password immediately after logging in.</p>
+                    """,
+                    isHtml: true
             );
         }
 
@@ -342,7 +344,7 @@ namespace OTMS.Service.Services
                     , request.Password);
 
             if (verificationResult == PasswordVerificationResult.Success)
-                {
+            {
                 return new PasswordVerificationResponseDTO
                 {
                     isSuccess = true,
@@ -533,7 +535,7 @@ namespace OTMS.Service.Services
 
             employee.Account.PasswordResetToken = token;
             employee.Account.PasswordResetTokenExpiryTime = DateTime.UtcNow.AddMinutes(15); // Based on https://www.authgear.com/post/authentication-security-password-reset-best-practices-and-more/#:~:text=How%20long%20should%20a%20password,immediately%20after%20a%20successful%20reset.
-            
+
             await context.SaveChangesAsync();
 
             var resetLink = $"{configuration["FrontendBaseUrl"]}/reset-password?token={token}";
@@ -542,13 +544,14 @@ namespace OTMS.Service.Services
                         employee.Email,
                             "Change Password for Operational Management System Account",
                             $"""
-                            Welcome {string.Join(" ", new[]
-                                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} to the Operational Management System.
+                            <p>Welcome <strong>{string.Join(" ", new[]
+                                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))}</strong> to the Operational Management System.</p>
 
-                            Please click the link below to reset your password, the link last 15 minutes:
+                            <p>Please click the link below to reset your password, the link last 15 minutes:</p>
 
-                            {resetLink}
-                            """
+                            <p><a href="{resetLink}">{resetLink}</a></p>
+                            """,
+                            isHtml: true
                 );
 
             return new ApiResponseDTO<object>
@@ -570,7 +573,7 @@ namespace OTMS.Service.Services
             if (account == null)
                 throw new Exception("Invalid or expired password reset token.");
 
-            if(request.NewPassword.Length < PasswordLength.MinimumLength ||
+            if (request.NewPassword.Length < PasswordLength.MinimumLength ||
                 request.NewPassword.Length > PasswordLength.MaximumLength)
                 throw new Exception("New password must be at least 15 to 64 characters long.");
 
