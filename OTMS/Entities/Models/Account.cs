@@ -31,7 +31,8 @@ namespace OTMS.Entities.Models
         public ICollection<EmergencyOverrideRequest> RequestedEmergencyOverrides { get; set; } = new List<EmergencyOverrideRequest>(); // Emergency Override Requests that is requested by this Account.
         public ICollection<EmergencyOverrideRequest> ApprovedEmergencyOverrides { get; set; } = new List<EmergencyOverrideRequest>(); // Emergency Override Requests that is approved by this Account.
 
-
+        public ICollection<TaskStatusRecord> TaskStatusUpdates { get; set; } = new List<TaskStatusRecord>();
+        public ICollection<AdminOverrideRecord> AdminOverrides { get; set; } = new List<AdminOverrideRecord>();
         // for password change tracking.
         public bool IsPasswordChanged { get; set; } = false;
     }

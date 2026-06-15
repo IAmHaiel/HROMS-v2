@@ -19,7 +19,7 @@ namespace OTMS.Service.Services
             var notification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo,
+                EmployeeId = task.AssignedTo.Value,
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskDeadlineApproaching,
@@ -52,7 +52,7 @@ namespace OTMS.Service.Services
             var assigneeNotification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's AccountId
+                EmployeeId = task.AssignedTo.Value, // EmployeeId = Assignee's AccountId
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskAssigned,
@@ -183,7 +183,7 @@ namespace OTMS.Service.Services
             var assigneeNotification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                EmployeeId = task.AssignedTo.Value, // EmployeeId = Assignee's Account ID
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskUpdated,
@@ -204,7 +204,7 @@ namespace OTMS.Service.Services
             var assigneeNotification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                EmployeeId = task.AssignedTo.Value, // EmployeeId = Assignee's Account ID
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskUpdated,
@@ -238,7 +238,7 @@ namespace OTMS.Service.Services
             var assigneeNotification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo, // EmployeeId = Assignee's Account ID
+                EmployeeId = task.AssignedTo.Value, // EmployeeId = Assignee's Account ID
                 TaskId = task.TaskId,
                 NotificationType =
                     NotificationTypes.TaskUpdated,

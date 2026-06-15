@@ -16,5 +16,7 @@ namespace OTMS.Common.Constraints
         public const string TaskDuplicateDetected = "Task Duplicate Detected";
         public const string TaskSimilarityDetected = "Similar Task Detected";
         public const string TaskCreated = "Task Created";
+        public const string TaskStatusUpdated = "Task Status Updated";
+        public const string TaskStatusUpdateFailed = "Task Status Update Failed";
     }
 }

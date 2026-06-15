@@ -139,6 +139,50 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
+        /// Operations Admin verifies and approves the completion of a "Done" task.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpPatch("{taskId}/approve-completion")]
+        public async Task<ActionResult<TaskResponseDTO>> ApproveTaskCompletion(Guid taskId)
+        {
+            try
+            {
+                var result = await taskService.ApproveTaskCompletionAsync(taskId);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// System/Operations Admin overrides a "Completed" task, providing reasons and unlocking its status.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpPost("{taskId}/override")]
+        public async Task<ActionResult<TaskResponseDTO>> OverrideCompletedTask(Guid taskId, [FromBody] AdminOverrideDTO request)
+        {
+            try
+            {
+                var result = await taskService.OverrideCompletedTaskAsync(taskId, request);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Gets a list of tasks that are assigned to the currently authenticated user. Only authenticated users with the "OperationsAdmin", "Encoder", or "Coordinator" roles can access this endpoint, and they will only see tasks that are assigned to them.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.View")]

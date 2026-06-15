@@ -32,26 +32,30 @@ namespace OTMS.Service.Services
             var creatorId = Guid.Parse(accountIdClaim);
 
             // Check Assigned Employee
-            var assignedAccount = await context.Accounts
-                .Include(a => a.Employee)
-                .Include(a => a.ActivityLogs)
-                .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
-
-            if (assignedAccount == null)
+            Account? assignedAccount = null;
+            if (request.AssignedTo.HasValue)
             {
-                throw new Exception("Assigned employee not found.");
-            }
+                assignedAccount = await context.Accounts
+                    .Include(a => a.Employee)
+                    .Include(a => a.ActivityLogs)
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo.Value);
 
-            if (assignedAccount.AccountStatus == "On Leave")
-            {
-                throw new Exception("Cannot assign task to an employee who is on leave.");
-            }
+                if (assignedAccount == null)
+                {
+                    throw new Exception("Assigned employee not found.");
+                }
 
-            var latestLog = assignedAccount.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-            var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
-            if (presenceStatus == "Offline")
-            {
-                throw new Exception("Cannot assign task to an offline employee.");
+                if (assignedAccount.AccountStatus == "On Leave")
+                {
+                    throw new Exception("Cannot assign task to an employee who is on leave.");
+                }
+
+                var latestLog = assignedAccount.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
+                if (presenceStatus == "Offline")
+                {
+                    throw new Exception("Cannot assign task to an offline employee.");
+                }
             }
 
             // Get Creator
@@ -109,7 +113,7 @@ namespace OTMS.Service.Services
                 Priority = request.Priority,
                 DueAt = request.DueAt,
 
-                TaskStatus = "Pending",
+                TaskStatus = request.AssignedTo.HasValue ? "Assigned" : "Draft",
 
                 CreatedAt = DateTime.UtcNow,
                 Deleted = false
@@ -118,9 +122,11 @@ namespace OTMS.Service.Services
             await context.Tasks.AddAsync(task);
             await context.SaveChangesAsync();
 
-            // Integrate Notification
-            await notificationService
-                .CreateTaskAssignedNotificationAsync(task);
+            await RecordTaskStatusAsync(task.TaskId, "None", "Draft", creatorId, true);
+            if (request.AssignedTo.HasValue)
+            {
+                await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", creatorId, true);
+            }
 
             await activityLogService.LogActivityAsync(
                 creatorId,
@@ -128,23 +134,30 @@ namespace OTMS.Service.Services
                 $"{string.Join(" ", new[]
                     {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created the task {request.TaskTitle} at {DateTime.Now:hh:mm tt}");
 
-            if (request.RecommendedEmployeeId.HasValue)
+            if (request.AssignedTo.HasValue)
             {
-                if (request.AssignedTo == request.RecommendedEmployeeId.Value)
+                // Integrate Notification
+                await notificationService
+                    .CreateTaskAssignedNotificationAsync(task);
+
+                if (request.RecommendedEmployeeId.HasValue)
                 {
-                    await activityLogService.LogActivityAsync(
-                        creatorId,
-                        "Task Assignment Recommendation",
-                        $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                    );
-                }
-                else
-                {
-                    await activityLogService.LogActivityAsync(
-                        creatorId,
-                        "Task Assignment Recommendation",
-                        $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                    );
+                    if (request.AssignedTo == request.RecommendedEmployeeId.Value)
+                    {
+                        await activityLogService.LogActivityAsync(
+                            creatorId,
+                            "Task Assignment Recommendation",
+                            $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                        );
+                    }
+                    else
+                    {
+                        await activityLogService.LogActivityAsync(
+                            creatorId,
+                            "Task Assignment Recommendation",
+                            $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                        );
+                    }
                 }
             }
 
@@ -169,6 +182,13 @@ namespace OTMS.Service.Services
 
         public async Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request)
         {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+
             var task = await context.Tasks
                 .Include(t => t.Assignee)
                     .ThenInclude(a => a.Employee)
@@ -181,25 +201,39 @@ namespace OTMS.Service.Services
                 throw new Exception("Task not found.");
             }
 
+            if (task.TaskStatus == "Completed")
+            {
+                throw new Exception("Completed tasks cannot be modified. Administrator override required.");
+            }
+
             if (task.AssignedTo != request.AssignedTo)
             {
-                var newAssignee = await context.Accounts
-                    .Include(a => a.ActivityLogs)
-                    .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
-
-                if (newAssignee != null)
+                if (request.AssignedTo.HasValue)
                 {
-                    if (newAssignee.AccountStatus == "On Leave")
-                    {
-                        throw new Exception("Cannot assign task to an employee who is on leave.");
-                    }
+                    var newAssignee = await context.Accounts
+                        .Include(a => a.ActivityLogs)
+                        .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo.Value);
 
-                    var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                    var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
-                    if (presenceStatus == "Offline")
+                    if (newAssignee != null)
                     {
-                        throw new Exception("Cannot assign task to an offline employee.");
+                        if (newAssignee.AccountStatus == "On Leave")
+                        {
+                            throw new Exception("Cannot assign task to an employee who is on leave.");
+                        }
+
+                        var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                        var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
+                        if (presenceStatus == "Offline")
+                        {
+                            throw new Exception("Cannot assign task to an offline employee.");
+                        }
                     }
+                }
+
+                if (task.TaskStatus == "Draft" && request.AssignedTo.HasValue)
+                {
+                    task.TaskStatus = "Assigned";
+                    await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", loggedInAccountId, true);
                 }
             }
 
@@ -481,21 +515,35 @@ namespace OTMS.Service.Services
                 throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
-            // Validate Status
-            var validStatuses = new[] { "Pending", "In Progress", "Done", "Completed" };
-
-            if (!validStatuses.Contains(request.TaskStatus))
+            // FSM Validation
+            bool isStatusChanged = task.TaskStatus != request.TaskStatus;
+            if (isStatusChanged)
             {
-                throw new Exception("Invalid task status.");
-            }
+                bool isValidTransition = false;
+                string failureReason = "";
 
-            if (request.TaskStatus == "Completed")
-            {
-                throw new Exception("Users are not allowed to mark tasks as Completed.");
-            }
+                if (task.TaskStatus == "Assigned" && request.TaskStatus == "In Progress")
+                {
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
+                {
+                    isValidTransition = true;
+                }
+                else
+                {
+                    failureReason = $"Invalid transition from {task.TaskStatus} to {request.TaskStatus}.";
+                }
 
-            // Update Progress
-            task.TaskStatus = request.TaskStatus;
+                if (!isValidTransition)
+                {
+                    await RecordTaskStatusAsync(task.TaskId, task.TaskStatus, request.TaskStatus, loggedInAccountId, false, failureReason);
+                    throw new Exception(failureReason);
+                }
+                
+                await RecordTaskStatusAsync(task.TaskId, task.TaskStatus, request.TaskStatus, loggedInAccountId, true);
+                task.TaskStatus = request.TaskStatus;
+            }
 
             if (!string.IsNullOrWhiteSpace(request.TaskRemarks))
             {
@@ -529,7 +577,7 @@ namespace OTMS.Service.Services
             }
 
             await activityLogService.LogActivityAsync(
-                task.AssignedTo,
+                task.AssignedTo.Value,
                 ActivityTypes.TaskUpdated,
                 $"{string.Join(" ", new[]
                     {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
@@ -987,6 +1035,140 @@ namespace OTMS.Service.Services
                     TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
                 }
             };
+        }
+
+        public async Task<TaskResponseDTO> ApproveTaskCompletionAsync(Guid taskId)
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+
+            var task = await context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
+
+            if (task == null) throw new Exception("Task not found.");
+
+            if (task.TaskStatus != "Done")
+            {
+                string failureReason = $"Cannot approve completion. Task is not in 'Done' state. Current status: '{task.TaskStatus}'.";
+                await RecordTaskStatusAsync(taskId, task.TaskStatus, "Completed", loggedInAccountId, false, failureReason);
+                throw new Exception(failureReason);
+            }
+
+            task.TaskStatus = "Completed";
+            task.UpdatedAt = DateTime.UtcNow;
+
+            await RecordTaskStatusAsync(taskId, "Done", "Completed", loggedInAccountId, true);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(loggedInAccountId, "Task Completed", $"Operations Admin verified and completed task '{task.TaskTitle}'.");
+
+            return new TaskResponseDTO
+            {
+                TaskId = task.TaskId,
+                TaskTitle = task.TaskTitle,
+                TaskStatus = task.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[] { task.Assignee?.Employee.FirstName, task.Assignee?.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { task.Creator.Employee.FirstName, task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = task.CreatedAt
+            };
+        }
+
+        public async Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request)
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+
+            if (!request.ApprovalConfirmation)
+            {
+                throw new Exception("Approval confirmation is required to perform an admin override.");
+            }
+
+            var task = await context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(t => t.TaskId == taskId && !t.Deleted && !t.PermanentlyDeleted);
+
+            if (task == null) throw new Exception("Task not found.");
+
+            if (task.TaskStatus != "Completed")
+            {
+                throw new Exception("Admin override can only be applied to Completed tasks.");
+            }
+
+            var validRequestedStatuses = new[] { "Assigned", "In Progress", "Done" };
+            if (!validRequestedStatuses.Contains(request.RequestedStatus))
+            {
+                throw new Exception($"Invalid requested status. Must be one of: {string.Join(", ", validRequestedStatuses)}");
+            }
+
+            // Create override record
+            var overrideRecord = new AdminOverrideRecord
+            {
+                OverrideId = Guid.NewGuid(),
+                TaskId = taskId,
+                AdminId = loggedInAccountId,
+                OverrideReason = request.OverrideReason,
+                AdminRemarks = request.AdminRemarks,
+                ApprovalConfirmation = request.ApprovalConfirmation,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.AdminOverrideRecords.AddAsync(overrideRecord);
+
+            var oldStatus = task.TaskStatus;
+            task.TaskStatus = request.RequestedStatus;
+            task.UpdatedAt = DateTime.UtcNow;
+
+            await RecordTaskStatusAsync(taskId, oldStatus, task.TaskStatus, loggedInAccountId, true, "Admin Override Executed");
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(loggedInAccountId, "Task Override", $"Operations Admin overrode task '{task.TaskTitle}' from Completed to {task.TaskStatus}. Reason: {request.OverrideReason}");
+
+            return new TaskResponseDTO
+            {
+                TaskId = task.TaskId,
+                TaskTitle = task.TaskTitle,
+                TaskStatus = task.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[] { task.Assignee?.Employee.FirstName, task.Assignee?.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { task.Creator.Employee.FirstName, task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = task.CreatedAt
+            };
+        }
+
+        private async System.Threading.Tasks.Task RecordTaskStatusAsync(Guid taskId, string currentStatus, string requestedStatus, Guid accountId, bool isSuccessful, string? failureReason = null)
+        {
+            var statusRecord = new TaskStatusRecord
+            {
+                RecordId = Guid.NewGuid(),
+                TaskId = taskId,
+                CurrentStatus = currentStatus,
+                RequestedStatus = requestedStatus,
+                ChangeDate = DateTime.UtcNow,
+                UpdatedBy = accountId,
+                IsSuccessful = isSuccessful,
+                FailureReason = failureReason
+            };
+
+            await context.TaskStatusRecords.AddAsync(statusRecord);
+            await context.SaveChangesAsync();
+
+            string statusLogMsg = isSuccessful
+                ? $"Status transition validated: '{currentStatus}' -> '{requestedStatus}'."
+                : $"Status sequence violation detected: Failed to transition from '{currentStatus}' to '{requestedStatus}'. Reason: {failureReason}";
+
+            await activityLogService.LogActivityAsync(
+                accountId,
+                isSuccessful ? ActivityTypes.TaskStatusUpdated : ActivityTypes.TaskStatusUpdateFailed,
+                statusLogMsg
+            );
         }
     }
 }

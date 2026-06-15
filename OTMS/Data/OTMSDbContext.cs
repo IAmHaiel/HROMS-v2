@@ -11,6 +11,8 @@ namespace OTMS.Data
         public DbSet<Entities.Models.Task> Tasks { get; set; }
         public DbSet<TaskComment> TaskComments { get; set; }
         public DbSet<TaskReopenRequest> TaskReopenRequests { get; set; }
+        public DbSet<TaskStatusRecord> TaskStatusRecords { get; set; }
+        public DbSet<AdminOverrideRecord> AdminOverrideRecords { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
@@ -128,6 +130,32 @@ namespace OTMS.Data
                 .HasOne(tr => tr.RequestedBy)
                 .WithMany()
                 .HasForeignKey(tr => tr.RequestedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // TaskStatusRecord Relationships
+            modelBuilder.Entity<TaskStatusRecord>()
+                .HasOne(tsr => tsr.Task)
+                .WithMany(t => t.StatusRecords)
+                .HasForeignKey(tsr => tsr.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaskStatusRecord>()
+                .HasOne(tsr => tsr.Updater)
+                .WithMany(a => a.TaskStatusUpdates)
+                .HasForeignKey(tsr => tsr.UpdatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // AdminOverrideRecord Relationships
+            modelBuilder.Entity<AdminOverrideRecord>()
+                .HasOne(aor => aor.Task)
+                .WithMany(t => t.OverrideRecords)
+                .HasForeignKey(aor => aor.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AdminOverrideRecord>()
+                .HasOne(aor => aor.Admin)
+                .WithMany(a => a.AdminOverrides)
+                .HasForeignKey(aor => aor.AdminId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Notifications Relationship

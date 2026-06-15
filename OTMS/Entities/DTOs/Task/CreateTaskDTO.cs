@@ -5,7 +5,7 @@ namespace OTMS.Entities.DTOs.Task
 {
     public class CreateTaskDTO
     {
-        public Guid AssignedTo { get; set; }
+        public Guid? AssignedTo { get; set; }
 
         [Required(ErrorMessage = "Task Title is required.")]
         public string TaskTitle { get; set; } = string.Empty;
