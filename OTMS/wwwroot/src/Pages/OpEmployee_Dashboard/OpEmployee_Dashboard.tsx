@@ -1536,10 +1536,16 @@ export default function EmployeeDashboard() {
 
         fetch('/api/profile/view-profile', { headers: authHeader() })
             .then(res => { if (!res.ok) throw new Error(); return res.json(); })
-            .then((data: any) => {
+            .then((resJson: any) => {
+                if (!resJson || !resJson.isSuccess || !resJson.data) throw new Error('Invalid response structure');
+                const data = resJson.data;
+                const fetchedFullName = (data.firstName || data.lastName)
+                    ? [data.firstName, data.middleName, data.lastName, data.suffix].map(s => (s ?? '').trim()).filter(Boolean).join(' ')
+                    : (data.employeeName ?? localStorage.getItem('employeeName') ?? '');
+
                 const fetched: UserProfile = {
                     employeeId: data.employeeNumber ?? employeeId,
-                    fullName: data.employeeName ?? localStorage.getItem('employeeName') ?? '',
+                    fullName: fetchedFullName,
                     phone: data.contactNumber ?? localStorage.getItem('contactNumber') ?? '',
                     email: data.email ?? localStorage.getItem('email') ?? '',
                     role: data.role ?? localStorage.getItem('role') ?? '',
@@ -1551,6 +1557,11 @@ export default function EmployeeDashboard() {
                 localStorage.setItem('contactNumber', fetched.phone);
                 localStorage.setItem('email', fetched.email);
                 localStorage.setItem('role', fetched.role);
+
+                localStorage.setItem('firstName', data.firstName ?? '');
+                localStorage.setItem('middleName', data.middleName ?? '');
+                localStorage.setItem('lastName', data.lastName ?? '');
+                localStorage.setItem('suffix', data.suffix ?? '');
             })
             .catch(err => console.warn('Could not fetch profile:', err))
             .finally(() => setLoadingUser(false));

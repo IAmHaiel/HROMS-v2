@@ -1119,18 +1119,31 @@ function ProfileTab() {
             headers: { Authorization: `Bearer ${t}` },
         })
             .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (!data) return;
+            .then(resJson => {
+                if (!resJson || !resJson.isSuccess || !resJson.data) return;
+                const data = resJson.data;
                 const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
                 const email = data.email ?? '';
-                if (contact) {
-                    localStorage.setItem('contactNumber', contact);
-                    setProfileForm(prev => ({ ...prev, contactNumber: contact }));
-                }
-                if (email) {
-                    localStorage.setItem('email', email);
-                    setProfileForm(prev => ({ ...prev, email: email }));
-                }
+                const firstNameVal = data.firstName ?? '';
+                const middleNameVal = data.middleName ?? '';
+                const lastNameVal = data.lastName ?? '';
+                const suffixVal = data.suffix ?? '';
+
+                if (firstNameVal) localStorage.setItem('firstName', firstNameVal);
+                if (middleNameVal) localStorage.setItem('middleName', middleNameVal);
+                if (lastNameVal) localStorage.setItem('lastName', lastNameVal);
+                if (suffixVal) localStorage.setItem('suffix', suffixVal);
+                if (contact) localStorage.setItem('contactNumber', contact);
+                if (email) localStorage.setItem('email', email);
+
+                setProfileForm(prev => ({
+                    ...prev,
+                    firstName: firstNameVal || prev.firstName,
+                    middleName: middleNameVal || prev.middleName,
+                    lastName: lastNameVal || prev.lastName,
+                    contactNumber: contact || prev.contactNumber,
+                    email: email || prev.email,
+                }));
             })
             .catch(() => { });
     }, []);
@@ -2224,16 +2237,25 @@ export default function OpsAdminDashboard() {
             headers: { Authorization: `Bearer ${t}` },
         })
             .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (!data) return;
+            .then(resJson => {
+                if (!resJson || !resJson.isSuccess || !resJson.data) return;
+                const data = resJson.data;
                 const contact = data.contactNumber ?? data.contact ?? data.phoneNumber ?? '';
                 const email = data.email ?? '';
-                if (contact) {
-                    localStorage.setItem('contactNumber', contact);
-                }
-                if (email) {
-                    localStorage.setItem('email', email);
-                }
+                const firstNameVal = data.firstName ?? '';
+                const middleNameVal = data.middleName ?? '';
+                const lastNameVal = data.lastName ?? '';
+                const suffixVal = data.suffix ?? '';
+
+                if (firstNameVal) localStorage.setItem('firstName', firstNameVal);
+                if (middleNameVal) localStorage.setItem('middleName', middleNameVal);
+                if (lastNameVal) localStorage.setItem('lastName', lastNameVal);
+                if (suffixVal) localStorage.setItem('suffix', suffixVal);
+                if (contact) localStorage.setItem('contactNumber', contact);
+                if (email) localStorage.setItem('email', email);
+
+                const fullName = [firstNameVal, middleNameVal, lastNameVal, suffixVal].map(s => (s ?? '').trim()).filter(Boolean).join(' ');
+                if (fullName) localStorage.setItem('employeeName', fullName);
             })
             .catch(() => { });
     }, []);

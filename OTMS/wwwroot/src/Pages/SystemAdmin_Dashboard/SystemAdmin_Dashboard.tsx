@@ -1199,7 +1199,7 @@ function ManageEmployeesTab({
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 
-function ProfileTab() {
+function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) => void }) {
     const employeeId = localStorage.getItem('employeeId') ?? '';
     const storedFirstName = localStorage.getItem('firstName') ?? '';
     const storedMiddleName = localStorage.getItem('middleName') ?? '';
@@ -1229,6 +1229,48 @@ function ProfileTab() {
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileSuccess, setProfileSuccess] = useState(false);
+
+    useEffect(() => {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+        fetch('/api/profile/view-profile', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(result => {
+                if (!result || !result.isSuccess || !result.data) return;
+                const p = result.data;
+                const contact = p.contactNumber ?? '';
+                const email = p.email ?? '';
+                const firstName = p.firstName ?? '';
+                const middleName = p.middleName ?? '';
+                const lastName = p.lastName ?? '';
+                const suffix = p.suffix ?? '';
+                const fullName = buildDisplayName(firstName, middleName, lastName, suffix);
+
+                localStorage.setItem('firstName', firstName);
+                localStorage.setItem('middleName', middleName);
+                localStorage.setItem('lastName', lastName);
+                localStorage.setItem('suffix', suffix);
+                localStorage.setItem('contactNumber', contact);
+                localStorage.setItem('email', email);
+                localStorage.setItem('employeeName', fullName);
+
+                setProfileForm({
+                    firstName,
+                    middleName,
+                    lastName,
+                    suffix,
+                    contactNumber: contact,
+                    email,
+                });
+
+                if (onProfileUpdate) {
+                    onProfileUpdate(fullName);
+                }
+            })
+            .catch(err => console.error('Error fetching profile:', err));
+    }, [onProfileUpdate]);
 
     const [editingPassword, setEditingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
@@ -1367,7 +1409,11 @@ function ProfileTab() {
                     localStorage.setItem('suffix', profileForm.suffix.trim());
                     localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
                     localStorage.setItem('email', profileForm.email.trim());
-                    localStorage.setItem('employeeName', buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix));
+                    const newFullName = buildDisplayName(profileForm.firstName, profileForm.middleName, profileForm.lastName, profileForm.suffix);
+                    localStorage.setItem('employeeName', newFullName);
+                    if (onProfileUpdate) {
+                        onProfileUpdate(newFullName);
+                    }
                     setProfileSuccess(true);
                     setEditingProfile(false);
                     setConfirmModal(CONFIRM_CLOSED);
@@ -1788,11 +1834,13 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
 export default function Dashboard() {
     const navigate = useNavigate();
     const { success } = useToast();
-    const storedFirst = localStorage.getItem('firstName') ?? '';
-    const storedMiddle = localStorage.getItem('middleName') ?? '';
-    const storedLast = localStorage.getItem('lastName') ?? '';
-    const storedSuffix = localStorage.getItem('suffix') ?? '';
-    const employeeName = buildDisplayName(storedFirst, storedMiddle, storedLast, storedSuffix) || localStorage.getItem('employeeName') || '';
+    const [employeeName, setEmployeeName] = useState(() => {
+        const storedFirst = localStorage.getItem('firstName') ?? '';
+        const storedMiddle = localStorage.getItem('middleName') ?? '';
+        const storedLast = localStorage.getItem('lastName') ?? '';
+        const storedSuffix = localStorage.getItem('suffix') ?? '';
+        return buildDisplayName(storedFirst, storedMiddle, storedLast, storedSuffix) || localStorage.getItem('employeeName') || '';
+    });
     const currentEmployeeId = localStorage.getItem('employeeId') || '';
     usePreventBackNav();
 
@@ -1935,6 +1983,31 @@ export default function Dashboard() {
         fetchLeaveRequests(1, { status: 'pending', role: '', search: '' });
         fetchOverrides(1, { status: 'Pending', search: '' });
         const token = localStorage.getItem('authToken');
+
+        // Fetch profile to sync name/contact info to localStorage
+        fetch('/api/profile/view-profile', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => res.ok ? res.json() : null)
+            .then(result => {
+                if (!result || !result.isSuccess || !result.data) return;
+                const p = result.data;
+                const firstName = p.firstName ?? '';
+                const middleName = p.middleName ?? '';
+                const lastName = p.lastName ?? '';
+                const suffix = p.suffix ?? '';
+                const fullName = buildDisplayName(firstName, middleName, lastName, suffix);
+
+                localStorage.setItem('firstName', firstName);
+                localStorage.setItem('middleName', middleName);
+                localStorage.setItem('lastName', lastName);
+                localStorage.setItem('suffix', suffix);
+                localStorage.setItem('contactNumber', p.contactNumber ?? '');
+                localStorage.setItem('email', p.email ?? '');
+                localStorage.setItem('employeeName', fullName);
+
+                setEmployeeName(fullName);
+            })
+            .catch((err) => console.error('Profile fetch error:', err));
+
         fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
             .then(async res => {
                 if (!res.ok) return [];
@@ -2010,7 +2083,7 @@ export default function Dashboard() {
         <div className="dashboard-container">
             <aside className="sidebar">
                 <div className="sidebar-logo"><img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="logo-image" /></div>
-                <div className="sidebar-role-section"><div className="sidebar-role-badge super-admin"><div className="role-dot-inner" />SUPER ADMIN</div></div>
+                <div className="sidebar-role-section"><div className="sidebar-role-badge super-admin"><div className="role-dot-inner" />SYSTEM ADMIN</div></div>
                 <nav className="sidebar-nav">
                     {NAV_GROUPS.map(group => (
                         <div key={group.label} className="nav-section">
@@ -2026,7 +2099,7 @@ export default function Dashboard() {
                 <div className="sidebar-footer-profile">
                     <div className="profile-card">
                         <div className="profile-avatar">{getInitials(employeeName || 'Super Admin')}</div>
-                        <div className="profile-info"><span className="profile-name">{employeeName || 'Super Admin'}</span><span className="profile-role">SUPER ADMIN</span></div>
+                        <div className="profile-info"><span className="profile-name">{employeeName || 'Super Admin'}</span><span className="profile-role">SYSTEM ADMIN</span></div>
                         <button className="profile-logout" onClick={handleLogout} title="Logout" aria-label="Logout"><LogOut size={18} /></button>
                     </div>
                 </div>
@@ -2072,7 +2145,7 @@ export default function Dashboard() {
                     )
                 )}
 
-                {(activeTab === 'profile' || activeTab === 'settings') && <ProfileTab />}
+                {(activeTab === 'profile' || activeTab === 'settings') && <ProfileTab onProfileUpdate={setEmployeeName} />}
 
                 {activeTab === 'roles' && <RoleManagementTab />}
 
