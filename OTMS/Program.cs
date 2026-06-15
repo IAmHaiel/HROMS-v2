@@ -116,6 +116,10 @@ builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ISystemAdminService, SystemAdminService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
+builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
+
+// Register Background Services
+builder.Services.AddHostedService<TaskTemplateSchedulingService>();
 
 builder.Services.AddMailKit(config =>
 {
