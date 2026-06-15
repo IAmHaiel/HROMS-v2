@@ -98,6 +98,62 @@ namespace OTMS.Service.Services
                 }
             }
         }
+        
+        public async System.Threading.Tasks.Task CreateTaskReviewRequestedNotificationAsync(Entities.Models.Task task)
+        {
+            var adminNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy, // Usually Ops Admin who created the task
+                TaskId = task.TaskId,
+                NotificationType = NotificationTypes.TaskReviewRequested,
+                Message = $"Task '{task.TaskTitle}' has been submitted for your review by the assigned employee.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(adminNotification);
+            await context.SaveChangesAsync();
+        }
+
+        public async System.Threading.Tasks.Task CreateTaskReturnedForReworkNotificationAsync(Entities.Models.Task task)
+        {
+            if (!task.AssignedTo.HasValue) return;
+
+            var assigneeNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.AssignedTo.Value,
+                TaskId = task.TaskId,
+                NotificationType = NotificationTypes.TaskReturnedForRework,
+                Message = $"Task '{task.TaskTitle}' was returned for rework. Please check the task remarks.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(assigneeNotification);
+            await context.SaveChangesAsync();
+        }
+
+        public async System.Threading.Tasks.Task CreateTaskApprovedAndClosedNotificationAsync(Entities.Models.Task task)
+        {
+            if (!task.AssignedTo.HasValue) return;
+
+            var assigneeNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.AssignedTo.Value,
+                TaskId = task.TaskId,
+                NotificationType = NotificationTypes.TaskApprovedAndClosed,
+                Message = $"Task '{task.TaskTitle}' was approved and officially closed.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(assigneeNotification);
+            await context.SaveChangesAsync();
+        }
+    
 
         public async System.Threading.Tasks.Task<PaginationResponseDTO<NotificationResponseDTO>> GetMyNotificationsAsync(PaginationDTO request)
         {

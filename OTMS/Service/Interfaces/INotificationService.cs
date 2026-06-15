@@ -11,6 +11,9 @@ namespace OTMS.Service.Interfaces
         System.Threading.Tasks.Task CreateTaskUpdateNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateEmployeeTaskUpdateNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateCompletedTaskUpdateNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateTaskReviewRequestedNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateTaskReturnedForReworkNotificationAsync(Entities.Models.Task task);
+        System.Threading.Tasks.Task CreateTaskApprovedAndClosedNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task);
         System.Threading.Tasks.Task CreateLeaveRequestNotificationAsync(LeaveRequest leaveRequest);
         System.Threading.Tasks.Task CreateEmergencyOverrideNotificationAsync(EmergencyOverrideRequest emergencyOverride);
