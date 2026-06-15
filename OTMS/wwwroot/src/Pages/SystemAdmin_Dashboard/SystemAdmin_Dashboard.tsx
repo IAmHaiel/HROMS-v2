@@ -569,7 +569,6 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             }
 
             const data = responseData.data;
-            setSuccessData({ employeeNumber: data.employeeNumber ?? form.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
                 employeeNumber: data.employeeNumber ?? form.employeeNumber,
@@ -583,6 +582,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 accountStatus: 'Pending Verification',
                 email: form.email.trim(),
             });
+            onClose();
         } catch (err: any) {
             setApiError(err.message ?? 'Something went wrong. Please try again.');
         } finally {
