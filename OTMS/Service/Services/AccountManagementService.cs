@@ -561,9 +561,113 @@ namespace OTMS.Service.Services
                         FileUrl = a.FilePath,
                         ContentType = a.ContentType,
                         FileSize = a.FileSize,
-                        Version = a.Version
+                        Version = a.Version,
+                        DocumentType = a.DocumentType,
+                        IsArchived = a.IsArchived
                     }).ToList()
                 }
+            };
+        }
+
+        public async Task<ApiResponseDTO<EmployeeAttachmentDTO>> UploadEmployeeDocument(string employeeNumber, UploadEmployeeDocumentDTO request)
+        {
+            var employee = await context.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+            if (employee == null)
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Employee not found." };
+
+            var attachment = await fileService.SaveFileAsync(request.File, employee.EmployeeId);
+            attachment.DocumentType = request.DocumentType;
+            attachment.IsArchived = false;
+
+            context.EmployeeAttachments.Add(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<EmployeeAttachmentDTO>
+            {
+                IsSuccess = true,
+                Message = "Document uploaded successfully.",
+                Data = new EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = attachment.EmployeeAttachmentId,
+                    FileName = attachment.FileName,
+                    FileUrl = attachment.FilePath,
+                    ContentType = attachment.ContentType,
+                    FileSize = attachment.FileSize,
+                    Version = attachment.Version,
+                    DocumentType = attachment.DocumentType,
+                    IsArchived = attachment.IsArchived
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<EmployeeAttachmentDTO>> UpdateEmployeeDocument(Guid attachmentId, UpdateEmployeeDocumentDTO request)
+        {
+            var attachment = await context.EmployeeAttachments.FirstOrDefaultAsync(a => a.EmployeeAttachmentId == attachmentId);
+            if (attachment == null)
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Document not found." };
+
+            if (!string.IsNullOrEmpty(request.DocumentType))
+            {
+                attachment.DocumentType = request.DocumentType;
+            }
+
+            if (request.IsArchived.HasValue)
+            {
+                attachment.IsArchived = request.IsArchived.Value;
+            }
+
+            if (request.File != null)
+            {
+                // Optionally delete the old file
+                if (!string.IsNullOrEmpty(attachment.FilePath))
+                {
+                    fileService.DeleteFile(attachment.FilePath);
+                }
+
+                var newAttachmentData = await fileService.SaveFileAsync(request.File, attachment.EmployeeId);
+                attachment.FileName = newAttachmentData.FileName;
+                attachment.FilePath = newAttachmentData.FilePath;
+                attachment.ContentType = newAttachmentData.ContentType;
+                attachment.FileSize = newAttachmentData.FileSize;
+                attachment.Version += 1;
+                attachment.UploadedAt = DateTime.UtcNow;
+            }
+
+            context.EmployeeAttachments.Update(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<EmployeeAttachmentDTO>
+            {
+                IsSuccess = true,
+                Message = "Document updated successfully.",
+                Data = new EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = attachment.EmployeeAttachmentId,
+                    FileName = attachment.FileName,
+                    FileUrl = attachment.FilePath,
+                    ContentType = attachment.ContentType,
+                    FileSize = attachment.FileSize,
+                    Version = attachment.Version,
+                    DocumentType = attachment.DocumentType,
+                    IsArchived = attachment.IsArchived
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ArchiveEmployeeDocument(Guid attachmentId)
+        {
+            var attachment = await context.EmployeeAttachments.FirstOrDefaultAsync(a => a.EmployeeAttachmentId == attachmentId);
+            if (attachment == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "Document not found." };
+
+            attachment.IsArchived = true;
+            context.EmployeeAttachments.Update(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Document archived successfully."
             };
         }
 

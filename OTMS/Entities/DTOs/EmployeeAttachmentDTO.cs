@@ -8,5 +8,7 @@ namespace OTMS.Entities.DTOs
         public string ContentType { get; set; } = string.Empty;
         public long FileSize { get; set; }
         public int Version { get; set; }
+        public string DocumentType { get; set; } = string.Empty;
+        public bool IsArchived { get; set; }
     }
 }

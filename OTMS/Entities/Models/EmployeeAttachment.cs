@@ -11,6 +11,9 @@ namespace OTMS.Entities.Models
         public long FileSize { get; set; } // Size in bytes
         public int Version { get; set; } = 1; // File version
 
+        public string DocumentType { get; set; } = string.Empty; // e.g., Resume, Contract, Government, Certificate, Performance, Disciplinary
+        public bool IsArchived { get; set; } = false;
+
         public DateTime UploadedAt { get; set; }
 
         // Navigation property
