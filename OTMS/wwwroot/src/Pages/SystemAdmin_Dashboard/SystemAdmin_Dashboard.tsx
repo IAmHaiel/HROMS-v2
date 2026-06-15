@@ -99,6 +99,13 @@ interface RecentEmployee {
     accountStatus: string;
     presenceStatus?: string;
     email?: string;
+    attachments?: Array<{
+        employeeAttachmentId: string;
+        fileName: string;
+        fileUrl: string;
+        contentType: string;
+        fileSize: number;
+    }>;
 }
 
 type LeaveType = 'vacation' | 'sick' | 'emergency' | 'personal' | 'maternity' | 'other';
@@ -1899,6 +1906,7 @@ export default function Dashboard() {
                     accountStatus: e.accountStatus ?? 'Unknown',
                     presenceStatus: e.presenceStatus ?? 'Offline',
                     email: e.email ?? '',
+                    attachments: e.attachments ?? [],
                 })).filter((e: RecentEmployee) => e.accountStatus !== 'Deleted' && e.employeeNumber !== currentEmployeeId);
                 setEmployees(list);
                 setRecentEmployees(list);

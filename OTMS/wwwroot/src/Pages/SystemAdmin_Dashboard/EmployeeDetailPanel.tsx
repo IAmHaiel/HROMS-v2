@@ -20,6 +20,8 @@ import {
     Clock,
     ChevronLeft,
     Mail,
+    FileText,
+    Download,
 } from 'lucide-react';
 import '../employee_details/employee_detail.css';
 import { useToast } from '../../components/Toast/Toast';
@@ -33,6 +35,13 @@ interface RecentEmployee {
     role: string;
     accountStatus: string;
     email?: string;
+    attachments?: Array<{
+        employeeAttachmentId: string;
+        fileName: string;
+        fileUrl: string;
+        contentType: string;
+        fileSize: number;
+    }>;
 }
 
 interface DeliveryRecord {
@@ -572,6 +581,52 @@ export default function EmployeeDetailPanel({
                                     ))}
                                 </div>
                             )}
+                        </div>
+
+                        {/* Uploaded Documents */}
+                        <div className="ed-card ed-card-full" style={{ marginTop: 20 }}>
+                            <div className="ed-card-header">
+                                <h3>
+                                    <FileText size={15} /> Uploaded Documents / Attachments
+                                </h3>
+                                <span className="ed-badge-count">
+                                    {profile.attachments?.length ?? 0} files
+                                </span>
+                            </div>
+                            <div style={{ padding: '20px' }}>
+                                {!profile.attachments || profile.attachments.length === 0 ? (
+                                    <div className="ed-empty" style={{ padding: '24px 0' }}>
+                                        <FileText size={20} />
+                                        <p>No documents uploaded yet</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                                        {profile.attachments.map(att => {
+                                            const sizeMB = (att.fileSize / (1024 * 1024)).toFixed(2);
+                                            return (
+                                                <div key={att.employeeAttachmentId} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', justifyContent: 'space-between' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                                        <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(67, 24, 255, 0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                            <FileText size={16} color="#4318ff" />
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.fileName}>
+                                                                {att.fileName}
+                                                            </div>
+                                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                                                {sizeMB} MB
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, border: '1.5px solid #cbd5e1', color: '#64748b', transition: 'all 0.15s ease' }} title="Download / Open file">
+                                                        <Download size={14} />
+                                                    </a>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}

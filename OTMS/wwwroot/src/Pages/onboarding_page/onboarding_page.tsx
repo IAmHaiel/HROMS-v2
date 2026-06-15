@@ -34,22 +34,17 @@ export default function OnboardingPage() {
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
+    const [fileObjects, setFileObjects] = useState<Record<string, File>>({});
+    const [submittingDocs, setSubmittingDocs] = useState(false);
+    const [docsApiError, setDocsApiError] = useState('');
+
     const token = localStorage.getItem('authToken') ?? '';
     const steps: Step[] = ['welcome', 'profile', 'password', 'documents', 'done'];
     const stepIndex = steps.indexOf(step);
 
     const [uploadedDocs, setUploadedDocs] = useState<Record<string, UploadedFile>>({
-        biodata: {
-            name: 'biodata_juan_delacruz.pdf',
-            size: '1.2 MB',
-            status: 'done',
-        },
-        medical: {
-            name: 'invalid_file.iso',
-            size: '4.8 MB',
-            status: 'error',
-            error: 'File type not allowed. Upload a PDF or image.',
-        },
+        biodata: { name: '', size: '', status: 'idle' },
+        medical: { name: '', size: '', status: 'idle' },
         govId: { name: '', size: '', status: 'idle' },
         nbi: { name: '', size: '', status: 'idle' },
         education: { name: '', size: '', status: 'idle' },
@@ -121,6 +116,8 @@ export default function OnboardingPage() {
             }
         }));
 
+        setFileObjects(prev => ({ ...prev, [key]: file }));
+
         setTimeout(() => {
             setUploadedDocs(prev => {
                 if (prev[key]?.status === 'uploading') {
@@ -146,6 +143,11 @@ export default function OnboardingPage() {
                 status: 'idle',
             }
         }));
+        setFileObjects(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
     };
 
     const requiredKeys = ['biodata', 'medical', 'govId'];
@@ -212,9 +214,9 @@ export default function OnboardingPage() {
                     }}
                     accept={key === 'biodata' ? '.pdf,.docx' : '.pdf,.jpg,.jpeg,.png'}
                 />
-                
-                <div 
-                    className={status === 'idle' || status === 'error' ? 'upload-slot-card' : ''} 
+
+                <div
+                    className={status === 'idle' || status === 'error' ? 'upload-slot-card' : ''}
                     style={cardStyle}
                     onClick={handleCardClick}
                 >
@@ -227,10 +229,10 @@ export default function OnboardingPage() {
                         justifyContent: 'center',
                         flexShrink: 0,
                         marginRight: 14,
-                        background: status === 'done' 
-                            ? 'rgba(5,205,153,0.08)' 
-                            : status === 'error' 
-                                ? 'rgba(238,93,80,0.08)' 
+                        background: status === 'done'
+                            ? 'rgba(5,205,153,0.08)'
+                            : status === 'error'
+                                ? 'rgba(238,93,80,0.08)'
                                 : 'rgba(67,24,255,0.05)',
                     }}>
                         {status === 'idle' && <Upload size={16} color="#4318ff" />}
@@ -421,17 +423,18 @@ export default function OnboardingPage() {
         if (Object.keys(errs).length > 0) { setProfileErrors(errs); return; }
         setProfileSaving(true); setProfileApiError('');
         try {
-            const employeeNumber = localStorage.getItem('employeeId');
-            const res = await fetch(`/api/profile/update-profile?employeeNumber=${employeeNumber}`, {
+            const employeeNumber = localStorage.getItem('employeeId') ?? '';
+            const formData = new FormData();
+            formData.append('firstName', profile.firstName.trim());
+            formData.append('middleName', profile.middleName.trim());
+            formData.append('lastName', profile.lastName.trim());
+            formData.append('suffix', profile.suffix.trim());
+            formData.append('contactNumber', profile.contactNumber.trim());
+
+            const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeNumber)}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({
-                    firstName: profile.firstName.trim(),
-                    middleName: profile.middleName.trim() || null,
-                    lastName: profile.lastName.trim(),
-                    suffix: profile.suffix.trim() || null,
-                    contactNumber: profile.contactNumber.trim(),
-                }),
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -480,6 +483,41 @@ export default function OnboardingPage() {
             setPwApiError(err.message ?? 'Something went wrong.');
         } finally {
             setPwSaving(false);
+        }
+    };
+
+    const handleSubmitAndFinish = async () => {
+        const files = Object.values(fileObjects);
+        if (files.length === 0) {
+            setStep('done');
+            return;
+        }
+        setSubmittingDocs(true);
+        setDocsApiError('');
+        try {
+            const employeeNumber = localStorage.getItem('employeeId') ?? '';
+            const formData = new FormData();
+            formData.append('employeeNumber', employeeNumber);
+            files.forEach(file => {
+                formData.append('Attachments', file);
+            });
+
+            const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeNumber)}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData,
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to upload documents.');
+            }
+
+            setStep('done');
+        } catch (err: any) {
+            setDocsApiError(err.message ?? 'Failed to upload documents.');
+        } finally {
+            setSubmittingDocs(false);
         }
     };
 
@@ -843,41 +881,52 @@ export default function OnboardingPage() {
                                     </span>
                                 </div>
 
+                                 {docsApiError && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'rgba(238,93,80,0.08)', border: '1px solid rgba(238,93,80,0.2)', borderRadius: 8, fontSize: 13, color: '#ee5d50', marginBottom: 12 }}>
+                                        <AlertCircle size={14} />{docsApiError}
+                                    </div>
+                                )}
+
                                 {/* Actions Area */}
                                 <div style={{ marginTop: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-                                        <button 
+                                        <button
                                             onClick={() => setStep('done')}
-                                            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: '8px 4px' }}
-                                            onMouseEnter={(e) => (e.currentTarget.style.color = '#334155')}
-                                            onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+                                            disabled={submittingDocs}
+                                            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: submittingDocs ? 'not-allowed' : 'pointer', fontFamily: 'inherit', padding: '8px 4px' }}
+                                            onMouseEnter={(e) => { if (!submittingDocs) e.currentTarget.style.color = '#334155'; }}
+                                            onMouseLeave={(e) => { if (!submittingDocs) e.currentTarget.style.color = '#64748b'; }}
                                         >
                                             Skip for now
                                         </button>
 
                                         <button
-                                            disabled={isSubmitDisabled}
-                                            onClick={() => setStep('done')}
+                                            disabled={isSubmitDisabled || submittingDocs}
+                                            onClick={handleSubmitAndFinish}
                                             style={{
                                                 height: 44,
                                                 padding: '0 24px',
                                                 border: 'none',
                                                 borderRadius: 10,
-                                                background: isSubmitDisabled ? '#cbd5e1' : 'linear-gradient(135deg, #4318ff, #6a5cff)',
-                                                color: isSubmitDisabled ? '#94a3b8' : 'white',
+                                                background: (isSubmitDisabled || submittingDocs) ? '#cbd5e1' : 'linear-gradient(135deg, #4318ff, #6a5cff)',
+                                                color: (isSubmitDisabled || submittingDocs) ? '#94a3b8' : 'white',
                                                 fontSize: 13,
                                                 fontWeight: 700,
-                                                cursor: isSubmitDisabled ? 'not-allowed' : 'pointer',
+                                                cursor: (isSubmitDisabled || submittingDocs) ? 'not-allowed' : 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 gap: 8,
                                                 fontFamily: 'inherit',
-                                                boxShadow: isSubmitDisabled ? 'none' : '0 8px 20px rgba(67,24,255,0.25)',
+                                                boxShadow: (isSubmitDisabled || submittingDocs) ? 'none' : '0 8px 20px rgba(67,24,255,0.25)',
                                                 transition: 'all 0.2s ease',
                                             }}
                                         >
-                                            Submit & Finish <ArrowRight size={14} />
+                                            {submittingDocs ? (
+                                                <><Loader2 size={14} className="spin-icon" /> Submitting…</>
+                                            ) : (
+                                                <>Submit & Finish <ArrowRight size={14} /></>
+                                            )}
                                         </button>
                                     </div>
 
