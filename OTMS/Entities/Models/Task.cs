@@ -11,6 +11,7 @@ namespace OTMS.Entities.Models
 
         public string TaskTitle { get; set; } = string.Empty;
         public string? TaskDescription { get; set; }
+        public string? TaskCategory { get; set; }
         public string Priority { get; set; } = "Normal";
         public DateTime? DueAt { get; set; }
         public bool Deleted { get; set; } = false;
