@@ -1,4 +1,4 @@
-﻿namespace OTMS.Entities.Models
+namespace OTMS.Entities.Models
 {
     public class Task
     {
@@ -18,6 +18,9 @@
 
         public string? TaskRemarks { get; set; }
         public string TaskStatus { get; set; } = "Pending";
+
+        public string? ProgressNotes { get; set; }
+        public string? ProgressEvidenceUrl { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

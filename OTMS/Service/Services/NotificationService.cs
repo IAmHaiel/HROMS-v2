@@ -347,5 +347,21 @@ namespace OTMS.Service.Services
             await context.Notifications.AddAsync(submitterNotification);
             await context.SaveChangesAsync();
         }
+
+        public async System.Threading.Tasks.Task CreateGeneralNotificationAsync(Guid accountId, string title, string message)
+        {
+            var notification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = accountId,
+                NotificationType = title,
+                Message = message,
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(notification);
+            await context.SaveChangesAsync();
+        }
     }
 }

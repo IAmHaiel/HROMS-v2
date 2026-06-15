@@ -10,6 +10,7 @@ namespace OTMS.Data
         public DbSet<Account> Accounts { get; set; }
         public DbSet<Entities.Models.Task> Tasks { get; set; }
         public DbSet<TaskComment> TaskComments { get; set; }
+        public DbSet<TaskReopenRequest> TaskReopenRequests { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
@@ -112,6 +113,22 @@ namespace OTMS.Data
                 .HasOne(tc => tc.Task)
                 .WithMany(t => t.Comments)
                 .HasForeignKey(tc => tc.TaskId);
+
+            // TaskReopenRequest Relationships
+            modelBuilder.Entity<TaskReopenRequest>()
+                .HasKey(tr => tr.RequestId);
+
+            modelBuilder.Entity<TaskReopenRequest>()
+                .HasOne(tr => tr.Task)
+                .WithMany()
+                .HasForeignKey(tr => tr.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TaskReopenRequest>()
+                .HasOne(tr => tr.RequestedBy)
+                .WithMany()
+                .HasForeignKey(tr => tr.RequestedById)
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Notifications Relationship
             modelBuilder.Entity<Notification>()
