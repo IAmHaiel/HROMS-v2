@@ -301,7 +301,30 @@ namespace OTMS.Controllers
 
 
 
+        }
 
+        /// <summary>
+        /// Gets smart routing recommendations for task assignment, excluding offline and on-leave employees.
+        /// Suggests the most appropriate employee based on their current active task load.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpGet("assignable-employees")]
+        public async Task<IActionResult> GetAssignableEmployees([FromQuery] PaginationDTO pagination, [FromQuery] string? nameFilter)
+        {
+            try
+            {
+                var result = await taskService.GetAssignableEmployeesAsync(pagination, nameFilter);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
         }
     }
 }

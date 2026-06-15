@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
@@ -8,8 +10,6 @@ using OTMS.Entities.DTOs.Task;
 using OTMS.Entities.DTOs.Task.Responses;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
-using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
@@ -34,11 +34,24 @@ namespace OTMS.Service.Services
             // Check Assigned Employee
             var assignedAccount = await context.Accounts
                 .Include(a => a.Employee)
+                .Include(a => a.ActivityLogs)
                 .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
 
             if (assignedAccount == null)
             {
                 throw new Exception("Assigned employee not found.");
+            }
+
+            if (assignedAccount.AccountStatus == "On Leave")
+            {
+                throw new Exception("Cannot assign task to an employee who is on leave.");
+            }
+
+            var latestLog = assignedAccount.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+            var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
+            if (presenceStatus == "Offline")
+            {
+                throw new Exception("Cannot assign task to an offline employee.");
             }
 
             // Get Creator
@@ -55,7 +68,7 @@ namespace OTMS.Service.Services
             bool exactDuplicateExists = await context.Tasks
                 .AnyAsync(t => t.TaskTitle.ToLower() == request.TaskTitle.ToLower()
                     && t.TaskDescription!.ToLower() == request.TaskDescription!.ToLower());
-            
+
             bool similarTaskExists = await context.Tasks
                 .AnyAsync(t => t.TaskTitle.ToLower().Contains(request.TaskTitle.ToLower())
                     || request.TaskTitle.ToLower().Contains(t.TaskTitle.ToLower()));
@@ -126,7 +139,7 @@ namespace OTMS.Service.Services
                 AssignedEmployee = string.Join(" ", new[]
                     {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedByEmployee = string.Join(" ", new[]
-                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),   
+                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
 
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
@@ -145,6 +158,28 @@ namespace OTMS.Service.Services
             if (task == null)
             {
                 throw new Exception("Task not found.");
+            }
+
+            if (task.AssignedTo != request.AssignedTo)
+            {
+                var newAssignee = await context.Accounts
+                    .Include(a => a.ActivityLogs)
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
+
+                if (newAssignee != null)
+                {
+                    if (newAssignee.AccountStatus == "On Leave")
+                    {
+                        throw new Exception("Cannot assign task to an employee who is on leave.");
+                    }
+
+                    var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                    var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
+                    if (presenceStatus == "Offline")
+                    {
+                        throw new Exception("Cannot assign task to an offline employee.");
+                    }
+                }
             }
 
             // Update Fields
@@ -331,7 +366,8 @@ namespace OTMS.Service.Services
             {
                 await notificationService
                     .CreateCompletedTaskUpdateNotificationAsync(task);
-            } else
+            }
+            else
             {
                 await notificationService
                     .CreateEmployeeTaskUpdateNotificationAsync(task);
@@ -419,7 +455,7 @@ namespace OTMS.Service.Services
                         && !t.Deleted
                         && !t.PermanentlyDeleted)
                 .OrderByDescending(t => t.CreatedAt);
-               
+
             var totalRecords = await query.CountAsync();
 
             var data = await query
@@ -452,7 +488,7 @@ namespace OTMS.Service.Services
                 TotalRecords = totalRecords,
                 TotalPages = (int)Math.Ceiling((double)totalRecords / request.PageSize)
             };
-            
+
         }
 
         public async Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId)
@@ -612,15 +648,92 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<PaginationResponseDTO<AssignableEmployeeDTO>>> GetAssignableEmployeesAsync(PaginationDTO pagination, string? nameFilter)
+        {
+            var query = context.Accounts
+                .Include(a => a.Employee)
+                .Include(a => a.ActivityLogs)
+                .Include(a => a.AssignedTasks)
+                .Where(a => a.Role != null && (a.Role.Name == Common.Constraints.Roles.Encoder || a.Role.Name == Common.Constraints.Roles.Coordinator))
+                .Where(a => a.AccountStatus != "On Leave");
 
+            if (!string.IsNullOrEmpty(nameFilter))
+            {
+                var lowerFilter = nameFilter.ToLower();
+                query = query.Where(a => 
+                    a.Employee.FirstName.ToLower().Contains(lowerFilter) ||
+                    a.Employee.LastName.ToLower().Contains(lowerFilter) ||
+                    a.Employee.MiddleName.ToLower().Contains(lowerFilter) ||
+                    a.Employee.Suffix.ToLower().Contains(lowerFilter));
+            }
 
+            var accounts = await query.ToListAsync();
 
+            var assignableList = new List<AssignableEmployeeDTO>();
 
+            foreach (var a in accounts)
+            {
+                var latestLog = a.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
 
+                if (presenceStatus == "Offline")
+                {
+                    continue; // Exclude Offline
+                }
 
+                var activeTasks = a.AssignedTasks.Count(t => t.TaskStatus != "Completed" && t.TaskStatus != "Closed" && t.TaskStatus != "Cancelled" && !t.Deleted && !t.PermanentlyDeleted);
 
+                var fullName = string.Join(" ", new[] { a.Employee.FirstName, a.Employee.MiddleName, a.Employee.LastName, a.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)));
 
+                assignableList.Add(new AssignableEmployeeDTO
+                {
+                    AccountId = a.AccountId,
+                    DisplayName = fullName,
+                    Role = a.Role.Name,
+                    ActiveTaskCount = activeTasks,
+                    IsRecommended = false
+                });
+            }
 
+            if (assignableList.Any())
+            {
+                var minTasks = assignableList.Min(x => x.ActiveTaskCount);
+                foreach (var emp in assignableList)
+                {
+                    if (emp.ActiveTaskCount == minTasks)
+                    {
+                        emp.IsRecommended = true;
+                        emp.DisplayName = $"{emp.DisplayName} ({emp.ActiveTaskCount} tasks) - Recommended";
+                    }
+                    else
+                    {
+                        emp.DisplayName = $"{emp.DisplayName} ({emp.ActiveTaskCount} tasks)";
+                    }
+                }
+            }
 
+            var totalRecords = assignableList.Count;
+
+            var pagedData = assignableList
+                .OrderByDescending(x => x.IsRecommended)
+                .ThenBy(x => x.ActiveTaskCount)
+                .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .ToList();
+
+            return new ApiResponseDTO<PaginationResponseDTO<AssignableEmployeeDTO>>
+            {
+                IsSuccess = true,
+                Message = "Assignable employees retrieved successfully.",
+                Data = new PaginationResponseDTO<AssignableEmployeeDTO>
+                {
+                    Data = pagedData,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
+                }
+            };
+        }
     }
 }

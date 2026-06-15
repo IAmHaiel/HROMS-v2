@@ -269,7 +269,85 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// View the complete Digital 201 File of an employee.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.View")]
+        [ProducesResponseType(typeof(ApiResponseDTO<Digital201FileResponseDTO>), 200)]
+        [HttpGet("digital-201-file")]
+        public async Task<IActionResult> GetDigital201File([Required][FromQuery] string employeeNumber)
+        {
+            var result = await accountManagementService.GetDigital201File(employeeNumber);
+            if (!result.IsSuccess)
+            {
+                return NotFound(result);
+            }
+            return Ok(result);
+        }
 
+        /// <summary>
+        /// Upload a document to an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
+        [HttpPost("documents/upload")]
+        public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request)
+        {
+            var result = await accountManagementService.UploadEmployeeDocument(employeeNumber, request);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Update a document in an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
+        [HttpPut("documents/{attachmentId}")]
+        public async Task<IActionResult> UpdateEmployeeDocument([FromRoute] Guid attachmentId, [FromForm] UpdateEmployeeDocumentDTO request)
+        {
+            var result = await accountManagementService.UpdateEmployeeDocument(attachmentId, request);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Archive a document in an employee's Digital 201 File.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
+        [HttpPatch("documents/{attachmentId}/archive")]
+        public async Task<IActionResult> ArchiveEmployeeDocument([FromRoute] Guid attachmentId)
+        {
+            var result = await accountManagementService.ArchiveEmployeeDocument(attachmentId);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Retrieve all employment contracts across all employees (Centralized Repository).
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.View")]
+        [ProducesResponseType(typeof(ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>), 200)]
+        [HttpGet("contracts")]
+        public async Task<IActionResult> GetAllEmploymentContracts([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] bool? isArchived)
+        {
+            var result = await accountManagementService.GetAllEmploymentContracts(request, search, isArchived);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
 
     }
 }

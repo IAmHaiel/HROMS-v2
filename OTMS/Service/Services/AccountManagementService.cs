@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.HttpResults;
+using OTMS.Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
@@ -511,6 +512,228 @@ namespace OTMS.Service.Services
                 ContactNumber = request.ContactNumber ?? employee.ContactNumber,
                 Email = request.Email ?? employee.Email,
                 Success = true
+            };
+        }
+
+        public async Task<ApiResponseDTO<Digital201FileResponseDTO>> GetDigital201File(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                .Include(e => e.Department)
+                .Include(e => e.JobPosition)
+                .Include(e => e.Attachments)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<Digital201FileResponseDTO>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            return new ApiResponseDTO<Digital201FileResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Digital 201 File retrieved successfully.",
+                Data = new Digital201FileResponseDTO
+                {
+                    EmployeeNumber = employee.EmployeeNumber,
+                    FirstName = employee.FirstName,
+                    MiddleName = employee.MiddleName,
+                    LastName = employee.LastName,
+                    Suffix = employee.Suffix,
+                    ContactNumber = employee.ContactNumber,
+                    Email = employee.Email,
+                    DepartmentName = employee.Department?.Name,
+                    JobPositionTitle = employee.JobPosition?.Title,
+                    DateHired = employee.CreatedAt,
+                    Role = employee.Account?.Role?.Name ?? "No Account",
+                    AccountStatus = employee.Account?.AccountStatus ?? "No Account",
+                    Success = true,
+                    Attachments = employee.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
+                    {
+                        EmployeeAttachmentId = a.EmployeeAttachmentId,
+                        FileName = a.FileName,
+                        FileUrl = a.FilePath,
+                        ContentType = a.ContentType,
+                        FileSize = a.FileSize,
+                        Version = a.Version,
+                        DocumentType = a.DocumentType,
+                        IsArchived = a.IsArchived
+                    }).ToList()
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<EmployeeAttachmentDTO>> UploadEmployeeDocument(string employeeNumber, UploadEmployeeDocumentDTO request)
+        {
+            var employee = await context.Employees.FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+            if (employee == null)
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Employee not found." };
+
+            var attachment = await fileService.SaveFileAsync(request.File, employee.EmployeeId);
+            attachment.DocumentType = request.DocumentType;
+            attachment.IsArchived = false;
+
+            context.EmployeeAttachments.Add(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<EmployeeAttachmentDTO>
+            {
+                IsSuccess = true,
+                Message = "Document uploaded successfully.",
+                Data = new EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = attachment.EmployeeAttachmentId,
+                    FileName = attachment.FileName,
+                    FileUrl = attachment.FilePath,
+                    ContentType = attachment.ContentType,
+                    FileSize = attachment.FileSize,
+                    Version = attachment.Version,
+                    DocumentType = attachment.DocumentType,
+                    IsArchived = attachment.IsArchived
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<EmployeeAttachmentDTO>> UpdateEmployeeDocument(Guid attachmentId, UpdateEmployeeDocumentDTO request)
+        {
+            var attachment = await context.EmployeeAttachments.FirstOrDefaultAsync(a => a.EmployeeAttachmentId == attachmentId);
+            if (attachment == null)
+                return new ApiResponseDTO<EmployeeAttachmentDTO> { IsSuccess = false, Message = "Document not found." };
+
+            if (!string.IsNullOrEmpty(request.DocumentType))
+            {
+                attachment.DocumentType = request.DocumentType;
+            }
+
+            if (request.IsArchived.HasValue)
+            {
+                attachment.IsArchived = request.IsArchived.Value;
+            }
+
+            if (request.File != null)
+            {
+                // Optionally delete the old file
+                if (!string.IsNullOrEmpty(attachment.FilePath))
+                {
+                    fileService.DeleteFile(attachment.FilePath);
+                }
+
+                var newAttachmentData = await fileService.SaveFileAsync(request.File, attachment.EmployeeId);
+                attachment.FileName = newAttachmentData.FileName;
+                attachment.FilePath = newAttachmentData.FilePath;
+                attachment.ContentType = newAttachmentData.ContentType;
+                attachment.FileSize = newAttachmentData.FileSize;
+                attachment.Version += 1;
+                attachment.UploadedAt = DateTime.UtcNow;
+            }
+
+            context.EmployeeAttachments.Update(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<EmployeeAttachmentDTO>
+            {
+                IsSuccess = true,
+                Message = "Document updated successfully.",
+                Data = new EmployeeAttachmentDTO
+                {
+                    EmployeeAttachmentId = attachment.EmployeeAttachmentId,
+                    FileName = attachment.FileName,
+                    FileUrl = attachment.FilePath,
+                    ContentType = attachment.ContentType,
+                    FileSize = attachment.FileSize,
+                    Version = attachment.Version,
+                    DocumentType = attachment.DocumentType,
+                    IsArchived = attachment.IsArchived
+                }
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ArchiveEmployeeDocument(Guid attachmentId)
+        {
+            var attachment = await context.EmployeeAttachments.FirstOrDefaultAsync(a => a.EmployeeAttachmentId == attachmentId);
+            if (attachment == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "Document not found." };
+
+            attachment.IsArchived = true;
+            context.EmployeeAttachments.Update(attachment);
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Document archived successfully."
+            };
+        }
+
+        public async Task<ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>> GetAllEmploymentContracts(PaginationDTO request, string? search, bool? isArchived)
+        {
+            var query = context.EmployeeAttachments
+                .Include(ea => ea.Employee)
+                    .ThenInclude(e => e.Department)
+                .Include(ea => ea.Employee)
+                    .ThenInclude(e => e.JobPosition)
+                .Where(ea => ea.DocumentType == "Employment Contracts" || ea.DocumentType == "Contract" || ea.DocumentType.Contains("Contract"));
+
+            if (isArchived.HasValue)
+            {
+                query = query.Where(ea => ea.IsArchived == isArchived.Value);
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(ea => ea.FileName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.FirstName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.LastName.ToLower().Contains(lowerSearch) ||
+                                          ea.Employee.EmployeeNumber.ToLower().Contains(lowerSearch));
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            var records = await query
+                .OrderByDescending(ea => ea.UploadedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var data = records.Select(ea => new EmploymentContractResponseDTO
+            {
+                EmployeeAttachmentId = ea.EmployeeAttachmentId,
+                FileName = ea.FileName,
+                FileUrl = ea.FilePath,
+                ContentType = ea.ContentType,
+                FileSize = ea.FileSize,
+                Version = ea.Version,
+                DocumentType = ea.DocumentType,
+                IsArchived = ea.IsArchived,
+                UploadedAt = ea.UploadedAt,
+                EmployeeNumber = ea.Employee.EmployeeNumber,
+                FirstName = ea.Employee.FirstName,
+                LastName = ea.Employee.LastName,
+                DepartmentName = ea.Employee.Department?.Name,
+                JobPositionTitle = ea.Employee.JobPosition?.Title
+            }).ToList();
+
+            return new ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Employment contracts retrieved successfully.",
+                Data = new PaginationResponseDTO<EmploymentContractResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Employment contracts retrieved successfully.",
+                    Data = data,
+                    PageNumber = request.PageNumber,
+                    PageSize = request.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+                }
             };
         }
 
