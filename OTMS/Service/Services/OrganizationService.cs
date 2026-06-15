@@ -37,10 +37,10 @@ namespace OTMS.Service.Services
             {
                 DepartmentId = Guid.NewGuid(),
                 Name = request.Name,
-                Description = request.Description,
+                Description = request.Description ?? string.Empty,
                 Code = request.Code,
-                IsActive = request.IsActive,
-                EffectiveDate = request.EffectiveDate,
+                IsActive = request.ResolvedIsActive,
+                EffectiveDate = request.ResolvedEffectiveDate,
                 HeadEmployeeId = request.HeadEmployeeId
             };
 
@@ -78,11 +78,12 @@ namespace OTMS.Service.Services
                 throw new InvalidOperationException("Department with that name already exists.");
 
             dept.Name = request.Name;
-            dept.Description = request.Description;
+            dept.Description = request.Description ?? string.Empty;
             dept.Code = request.Code;
-            dept.IsActive = request.IsActive;
-            dept.EffectiveDate = request.EffectiveDate;
+            dept.IsActive = request.ResolvedIsActive;
+            dept.EffectiveDate = request.ResolvedEffectiveDate;
             dept.HeadEmployeeId = request.HeadEmployeeId;
+            dept.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
 
@@ -178,14 +179,14 @@ namespace OTMS.Service.Services
             {
                 JobPositionId = Guid.NewGuid(),
                 Title = request.Name,
-                Description = request.Description,
+                Description = request.Description ?? string.Empty,
                 DepartmentId = request.DepartmentId,
                 Code = request.Code,
-                IsActive = request.IsActive,
+                IsActive = request.ResolvedIsActive,
                 ReportsToId = request.ReportsToId,
                 EmploymentType = request.EmploymentType,
                 PositionLevel = request.PositionLevel,
-                EffectiveDate = request.EffectiveDate
+                EffectiveDate = request.ResolvedEffectiveDate
             };
 
             context.JobPositions.Add(position);
@@ -225,14 +226,15 @@ namespace OTMS.Service.Services
             if (dept == null) throw new KeyNotFoundException("Department not found.");
 
             position.Title = request.Name;
-            position.Description = request.Description;
+            position.Description = request.Description ?? string.Empty;
             position.DepartmentId = request.DepartmentId;
             position.Code = request.Code;
-            position.IsActive = request.IsActive;
+            position.IsActive = request.ResolvedIsActive;
             position.ReportsToId = request.ReportsToId;
             position.EmploymentType = request.EmploymentType;
             position.PositionLevel = request.PositionLevel;
-            position.EffectiveDate = request.EffectiveDate;
+            position.EffectiveDate = request.ResolvedEffectiveDate;
+            position.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
 

@@ -226,8 +226,8 @@
 }
 
 .table-card-data-table th {
-    padding: 12px 18px;
-    font-size: 0.69rem;
+    padding: 8px 12px;
+    font-size: 0.65rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.75);
     letter-spacing: 0.06em;
@@ -244,9 +244,9 @@
 }
 
 .table-card-data-table td {
-    padding: 14px 18px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border, #e8ecf4);
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     color: var(--text-primary, #1a2332);
     font-weight: 500;
 }
@@ -292,11 +292,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 24px;
+    padding: 10px 16px;
     border-top: 1px solid var(--border, #e8ecf4);
     margin-top: auto;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 8px;
 }
 
 .table-card-pagination-info {

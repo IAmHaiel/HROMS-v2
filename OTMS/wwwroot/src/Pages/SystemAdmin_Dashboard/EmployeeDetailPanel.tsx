@@ -137,9 +137,10 @@ interface EditModalProps {
     profile: RecentEmployee;
     onClose: () => void;
     onSaved: (updated: RecentEmployee) => void;
+    rolesList?: string[];
 }
 
-function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
+function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalProps) {
     const [form, setForm] = useState({
         employeeName: profile.employeeName,
         contactNumber: profile.contactNumber,
@@ -361,7 +362,7 @@ function EditProfileModal({ profile, onClose, onSaved }: EditModalProps) {
                         <div className="fm-field">
                             <label className="fm-label">Role</label>
                             <select value={form.role} onChange={set('role')} className="fm-select">
-                                {ROLES.map(r => (
+                                {(rolesList && rolesList.length > 0 ? rolesList : ROLES).map(r => (
                                     <option key={r} value={r}>
                                         {r}
                                     </option>
@@ -402,6 +403,7 @@ interface EmployeeDetailPanelProps {
     initialSection?: 'overview' | 'deliveries' | 'activity' | 'digital_201';
     onBack: () => void;
     onEmployeeUpdated: (updated: RecentEmployee) => void;
+    rolesList?: string[];
 }
 
 export default function EmployeeDetailPanel({
@@ -409,6 +411,7 @@ export default function EmployeeDetailPanel({
     initialSection = 'overview',
     onBack,
     onEmployeeUpdated,
+    rolesList,
 }: EmployeeDetailPanelProps) {
     const [profile, setProfile] = useState<RecentEmployee>(employee);
     const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
@@ -868,6 +871,7 @@ export default function EmployeeDetailPanel({
             {showEdit && (
                 <EditProfileModal
                     profile={profile}
+                    rolesList={rolesList}
                     onClose={() => setShowEdit(false)}
                     onSaved={updated => {
                         setProfile(updated);

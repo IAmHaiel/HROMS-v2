@@ -22,6 +22,7 @@ import {
     TrendingUp,
     Activity,
     Lock,
+    Calendar,
 } from 'lucide-react';
 import { useToast } from '../../components/Toast/Toast';
 import StatCard from '../../components/StatCard/StatCard';
@@ -37,11 +38,11 @@ type SubTab = 'roles' | 'departments' | 'positions' | 'overview';
 // ── Audit / Activity ──
 export interface OrgAuditEntry {
     id: string;
-    action: string;          // e.g. "Department Created"
+    action: string;
     entityType: 'Department' | 'JobPosition' | 'Role';
     entityName: string;
     performedBy: string;
-    performedAt: string;     // ISO date string
+    performedAt: string;
     details?: string;
 }
 
@@ -66,36 +67,62 @@ export interface DepartmentResponseDTO {
     departmentId: string;
     name: string;
     description?: string;
-    // Future fields (handled gracefully when backend adds them):
     code?: string;
     isActive?: boolean;
+    status?: 'Active' | 'Inactive';
     employeeCount?: number;
+    headEmployeeId?: string;
+    headEmployeeName?: string;
+    effectiveDate?: string;
     createdAt?: string;
 }
-export interface CreateDepartmentDTO { name: string; description?: string; code?: string; isActive?: boolean; }
+export interface CreateDepartmentDTO {
+    name: string;
+    description?: string;
+    code: string;
+    status: 'Active' | 'Inactive';
+    headEmployeeId?: string;
+    effectiveDate: string;
+}
+
+// ── Employees (for dropdowns) ──
+export interface EmployeeSummaryDTO {
+    employeeId: string;
+    fullName: string;
+    jobPositionName?: string;
+}
 
 // ── Job Positions ──
+export type EmploymentType = 'Regular' | 'Probationary' | 'Contractual' | 'Project-Based';
+export type PositionLevel = 'Entry Level' | 'Staff' | 'Supervisor' | 'Manager' | 'Executive';
+
 export interface JobPositionResponseDTO {
     jobPositionId: string;
     name: string;
     description?: string;
     departmentId: string;
     departmentName: string;
-    // Future fields:
     code?: string;
     isActive?: boolean;
+    status?: 'Active' | 'Inactive';
     employeeCount?: number;
     reportsToId?: string;
     reportsToName?: string;
+    employmentType?: EmploymentType;
+    positionLevel?: PositionLevel;
+    effectiveDate?: string;
     createdAt?: string;
 }
 export interface CreateJobPositionDTO {
     name: string;
     description?: string;
     departmentId: string;
-    code?: string;
-    isActive?: boolean;
+    code: string;
+    status: 'Active' | 'Inactive';
     reportsToId?: string;
+    employmentType: EmploymentType;
+    positionLevel: PositionLevel;
+    effectiveDate: string;
 }
 
 // ── Shared ──
@@ -109,7 +136,7 @@ interface ConfirmState {
     confirmLabel?: string;
     onConfirm: () => void;
 }
-const CONFIRM_CLOSED: ConfirmState = { isOpen: false, variant: 'neutral', title: '', description: '', onConfirm: () => {} };
+const CONFIRM_CLOSED: ConfirmState = { isOpen: false, variant: 'neutral', title: '', description: '', onConfirm: () => { } };
 
 // ─── Permission Helpers ───────────────────────────────────────────────────────
 
@@ -161,12 +188,12 @@ const DonutChart: React.FC<{ slices: { label: string; value: number }[]; total: 
 // ─── Audit Entry Row ──────────────────────────────────────────────────────────
 
 const AUDIT_ICON_MAP: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
-    Created:     { icon: <Plus size={11} />,    bg: '#dcfce7', color: '#16a34a' },
-    Updated:     { icon: <Pencil size={11} />,  bg: '#dbeafe', color: '#2563eb' },
-    Deleted:     { icon: <Trash2 size={11} />,  bg: '#fee2e2', color: '#dc2626' },
-    Activated:   { icon: <CheckCircle2 size={11} />, bg: '#d1fae5', color: '#059669' },
+    Created: { icon: <Plus size={11} />, bg: '#dcfce7', color: '#16a34a' },
+    Updated: { icon: <Pencil size={11} />, bg: '#dbeafe', color: '#2563eb' },
+    Deleted: { icon: <Trash2 size={11} />, bg: '#fee2e2', color: '#dc2626' },
+    Activated: { icon: <CheckCircle2 size={11} />, bg: '#d1fae5', color: '#059669' },
     Deactivated: { icon: <XCircle size={11} />, bg: '#fef3c7', color: '#d97706' },
-    Default:     { icon: <Activity size={11} />, bg: '#ede9fe', color: '#7c3aed' },
+    Default: { icon: <Activity size={11} />, bg: '#ede9fe', color: '#7c3aed' },
 };
 
 function getAuditStyle(action: string) {
@@ -243,9 +270,37 @@ const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, se
     </div>
 );
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const EMPLOYMENT_TYPES: EmploymentType[] = ['Regular', 'Probationary', 'Contractual', 'Project-Based'];
+const POSITION_LEVELS: PositionLevel[] = ['Entry Level', 'Staff', 'Supervisor', 'Manager', 'Executive'];
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const PER_PAGE = 10;
+
+// ─── Default form states ──────────────────────────────────────────────────────
+
+const DEFAULT_DEPT_FORM = {
+    name: '',
+    description: '',
+    code: '',
+    status: 'Active' as 'Active' | 'Inactive',
+    headEmployeeId: '',
+    effectiveDate: '',
+};
+
+const DEFAULT_POS_FORM = {
+    name: '',
+    description: '',
+    code: '',
+    departmentId: '',
+    status: 'Active' as 'Active' | 'Inactive',
+    reportsToId: '',
+    employmentType: 'Regular' as EmploymentType,
+    positionLevel: 'Staff' as PositionLevel,
+    effectiveDate: '',
+};
 
 export default function RoleManagementTab() {
     const { success: toastSuccess, error: toastError } = useToast();
@@ -256,17 +311,19 @@ export default function RoleManagementTab() {
     const [deptsLoading, setDeptsLoading] = useState(false);
     const [posLoading, setPosLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [employeesLoading, setEmployeesLoading] = useState(false);
 
     // ── Data ──
     const [roles, setRoles] = useState<RoleResponseDTO[]>([]);
     const [permissions, setPermissions] = useState<PermissionResponseDTO[]>([]);
     const [departments, setDepartments] = useState<DepartmentResponseDTO[]>([]);
     const [positions, setPositions] = useState<JobPositionResponseDTO[]>([]);
+    const [employees, setEmployees] = useState<EmployeeSummaryDTO[]>([]);
 
     // ── Search / page ──
     const [roleSearch, setRoleSearch] = useState(''); const [rolePage, setRolePage] = useState(1);
     const [deptSearch, setDeptSearch] = useState(''); const [deptPage, setDeptPage] = useState(1);
-    const [posSearch, setPosSearch] = useState('');  const [posPage, setPosPage] = useState(1);
+    const [posSearch, setPosSearch] = useState(''); const [posPage, setPosPage] = useState(1);
 
     // ── Modals ──
     const [confirmModal, setConfirmModal] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -285,14 +342,20 @@ export default function RoleManagementTab() {
     // Dept form
     const [isCreateDeptOpen, setIsCreateDeptOpen] = useState(false);
     const [editingDept, setEditingDept] = useState<DepartmentResponseDTO | null>(null);
-    const [deptForm, setDeptForm] = useState({ name: '', description: '', code: '', isActive: true });
+    const [deptForm, setDeptForm] = useState(DEFAULT_DEPT_FORM);
     const [deptFormErrors, setDeptFormErrors] = useState<Record<string, string>>({});
 
     // Position form
     const [isCreatePosOpen, setIsCreatePosOpen] = useState(false);
     const [editingPos, setEditingPos] = useState<JobPositionResponseDTO | null>(null);
-    const [posForm, setPosForm] = useState({ name: '', description: '', code: '', departmentId: '', isActive: true, reportsToId: '' });
+    const [posForm, setPosForm] = useState(DEFAULT_POS_FORM);
     const [posFormErrors, setPosFormErrors] = useState<Record<string, string>>({});
+
+    // Quick-create dept from within position modal
+    const [showQuickDept, setShowQuickDept] = useState(false);
+    const [quickDeptForm, setQuickDeptForm] = useState({ name: '', code: '', effectiveDate: '' });
+    const [quickDeptLoading, setQuickDeptLoading] = useState(false);
+    const [quickDeptErrors, setQuickDeptErrors] = useState<Record<string, string>>({});
 
     // Audit / Activity Log
     const [auditEntries, setAuditEntries] = useState<OrgAuditEntry[]>([]);
@@ -334,9 +397,15 @@ export default function RoleManagementTab() {
             const data = await res.json();
             const normalize = (d: any): DepartmentResponseDTO => ({
                 departmentId: d.departmentId ?? d.DepartmentId,
-                name: d.name ?? d.Name, description: d.description ?? d.Description,
-                code: d.code ?? d.Code ?? '', isActive: d.isActive ?? d.IsActive ?? true,
+                name: d.name ?? d.Name,
+                description: d.description ?? d.Description,
+                code: d.code ?? d.Code ?? '',
+                isActive: d.isActive ?? d.IsActive ?? ((d.status ?? d.Status) === 'Active'),
+                status: d.status ?? d.Status ?? (d.isActive ?? d.IsActive ? 'Active' : 'Inactive'),
                 employeeCount: d.employeeCount ?? d.EmployeeCount ?? 0,
+                headEmployeeId: d.headEmployeeId ?? d.HeadEmployeeId ?? '',
+                headEmployeeName: d.headEmployeeName ?? d.HeadEmployeeName ?? '',
+                effectiveDate: d.effectiveDate ?? d.EffectiveDate ?? '',
                 createdAt: d.createdAt ?? d.CreatedAt,
             });
             setDepartments((Array.isArray(data) ? data : data.data ?? data.$values ?? []).map(normalize));
@@ -351,21 +420,41 @@ export default function RoleManagementTab() {
             const data = await res.json();
             const normalize = (p: any): JobPositionResponseDTO => ({
                 jobPositionId: p.jobPositionId ?? p.JobPositionId,
-                name: p.name ?? p.Name, description: p.description ?? p.Description,
+                name: p.name ?? p.Name,
+                description: p.description ?? p.Description,
                 departmentId: p.departmentId ?? p.DepartmentId,
                 departmentName: p.departmentName ?? p.DepartmentName ?? '',
-                code: p.code ?? p.Code ?? '', isActive: p.isActive ?? p.IsActive ?? true,
+                code: p.code ?? p.Code ?? '',
+                isActive: p.isActive ?? p.IsActive ?? ((p.status ?? p.Status) === 'Active'),
+                status: p.status ?? p.Status ?? (p.isActive ?? p.IsActive ? 'Active' : 'Inactive'),
                 employeeCount: p.employeeCount ?? p.EmployeeCount ?? 0,
                 reportsToId: p.reportsToId ?? p.ReportsToId ?? '',
                 reportsToName: p.reportsToName ?? p.ReportsToName ?? '',
+                employmentType: p.employmentType ?? p.EmploymentType ?? 'Regular',
+                positionLevel: p.positionLevel ?? p.PositionLevel ?? 'Staff',
+                effectiveDate: p.effectiveDate ?? p.EffectiveDate ?? '',
                 createdAt: p.createdAt ?? p.CreatedAt,
             });
             setPositions((Array.isArray(data) ? data : data.data ?? data.$values ?? []).map(normalize));
         } catch (e: any) { toastError(e.message || 'Failed to load job positions'); } finally { setPosLoading(false); }
     };
 
-    // Fetch audit log (wired to /api/activity-logs?module=organization when backend supports filtering)
-    // Falls back to empty list gracefully until backend implements it.
+    const fetchEmployees = async () => {
+        if (employees.length > 0) return; // already loaded
+        setEmployeesLoading(true);
+        try {
+            const res = await fetch('/api/employees?status=Active&pageSize=500', { headers: authHeaders() });
+            if (!res.ok) { setEmployees([]); return; }
+            const data = await res.json();
+            const raw: any[] = Array.isArray(data) ? data : data.data ?? data.$values ?? data.items ?? [];
+            setEmployees(raw.map((e: any): EmployeeSummaryDTO => ({
+                employeeId: e.employeeId ?? e.EmployeeId ?? e.id,
+                fullName: e.fullName ?? e.FullName ?? `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(),
+                jobPositionName: e.jobPositionName ?? e.JobPositionName ?? e.position,
+            })));
+        } catch { setEmployees([]); } finally { setEmployeesLoading(false); }
+    };
+
     const fetchAuditLog = async () => {
         setAuditLoading(true);
         try {
@@ -386,7 +475,7 @@ export default function RoleManagementTab() {
     };
 
     useEffect(() => { fetchRoles(); }, []);
-    useEffect(() => { if (subTab === 'departments' && departments.length === 0) fetchDepartments(); }, [subTab]);
+    useEffect(() => { if (subTab === 'departments') { if (departments.length === 0) fetchDepartments(); fetchEmployees(); } }, [subTab]);
     useEffect(() => {
         if (subTab === 'positions') {
             if (positions.length === 0) fetchPositions();
@@ -401,6 +490,8 @@ export default function RoleManagementTab() {
         }
     }, [subTab]);
 
+    // Fetch employees when dept/pos modals open
+    useEffect(() => { if (isCreateDeptOpen || !!editingDept) fetchEmployees(); }, [isCreateDeptOpen, editingDept]);
 
     // ─── Derived Data ─────────────────────────────────────────────────────────
 
@@ -431,6 +522,41 @@ export default function RoleManagementTab() {
     const openCreateRole = () => {
         setCreateRoleName(''); setCreateRoleDesc(''); setCreateRolePerms(new Set()); setCreateRoleErrors({});
         setIsCreateRoleOpen(true);
+    };
+
+    const openCreatePos = () => {
+        setPosForm(DEFAULT_POS_FORM); setPosFormErrors({});
+        setShowQuickDept(false); setQuickDeptForm({ name: '', code: '', effectiveDate: '' }); setQuickDeptErrors({});
+        setIsCreatePosOpen(true);
+    };
+
+    const handleQuickCreateDept = async () => {
+        const errors: Record<string, string> = {};
+        if (!quickDeptForm.name.trim()) errors.name = 'Name is required.';
+        if (!quickDeptForm.code.trim()) errors.code = 'Code is required.';
+        else if (!/^[a-zA-Z0-9]+$/.test(quickDeptForm.code.trim())) errors.code = 'Alphanumeric only.';
+        if (!quickDeptForm.effectiveDate) errors.effectiveDate = 'Effective date is required.';
+        if (Object.keys(errors).length) { setQuickDeptErrors(errors); return; }
+        setQuickDeptLoading(true);
+        try {
+            const res = await fetch('/api/organization/departments', {
+                method: 'POST', headers: authHeaders(),
+                body: JSON.stringify({
+                    name: quickDeptForm.name.trim(),
+                    code: quickDeptForm.code.trim().toUpperCase(),
+                    status: 'Active',
+                    effectiveDate: quickDeptForm.effectiveDate,
+                }),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create department.'); }
+            const created = await res.json();
+            toastSuccess(`Department "${created.name ?? quickDeptForm.name}" created!`);
+            await fetchDepartments();
+            const newId = created.departmentId ?? created.DepartmentId ?? '';
+            if (newId) setPosForm(f => ({ ...f, departmentId: newId }));
+            setShowQuickDept(false);
+            setQuickDeptForm({ name: '', code: '', effectiveDate: '' }); setQuickDeptErrors({});
+        } catch (e: any) { toastError(e.message); setQuickDeptErrors({ api: e.message }); } finally { setQuickDeptLoading(false); }
     };
 
     const handleCreateRole = async (e: React.FormEvent) => {
@@ -492,26 +618,54 @@ export default function RoleManagementTab() {
     // ─── Department Actions ───────────────────────────────────────────────────
 
     const openCreateDept = () => {
-        setDeptForm({ name: '', description: '', code: '', isActive: true }); setDeptFormErrors({});
+        setDeptForm(DEFAULT_DEPT_FORM);
+        setDeptFormErrors({});
         setIsCreateDeptOpen(true);
     };
 
     const validateDeptForm = () => {
         const errors: Record<string, string> = {};
-        if (!deptForm.name.trim()) errors.name = 'Department name is required.';
-        else if (deptForm.name.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
-        else {
+
+        // Name: required, unique, letters/numbers/spaces, max 100
+        if (!deptForm.name.trim()) {
+            errors.name = 'Department name is required.';
+        } else if (deptForm.name.trim().length < 2) {
+            errors.name = 'Name must be at least 2 characters.';
+        } else if (deptForm.name.trim().length > 100) {
+            errors.name = 'Name must not exceed 100 characters.';
+        } else if (!/^[a-zA-Z0-9 ]+$/.test(deptForm.name.trim())) {
+            errors.name = 'Name may only contain letters, numbers, and spaces.';
+        } else {
             const existing = departments.find(d =>
                 d.name.toLowerCase() === deptForm.name.trim().toLowerCase() &&
                 d.departmentId !== (editingDept?.departmentId ?? ''));
             if (existing) errors.name = 'A department with this name already exists.';
         }
-        if (deptForm.code.trim()) {
+
+        // Code: required, unique, alphanumeric, max 20
+        if (!deptForm.code.trim()) {
+            errors.code = 'Department code is required.';
+        } else if (!/^[a-zA-Z0-9]+$/.test(deptForm.code.trim())) {
+            errors.code = 'Code must be alphanumeric (no spaces or special characters).';
+        } else if (deptForm.code.trim().length > 20) {
+            errors.code = 'Code must not exceed 20 characters.';
+        } else {
             const codeExists = departments.find(d =>
                 (d.code || '').toLowerCase() === deptForm.code.trim().toLowerCase() &&
                 d.departmentId !== (editingDept?.departmentId ?? ''));
             if (codeExists) errors.code = 'This department code is already in use.';
         }
+
+        // Description: optional, max 500
+        if (deptForm.description.length > 500) {
+            errors.description = 'Description must not exceed 500 characters.';
+        }
+
+        // Effective Date: required
+        if (!deptForm.effectiveDate) {
+            errors.effectiveDate = 'Effective date is required.';
+        }
+
         return errors;
     };
 
@@ -522,8 +676,12 @@ export default function RoleManagementTab() {
         setActionLoading(true);
         try {
             const payload: CreateDepartmentDTO = {
-                name: deptForm.name.trim(), description: deptForm.description.trim() || undefined,
-                code: deptForm.code.trim() || undefined, isActive: deptForm.isActive,
+                name: deptForm.name.trim(),
+                description: deptForm.description.trim() || undefined,
+                code: deptForm.code.trim(),
+                status: deptForm.status,
+                headEmployeeId: deptForm.headEmployeeId || undefined,
+                effectiveDate: deptForm.effectiveDate,
             };
             const res = await fetch('/api/organization/departments', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create department.'); }
@@ -534,7 +692,14 @@ export default function RoleManagementTab() {
 
     const openEditDept = (dept: DepartmentResponseDTO) => {
         setEditingDept(dept);
-        setDeptForm({ name: dept.name, description: dept.description || '', code: dept.code || '', isActive: dept.isActive ?? true });
+        setDeptForm({
+            name: dept.name,
+            description: dept.description || '',
+            code: dept.code || '',
+            status: dept.status ?? (dept.isActive !== false ? 'Active' : 'Inactive'),
+            headEmployeeId: dept.headEmployeeId || '',
+            effectiveDate: dept.effectiveDate ? dept.effectiveDate.split('T')[0] : '',
+        });
         setDeptFormErrors({});
     };
 
@@ -546,8 +711,12 @@ export default function RoleManagementTab() {
         setActionLoading(true);
         try {
             const payload: CreateDepartmentDTO = {
-                name: deptForm.name.trim(), description: deptForm.description.trim() || undefined,
-                code: deptForm.code.trim() || undefined, isActive: deptForm.isActive,
+                name: deptForm.name.trim(),
+                description: deptForm.description.trim() || undefined,
+                code: deptForm.code.trim(),
+                status: deptForm.status,
+                headEmployeeId: deptForm.headEmployeeId || undefined,
+                effectiveDate: deptForm.effectiveDate,
             };
             const res = await fetch(`/api/organization/departments/${editingDept.departmentId}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(payload) });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update department.'); }
@@ -557,7 +726,8 @@ export default function RoleManagementTab() {
     };
 
     const confirmToggleDeptStatus = (dept: DepartmentResponseDTO) => {
-        const activate = !(dept.isActive ?? true);
+        const currentlyActive = dept.status === 'Active' || dept.isActive !== false;
+        const activate = !currentlyActive;
         setConfirmModal({
             isOpen: true, variant: activate ? 'success' : 'warning',
             icon: activate ? 'ti-check' : 'ti-alert-triangle',
@@ -568,13 +738,11 @@ export default function RoleManagementTab() {
             onConfirm: async () => {
                 setActionLoading(true);
                 try {
-                    // Try PATCH toggle-status endpoint; if not available, use PUT with toggled isActive
                     const patchRes = await fetch(`/api/organization/departments/${dept.departmentId}/toggle-status`, { method: 'PATCH', headers: authHeaders() });
                     if (!patchRes.ok) {
-                        // Fallback: PUT with toggled isActive
                         const putRes = await fetch(`/api/organization/departments/${dept.departmentId}`, {
                             method: 'PUT', headers: authHeaders(),
-                            body: JSON.stringify({ name: dept.name, description: dept.description, code: dept.code, isActive: activate }),
+                            body: JSON.stringify({ name: dept.name, description: dept.description, code: dept.code, status: activate ? 'Active' : 'Inactive', effectiveDate: dept.effectiveDate }),
                         });
                         if (!putRes.ok) { const e = await putRes.json().catch(() => ({})); throw new Error(e.message || 'Failed to update status.'); }
                     }
@@ -608,28 +776,47 @@ export default function RoleManagementTab() {
 
     // ─── Position Actions ─────────────────────────────────────────────────────
 
-    const openCreatePos = () => {
-        setPosForm({ name: '', description: '', code: '', departmentId: '', isActive: true, reportsToId: '' });
-        setPosFormErrors({}); setIsCreatePosOpen(true);
-    };
-
     const validatePosForm = () => {
         const errors: Record<string, string> = {};
-        if (!posForm.name.trim()) errors.name = 'Position name is required.';
-        else {
+
+        // Position Title: required, unique within dept, max 100
+        if (!posForm.name.trim()) {
+            errors.name = 'Position title is required.';
+        } else if (posForm.name.trim().length > 100) {
+            errors.name = 'Title must not exceed 100 characters.';
+        } else {
             const existing = positions.find(p =>
                 p.name.toLowerCase() === posForm.name.trim().toLowerCase() &&
                 p.departmentId === posForm.departmentId &&
                 p.jobPositionId !== (editingPos?.jobPositionId ?? ''));
-            if (existing) errors.name = 'A position with this name already exists in this department.';
+            if (existing) errors.name = 'A position with this title already exists in this department.';
         }
-        if (!posForm.departmentId) errors.departmentId = 'Department is required.';
-        if (posForm.code.trim()) {
+
+        // Code: required, unique, max 20
+        if (!posForm.code.trim()) {
+            errors.code = 'Position code is required.';
+        } else if (posForm.code.trim().length > 20) {
+            errors.code = 'Code must not exceed 20 characters.';
+        } else {
             const codeExists = positions.find(p =>
                 (p.code || '').toLowerCase() === posForm.code.trim().toLowerCase() &&
                 p.jobPositionId !== (editingPos?.jobPositionId ?? ''));
             if (codeExists) errors.code = 'This position code is already in use.';
         }
+
+        // Department: required
+        if (!posForm.departmentId) errors.departmentId = 'Department is required.';
+
+        // Description: optional, max 1000
+        if (posForm.description.length > 1000) {
+            errors.description = 'Description must not exceed 1,000 characters.';
+        }
+
+        // Effective Date: required
+        if (!posForm.effectiveDate) {
+            errors.effectiveDate = 'Effective date is required.';
+        }
+
         return errors;
     };
 
@@ -640,9 +827,15 @@ export default function RoleManagementTab() {
         setActionLoading(true);
         try {
             const payload: CreateJobPositionDTO = {
-                name: posForm.name.trim(), description: posForm.description.trim() || undefined,
-                departmentId: posForm.departmentId, code: posForm.code.trim() || undefined,
-                isActive: posForm.isActive, reportsToId: posForm.reportsToId || undefined,
+                name: posForm.name.trim(),
+                description: posForm.description.trim() || undefined,
+                departmentId: posForm.departmentId,
+                code: posForm.code.trim(),
+                status: posForm.status,
+                reportsToId: posForm.reportsToId || undefined,
+                employmentType: posForm.employmentType,
+                positionLevel: posForm.positionLevel,
+                effectiveDate: posForm.effectiveDate,
             };
             const res = await fetch('/api/organization/job-positions', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create position.'); }
@@ -653,7 +846,17 @@ export default function RoleManagementTab() {
 
     const openEditPos = (pos: JobPositionResponseDTO) => {
         setEditingPos(pos);
-        setPosForm({ name: pos.name, description: pos.description || '', code: pos.code || '', departmentId: pos.departmentId, isActive: pos.isActive ?? true, reportsToId: pos.reportsToId || '' });
+        setPosForm({
+            name: pos.name,
+            description: pos.description || '',
+            code: pos.code || '',
+            departmentId: pos.departmentId,
+            status: pos.status ?? (pos.isActive !== false ? 'Active' : 'Inactive'),
+            reportsToId: pos.reportsToId || '',
+            employmentType: pos.employmentType ?? 'Regular',
+            positionLevel: pos.positionLevel ?? 'Staff',
+            effectiveDate: pos.effectiveDate ? pos.effectiveDate.split('T')[0] : '',
+        });
         setPosFormErrors({});
     };
 
@@ -665,9 +868,15 @@ export default function RoleManagementTab() {
         setActionLoading(true);
         try {
             const payload: CreateJobPositionDTO = {
-                name: posForm.name.trim(), description: posForm.description.trim() || undefined,
-                departmentId: posForm.departmentId, code: posForm.code.trim() || undefined,
-                isActive: posForm.isActive, reportsToId: posForm.reportsToId || undefined,
+                name: posForm.name.trim(),
+                description: posForm.description.trim() || undefined,
+                departmentId: posForm.departmentId,
+                code: posForm.code.trim(),
+                status: posForm.status,
+                reportsToId: posForm.reportsToId || undefined,
+                employmentType: posForm.employmentType,
+                positionLevel: posForm.positionLevel,
+                effectiveDate: posForm.effectiveDate,
             };
             const res = await fetch(`/api/organization/job-positions/${editingPos.jobPositionId}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(payload) });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update position.'); }
@@ -677,7 +886,8 @@ export default function RoleManagementTab() {
     };
 
     const confirmTogglePosStatus = (pos: JobPositionResponseDTO) => {
-        const activate = !(pos.isActive ?? true);
+        const currentlyActive = pos.status === 'Active' || pos.isActive !== false;
+        const activate = !currentlyActive;
         setConfirmModal({
             isOpen: true, variant: activate ? 'success' : 'warning',
             icon: activate ? 'ti-check' : 'ti-alert-triangle',
@@ -692,7 +902,7 @@ export default function RoleManagementTab() {
                     if (!patchRes.ok) {
                         const putRes = await fetch(`/api/organization/job-positions/${pos.jobPositionId}`, {
                             method: 'PUT', headers: authHeaders(),
-                            body: JSON.stringify({ name: pos.name, description: pos.description, departmentId: pos.departmentId, code: pos.code, isActive: activate }),
+                            body: JSON.stringify({ name: pos.name, description: pos.description, departmentId: pos.departmentId, code: pos.code, status: activate ? 'Active' : 'Inactive' }),
                         });
                         if (!putRes.ok) { const e = await putRes.json().catch(() => ({})); throw new Error(e.message || 'Failed to update status.'); }
                     }
@@ -728,10 +938,401 @@ export default function RoleManagementTab() {
 
     const systemRoles = roles.filter(r => r.isSystemDefined).length;
     const customRoles = roles.filter(r => !r.isSystemDefined).length;
-    const activeDepts = departments.filter(d => d.isActive !== false).length;
-    const activePositions = positions.filter(p => p.isActive !== false).length;
+    const activeDepts = departments.filter(d => d.status === 'Active' || d.isActive !== false).length;
+    const activePositions = positions.filter(p => p.status === 'Active' || p.isActive !== false).length;
+
+    // ─── Shared form helpers ──────────────────────────────────────────────────
+
+    const setDeptField = <K extends keyof typeof deptForm>(key: K, value: typeof deptForm[K]) => {
+        setDeptForm(f => ({ ...f, [key]: value }));
+        setDeptFormErrors(p => ({ ...p, [key]: '' }));
+    };
+
+    const setPosField = <K extends keyof typeof posForm>(key: K, value: typeof posForm[K]) => {
+        setPosForm(f => ({ ...f, [key]: value }));
+        setPosFormErrors(p => ({ ...p, [key]: '' }));
+    };
 
     // ─── Render ───────────────────────────────────────────────────────────────
+
+    // Shared dept form body (used in both create & edit modals)
+    const renderDeptFormBody = () => (
+        <div className="rm2-form-body">
+            {/* Row 1: Name + Code */}
+            <div className="rm2-field-row">
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        Department Name <span className="rm2-req">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className={`form-input${deptFormErrors.name ? ' rm2-input--error' : ''}`}
+                        placeholder="e.g. Human Resources"
+                        value={deptForm.name}
+                        maxLength={100}
+                        onChange={e => setDeptField('name', e.target.value)}
+                    />
+                    <div className="rm2-field-footer">
+                        {deptFormErrors.name
+                            ? <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.name}</span>
+                            : <span className="rm2-field-hint">Letters, numbers, and spaces only.</span>
+                        }
+                        <span className="rm2-char-count">{deptForm.name.length}/100</span>
+                    </div>
+                </div>
+                <div className="rm2-field rm2-field--sm">
+                    <label className="rm2-form-label">
+                        Code <span className="rm2-req">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className={`form-input${deptFormErrors.code ? ' rm2-input--error' : ''}`}
+                        placeholder="e.g. HR"
+                        value={deptForm.code}
+                        maxLength={20}
+                        onChange={e => setDeptField('code', e.target.value.toUpperCase())}
+                    />
+                    <div className="rm2-field-footer">
+                        {deptFormErrors.code
+                            ? <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.code}</span>
+                            : <span className="rm2-field-hint">Alphanumeric only.</span>
+                        }
+                        <span className="rm2-char-count">{deptForm.code.length}/20</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 2: Description */}
+            <div className="rm2-field">
+                <label className="rm2-form-label">Description</label>
+                <textarea
+                    className={`form-input${deptFormErrors.description ? ' rm2-input--error' : ''}`}
+                    rows={3}
+                    placeholder="Describe this department's purpose and scope…"
+                    value={deptForm.description}
+                    maxLength={500}
+                    onChange={e => setDeptField('description', e.target.value)}
+                />
+                <div className="rm2-field-footer">
+                    {deptFormErrors.description
+                        ? <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.description}</span>
+                        : <span />
+                    }
+                    <span className="rm2-char-count">{deptForm.description.length}/500</span>
+                </div>
+            </div>
+
+            {/* Row 3: Department Head + Status */}
+            <div className="rm2-field-row">
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        Department Head
+                        <span className="rm2-field-optional"> (optional)</span>
+                    </label>
+                    <select
+                        className="form-input"
+                        value={deptForm.headEmployeeId}
+                        onChange={e => setDeptField('headEmployeeId', e.target.value)}
+                        disabled={employeesLoading}
+                    >
+                        <option value="">
+                            {employeesLoading ? 'Loading employees…' : '— None —'}
+                        </option>
+                        {employees.map(emp => (
+                            <option key={emp.employeeId} value={emp.employeeId}>
+                                {emp.fullName}{emp.jobPositionName ? ` · ${emp.jobPositionName}` : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <span className="rm2-field-hint"><Info size={11} /> Select an active employee to lead this department.</span>
+                </div>
+                <div className="rm2-field rm2-field--sm">
+                    <label className="rm2-form-label">
+                        Status <span className="rm2-req">*</span>
+                    </label>
+                    <select
+                        className="form-input"
+                        value={deptForm.status}
+                        onChange={e => setDeptField('status', e.target.value as 'Active' | 'Inactive')}
+                    >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Row 4: Effective Date */}
+            <div className="rm2-field rm2-field--half">
+                <label className="rm2-form-label">
+                    <Calendar size={13} className="rm2-label-icon" />
+                    Effective Date <span className="rm2-req">*</span>
+                </label>
+                <input
+                    type="date"
+                    className={`form-input${deptFormErrors.effectiveDate ? ' rm2-input--error' : ''}`}
+                    value={deptForm.effectiveDate}
+                    onChange={e => setDeptField('effectiveDate', e.target.value)}
+                />
+                {deptFormErrors.effectiveDate && (
+                    <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.effectiveDate}</span>
+                )}
+            </div>
+        </div>
+    );
+
+    // Shared position form body
+    const renderPosFormBody = () => (
+        <div className="rm2-form-body">
+            {/* Row 1: Title + Code */}
+            <div className="rm2-field-row">
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        Position Title <span className="rm2-req">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className={`form-input${posFormErrors.name ? ' rm2-input--error' : ''}`}
+                        placeholder="e.g. Operations Manager"
+                        value={posForm.name}
+                        maxLength={100}
+                        onChange={e => setPosField('name', e.target.value)}
+                    />
+                    <div className="rm2-field-footer">
+                        {posFormErrors.name
+                            ? <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.name}</span>
+                            : <span className="rm2-field-hint">Must be unique within the selected department.</span>
+                        }
+                        <span className="rm2-char-count">{posForm.name.length}/100</span>
+                    </div>
+                </div>
+                <div className="rm2-field rm2-field--sm">
+                    <label className="rm2-form-label">
+                        Code <span className="rm2-req">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        className={`form-input${posFormErrors.code ? ' rm2-input--error' : ''}`}
+                        placeholder="e.g. OPS-MGR"
+                        value={posForm.code}
+                        maxLength={20}
+                        onChange={e => setPosField('code', e.target.value.toUpperCase())}
+                    />
+                    <div className="rm2-field-footer">
+                        {posFormErrors.code
+                            ? <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.code}</span>
+                            : <span />
+                        }
+                        <span className="rm2-char-count">{posForm.code.length}/20</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Row 2: Department */}
+            <div className="rm2-field">
+                <label className="rm2-form-label">
+                    Department <span className="rm2-req">*</span>
+                </label>
+                <select
+                    className={`form-input${posFormErrors.departmentId ? ' rm2-input--error' : ''}`}
+                    value={showQuickDept ? '__create__' : posForm.departmentId}
+                    onChange={e => {
+                        if (e.target.value === '__create__') {
+                            setShowQuickDept(true);
+                            setPosField('departmentId', '');
+                        } else {
+                            setShowQuickDept(false);
+                            setPosField('departmentId', e.target.value);
+                        }
+                    }}
+                >
+                    <option value="">— Select a department —</option>
+                    <option value="__create__">➕ Create New Department</option>
+                    {departments
+                        .filter(d => d.status === 'Active' || d.isActive !== false)
+                        .map(d => (
+                            <option key={d.departmentId} value={d.departmentId}>{d.name}</option>
+                        ))
+                    }
+                </select>
+                {posFormErrors.departmentId && (
+                    <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.departmentId}</span>
+                )}
+                {departments.filter(d => d.status === 'Active' || d.isActive !== false).length === 0 && !showQuickDept && (
+                    <span className="rm2-field-hint" style={{ color: '#f59e0b' }}>
+                        <AlertCircle size={11} /> No departments yet.
+                    </span>
+                )}
+
+                {/* Inline quick-create department panel */}
+                {showQuickDept && (
+                    <div className="rm2-quick-create-panel">
+                        <div className="rm2-quick-create-header">
+                            <Building2 size={13} />
+                            <span>Quick Create Department</span>
+                            <button type="button" className="rm2-quick-create-close" onClick={() => { setShowQuickDept(false); setQuickDeptErrors({}); }}>
+                                ✕
+                            </button>
+                        </div>
+                        <div className="rm2-quick-create-body">
+                            <div className="rm2-quick-row">
+                                <div className="rm2-quick-field">
+                                    <label className="rm2-form-label">Name <span className="rm2-req">*</span></label>
+                                    <input
+                                        type="text"
+                                        className={`form-input${quickDeptErrors.name ? ' rm2-input--error' : ''}`}
+                                        placeholder="e.g. Human Resources"
+                                        value={quickDeptForm.name}
+                                        onChange={e => setQuickDeptForm(f => ({ ...f, name: e.target.value }))}
+                                    />
+                                    {quickDeptErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {quickDeptErrors.name}</span>}
+                                </div>
+                                <div className="rm2-quick-field rm2-quick-field--sm">
+                                    <label className="rm2-form-label">Code <span className="rm2-req">*</span></label>
+                                    <input
+                                        type="text"
+                                        className={`form-input${quickDeptErrors.code ? ' rm2-input--error' : ''}`}
+                                        placeholder="e.g. HR"
+                                        maxLength={20}
+                                        value={quickDeptForm.code}
+                                        onChange={e => setQuickDeptForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                                    />
+                                    {quickDeptErrors.code && <span className="rm2-field-error"><AlertCircle size={11} /> {quickDeptErrors.code}</span>}
+                                </div>
+                                <div className="rm2-quick-field rm2-quick-field--sm">
+                                    <label className="rm2-form-label">Effective Date <span className="rm2-req">*</span></label>
+                                    <input
+                                        type="date"
+                                        className={`form-input${quickDeptErrors.effectiveDate ? ' rm2-input--error' : ''}`}
+                                        value={quickDeptForm.effectiveDate}
+                                        onChange={e => setQuickDeptForm(f => ({ ...f, effectiveDate: e.target.value }))}
+                                    />
+                                    {quickDeptErrors.effectiveDate && <span className="rm2-field-error"><AlertCircle size={11} /> {quickDeptErrors.effectiveDate}</span>}
+                                </div>
+                            </div>
+                            {quickDeptErrors.api && <span className="rm2-field-error"><AlertCircle size={11} /> {quickDeptErrors.api}</span>}
+                            <div className="rm2-quick-create-actions">
+                                <button type="button" className="rm2-btn rm2-btn--ghost rm2-btn--sm" onClick={() => { setShowQuickDept(false); setQuickDeptErrors({}); }}>
+                                    Cancel
+                                </button>
+                                <button type="button" className="rm2-btn rm2-btn--primary rm2-btn--sm" onClick={handleQuickCreateDept} disabled={quickDeptLoading}>
+                                    {quickDeptLoading ? <><Loader2 size={12} className="rm2-spin" /> Creating…</> : <><Plus size={12} /> Create Department</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+
+            {/* Row 3: Employment Type + Position Level */}
+            <div className="rm2-field-row">
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        Employment Type <span className="rm2-req">*</span>
+                    </label>
+                    <select
+                        className="form-input"
+                        value={posForm.employmentType}
+                        onChange={e => setPosField('employmentType', e.target.value as EmploymentType)}
+                    >
+                        {EMPLOYMENT_TYPES.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        Position Level <span className="rm2-req">*</span>
+                    </label>
+                    <select
+                        className="form-input"
+                        value={posForm.positionLevel}
+                        onChange={e => setPosField('positionLevel', e.target.value as PositionLevel)}
+                    >
+                        {POSITION_LEVELS.map(l => (
+                            <option key={l} value={l}>{l}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Row 4: Reporting Position */}
+            <div className="rm2-field">
+                <label className="rm2-form-label">
+                    Reporting Position
+                    <span className="rm2-field-optional"> (optional)</span>
+                </label>
+                <select
+                    className="form-input"
+                    value={posForm.reportsToId}
+                    onChange={e => setPosField('reportsToId', e.target.value)}
+                >
+                    <option value="">— None (top-level position) —</option>
+                    {positions
+                        .filter(p => p.jobPositionId !== editingPos?.jobPositionId && (p.status === 'Active' || p.isActive !== false))
+                        .map(p => (
+                            <option key={p.jobPositionId} value={p.jobPositionId}>
+                                {p.name} ({p.departmentName})
+                            </option>
+                        ))
+                    }
+                </select>
+                <span className="rm2-field-hint"><Info size={11} /> Defines the organizational reporting hierarchy.</span>
+            </div>
+
+            {/* Row 5: Description */}
+            <div className="rm2-field">
+                <label className="rm2-form-label">Description</label>
+                <textarea
+                    className={`form-input${posFormErrors.description ? ' rm2-input--error' : ''}`}
+                    rows={3}
+                    placeholder="Describe this position's responsibilities and scope…"
+                    value={posForm.description}
+                    maxLength={1000}
+                    onChange={e => setPosField('description', e.target.value)}
+                />
+                <div className="rm2-field-footer">
+                    {posFormErrors.description
+                        ? <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.description}</span>
+                        : <span />
+                    }
+                    <span className="rm2-char-count">{posForm.description.length}/1,000</span>
+                </div>
+            </div>
+
+            {/* Row 6: Status + Effective Date */}
+            <div className="rm2-field-row">
+                <div className="rm2-field rm2-field--sm">
+                    <label className="rm2-form-label">
+                        Status <span className="rm2-req">*</span>
+                    </label>
+                    <select
+                        className="form-input"
+                        value={posForm.status}
+                        onChange={e => setPosField('status', e.target.value as 'Active' | 'Inactive')}
+                    >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div className="rm2-field">
+                    <label className="rm2-form-label">
+                        <Calendar size={13} className="rm2-label-icon" />
+                        Effective Date <span className="rm2-req">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        className={`form-input${posFormErrors.effectiveDate ? ' rm2-input--error' : ''}`}
+                        value={posForm.effectiveDate}
+                        onChange={e => setPosField('effectiveDate', e.target.value)}
+                    />
+                    {posFormErrors.effectiveDate && (
+                        <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.effectiveDate}</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="rm2-root">
@@ -810,7 +1411,7 @@ export default function RoleManagementTab() {
                         title="Departments" totalResults={filteredDepts.length}
                         searchQuery={deptSearch} setSearchQuery={v => { setDeptSearch(v); setDeptPage(1); }}
                         searchPlaceholder="Search by name or code…"
-                        headers={['Department', 'Code', 'Status', 'Employees', 'Actions']}
+                        headers={['Department', 'Code', 'Head', 'Status', 'Effective Date', 'Employees', 'Actions']}
                         loading={deptsLoading} emptyMessage="No departments found." emptyIcon={<Building2 size={20} />}
                         actionButton={{ label: 'Add Department', icon: <Plus size={14} />, onClick: openCreateDept }}
                         currentPage={deptPage} totalPages={deptTotalPages} onPageChange={setDeptPage}
@@ -827,16 +1428,23 @@ export default function RoleManagementTab() {
                                     </div>
                                 </td>
                                 <td>{dept.code ? <span className="rm2-code-badge">{dept.code}</span> : <span className="rm2-no-desc">—</span>}</td>
-                                <td><StatusBadge isActive={dept.isActive} /></td>
+                                <td>{dept.headEmployeeName ? <span className="rm2-reports-to">{dept.headEmployeeName}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td><StatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
+                                <td>
+                                    {dept.effectiveDate
+                                        ? <span className="rm2-date-text">{new Date(dept.effectiveDate).toLocaleDateString()}</span>
+                                        : <span className="rm2-no-desc">—</span>
+                                    }
+                                </td>
                                 <td><span className="rm2-count-text">{dept.employeeCount ?? 0} employees</span></td>
                                 <td>
                                     <ActionsDropdown actions={[
                                         { label: 'Edit', icon: <Pencil size={13} />, onClick: () => openEditDept(dept) },
                                         {
-                                            label: (dept.isActive ?? true) ? 'Deactivate' : 'Activate',
-                                            icon: (dept.isActive ?? true) ? <ToggleLeft size={13} /> : <ToggleRight size={13} />,
+                                            label: (dept.status === 'Active' || dept.isActive !== false) ? 'Deactivate' : 'Activate',
+                                            icon: (dept.status === 'Active' || dept.isActive !== false) ? <ToggleLeft size={13} /> : <ToggleRight size={13} />,
                                             onClick: () => confirmToggleDeptStatus(dept),
-                                            variant: (dept.isActive ?? true) ? 'danger' as const : 'success' as const,
+                                            variant: (dept.status === 'Active' || dept.isActive !== false) ? 'danger' as const : 'success' as const,
                                         },
                                         { label: 'Delete', icon: <Trash2 size={13} />, onClick: () => confirmDeleteDept(dept), variant: 'danger' as const },
                                     ]} />
@@ -861,7 +1469,7 @@ export default function RoleManagementTab() {
                         title="Job Positions" totalResults={filteredPos.length}
                         searchQuery={posSearch} setSearchQuery={v => { setPosSearch(v); setPosPage(1); }}
                         searchPlaceholder="Search by name, code, or department…"
-                        headers={['Position', 'Code', 'Department', 'Status', 'Reports To', 'Employees', 'Actions']}
+                        headers={['Position', 'Code', 'Department', 'Type', 'Level', 'Status', 'Effective Date', 'Employees', 'Actions']}
                         loading={posLoading} emptyMessage="No positions found." emptyIcon={<Briefcase size={20} />}
                         actionButton={{ label: 'Add Position', icon: <Plus size={14} />, onClick: openCreatePos }}
                         currentPage={posPage} totalPages={posTotalPages} onPageChange={setPosPage}
@@ -879,17 +1487,24 @@ export default function RoleManagementTab() {
                                 </td>
                                 <td>{pos.code ? <span className="rm2-code-badge">{pos.code}</span> : <span className="rm2-no-desc">—</span>}</td>
                                 <td><span className="rm2-dept-tag">{pos.departmentName}</span></td>
-                                <td><StatusBadge isActive={pos.isActive} /></td>
-                                <td>{pos.reportsToName ? <span className="rm2-reports-to">{pos.reportsToName}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td>{pos.employmentType ? <span className="rm2-type-pill">{pos.employmentType}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td>{pos.positionLevel ? <span className="rm2-level-pill">{pos.positionLevel}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td><StatusBadge isActive={pos.status === 'Active' || pos.isActive !== false} /></td>
+                                <td>
+                                    {pos.effectiveDate
+                                        ? <span className="rm2-date-text">{new Date(pos.effectiveDate).toLocaleDateString()}</span>
+                                        : <span className="rm2-no-desc">—</span>
+                                    }
+                                </td>
                                 <td><span className="rm2-count-text">{pos.employeeCount ?? 0}</span></td>
                                 <td>
                                     <ActionsDropdown actions={[
                                         { label: 'Edit', icon: <Pencil size={13} />, onClick: () => openEditPos(pos) },
                                         {
-                                            label: (pos.isActive ?? true) ? 'Deactivate' : 'Activate',
-                                            icon: (pos.isActive ?? true) ? <ToggleLeft size={13} /> : <ToggleRight size={13} />,
+                                            label: (pos.status === 'Active' || pos.isActive !== false) ? 'Deactivate' : 'Activate',
+                                            icon: (pos.status === 'Active' || pos.isActive !== false) ? <ToggleLeft size={13} /> : <ToggleRight size={13} />,
                                             onClick: () => confirmTogglePosStatus(pos),
-                                            variant: (pos.isActive ?? true) ? 'danger' as const : 'success' as const,
+                                            variant: (pos.status === 'Active' || pos.isActive !== false) ? 'danger' as const : 'success' as const,
                                         },
                                         { label: 'Delete', icon: <Trash2 size={13} />, onClick: () => confirmDeletePos(pos), variant: 'danger' as const },
                                     ]} />
@@ -944,212 +1559,77 @@ export default function RoleManagementTab() {
             </FormModal>
 
             {/* ─── CREATE DEPT MODAL ───────────────────────────────────────── */}
-            <FormModal isOpen={isCreateDeptOpen} onClose={() => setIsCreateDeptOpen(false)}
-                title="Add Department" subtitle="Create a new department in the organization."
-                onSubmit={handleCreateDept} submitLabel="Create Department" isSubmitting={actionLoading}
-                apiError={deptFormErrors.api} size="md">
-                <div className="rm2-form-body">
-                    <div className="rm2-field-row">
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Department Name <span className="rm2-req">*</span></label>
-                            <input type="text" className={`form-input${deptFormErrors.name ? ' rm2-input--error' : ''}`}
-                                placeholder="e.g. Human Resources" value={deptForm.name}
-                                onChange={e => { setDeptForm(f => ({ ...f, name: e.target.value })); setDeptFormErrors(p => ({ ...p, name: '' })); }} />
-                            {deptFormErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.name}</span>}
-                        </div>
-                        <div className="rm2-field rm2-field--sm">
-                            <label className="rm2-form-label">Code</label>
-                            <input type="text" className={`form-input${deptFormErrors.code ? ' rm2-input--error' : ''}`}
-                                placeholder="e.g. HR" value={deptForm.code} maxLength={10}
-                                onChange={e => { setDeptForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setDeptFormErrors(p => ({ ...p, code: '' })); }} />
-                            {deptFormErrors.code && <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.code}</span>}
-                        </div>
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-form-label">Description</label>
-                        <textarea className="form-input" rows={2} placeholder="Describe this department's purpose…"
-                            value={deptForm.description} onChange={e => setDeptForm(f => ({ ...f, description: e.target.value }))} />
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-toggle-wrap">
-                            <input type="checkbox" checked={deptForm.isActive} onChange={e => setDeptForm(f => ({ ...f, isActive: e.target.checked }))} />
-                            <span className="rm2-toggle-label">Active on creation</span>
-                        </label>
-                    </div>
-                </div>
+            <FormModal
+                isOpen={isCreateDeptOpen}
+                onClose={() => setIsCreateDeptOpen(false)}
+                title="Add Department"
+                subtitle="Create a new department in the organization."
+                onSubmit={handleCreateDept}
+                submitLabel="Create Department"
+                isSubmitting={actionLoading}
+                apiError={deptFormErrors.api}
+                size="md"
+            >
+                {renderDeptFormBody()}
             </FormModal>
 
             {/* ─── EDIT DEPT MODAL ─────────────────────────────────────────── */}
-            <FormModal isOpen={!!editingDept} onClose={() => setEditingDept(null)}
-                title={editingDept ? `Edit: ${editingDept.name}` : ''} subtitle="Update department information."
-                onSubmit={handleEditDept} submitLabel="Save Changes" isSubmitting={actionLoading}
-                apiError={deptFormErrors.api} size="md">
-                {editingDept && (
-                    <div className="rm2-form-body">
-                        <div className="rm2-field-row">
-                            <div className="rm2-field">
-                                <label className="rm2-form-label">Department Name <span className="rm2-req">*</span></label>
-                                <input type="text" className={`form-input${deptFormErrors.name ? ' rm2-input--error' : ''}`}
-                                    value={deptForm.name}
-                                    onChange={e => { setDeptForm(f => ({ ...f, name: e.target.value })); setDeptFormErrors(p => ({ ...p, name: '' })); }} />
-                                {deptFormErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.name}</span>}
-                            </div>
-                            <div className="rm2-field rm2-field--sm">
-                                <label className="rm2-form-label">Code</label>
-                                <input type="text" className={`form-input${deptFormErrors.code ? ' rm2-input--error' : ''}`}
-                                    value={deptForm.code} maxLength={10}
-                                    onChange={e => { setDeptForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setDeptFormErrors(p => ({ ...p, code: '' })); }} />
-                                {deptFormErrors.code && <span className="rm2-field-error"><AlertCircle size={11} /> {deptFormErrors.code}</span>}
-                            </div>
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Description</label>
-                            <textarea className="form-input" rows={2} value={deptForm.description}
-                                onChange={e => setDeptForm(f => ({ ...f, description: e.target.value }))} />
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-toggle-wrap">
-                                <input type="checkbox" checked={deptForm.isActive} onChange={e => setDeptForm(f => ({ ...f, isActive: e.target.checked }))} />
-                                <span className="rm2-toggle-label">Active</span>
-                            </label>
-                        </div>
-                    </div>
-                )}
+            <FormModal
+                isOpen={!!editingDept}
+                onClose={() => setEditingDept(null)}
+                title={editingDept ? `Edit: ${editingDept.name}` : ''}
+                subtitle="Update department information."
+                onSubmit={handleEditDept}
+                submitLabel="Save Changes"
+                isSubmitting={actionLoading}
+                apiError={deptFormErrors.api}
+                size="md"
+            >
+                {editingDept && renderDeptFormBody()}
             </FormModal>
 
             {/* ─── CREATE POSITION MODAL ───────────────────────────────────── */}
-            <FormModal isOpen={isCreatePosOpen} onClose={() => setIsCreatePosOpen(false)}
-                title="Add Job Position" subtitle="Create a new position and associate it with a department."
-                onSubmit={handleCreatePos} submitLabel="Create Position" isSubmitting={actionLoading}
-                apiError={posFormErrors.api} size="md">
-                <div className="rm2-form-body">
-                    <div className="rm2-field-row">
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Position Name <span className="rm2-req">*</span></label>
-                            <input type="text" className={`form-input${posFormErrors.name ? ' rm2-input--error' : ''}`}
-                                placeholder="e.g. Operations Manager" value={posForm.name}
-                                onChange={e => { setPosForm(f => ({ ...f, name: e.target.value })); setPosFormErrors(p => ({ ...p, name: '' })); }} />
-                            {posFormErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.name}</span>}
-                        </div>
-                        <div className="rm2-field rm2-field--sm">
-                            <label className="rm2-form-label">Code</label>
-                            <input type="text" className={`form-input${posFormErrors.code ? ' rm2-input--error' : ''}`}
-                                placeholder="e.g. OPS-MGR" value={posForm.code} maxLength={12}
-                                onChange={e => { setPosForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setPosFormErrors(p => ({ ...p, code: '' })); }} />
-                            {posFormErrors.code && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.code}</span>}
-                        </div>
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-form-label">Department <span className="rm2-req">*</span></label>
-                        <select className={`form-input${posFormErrors.departmentId ? ' rm2-input--error' : ''}`}
-                            value={posForm.departmentId}
-                            onChange={e => { setPosForm(f => ({ ...f, departmentId: e.target.value })); setPosFormErrors(p => ({ ...p, departmentId: '' })); }}>
-                            <option value="">— Select a department —</option>
-                            {departments.filter(d => d.isActive !== false).map(d => (
-                                <option key={d.departmentId} value={d.departmentId}>{d.name}</option>
-                            ))}
-                        </select>
-                        {posFormErrors.departmentId && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.departmentId}</span>}
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-form-label">Reports To <span className="rm2-field-optional">(optional)</span></label>
-                        <select className="form-input" value={posForm.reportsToId}
-                            onChange={e => setPosForm(f => ({ ...f, reportsToId: e.target.value }))}>
-                            <option value="">— None (top-level position) —</option>
-                            {positions.filter(p => p.jobPositionId !== editingPos?.jobPositionId && (p.isActive ?? true)).map(p => (
-                                <option key={p.jobPositionId} value={p.jobPositionId}>{p.name} ({p.departmentName})</option>
-                            ))}
-                        </select>
-                        <span className="rm2-field-hint"><Info size={11} /> Defines the organizational reporting hierarchy.</span>
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-form-label">Description</label>
-                        <textarea className="form-input" rows={2} placeholder="Describe this position's responsibilities…"
-                            value={posForm.description} onChange={e => setPosForm(f => ({ ...f, description: e.target.value }))} />
-                    </div>
-                    <div className="rm2-field">
-                        <label className="rm2-toggle-wrap">
-                            <input type="checkbox" checked={posForm.isActive} onChange={e => setPosForm(f => ({ ...f, isActive: e.target.checked }))} />
-                            <span className="rm2-toggle-label">Active on creation</span>
-                        </label>
-                    </div>
-                </div>
+            <FormModal
+                isOpen={isCreatePosOpen}
+                onClose={() => setIsCreatePosOpen(false)}
+                title="Add Job Position"
+                subtitle="Create a new position and associate it with a department."
+                onSubmit={handleCreatePos}
+                submitLabel="Create Position"
+                isSubmitting={actionLoading}
+                apiError={posFormErrors.api}
+                size="md"
+            >
+                {renderPosFormBody()}
             </FormModal>
 
             {/* ─── EDIT POSITION MODAL ─────────────────────────────────────── */}
-            <FormModal isOpen={!!editingPos} onClose={() => setEditingPos(null)}
-                title={editingPos ? `Edit: ${editingPos.name}` : ''} subtitle="Update position information."
-                onSubmit={handleEditPos} submitLabel="Save Changes" isSubmitting={actionLoading}
-                apiError={posFormErrors.api} size="md">
-                {editingPos && (
-                    <div className="rm2-form-body">
-                        <div className="rm2-field-row">
-                            <div className="rm2-field">
-                                <label className="rm2-form-label">Position Name <span className="rm2-req">*</span></label>
-                                <input type="text" className={`form-input${posFormErrors.name ? ' rm2-input--error' : ''}`}
-                                    value={posForm.name}
-                                    onChange={e => { setPosForm(f => ({ ...f, name: e.target.value })); setPosFormErrors(p => ({ ...p, name: '' })); }} />
-                                {posFormErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.name}</span>}
-                            </div>
-                            <div className="rm2-field rm2-field--sm">
-                                <label className="rm2-form-label">Code</label>
-                                <input type="text" className={`form-input${posFormErrors.code ? ' rm2-input--error' : ''}`}
-                                    value={posForm.code} maxLength={12}
-                                    onChange={e => { setPosForm(f => ({ ...f, code: e.target.value.toUpperCase() })); setPosFormErrors(p => ({ ...p, code: '' })); }} />
-                                {posFormErrors.code && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.code}</span>}
-                            </div>
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Department <span className="rm2-req">*</span></label>
-                            <select className={`form-input${posFormErrors.departmentId ? ' rm2-input--error' : ''}`}
-                                value={posForm.departmentId}
-                                onChange={e => { setPosForm(f => ({ ...f, departmentId: e.target.value })); setPosFormErrors(p => ({ ...p, departmentId: '' })); }}>
-                                <option value="">— Select a department —</option>
-                                {departments.map(d => (
-                                    <option key={d.departmentId} value={d.departmentId}>{d.name}{d.isActive === false ? ' (Inactive)' : ''}</option>
-                                ))}
-                            </select>
-                            {posFormErrors.departmentId && <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.departmentId}</span>}
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Reports To <span className="rm2-field-optional">(optional)</span></label>
-                            <select className="form-input" value={posForm.reportsToId}
-                                onChange={e => setPosForm(f => ({ ...f, reportsToId: e.target.value }))}>
-                                <option value="">— None (top-level position) —</option>
-                                {positions.filter(p => p.jobPositionId !== editingPos.jobPositionId).map(p => (
-                                    <option key={p.jobPositionId} value={p.jobPositionId}>{p.name} ({p.departmentName})</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-form-label">Description</label>
-                            <textarea className="form-input" rows={2} value={posForm.description}
-                                onChange={e => setPosForm(f => ({ ...f, description: e.target.value }))} />
-                        </div>
-                        <div className="rm2-field">
-                            <label className="rm2-toggle-wrap">
-                                <input type="checkbox" checked={posForm.isActive} onChange={e => setPosForm(f => ({ ...f, isActive: e.target.checked }))} />
-                                <span className="rm2-toggle-label">Active</span>
-                            </label>
-                        </div>
-                    </div>
-                )}
+            <FormModal
+                isOpen={!!editingPos}
+                onClose={() => setEditingPos(null)}
+                title={editingPos ? `Edit: ${editingPos.name}` : ''}
+                subtitle="Update position information."
+                onSubmit={handleEditPos}
+                submitLabel="Save Changes"
+                isSubmitting={actionLoading}
+                apiError={posFormErrors.api}
+                size="md"
+            >
+                {editingPos && renderPosFormBody()}
             </FormModal>
 
             {/* ──────────────────────────── OVERVIEW TAB ────────────────────── */}
             {subTab === 'overview' && (() => {
-                // Derived analytics data
-                const activeDeptCount = departments.filter(d => d.isActive !== false).length;
+                const activeDeptCount = departments.filter(d => d.status === 'Active' || d.isActive !== false).length;
                 const inactiveDeptCount = departments.length - activeDeptCount;
-                const activePosCount = positions.filter(p => p.isActive !== false).length;
+                const activePosCount = positions.filter(p => p.status === 'Active' || p.isActive !== false).length;
                 const inactivePosCount = positions.length - activePosCount;
                 const totalEmployees = departments.reduce((s, d) => s + (d.employeeCount ?? 0), 0);
 
-                // Position count per department (for breakdown table)
                 const posByDept = departments.map(d => ({
                     dept: d,
                     posCount: positions.filter(p => p.departmentId === d.departmentId).length,
-                    activePosCount: positions.filter(p => p.departmentId === d.departmentId && p.isActive !== false).length,
+                    activePosCount: positions.filter(p => p.departmentId === d.departmentId && (p.status === 'Active' || p.isActive !== false)).length,
                 })).sort((a, b) => b.posCount - a.posCount);
 
                 const deptDonutSlices = [
@@ -1163,7 +1643,6 @@ export default function RoleManagementTab() {
 
                 return (
                     <>
-                        {/* Summary Stats */}
                         <div className="rm2-stats-grid">
                             <StatCard icon={<Building2 size={18} />} label="Total Departments" value={departments.length} subtext={`${activeDeptCount} active · ${inactiveDeptCount} inactive`} variant="primary" />
                             <StatCard icon={<Briefcase size={18} />} label="Total Positions" value={positions.length} subtext={`${activePosCount} active · ${inactivePosCount} inactive`} variant="success" />
@@ -1171,10 +1650,7 @@ export default function RoleManagementTab() {
                             <StatCard icon={<Users size={18} />} label="Employees on Record" value={totalEmployees > 0 ? totalEmployees : '—'} subtext="Across all departments" variant="primary" />
                         </div>
 
-                        {/* Charts + Audit row */}
                         <div className="rm2-overview-grid">
-
-                            {/* Dept Breakdown Donut */}
                             <div className="rm2-overview-card">
                                 <div className="rm2-overview-card__header">
                                     <TrendingUp size={15} />
@@ -1188,7 +1664,7 @@ export default function RoleManagementTab() {
                                         <div className="rm2-chart-legend">
                                             {deptDonutSlices.map((s, i) => s.value > 0 && (
                                                 <div key={i} className="rm2-legend-row">
-                                                    <span className="rm2-legend-dot" style={{ background: ['#00A99D','#FFB547'][i] }} />
+                                                    <span className="rm2-legend-dot" style={{ background: ['#00A99D', '#FFB547'][i] }} />
                                                     <span>{s.label}</span>
                                                     <strong>{s.value} ({departments.length > 0 ? Math.round((s.value / departments.length) * 100) : 0}%)</strong>
                                                 </div>
@@ -1198,7 +1674,6 @@ export default function RoleManagementTab() {
                                 )}
                             </div>
 
-                            {/* Position Breakdown Donut */}
                             <div className="rm2-overview-card">
                                 <div className="rm2-overview-card__header">
                                     <TrendingUp size={15} />
@@ -1212,7 +1687,7 @@ export default function RoleManagementTab() {
                                         <div className="rm2-chart-legend">
                                             {posDonutSlices.map((s, i) => s.value > 0 && (
                                                 <div key={i} className="rm2-legend-row">
-                                                    <span className="rm2-legend-dot" style={{ background: ['#01B574','#FFB547'][i] }} />
+                                                    <span className="rm2-legend-dot" style={{ background: ['#01B574', '#FFB547'][i] }} />
                                                     <span>{s.label}</span>
                                                     <strong>{s.value} ({positions.length > 0 ? Math.round((s.value / positions.length) * 100) : 0}%)</strong>
                                                 </div>
@@ -1222,7 +1697,6 @@ export default function RoleManagementTab() {
                                 )}
                             </div>
 
-                            {/* Audit / Activity Log — criteria #19 & #20 */}
                             <div className="rm2-overview-card rm2-overview-card--wide">
                                 <div className="rm2-overview-card__header">
                                     <Activity size={15} />
@@ -1267,7 +1741,6 @@ export default function RoleManagementTab() {
                             </div>
                         </div>
 
-                        {/* Position distribution by department — criteria #24 */}
                         <div className="rm2-overview-card">
                             <div className="rm2-overview-card__header">
                                 <BarChart2 size={15} />
@@ -1302,7 +1775,7 @@ export default function RoleManagementTab() {
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td><StatusBadge isActive={dept.isActive} /></td>
+                                                        <td><StatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
                                                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{posCount}</td>
                                                         <td style={{ textAlign: 'center' }}>{activePosCount}</td>
                                                         <td style={{ textAlign: 'center' }}>{dept.employeeCount ?? 0}</td>

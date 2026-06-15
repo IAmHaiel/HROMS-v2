@@ -46,7 +46,7 @@ import EmployeeDetailPanel from './EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import FormModal from '../../components/FormModal/FormModal';
-import RoleManagementTab from './RoleManagementTab';
+import RoleManagementTab, { DepartmentResponseDTO, JobPositionResponseDTO } from './RoleManagementTab';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
@@ -65,19 +65,36 @@ type NavTab =
     | 'emergency_override'
     | 'profile';
 
+// ─── Updated Types ────────────────────────────────────────────────────────────
+
 interface EmployeeRegisterDTO {
     employeeNumber: string;
-    role: string;
     email: string;
+    departmentId: string;
+    jobPositionId: string;
+    role: string;
+    employmentStatus: string;
 }
 
 interface FieldError {
     employeeNumber?: string;
-    role?: string;
     email?: string;
+    departmentId?: string;
+    jobPositionId?: string;
+    role?: string;
+    employmentStatus?: string;
 }
 
 type FormState = EmployeeRegisterDTO;
+
+const EMPTY_FORM: FormState = {
+    employeeNumber: '',
+    email: '',
+    departmentId: '',
+    jobPositionId: '',
+    role: '',
+    employmentStatus: '',
+};
 
 interface ActivityLog {
     activityLogId: string;
@@ -187,14 +204,35 @@ const CONFIRM_CLOSED: ConfirmModalState = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ROLES = [
+
+const SYSTEM_ROLES = [
     'System Admin',
     'Operation Admin',
-    'Operation Team',
     'Coordinator',
-    'Delivery Driver',
     'Encoder',
 ];
+
+const DEPARTMENTS = [
+    'Operations',
+    'Logistics',
+    'Finance',
+    'Human Resources',
+    'Information Technology',
+    'Customer Service',
+    'Administration',
+];
+
+const POSITIONS: Record<string, string[]> = {
+    'Operations': ['Operations Manager', 'Operations Coordinator', 'Operations Analyst'],
+    'Logistics': ['Logistics Coordinator', 'Delivery Driver', 'Warehouse Staff'],
+    'Finance': ['Finance Manager', 'Accountant', 'Finance Analyst'],
+    'Human Resources': ['HR Manager', 'HR Coordinator', 'Recruiter'],
+    'Information Technology': ['IT Manager', 'System Administrator', 'Developer', 'IT Support'],
+    'Customer Service': ['Customer Service Manager', 'Customer Service Representative'],
+    'Administration': ['Administrative Officer', 'Encoder', 'Data Entry Specialist'],
+};
+
+const EMPLOYMENT_STATUSES = ['Active', 'Probationary', 'Contractual'];
 
 const PAGE_SIZE = 10;
 
@@ -250,24 +288,41 @@ const getEmployeeDisplayName = (emp: RecentEmployee): string => {
     return emp.employeeName ?? '';
 };
 
-const EMPTY_FORM: FormState = {
-    employeeNumber: '',
-    role: '',
-    email: '',
-};
-
 function validate(form: FormState): FieldError {
     const errs: FieldError = {};
-    if (!form.role) { errs.role = 'Please select a role.'; }
-    else if (!ROLES.includes(form.role)) { errs.role = 'Selected role is not valid.'; }
+
+    // Email
     const email = form.email.trim();
-    if (!email) { errs.email = 'Email address is required.'; }
-    else if (email.length > 100) { errs.email = 'Email must not exceed 100 characters.'; }
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { errs.email = 'Enter a valid email address.'; }
+    if (!email) {
+        errs.email = 'Email address is required.';
+    } else if (email.length > 100) {
+        errs.email = 'Email must not exceed 100 characters.';
+    } else if (!/^[a-zA-Z0-9._+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        errs.email = 'Enter a valid email address.';
+    }
+
+    // Department
+    if (!form.departmentId) errs.departmentId = 'Please select a department.';
+
+    // Position
+    if (!form.jobPositionId) errs.jobPositionId = 'Please select a position.';
+
+    // Role
+    if (!form.role) {
+        errs.role = 'Please select a system role.';
+    }
+
+    // Employment Status
+    if (!form.employmentStatus) errs.employmentStatus = 'Please select an employment status.';
+
     return errs;
 }
 
-const toBackendRole = (role: string) => role.replace(/\s+/g, '');
+const toBackendRole = (role: string) => {
+    if (role === 'Systems Admin' || role === 'System Admin') return 'SystemAdmin';
+    if (role === 'Operations Admin' || role === 'Operation Admin') return 'OperationAdmin';
+    return role.replace(/\s+/g, '');
+};
 const toDisplayRole = (role: string) => role.replace(/([a-z])([A-Z])/g, '$1 $2');
 
 const fmtDate = (d: string): string => {
@@ -344,6 +399,7 @@ interface AddEmployeeModalProps {
     onSuccess: (employee: RecentEmployee) => void;
 }
 
+
 function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
     const [errors, setErrors] = useState<FieldError>({});
@@ -352,7 +408,59 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [successData, setSuccessData] = useState<{ employeeNumber: string } | null>(null);
     const [empNumLoading, setEmpNumLoading] = useState(true);
     const [empNumError, setEmpNumError] = useState('');
+        const [departments, setDepartments] = useState<DepartmentResponseDTO[]>([]);
+    const [jobPositions, setJobPositions] = useState<JobPositionResponseDTO[]>([]);
+    const [availableRoles, setAvailableRoles] = useState<string[]>(['Systems Admin', 'Operations Admin', 'Coordinator', 'Encoder']);
+    const [loadingOrg, setLoadingOrg] = useState(true);
     const { success } = useToast();
+
+    useEffect(() => {
+        const loadOrgData = async () => {
+            setLoadingOrg(true);
+            try {
+                const token = localStorage.getItem('authToken');
+                const headers = { 'Authorization': `Bearer ${token}` };
+                
+                const [dRes, pRes, rRes] = await Promise.all([
+                    fetch('/api/organization/departments', { headers }),
+                    fetch('/api/organization/job-positions', { headers }),
+                    fetch('/api/roles', { headers })
+                ]);
+                
+                if (dRes.ok && pRes.ok && rRes.ok) {
+                    const deptsData = await dRes.json();
+                    const posData = await pRes.json();
+                    const rolesData = await rRes.json();
+                    
+                    const rawDepts = Array.isArray(deptsData) ? deptsData : deptsData.data ?? deptsData.$values ?? [];
+                    const rawPos = Array.isArray(posData) ? posData : posData.data ?? posData.$values ?? [];
+                    const rawRoles = Array.isArray(rolesData) ? rolesData : rolesData.data ?? rolesData.$values ?? [];
+                    
+                    setDepartments(rawDepts.map((d: any) => ({
+                        departmentId: d.departmentId ?? d.DepartmentId,
+                        name: d.name ?? d.Name,
+                        isActive: d.isActive ?? d.IsActive ?? ((d.status ?? d.Status) === 'Active'),
+                        status: d.status ?? d.Status ?? 'Active'
+                    })).filter((d: any) => d.status === 'Active' || d.isActive !== false));
+                    
+                    setJobPositions(rawPos.map((p: any) => ({
+                        jobPositionId: p.jobPositionId ?? p.JobPositionId,
+                        name: p.name ?? p.Name,
+                        departmentId: p.departmentId ?? p.DepartmentId,
+                        isActive: p.isActive ?? p.IsActive ?? ((p.status ?? p.Status) === 'Active'),
+                        status: p.status ?? p.Status ?? 'Active'
+                    })).filter((p: any) => p.status === 'Active' || p.isActive !== false));
+
+                    setAvailableRoles(rawRoles.map((r: any) => toDisplayRole(r.name ?? r.Name)));
+                }
+            } catch (err) {
+                console.error('Error loading organization data:', err);
+            } finally {
+                setLoadingOrg(false);
+            }
+        };
+        loadOrgData();
+    }, []);
 
     useEffect(() => {
         const generateEmployeeNumber = async () => {
@@ -384,16 +492,44 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         generateEmployeeNumber();
     }, []);
 
+    // Derive available positions based on selected department
+    const availablePositions = form.departmentId 
+        ? jobPositions.filter(p => p.departmentId === form.departmentId)
+        : [];
+
     const validateField = (key: keyof FormState, value: string): string => {
         switch (key) {
-            case 'role': { if (!value) return 'Please select a role.'; if (!ROLES.includes(value)) return 'Selected role is not valid.'; return ''; }
-            case 'email': { const e = value.trim(); if (!e) return 'Email address is required.'; if (e.length > 100) return 'Email must not exceed 100 characters.'; if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return 'Enter a valid email address.'; return ''; }
-            default: return '';
+            case 'email': {
+                const v = value.trim();
+                if (!v) return 'Email address is required.';
+                if (v.length > 100) return 'Email must not exceed 100 characters.';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return 'Enter a valid email address.';
+                return '';
+            }
+            case 'departmentId':
+                return !value ? 'Please select a department.' : '';
+            case 'jobPositionId':
+                return !value ? 'Please select a position.' : '';
+            case 'role':
+                return !value ? 'Please select a system role.' : '';
+            case 'employmentStatus':
+                return !value ? 'Please select an employment status.' : '';
+            default:
+                return '';
         }
     };
 
     const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const value = e.target.value;
+
+        // If department changes, reset position
+        if (key === 'departmentId') {
+            setForm(prev => ({ ...prev, departmentId: value, jobPositionId: '' }));
+            setErrors(prev => ({ ...prev, departmentId: value ? undefined : 'Please select a department.', jobPositionId: undefined }));
+            setApiError('');
+            return;
+        }
+
         setForm(prev => ({ ...prev, [key]: value }));
         setApiError('');
         const errMsg = validateField(key, value);
@@ -412,32 +548,38 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             formData.append('EmployeeNumber', form.employeeNumber);
             formData.append('Role', toBackendRole(form.role));
             formData.append('Email', form.email.trim());
+            formData.append('DepartmentId', form.departmentId);
+            formData.append('JobPositionId', form.jobPositionId);
+            formData.append('EmploymentStatus', form.employmentStatus);
 
             const res = await fetch('/api/authorization/systemadmin/register', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData,
             });
+
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
                 throw new Error(errorData.message || 'Employee registration failed. Please try again.');
             }
+
             const responseData = await res.json();
             if (!responseData.isSuccess || !responseData.data) {
                 throw new Error(responseData.message || 'Registration failed');
             }
+
             const data = responseData.data;
-            setSuccessData({ employeeNumber: data.employeeNumber });
+            setSuccessData({ employeeNumber: data.employeeNumber ?? form.employeeNumber });
             success('Employee registered successfully!');
             onSuccess({
-                employeeNumber: data.employeeNumber,
+                employeeNumber: data.employeeNumber ?? form.employeeNumber,
                 employeeName: form.email.trim(),
                 firstName: '',
                 middleName: '',
                 lastName: '',
                 suffix: '',
                 contactNumber: '',
-                role: data.role,
+                role: data.role ?? toBackendRole(form.role),
                 accountStatus: 'Pending Verification',
                 email: form.email.trim(),
             });
@@ -448,26 +590,39 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         }
     };
 
+    // ── Error helper UI ───────────────────────────────────────────────────────
+    const FieldErr = ({ msg }: { msg?: string }) =>
+        msg ? (
+            <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                <AlertCircle size={12} /> {msg}
+            </span>
+        ) : null;
+
+    const inputStyle = (hasErr?: string): React.CSSProperties => ({
+        border: hasErr ? '1px solid #ef4444' : '1px solid #cbd5e1',
+    });
+
     return (
         <div style={{ display: 'contents' }}>
             <FormModal
                 isOpen={true}
                 onClose={onClose}
                 title="Add New Employee"
-                subtitle="Fill in the details to register a new employee account."
+                subtitle="Fill in all details to register a new employee account."
                 apiError={apiError}
                 onSubmit={handleSubmit}
                 isSubmitting={submitting}
-                submitDisabled={empNumLoading || !!empNumError}
+                submitDisabled={empNumLoading || !!empNumError || loadingOrg}
                 submitLabel="Register Employee"
                 size="md"
             >
                 <div className="fm-section">
-                    <h5 className="fm-section-title">Account info</h5>
+                    <h5 className="fm-section-title">Account Information</h5>
                     <div className="fm-field-grid">
+                        {/* Employee Number */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-number">
-                                Employee Number <span className="optional" style={{ fontWeight: 600, background: 'rgba(67,24,255,0.1)', color: '#4318ff', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>AUTO</span>
+                                Employee ID <span className="optional" style={{ fontWeight: 600, background: 'rgba(67,24,255,0.1)', color: '#4318ff', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>AUTO</span>
                             </label>
                             <div style={{ position: 'relative' }}>
                                 <input
@@ -477,7 +632,13 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                                     readOnly
                                     placeholder={empNumLoading ? 'Generating…' : ''}
                                     className="fm-input"
-                                    style={{ background: '#f8fafc', color: empNumLoading ? '#64748b' : '#0f172a', cursor: 'not-allowed', paddingRight: 36, border: empNumError ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
+                                    style={{
+                                        background: '#f8fafc',
+                                        color: empNumLoading ? '#64748b' : '#0f172a',
+                                        cursor: 'not-allowed',
+                                        paddingRight: 36,
+                                        border: empNumError ? '1px solid #ef4444' : '1px solid #cbd5e1'
+                                    }}
                                 />
                                 <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: empNumLoading ? '#64748b' : '#10b981' }}>
                                     {empNumLoading ? <Loader2 size={13} className="fm-spin" /> : <CheckCircle2 size={13} />}
@@ -491,72 +652,168 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                                 <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>Assigned automatically. Cannot be changed.</span>
                             )}
                         </div>
+
+                        {/* Email Address */}
                         <div className="fm-field">
-                            <label className="fm-label" htmlFor="emp-role">Role <span style={{ color: '#ef4444' }}>*</span></label>
-                            <select
-                                id="emp-role"
-                                value={form.role}
-                                onChange={handleChange('role')}
-                                className="fm-select"
-                                style={{ border: errors.role ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
-                            >
-                                <option value="">Select a role</option>
-                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                            {errors.role && (
-                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
-                                    <AlertCircle size={12} /> {errors.role}
-                                </span>
-                            )}
+                            <label className="fm-label" htmlFor="emp-email">
+                                Email Address <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <input
+                                id="emp-email"
+                                type="email"
+                                placeholder="e.g. name@company.com"
+                                value={form.email}
+                                onChange={handleChange('email')}
+                                className="fm-input"
+                                style={inputStyle(errors.email)}
+                                maxLength={100}
+                                autoComplete="off"
+                            />
+                            <FieldErr msg={errors.email} />
                         </div>
                     </div>
                 </div>
 
                 <div className="fm-section">
-                    <h5 className="fm-section-title">Contact info</h5>
+                    <h5 className="fm-section-title">Department & Position</h5>
                     <div className="fm-field-grid">
-                        <div className="fm-field fm-field-full">
-                            <label className="fm-label" htmlFor="emp-email">Email Address <span style={{ color: '#ef4444' }}>*</span></label>
-                            <input
-                                id="emp-email"
-                                type="email"
-                                placeholder="e.g. juan@speedex.com"
-                                value={form.email}
-                                onChange={handleChange('email')}
-                                className="fm-input"
-                                style={{ border: errors.email ? '1px solid #ef4444' : '1px solid #cbd5e1' }}
-                                maxLength={100}
-                                autoComplete="off"
-                            />
-                            {errors.email ? (
-                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
-                                    <AlertCircle size={12} /> {errors.email}
-                                </span>
-                            ) : form.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email.trim()) && (
-                                <span style={{ fontSize: 11, color: '#10b981', marginTop: 4, display: 'block' }}>✓ Valid email</span>
-                            )}
+                        {/* Department */}
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-dept">
+                                Department <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <select
+                                id="emp-dept"
+                                value={form.departmentId}
+                                onChange={handleChange('departmentId')}
+                                className="fm-select"
+                                style={inputStyle(errors.departmentId)}
+                                disabled={loadingOrg}
+                            >
+                                <option value="">{loadingOrg ? 'Loading departments...' : 'Select a department'}</option>
+                                {departments.map(d => <option key={d.departmentId} value={d.departmentId}>{d.name}</option>)}
+                            </select>
+                            <FieldErr msg={errors.departmentId} />
+                        </div>
+
+                        {/* Position */}
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-position">
+                                Position <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <select
+                                id="emp-position"
+                                value={form.jobPositionId}
+                                onChange={handleChange('jobPositionId')}
+                                className="fm-select"
+                                style={{
+                                    ...inputStyle(errors.jobPositionId),
+                                    opacity: !form.departmentId ? 0.6 : 1,
+                                    cursor: !form.departmentId ? 'not-allowed' : 'pointer',
+                                }}
+                                disabled={!form.departmentId || loadingOrg}
+                            >
+                                <option value="">
+                                    {form.departmentId ? 'Select a position' : 'Select department first'}
+                                </option>
+                                {availablePositions.map(p => <option key={p.jobPositionId} value={p.jobPositionId}>{p.name}</option>)}
+                            </select>
+                            <FieldErr msg={errors.jobPositionId} />
                         </div>
                     </div>
-                    <p style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 12 }}><AlertCircle size={11} />A verification link will be sent to this address after registration.</p>
+                </div>
+
+                <div className="fm-section">
+                    <h5 className="fm-section-title">System Role & Employment Status</h5>
+                    <div className="fm-field-grid">
+                        {/* System Role */}
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-role">
+                                System Role <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <select
+                                id="emp-role"
+                                value={form.role}
+                                onChange={handleChange('role')}
+                                className="fm-select"
+                                style={inputStyle(errors.role)}
+                            >
+                                <option value="">Select a role</option>
+                                {availableRoles.map(r => (
+                                    <option key={r} value={r}>
+                                        {r}
+                                    </option>
+                                ))}
+                            </select>
+                            <FieldErr msg={errors.role} />
+                        </div>
+
+                        {/* Employment Status */}
+                        <div className="fm-field">
+                            <label className="fm-label" htmlFor="emp-status">
+                                Employment Status <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <select
+                                id="emp-status"
+                                value={form.employmentStatus}
+                                onChange={handleChange('employmentStatus')}
+                                className="fm-select"
+                                style={inputStyle(errors.employmentStatus)}
+                            >
+                                <option value="">Select status</option>
+                                <option value="Active">Active</option>
+                                <option value="Probationary">Probationary</option>
+                                <option value="Contractual">Contractual</option>
+                            </select>
+                            <FieldErr msg={errors.employmentStatus} />
+                        </div>
+                    </div>
                 </div>
             </FormModal>
+
+            {/* ── Success Screen ── */}
             {successData && (
                 <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: '8px 0 20px' }}>
-                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(5,205,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={28} color="#05cd99" /></div>
-                            <div><h3 style={{ margin: 0 }}>Employee registered</h3><p className="modal-subtitle">Account has been created successfully.</p></div>
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(5,205,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircle2 size={28} color="#05cd99" />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0 }}>Employee registered</h3>
+                                <p className="modal-subtitle">Account has been created successfully.</p>
+                            </div>
                         </div>
+
                         <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--text-secondary)' }}>Employee number</span><strong>{successData.employeeNumber}</strong></div>
-                            <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><span style={{ color: 'var(--text-secondary)' }}>Email</span><span style={{ fontWeight: 500, color: 'var(--text-primary)', wordBreak: 'break-all', textAlign: 'right', maxWidth: 220 }}>{form.email.trim()}</span></div>
+                            {[
+                                { label: 'Employee ID', value: successData.employeeNumber },
+                                { label: 'Department', value: departments.find(d => d.departmentId === form.departmentId)?.name },
+                                { label: 'Position', value: jobPositions.find(p => p.jobPositionId === form.jobPositionId)?.name },
+                                { label: 'Role', value: form.role },
+                                { label: 'Status', value: form.employmentStatus },
+                                { label: 'Email', value: form.email.trim() },
+                            ].map(({ label, value }, i, arr) => (
+                                <div key={label}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                                        <strong style={{ textAlign: 'right', maxWidth: 240, wordBreak: 'break-all' }}>{value || '—'}</strong>
+                                    </div>
+                                    {i < arr.length - 1 && <div style={{ height: 1, background: 'var(--border)', marginTop: 10 }} />}
+                                </div>
+                            ))}
                         </div>
+
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
                             <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="#05cd99" />
-                            <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.</span>
+                            <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                                Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
+                            </span>
                         </div>
-                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>Done</button>
+
+                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>
+                            Done
+                        </button>
                     </div>
                 </div>
             )}
@@ -571,9 +828,10 @@ interface EmployeeDetailModalProps {
     onClose: () => void;
     onUpdated: (updated: RecentEmployee) => void;
     initialEditMode?: boolean;
+    rolesList?: string[];
 }
 
-function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = false }: EmployeeDetailModalProps) {
+function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = false, rolesList = SYSTEM_ROLES }: EmployeeDetailModalProps) {
     const [isEditing, setIsEditing] = useState(initialEditMode);
     const [form, setForm] = useState({
         firstName: employee.firstName ?? '',
@@ -870,7 +1128,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
                                 <div className="fm-field">
                                     <label className="fm-label">Role</label>
                                     <select value={form.role} onChange={handleChange('role')} className="fm-select">
-                                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                        {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
                                 </div>
                                 <div className="fm-field">
@@ -1062,9 +1320,10 @@ interface DashboardTabProps {
     onSelectEmployee: (emp: RecentEmployee) => void;
     onViewAll: () => void;
     onAddEmployee: () => void;
+    rolesCount?: number;
 }
 
-function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee }: DashboardTabProps) {
+function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee, rolesCount }: DashboardTabProps) {
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
@@ -1084,7 +1343,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     { icon: <Users size={20} strokeWidth={2.3} />, variant: 'primary', label: 'TOTAL EMPLOYEES', value: employees.length, subtext: 'All registered staff' },
                     { icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', label: 'ACTIVE', value: activeCount, subtext: 'Currently active accounts' },
                     { icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', label: 'DEACTIVATED', value: deactivatedCount, subtext: 'Accounts needing review' },
-                    { icon: <Shield size={20} strokeWidth={2.3} />, variant: 'warning', label: 'ROLES', value: ROLES.length, subtext: 'Available role types' },
+                    { icon: <Shield size={20} strokeWidth={2.3} />, variant: 'warning', label: 'ROLES', value: rolesCount ?? SYSTEM_ROLES.length, subtext: 'Available role types' },
                 ].map(({ icon, variant, label, value, subtext }) => (
                     <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
@@ -1185,6 +1444,7 @@ interface ManageEmployeesTabProps {
     contractsPage: number;
     contractsTotalPages: number;
     onContractsPageChange: (page: number, filters: { search: string; isArchived: boolean }) => void;
+    rolesList?: string[];
 }
 
 export interface LeaveFilters {
@@ -1200,6 +1460,7 @@ function ManageEmployeesTab({
     onLeavePageChange, onLeaveConfirm,
     onEditEmployee, onDeleteEmployee, onViewEmployee, onOpenDigital201,
     contracts, contractsLoading, contractsPage, contractsTotalPages, onContractsPageChange,
+    rolesList = SYSTEM_ROLES,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
     const [search, setSearch] = useState('');
@@ -1265,7 +1526,7 @@ function ManageEmployeesTab({
                         <>
                             <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
                                 <option value="">All Roles</option>
-                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="">All Statuses</option>
@@ -1283,7 +1544,7 @@ function ManageEmployeesTab({
                             </select>
                             <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
                                 <option value="">All Roles</option>
-                                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
                             </select>
                         </>
                     ) : (
@@ -2205,6 +2466,7 @@ export default function Dashboard() {
     usePreventBackNav();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+    const [rolesList, setRolesList] = useState<string[]>(['Systems Admin', 'Operations Admin', 'Coordinator', 'Encoder']);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<RecentEmployee | null>(null);
     const [empModalEditMode, setEmpModalEditMode] = useState(false);
@@ -2244,6 +2506,23 @@ export default function Dashboard() {
     const [contractsLoading, setContractsLoading] = useState(true);
     const [contractsPage, setContractsPage] = useState(1);
     const [contractsTotalPages, setContractsTotalPages] = useState(1);
+
+    const fetchBackendRoles = async () => {
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/roles', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const raw = Array.isArray(data) ? data : data.data ?? data.$values ?? [];
+                const roleNames = raw.map((r: any) => toDisplayRole(r.name ?? r.Name));
+                setRolesList(roleNames);
+            }
+        } catch (err) {
+            console.error('Failed to fetch backend roles:', err);
+        }
+    };
 
     const fetchEmployees = (page: number = 1, filters: { search: string; role: string; status: string } = { search: '', role: '', status: '' }) => {
         const token = localStorage.getItem('authToken');
@@ -2428,6 +2707,10 @@ export default function Dashboard() {
             .catch((err) => { console.error('Activity logs fetch error:', err); setActivityLogs([]); });
     }, []);
 
+    useEffect(() => {
+        fetchBackendRoles();
+    }, [activeTab]);
+
     // ── Logout ────────────────────────────────────────────────────────────────
     const handleLogout = () => setLogoutConfirm(true);
 
@@ -2529,6 +2812,7 @@ export default function Dashboard() {
                         onSelectEmployee={emp => { setEmpModalEditMode(false); setSelectedEmployee(emp); }}
                         onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }}
                         onAddEmployee={() => setShowAddModal(true)}
+                        rolesCount={rolesList.length}
                     />
                 )}
 
@@ -2543,6 +2827,7 @@ export default function Dashboard() {
                                 if (updated.accountStatus === '__deleted__') setSelectedPanelEmployee(null);
                                 else setSelectedPanelEmployee(updated);
                             }}
+                            rolesList={rolesList}
                         />
                     ) : (
                         <ManageEmployeesTab
@@ -2564,6 +2849,7 @@ export default function Dashboard() {
                             contractsPage={contractsPage}
                             contractsTotalPages={contractsTotalPages}
                             onContractsPageChange={fetchContracts}
+                            rolesList={rolesList}
                         />
                     )
                 )}
@@ -2644,6 +2930,7 @@ export default function Dashboard() {
                     onClose={() => setSelectedEmployee(null)}
                     onUpdated={handleEmployeeUpdated}
                     initialEditMode={empModalEditMode}
+                    rolesList={rolesList}
                 />
             )}
 
