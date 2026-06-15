@@ -37,5 +37,8 @@ namespace OTMS.Entities.Models
         public ICollection<TaskReopenRequest> ReopenRequests { get; set; } = new List<TaskReopenRequest>();
         public ICollection<TaskStatusRecord> StatusRecords { get; set; } = new List<TaskStatusRecord>();
         public ICollection<AdminOverrideRecord> OverrideRecords { get; set; } = new List<AdminOverrideRecord>();
+
+        public Guid? TaskTemplateId { get; set; }
+        public TaskTemplate? TaskTemplate { get; set; }
     }
 }

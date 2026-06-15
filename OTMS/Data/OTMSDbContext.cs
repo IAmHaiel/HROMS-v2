@@ -13,6 +13,7 @@ namespace OTMS.Data
         public DbSet<TaskReopenRequest> TaskReopenRequests { get; set; }
         public DbSet<TaskStatusRecord> TaskStatusRecords { get; set; }
         public DbSet<AdminOverrideRecord> AdminOverrideRecords { get; set; }
+        public DbSet<TaskTemplate> TaskTemplates { get; set; }
         public DbSet<Announcement> Announcements { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<ActivityLog> ActivityLogs { get; set; }
@@ -206,6 +207,25 @@ namespace OTMS.Data
                 .WithMany()
                 .HasForeignKey(e => e.LeaveId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Task Template Relationships
+            modelBuilder.Entity<TaskTemplate>()
+                .HasOne(tt => tt.Creator)
+                .WithMany(a => a.CreatedTaskTemplates)
+                .HasForeignKey(tt => tt.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<TaskTemplate>()
+                .HasOne(tt => tt.Assignee)
+                .WithMany(a => a.AssignedTaskTemplates)
+                .HasForeignKey(tt => tt.AssignedEmployee)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Entities.Models.Task>()
+                .HasOne(t => t.TaskTemplate)
+                .WithMany(tt => tt.GeneratedTasks)
+                .HasForeignKey(t => t.TaskTemplateId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

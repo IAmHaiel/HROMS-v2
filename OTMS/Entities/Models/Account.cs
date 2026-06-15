@@ -33,6 +33,10 @@ namespace OTMS.Entities.Models
 
         public ICollection<TaskStatusRecord> TaskStatusUpdates { get; set; } = new List<TaskStatusRecord>();
         public ICollection<AdminOverrideRecord> AdminOverrides { get; set; } = new List<AdminOverrideRecord>();
+
+        public ICollection<TaskTemplate> CreatedTaskTemplates { get; set; } = new List<TaskTemplate>();
+        public ICollection<TaskTemplate> AssignedTaskTemplates { get; set; } = new List<TaskTemplate>();
+
         // for password change tracking.
         public bool IsPasswordChanged { get; set; } = false;
     }
