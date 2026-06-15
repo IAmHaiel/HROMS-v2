@@ -235,6 +235,14 @@ namespace OTMS.Service.Services
 
         public async Task<TaskResponseDTO> ReopenTaskAsync(Guid taskId)
         {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
+
             var task = await context.Tasks
                 .Include(t => t.Assignee)
                     .ThenInclude(a => a.Employee)
@@ -250,6 +258,22 @@ namespace OTMS.Service.Services
             if (task.TaskStatus != "Completed")
             {
                 throw new Exception("Only completed tasks can be reopened.");
+            }
+
+            bool canManageTasks = permissions.Contains("Permissions.Tasks.Manage");
+            bool canViewTasks = permissions.Contains("Permissions.Tasks.View");
+
+            if (!canManageTasks && !canViewTasks)
+            {
+                throw new UnauthorizedAccessException("You are not authorized to reopen tasks.");
+            }
+
+            if (!canManageTasks && canViewTasks)
+            {
+                if (task.AssignedTo != loggedInAccountId)
+                {
+                    throw new UnauthorizedAccessException("You can only reopen tasks assigned to you.");
+                }
             }
 
             // Reopen Task
@@ -301,22 +325,12 @@ namespace OTMS.Service.Services
 
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
-            // Get Logged-In User Role
-            var roleClaim = httpContextAccessor
-                .HttpContext?
-                .User
-                .FindFirst(ClaimTypes.Role)?
-                .Value;
+            // Get Logged-In User Permissions
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
 
-            // Allowed Roles
-            var allowedRoles = new[]
-            {"OperationAdmin", "Encoder", "Coordinator"};
-
-            if (string.IsNullOrEmpty(roleClaim)
-                || !allowedRoles.Contains(roleClaim))
+            if (!permissions.Contains("Permissions.Tasks.Manage") && !permissions.Contains("Permissions.Tasks.View"))
             {
-                throw new UnauthorizedAccessException(
-                    "You are not authorized to update task progress.");
+                throw new UnauthorizedAccessException("You are not authorized to update task progress.");
             }
 
             // Get Task
@@ -338,6 +352,12 @@ namespace OTMS.Service.Services
             {
                 throw new UnauthorizedAccessException(
                     "You can only update tasks assigned to you.");
+            }
+
+            // Immutability Check for Completed Tasks
+            if (task.TaskStatus == "Completed")
+            {
+                throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
             // Validate Status
@@ -423,22 +443,12 @@ namespace OTMS.Service.Services
 
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
-            // Get Logged-In Role
-            var roleClaim = httpContextAccessor
-                .HttpContext?
-                .User
-                .FindFirst(ClaimTypes.Role)?
-                .Value;
+            // Get Logged-In Role Permissions
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
 
-            // Allowed Roles
-            var allowedRoles = new[]
-            {"OperationAdmin", "Encoder", "Coordinator"};
-
-            if (string.IsNullOrEmpty(roleClaim)
-                || !allowedRoles.Contains(roleClaim))
+            if (!permissions.Contains("Permissions.Tasks.Manage") && !permissions.Contains("Permissions.Tasks.View"))
             {
-                throw new UnauthorizedAccessException(
-                    "You are not authorized to access tasks.");
+                throw new UnauthorizedAccessException("You are not authorized to access tasks.");
             }
 
             // Get Assigned Tasks
@@ -654,7 +664,7 @@ namespace OTMS.Service.Services
                 .Include(a => a.Employee)
                 .Include(a => a.ActivityLogs)
                 .Include(a => a.AssignedTasks)
-                .Where(a => a.Role != null && (a.Role.Name == Common.Constraints.Roles.Encoder || a.Role.Name == Common.Constraints.Roles.Coordinator))
+                .Where(a => a.Role != null && a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.View") && !a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.Manage"))
                 .Where(a => a.AccountStatus != "On Leave");
 
             if (!string.IsNullOrEmpty(nameFilter))

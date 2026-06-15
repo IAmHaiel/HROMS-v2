@@ -66,9 +66,9 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
-        /// Reopens a completed or closed task, changing its status back to "Pending". Only authenticated users with the "OperationsAdmin" role can reopen tasks.
+        /// Reopens a completed or closed task, changing its status back to "In Progress". Employees can reopen their own completed tasks, and OperationAdmins can reopen any completed task.
         /// </summary>
-        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpPatch("{taskId}/reopen")]
         public async Task<ActionResult<TaskResponseDTO>> ReopenTask(Guid taskId)
         {
