@@ -2,6 +2,8 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
+using OTMS.Common.Exceptions;
+using OTMS.Common.Helpers;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Pagination;
@@ -68,36 +70,46 @@ namespace OTMS.Service.Services
                 throw new Exception("Creator account not found.");
             }
 
-            // Check for duplicates or similar tasks
-            bool exactDuplicateExists = await context.Tasks
-                .AnyAsync(t => t.TaskTitle.ToLower() == request.TaskTitle.ToLower()
-                    && t.TaskDescription!.ToLower() == request.TaskDescription!.ToLower());
+            // Check for duplicate or similar tasks using Jaccard Similarity (70% threshold)
+            var existingTasks = await context.Tasks
+                .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                .Select(t => new { t.TaskId, t.TaskTitle, t.TaskDescription, t.TaskStatus })
+                .ToListAsync();
 
-            bool similarTaskExists = await context.Tasks
-                .AnyAsync(t => t.TaskTitle.ToLower().Contains(request.TaskTitle.ToLower())
-                    || request.TaskTitle.ToLower().Contains(t.TaskTitle.ToLower()));
+            var duplicates = new List<DuplicateTaskWarningDTO>();
+            const double SimilarityThreshold = 0.70;
 
-            if (exactDuplicateExists)
+            foreach (var existing in existingTasks)
             {
-                await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskDuplicateDetected,
-                $"Duplicated Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
+                double similarity = TextSimilarityHelper.CalculateWeightedSimilarity(
+                    request.TaskTitle, request.TaskDescription,
+                    existing.TaskTitle, existing.TaskDescription);
 
-                throw new Exception(
-                    "A task with the same title and description already exists.");
+                if (similarity >= SimilarityThreshold)
+                {
+                    duplicates.Add(new DuplicateTaskWarningDTO
+                    {
+                        ExistingTaskTitle = existing.TaskTitle,
+                        ExistingTaskId = existing.TaskId,
+                        ExistingTaskStatus = existing.TaskStatus,
+                        SimilarityPercentage = Math.Round(similarity * 100, 2)
+                    });
+                }
             }
 
-            if (similarTaskExists)
+            if (duplicates.Any() && !request.IsDuplicateAcknowledged)
+            {
+                throw new DuplicateTaskException(duplicates);
+            }
+
+            if (duplicates.Any() && request.IsDuplicateAcknowledged)
             {
                 await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskSimilarityDetected,
-                $"Similar Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
-
-                throw new Exception(
-                    "A similar task already exists.");
+                    creatorId,
+                    ActivityTypes.TaskDuplicateDetected,
+                    $"Admin proceeded with task creation despite duplicate warnings for '{request.TaskTitle}'.");
             }
+
 
 
             // Create Task

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Exceptions;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Pagination;
@@ -31,6 +32,15 @@ namespace OTMS.Controllers
                 var result = await taskService.CreateTaskAsync(request);
 
                 return Ok(result);
+            }
+            catch (DuplicateTaskException ex)
+            {
+                return Conflict(new ApiResponseDTO<List<DuplicateTaskWarningDTO>>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = ex.Duplicates
+                });
             }
             catch (Exception ex)
             {
