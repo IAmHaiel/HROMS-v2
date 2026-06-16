@@ -30,6 +30,7 @@ import {
     Filter,
     Copy,
     ShieldAlert,
+    ShieldCheck,
     LogOut,
     Settings,
     Activity,
@@ -66,6 +67,7 @@ type NavTab =
     | 'roles'
     | 'activity_logs'
     | 'emergency_override'
+    | 'government_records'
     | 'profile';
 
 // ─── Updated Types ────────────────────────────────────────────────────────────
@@ -254,6 +256,12 @@ const NAV_GROUPS = [
         items: [
             { tab: 'delivery' as NavTab, icon: FileText, label: 'Delivery Summary' },
             { tab: 'analytics' as NavTab, icon: BarChart3, label: 'Analytics View' },
+        ],
+    },
+    {
+        label: 'COMPLIANCE',
+        items: [
+            { tab: 'government_records' as NavTab, icon: ShieldCheck, label: 'Government Records' },
         ],
     },
     {
@@ -2472,6 +2480,348 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
     );
 }
 
+// ─── Government Records Tab ────────────────────────────────────────────────────
+
+const SSS_REGEX = /^\d{2}-\d{7}-\d{1}$/;
+const PHILHEALTH_REGEX = /^\d{2}-\d{9}-\d{1}$/;
+const PAGIBIG_REGEX = /^\d{4}-\d{4}-\d{4}$/;
+const TIN_REGEX = /^\d{3}-\d{3}-\d{3}-\d{3}$/;
+
+const FORMAT_LABELS: Record<string, string> = {
+    sssNumber: 'XX-XXXXXXX-X',
+    philhealthNumber: 'XX-XXXXXXXXX-X',
+    pagibigNumber: 'XXXX-XXXX-XXXX',
+    tinNumber: 'XXX-XXX-XXX-XXX',
+};
+
+const GovernmentRecordsTab: React.FC = () => {
+    const { success, error } = useToast();
+    const [employees, setEmployees] = useState<RecentEmployee[]>([]);
+    const [selectedEmployeeNumber, setSelectedEmployeeNumber] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [fetchingData, setFetchingData] = useState(false);
+
+    const [form, setForm] = useState({
+        sssNumber: '',
+        philhealthNumber: '',
+        pagibigNumber: '',
+        tinNumber: '',
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [apiError, setApiError] = useState('');
+    const [complianceLoaded, setComplianceLoaded] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+
+    const [syncRecords, setSyncRecords] = useState<any[]>([]);
+    const [syncRecordsLoading, setSyncRecordsLoading] = useState(false);
+
+    const resetToViewMode = () => {
+        setEditMode(false);
+        setApiError('');
+        setErrors({});
+    };
+
+    useEffect(() => {
+        const fetchEmployees = async () => {
+            try {
+                const token = localStorage.getItem('authToken');
+                const res = await fetch('/api/systemadmin/recent?pageNumber=1&pageSize=200', {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.ok) {
+                    const body = await res.json();
+                    setEmployees(body.data?.data ?? body.data ?? body ?? []);
+                }
+            } catch { /* ignore */ }
+        };
+        fetchEmployees();
+    }, []);
+
+    const loadEmployeeData = async (empNumber: string) => {
+        if (!empNumber) return;
+        resetToViewMode();
+        setFetchingData(true);
+        setComplianceLoaded(false);
+        setApiError('');
+        setSyncRecords([]);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`/api/systemadmin/digital-201-file?employeeNumber=${encodeURIComponent(empNumber)}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error('Failed to load employee compliance data.');
+            const body = await res.json();
+            const compliance = body.data?.compliance ?? body?.compliance;
+            if (compliance) {
+                setForm({
+                    sssNumber: compliance.sssNumber ?? '',
+                    philhealthNumber: compliance.philhealthNumber ?? '',
+                    pagibigNumber: compliance.pagibigNumber ?? '',
+                    tinNumber: compliance.tinNumber ?? '',
+                });
+            } else {
+                setForm({ sssNumber: '', philhealthNumber: '', pagibigNumber: '', tinNumber: '' });
+            }
+            setComplianceLoaded(true);
+            setErrors({});
+        } catch (err: any) {
+            setApiError(err.message);
+            setForm({ sssNumber: '', philhealthNumber: '', pagibigNumber: '', tinNumber: '' });
+        } finally {
+            setFetchingData(false);
+        }
+    };
+
+    useEffect(() => {
+        loadEmployeeData(selectedEmployeeNumber);
+    }, [selectedEmployeeNumber]);
+
+    const validate = (): boolean => {
+        const e: Record<string, string> = {};
+        if (!SSS_REGEX.test(form.sssNumber)) e.sssNumber = `Invalid SSS Number format detected. Expected: ${FORMAT_LABELS.sssNumber}`;
+        if (!PHILHEALTH_REGEX.test(form.philhealthNumber)) e.philhealthNumber = `Invalid PhilHealth Number format detected. Expected: ${FORMAT_LABELS.philhealthNumber}`;
+        if (!PAGIBIG_REGEX.test(form.pagibigNumber)) e.pagibigNumber = `Invalid Pag-IBIG Number format detected. Expected: ${FORMAT_LABELS.pagibigNumber}`;
+        if (!TIN_REGEX.test(form.tinNumber)) e.tinNumber = `Invalid TIN format detected. Expected: ${FORMAT_LABELS.tinNumber}`;
+        setErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    const applyAutoFormat = (field: string, value: string) => {
+        const digits = value.replace(/\D/g, '');
+        if (field === 'sssNumber') {
+            if (digits.length <= 2) return digits;
+            if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+            return `${digits.slice(0, 2)}-${digits.slice(2, 9)}-${digits.slice(9, 10)}`;
+        }
+        if (field === 'philhealthNumber') {
+            if (digits.length <= 2) return digits;
+            if (digits.length <= 11) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+            return `${digits.slice(0, 2)}-${digits.slice(2, 11)}-${digits.slice(11, 12)}`;
+        }
+        if (field === 'pagibigNumber') {
+            if (digits.length <= 4) return digits;
+            if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+            return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}`;
+        }
+        if (field === 'tinNumber') {
+            if (digits.length <= 3) return digits;
+            if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+            if (digits.length <= 9) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+            return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}-${digits.slice(9, 12)}`;
+        }
+        return value;
+    };
+
+    const handleFieldChange = (field: string, raw: string) => {
+        const formatted = applyAutoFormat(field, raw);
+        setForm(prev => ({ ...prev, [field]: formatted }));
+        setErrors(prev => ({ ...prev, [field]: '' }));
+        setApiError('');
+    };
+
+    const loadSyncRecords = async (empNumber: string) => {
+        setSyncRecordsLoading(true);
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`/api/systemadmin/${encodeURIComponent(empNumber)}/statutory-sync-records`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const body = await res.json();
+                setSyncRecords(body.data ?? []);
+            }
+        } catch { /* ignore */ }
+        finally { setSyncRecordsLoading(false); }
+    };
+
+    const handleSubmit = async () => {
+        if (!validate()) return;
+        setSaving(true);
+        setApiError('');
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/systemadmin/update-statutory-records', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    employeeNumber: selectedEmployeeNumber,
+                    sssNumber: form.sssNumber,
+                    philhealthNumber: form.philhealthNumber,
+                    pagibigNumber: form.pagibigNumber,
+                    tinNumber: form.tinNumber,
+                }),
+            });
+            const body = await res.json();
+            if (!res.ok || !body.isSuccess) {
+                throw new Error(body.message || 'Failed to save government records.');
+            }
+            success('Government records saved successfully. Statutory identifiers synchronized with FOMS.');
+            await loadSyncRecords(selectedEmployeeNumber);
+            resetToViewMode();
+        } catch (err: any) {
+            setApiError(err.message);
+            error(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="dashboard-content">
+            <div className="card" style={{ padding: 24 }}>
+                <div className="field" style={{ marginBottom: 20 }}>
+                    <label>Select Employee</label>
+                    <select
+                        className="report-select"
+                        value={selectedEmployeeNumber}
+                        onChange={e => setSelectedEmployeeNumber(e.target.value)}
+                    >
+                        <option value="">— Choose an employee —</option>
+                        {employees.map(emp => (
+                            <option key={emp.employeeNumber} value={emp.employeeNumber}>
+                                {(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} ({emp.employeeNumber})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {!selectedEmployeeNumber && (
+                    <div className="empty-state" style={{ padding: 32 }}>
+                        <ShieldCheck size={32} />
+                        <p>Select an employee to view or update their government records.</p>
+                    </div>
+                )}
+
+                {selectedEmployeeNumber && fetchingData && (
+                    <div className="empty-state" style={{ padding: 32 }}>
+                        <Loader2 size={22} className="spin" />
+                        <p>Loading compliance data...</p>
+                    </div>
+                )}
+
+                {selectedEmployeeNumber && !fetchingData && (
+                    <>
+                        {apiError && (
+                            <div className="form-api-error" style={{ marginBottom: 14 }}>
+                                <AlertCircle size={14} /><span>{apiError}</span>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <ShieldCheck size={18} /> Government IDs Form
+                            </h3>
+                            {!editMode && (
+                                <button className="btn btn-primary" onClick={() => setEditMode(true)}>
+                                    <Pencil size={13} /> Edit
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="field">
+                            <label>Employee ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated Reference)</span></label>
+                            <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                                <span className="if-icon"><Hash size={15} /></span>
+                                <input type="text" value={selectedEmployeeNumber} readOnly style={{ color: 'var(--text-secondary)' }} />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+                            {(['sssNumber', 'philhealthNumber', 'pagibigNumber', 'tinNumber'] as const).map(field => (
+                                <div className="field" key={field}>
+                                    <label>
+                                        {field === 'sssNumber' ? 'SSS Number' :
+                                         field === 'philhealthNumber' ? 'PhilHealth Number' :
+                                         field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
+                                    </label>
+                                    {editMode ? (
+                                        <>
+                                            <span style={{ color: 'var(--text-muted)', fontSize: 11, display: 'block', marginBottom: 2 }}>
+                                                Format: {FORMAT_LABELS[field]}
+                                            </span>
+                                            <input
+                                                type="text"
+                                                className={errors[field] ? 'report-input report-input-error' : 'report-input'}
+                                                value={form[field]}
+                                                onChange={e => handleFieldChange(field, e.target.value)}
+                                                placeholder={FORMAT_LABELS[field]}
+                                                maxLength={field === 'sssNumber' ? 12 : field === 'philhealthNumber' ? 14 : field === 'pagibigNumber' ? 14 : 14}
+                                            />
+                                            {errors[field] && <span className="report-field-error">{errors[field]}</span>}
+                                        </>
+                                    ) : (
+                                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'default' }}>
+                                            <span className="if-icon"><Hash size={15} /></span>
+                                            <input type="text" value={form[field] || '—'} readOnly style={{ color: 'var(--text-primary)' }} />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {editMode && (
+                            <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                                <button className="btn" onClick={resetToViewMode} disabled={saving}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+                                    {saving
+                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        : <><Save size={13} /> Update Statutory Records</>
+                                    }
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Sync Records */}
+                        <div style={{ marginTop: 32 }}>
+                            <h3 style={{ margin: '0 0 12px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Activity size={18} /> Synchronization Record
+                            </h3>
+                            {syncRecordsLoading ? (
+                                <div className="empty-state" style={{ padding: 24 }}>
+                                    <Loader2 size={18} className="spin" /><p>Loading sync records...</p>
+                                </div>
+                            ) : syncRecords.length === 0 ? (
+                                <div style={{ fontSize: 13, color: 'var(--text-secondary)', padding: '16px 0' }}>
+                                    No synchronization records yet. Submit the form to generate one.
+                                </div>
+                            ) : (
+                                <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Target System</th>
+                                            <th>Sync Timestamp</th>
+                                            <th>Sync Status</th>
+                                            <th>Error Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {syncRecords.map((r: any) => (
+                                            <tr key={r.syncRecordId ?? r.statutorySyncRecordId}>
+                                                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.targetSystem ?? 'FOMS'}</td>
+                                                <td style={{ fontSize: 12 }}>{r.syncTimestamp ? new Date(r.syncTimestamp).toLocaleString() : '—'}</td>
+                                                <td>
+                                                    <span className={`badge ${r.syncStatus === 'Successful' ? 'badge-green' : r.syncStatus === 'Failed' ? 'badge-red' : 'badge-amber'}`}>
+                                                        {r.syncStatus ?? 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.errorMessage || '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ─── Root Dashboard ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -2786,7 +3136,8 @@ export default function Dashboard() {
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
         delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
-        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment'
+        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment',
+        government_records: 'Government Records'
     };
 
     return (
@@ -2889,6 +3240,8 @@ export default function Dashboard() {
 
                 {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><Truck size={32} /><p>Delivery module coming soon.</p></div></div></div>}
                 {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><BarChart3 size={32} /><p>Analytics module coming soon.</p></div></div></div>}
+
+                {activeTab === 'government_records' && <GovernmentRecordsTab />}
 
                 {activeTab === 'emergency_override' && (
                     <EmergencyOverridesTab
