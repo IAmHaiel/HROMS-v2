@@ -9,5 +9,6 @@ namespace OTMS.Service.Interfaces
         Task<ApiResponseDTO<PaginationResponseDTO<ApplicantRecordDTO>>> GetDashboardApplicantsAsync(ApplicantDashboardFilterDTO filter);
         Task<ApiResponseDTO<string>> UpdateApplicantStatusAsync(UpdateApplicantStatusDTO request);
         Task<ApiResponseDTO<IEnumerable<ApplicantStatusHistoryDTO>>> GetApplicantStatusHistoryAsync(Guid applicantRecordId);
+        Task<ApiResponseDTO<string>> ScheduleInterviewAsync(InterviewSchedulingDTO request);
     }
 }

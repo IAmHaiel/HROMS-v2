@@ -41,5 +41,17 @@ namespace OTMS.Controllers
 
             return Ok(result);
         }
+
+        [HttpPost("schedule-interview")]
+        [Authorize(Policy = "Permissions.Recruitment.Manage")]
+        public async Task<IActionResult> ScheduleInterview([FromBody] InterviewSchedulingDTO request)
+        {
+            var result = await recruitmentService.ScheduleInterviewAsync(request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
     }
 }

@@ -18,7 +18,13 @@ import {
     Archive,
     Folder,
     RefreshCw,
-    Lock
+    Lock,
+    CreditCard,
+    Building2,
+    Smartphone,
+    Hash,
+    Banknote,
+    PhoneCall
 } from 'lucide-react';
 import './Digital201FileView.css';
 import { useToast } from '../../../components/Toast/Toast';
@@ -57,6 +63,17 @@ interface EmployeeAttachment {
     isArchived: boolean;
 }
 
+interface ComplianceData {
+    sssNumber: string;
+    philhealthNumber: string;
+    pagibigNumber: string;
+    tinNumber?: string;
+    bankName: string;
+    bankAccountNumber: string;
+    emergencyContactName: string;
+    emergencyContactNumber: string;
+}
+
 interface Digital201FileData {
     employeeNumber: string;
     firstName: string;
@@ -71,6 +88,7 @@ interface Digital201FileData {
     role: string;
     accountStatus: string;
     attachments: EmployeeAttachment[];
+    compliance?: ComplianceData | null;
 }
 
 interface Digital201FileViewProps {
@@ -451,6 +469,36 @@ export default function Digital201FileView({
                     Show Archived Documents
                 </label>
             </div>
+
+            {/* Compliance data section */}
+            {activeTab === 'compliance' && data?.compliance && (
+                <div className="d201-compliance-section" style={{ marginBottom: 20, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                        <Shield size={16} color="#065f46" />
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>Bio-Data & Compliance (Encrypted at Rest)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {[
+                            { icon: <Hash size={14} />, label: 'SSS Number', value: data.compliance.sssNumber },
+                            { icon: <Hash size={14} />, label: 'PhilHealth Number', value: data.compliance.philhealthNumber },
+                            { icon: <Hash size={14} />, label: 'Pag-IBIG Number', value: data.compliance.pagibigNumber },
+                            { icon: <Hash size={14} />, label: 'TIN', value: data.compliance.tinNumber || '—' },
+                            { icon: <Building2 size={14} />, label: 'Bank Name', value: data.compliance.bankName },
+                            { icon: <Banknote size={14} />, label: 'Bank Account', value: data.compliance.bankAccountNumber },
+                            { icon: <User size={14} />, label: 'Emergency Contact', value: data.compliance.emergencyContactName },
+                            { icon: <PhoneCall size={14} />, label: 'Emergency Number', value: data.compliance.emergencyContactNumber },
+                        ].map(({ icon, label, value }) => (
+                            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                                <div style={{ color: '#64748b', flexShrink: 0 }}>{icon}</div>
+                                <div>
+                                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                                    <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600 }}>{value}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Document list or empty state */}
             {currentTabAttachments.length === 0 ? (
