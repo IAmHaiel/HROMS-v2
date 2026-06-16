@@ -2672,151 +2672,164 @@ const GovernmentRecordsTab: React.FC = () => {
 
     return (
         <div className="dashboard-content">
-            <div className="card" style={{ padding: 24 }}>
-                <div className="field" style={{ marginBottom: 20 }}>
-                    <label>Select Employee</label>
-                    <select
-                        className="report-select"
-                        value={selectedEmployeeNumber}
-                        onChange={e => setSelectedEmployeeNumber(e.target.value)}
-                    >
-                        <option value="">— Choose an employee —</option>
-                        {employees.map(emp => (
-                            <option key={emp.employeeNumber} value={emp.employeeNumber}>
-                                {(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} ({emp.employeeNumber})
-                            </option>
-                        ))}
-                    </select>
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card-header-layout" style={{ padding: '20px 22px', borderBottom: '1px solid var(--border)' }}>
+                    <div className="field" style={{ margin: 0, flex: 1 }}>
+                        <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Select Employee</label>
+                        <select
+                            value={selectedEmployeeNumber}
+                            onChange={e => setSelectedEmployeeNumber(e.target.value)}
+                            style={{ marginTop: 6, width: '100%', maxWidth: 360, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', padding: '0 12px', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)' }}
+                        >
+                            <option value="">— Choose an employee —</option>
+                            {employees.map(emp => (
+                                <option key={emp.employeeNumber} value={emp.employeeNumber}>
+                                    {(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} ({emp.employeeNumber})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
-                {!selectedEmployeeNumber && (
-                    <div className="empty-state" style={{ padding: 32 }}>
-                        <ShieldCheck size={32} />
-                        <p>Select an employee to view or update their government records.</p>
-                    </div>
-                )}
+                <div style={{ padding: '20px 22px' }}>
+                    {!selectedEmployeeNumber && (
+                        <div className="empty-state" style={{ padding: '48px 0' }}>
+                            <ShieldCheck size={40} color="#cbd5e1" />
+                            <p style={{ fontSize: 15, color: '#64748b', marginTop: 12 }}>Select an employee to view or update their government records.</p>
+                        </div>
+                    )}
 
-                {selectedEmployeeNumber && fetchingData && (
-                    <div className="empty-state" style={{ padding: 32 }}>
-                        <Loader2 size={22} className="spin" />
-                        <p>Loading compliance data...</p>
-                    </div>
-                )}
+                    {selectedEmployeeNumber && fetchingData && (
+                        <div className="empty-state" style={{ padding: '48px 0' }}>
+                            <Loader2 size={24} className="spin" />
+                            <p style={{ fontSize: 14, color: '#64748b', marginTop: 10 }}>Loading compliance data...</p>
+                        </div>
+                    )}
 
-                {selectedEmployeeNumber && !fetchingData && (
-                    <>
-                        {apiError && (
-                            <div className="form-api-error" style={{ marginBottom: 14 }}>
-                                <AlertCircle size={14} /><span>{apiError}</span>
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <ShieldCheck size={18} /> Government IDs Form
-                            </h3>
-                            {!editMode && (
-                                <button className="btn btn-primary" onClick={() => setEditMode(true)}>
-                                    <Pencil size={13} /> Edit
-                                </button>
+                    {selectedEmployeeNumber && !fetchingData && (
+                        <>
+                            {apiError && (
+                                <div style={{ background: 'rgba(238,93,80,0.08)', borderRadius: 9, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#ee5d50', marginBottom: 16, border: '1px solid rgba(238,93,80,0.2)' }}>
+                                    <AlertCircle size={14} /><span>{apiError}</span>
+                                </div>
                             )}
-                        </div>
 
-                        <div className="field">
-                            <label>Employee ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated Reference)</span></label>
-                            <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
-                                <span className="if-icon"><Hash size={15} /></span>
-                                <input type="text" value={selectedEmployeeNumber} readOnly style={{ color: 'var(--text-secondary)' }} />
+                            <div className="card-header-layout" style={{ margin: 0 }}>
+                                <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <ShieldCheck size={18} /> Government IDs Form
+                                </h3>
+                                {!editMode && (
+                                    <button className="btn btn-primary" onClick={() => setEditMode(true)} style={{ fontSize: 12, padding: '6px 14px' }}>
+                                        <Pencil size={12} /> Edit
+                                    </button>
+                                )}
                             </div>
-                        </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-                            {(['sssNumber', 'philhealthNumber', 'pagibigNumber', 'tinNumber'] as const).map(field => (
-                                <div className="field" key={field}>
-                                    <label>
-                                        {field === 'sssNumber' ? 'SSS Number' :
-                                         field === 'philhealthNumber' ? 'PhilHealth Number' :
-                                         field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
-                                    </label>
-                                    {editMode ? (
-                                        <>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: 11, display: 'block', marginBottom: 2 }}>
-                                                Format: {FORMAT_LABELS[field]}
-                                            </span>
-                                            <input
-                                                type="text"
-                                                className={errors[field] ? 'report-input report-input-error' : 'report-input'}
-                                                value={form[field]}
-                                                onChange={e => handleFieldChange(field, e.target.value)}
-                                                placeholder={FORMAT_LABELS[field]}
-                                                maxLength={field === 'sssNumber' ? 12 : field === 'philhealthNumber' ? 14 : field === 'pagibigNumber' ? 14 : 14}
-                                            />
-                                            {errors[field] && <span className="report-field-error">{errors[field]}</span>}
-                                        </>
-                                    ) : (
-                                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'default' }}>
-                                            <span className="if-icon"><Hash size={15} /></span>
-                                            <input type="text" value={form[field] || '—'} readOnly style={{ color: 'var(--text-primary)' }} />
-                                        </div>
-                                    )}
+                            <div className="field" style={{ marginTop: 16 }}>
+                                <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>Employee ID <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(System Generated Reference)</span></label>
+                                <div style={{ position: 'relative', marginTop: 6 }}>
+                                    <Hash size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                                    <input type="text" value={selectedEmployeeNumber} readOnly
+                                        style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: '#f8fafc', color: 'var(--text-secondary)', boxSizing: 'border-box' }} />
                                 </div>
-                            ))}
-                        </div>
-
-                        {editMode && (
-                            <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-                                <button className="btn" onClick={resetToViewMode} disabled={saving}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
-                                    {saving
-                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
-                                        : <><Save size={13} /> Update Statutory Records</>
-                                    }
-                                </button>
                             </div>
-                        )}
 
-                        {/* Sync Records */}
-                        <div style={{ marginTop: 32 }}>
-                            <h3 style={{ margin: '0 0 12px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Activity size={18} /> Synchronization Record
-                            </h3>
-                            {syncRecordsLoading ? (
-                                <div className="empty-state" style={{ padding: 24 }}>
-                                    <Loader2 size={18} className="spin" /><p>Loading sync records...</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+                                {(['sssNumber', 'philhealthNumber', 'pagibigNumber', 'tinNumber'] as const).map(field => (
+                                    <div className="field" key={field}>
+                                        <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                            {field === 'sssNumber' ? 'SSS Number' :
+                                             field === 'philhealthNumber' ? 'PhilHealth Number' :
+                                             field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
+                                        </label>
+                                        {editMode ? (
+                                            <>
+                                                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 4, marginBottom: 4 }}>
+                                                    Format: {FORMAT_LABELS[field]}
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    value={form[field]}
+                                                    onChange={e => handleFieldChange(field, e.target.value)}
+                                                    placeholder={FORMAT_LABELS[field]}
+                                                    maxLength={field === 'sssNumber' ? 12 : field === 'philhealthNumber' ? 14 : field === 'pagibigNumber' ? 14 : 14}
+                                                    style={{
+                                                        width: '100%', height: 38, borderRadius: 9, padding: '0 12px', fontSize: 13,
+                                                        border: `1px solid ${errors[field] ? '#ee5d50' : '#e2e8f0'}`,
+                                                        background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)',
+                                                        boxSizing: 'border-box',
+                                                    }}
+                                                />
+                                                {errors[field] && <span style={{ fontSize: 11, color: '#ee5d50', marginTop: 4, display: 'block' }}>{errors[field]}</span>}
+                                            </>
+                                        ) : (
+                                            <div style={{ position: 'relative', marginTop: 6 }}>
+                                                <Hash size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                                                <input type="text" value={form[field] || '—'} readOnly
+                                                    style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: '#f8fafc', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {editMode && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+                                    <button className="btn" onClick={resetToViewMode} disabled={saving} style={{ fontSize: 12, padding: '6px 14px' }}>Cancel</button>
+                                    <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ fontSize: 12, padding: '6px 14px' }}>
+                                        {saving
+                                            ? <><Loader2 size={12} className="spin" /> Saving…</>
+                                            : <><Save size={12} /> Update Statutory Records</>
+                                        }
+                                    </button>
                                 </div>
-                            ) : syncRecords.length === 0 ? (
-                                <div style={{ fontSize: 13, color: 'var(--text-secondary)', padding: '16px 0' }}>
-                                    No synchronization records yet. Submit the form to generate one.
+                            )}
+
+                            {/* Sync Records */}
+                            <div style={{ marginTop: 32 }}>
+                                <div className="card-header-layout" style={{ margin: '0 0 16px' }}>
+                                    <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Activity size={18} /> Synchronization Record
+                                    </h3>
                                 </div>
-                            ) : (
-                                <table className="data-table" style={{ width: '100%', fontSize: 13 }}>
-                                    <thead>
-                                        <tr>
-                                            <th>Target System</th>
-                                            <th>Sync Timestamp</th>
-                                            <th>Sync Status</th>
-                                            <th>Error Message</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {syncRecords.map((r: any) => (
-                                            <tr key={r.syncRecordId ?? r.statutorySyncRecordId}>
-                                                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.targetSystem ?? 'FOMS'}</td>
-                                                <td style={{ fontSize: 12 }}>{r.syncTimestamp ? new Date(r.syncTimestamp).toLocaleString() : '—'}</td>
-                                                <td>
-                                                    <span className={`badge ${r.syncStatus === 'Successful' ? 'badge-green' : r.syncStatus === 'Failed' ? 'badge-red' : 'badge-amber'}`}>
-                                                        {r.syncStatus ?? 'Pending'}
-                                                    </span>
-                                                </td>
-                                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.errorMessage || '—'}</td>
+                                {syncRecordsLoading ? (
+                                    <div className="empty-state" style={{ padding: '32px 0' }}>
+                                        <Loader2 size={20} className="spin" /><p style={{ fontSize: 14, color: '#64748b', marginTop: 8 }}>Loading sync records...</p>
+                                    </div>
+                                ) : syncRecords.length === 0 ? (
+                                    <div style={{ fontSize: 13, color: '#64748b', padding: '16px 0' }}>
+                                        No synchronization records yet. Submit the form to generate one.
+                                    </div>
+                                ) : (
+                                    <table className="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Target System</th>
+                                                <th>Sync Timestamp</th>
+                                                <th>Sync Status</th>
+                                                <th>Error Message</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </>
-                )}
+                                        </thead>
+                                        <tbody>
+                                            {syncRecords.map((r: any) => (
+                                                <tr key={r.syncRecordId ?? r.statutorySyncRecordId}>
+                                                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.targetSystem ?? 'FOMS'}</td>
+                                                    <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{r.syncTimestamp ? new Date(r.syncTimestamp).toLocaleString() : '—'}</td>
+                                                    <td>
+                                                        <span className={`status-badge ${r.syncStatus === 'Successful' ? 'active' : r.syncStatus === 'Failed' ? 'deactivated' : 'pending-badge'}`}>
+                                                            {r.syncStatus ?? 'Pending'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{r.errorMessage || '—'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
