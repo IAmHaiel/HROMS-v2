@@ -34,6 +34,8 @@ import {
     Upload,
     File,
     Paperclip,
+    RotateCcw,
+    ThumbsUp,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -252,6 +254,13 @@ const MOCK_TASKS: Task[] = [
         priority: 'high', status: 'pending', progress: 0,
         assignedBy: 'Operations Admin',
     },
+    {
+        id: 'mock-006', name: 'Weekly Inventory Report - March',
+        description: 'Compile and submit the weekly inventory report for the first week of March. All entries have been verified and approved.',
+        deadline: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
+        priority: 'medium', status: 'completed', progress: 100,
+        assignedBy: 'Operations Admin',
+    },
 ];
 
 // ─── Nav Config ───────────────────────────────────────────────────────────────
@@ -375,6 +384,12 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForRevi
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
                                     <Shield size={13} /> Submitted for Admin Review
                                 </div>
+                            )}
+                            {task.status === 'completed' && (
+                                <button className="btn btn-primary" onClick={onSubmitForReview}
+                                    style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}>
+                                    <RotateCcw size={13} /> Request Reopen
+                                </button>
                             )}
                         </div>
                     </div>
@@ -1928,6 +1943,190 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     );
 };
 
+// ─── Reopen Request Modal ──────────────────────────────────────────────────────
+
+interface ReopenRequestModalProps {
+    task: Task;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, onSuccess }) => {
+    const [reason, setReason] = useState('');
+    const [evidence, setEvidence] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [dragActive, setDragActive] = useState(false);
+    const { success, error: showError } = useToast();
+
+    const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg', 'image/png'];
+    const MAX_SIZE = 20 * 1024 * 1024;
+
+    const handleFileChange = (file: File | null) => {
+        if (!file) { setEvidence(null); return; }
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            setError('Only PDF, DOCX, JPG, and PNG files are allowed.');
+            return;
+        }
+        if (file.size > MAX_SIZE) {
+            setError('File size must not exceed 20MB.');
+            return;
+        }
+        setEvidence(file);
+        setError('');
+    };
+
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); };
+    const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
+    const handleDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (e.dataTransfer.files.length > 0) handleFileChange(e.dataTransfer.files[0]); };
+
+    const handleSubmit = async () => {
+        if (!reason.trim()) { setError('Reopening reason is required.'); return; }
+        if (reason.trim().length > 500) { setError('Reopening reason must not exceed 500 characters.'); return; }
+        setError('');
+        setSaving(true);
+        try {
+            const formData = new FormData();
+            formData.append('Reason', reason.trim());
+            if (evidence) formData.append('SupportingEvidence', evidence);
+
+            const res = await fetch(`/api/task/${task.id}/reopen-request`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+                body: formData,
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to submit reopen request.');
+            }
+            success('Reopen request submitted successfully.');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            showError(err.message ?? 'Failed to submit reopen request.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                    <div>
+                        <h3>Request Task Reopening</h3>
+                        <p className="modal-sub">Submit a request to reopen this completed task.</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="field">
+                        <label>Task ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated Reference)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><Hash size={15} /></span>
+                            <input type="text" value={task.id} readOnly style={{ color: 'var(--text-secondary)' }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Task Title <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Display Field)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><ClipboardList size={15} /></span>
+                            <input type="text" value={task.name} readOnly style={{ color: 'var(--text-secondary)' }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Current Task Status <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Display Field)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><CheckCircle2 size={15} /></span>
+                            <input type="text" value="Completed" readOnly style={{ color: 'var(--status-success, #05cd99)', fontWeight: 600 }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Reason for Reopening <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                        <textarea
+                            className="leave-reason-textarea"
+                            rows={4}
+                            maxLength={500}
+                            placeholder="Explain why this task needs to be reopened..."
+                            value={reason}
+                            onChange={e => { setReason(e.target.value); setError(''); }}
+                        />
+                        <div className="leave-char-count" style={{ color: reason.length > 450 ? 'var(--status-failed)' : 'var(--text-muted)' }}>
+                            {reason.length} / 500
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Supporting Evidence <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/JPG/PNG, Max 20MB)</span></label>
+                        <div
+                            className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                        >
+                            <input
+                                type="file"
+                                id="reopen-evidence"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.docx,.jpg,.jpeg,.png"
+                                onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
+                            />
+                            {evidence ? (
+                                <div className="file-selected" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <File size={20} color="var(--primary)" />
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{evidence.name}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{(evidence.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                        </div>
+                                    </div>
+                                    <button type="button" className="icon-btn" onClick={() => setEvidence(null)} style={{ color: 'var(--status-failed)' }}><X size={16} /></button>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 8 }}>
+                                    <Upload size={28} color="var(--primary)" />
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, textAlign: 'center' }}>
+                                        Drag & drop a file here, or click to browse
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm"
+                                        onClick={e => { e.stopPropagation(); document.getElementById('reopen-evidence')?.click(); }}
+                                        style={{ marginTop: 8 }}
+                                    >
+                                        <Paperclip size={13} /> Choose File
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><RotateCcw size={13} /> Submit Reopen Request</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeDashboard() {
@@ -1941,6 +2140,7 @@ export default function EmployeeDashboard() {
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
     const [submittingForReviewId, setSubmittingForReviewId] = useState<string | null>(null);
+    const [reopeningId, setReopeningId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -2096,6 +2296,7 @@ export default function EmployeeDashboard() {
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
     const submittingForReviewTask = submittingForReviewId != null ? tasks.find(t => t.id === submittingForReviewId) ?? null : null;
+    const reopeningTask = reopeningId != null ? tasks.find(t => t.id === reopeningId) ?? null : null;
     const pendingLeaveCount = leaveRecords.filter(r => r.status === 'Pending').length;
     const initials = getInitials(user.fullName);
 
@@ -2225,7 +2426,14 @@ export default function EmployeeDashboard() {
                     task={viewingTask}
                     onUpdate={() => { setUpdatingId(viewingTask.id); setViewingId(null); }}
                     onClose={() => setViewingId(null)}
-                    onSubmitForReview={() => { setSubmittingForReviewId(viewingTask.id); setViewingId(null); }}
+                    onSubmitForReview={() => {
+                        if (viewingTask.status === 'completed') {
+                            setReopeningId(viewingTask.id);
+                        } else {
+                            setSubmittingForReviewId(viewingTask.id);
+                        }
+                        setViewingId(null);
+                    }}
                 />
             )}
             {updatingTask && (
@@ -2241,6 +2449,13 @@ export default function EmployeeDashboard() {
                     task={submittingForReviewTask}
                     onSave={handleSubmitForReview}
                     onClose={() => setSubmittingForReviewId(null)}
+                />
+            )}
+            {reopeningTask && (
+                <ReopenRequestModal
+                    task={reopeningTask}
+                    onClose={() => setReopeningId(null)}
+                    onSuccess={() => fetchTasks()}
                 />
             )}
         </div>

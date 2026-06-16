@@ -3962,7 +3962,8 @@ export default function OpsAdminDashboard() {
     const [leaveLoading, setLeaveLoading] = useState(false);
 
     // Reopen Requests state
-    const [reopenRequests, setReopenRequests] = useState<ReopenRequest[]>(MOCK_REOPEN_REQUESTS);
+    const [reopenRequests, setReopenRequests] = useState<ReopenRequest[]>([]);
+    const [reopenLoading, setReopenLoading] = useState(false);
     const [reviewingRequest, setReviewingRequest] = useState<ReopenRequest | null>(null);
 
     // Duplicate warning state
@@ -4114,6 +4115,35 @@ export default function OpsAdminDashboard() {
         }
     };
 
+    const fetchReopenRequests = async () => {
+        setReopenLoading(true);
+        try {
+            const res = await fetch('/api/task/reopen-requests', {
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) throw new Error();
+            const data: any[] = await res.json();
+            setReopenRequests(data.map((r: any) => ({
+                requestId: r.requestId,
+                taskId: r.taskId,
+                taskTitle: r.taskTitle,
+                employeeName: r.employeeName,
+                employeeId: r.employeeId,
+                reason: r.reason,
+                supportingEvidence: r.supportingEvidence,
+                currentStatus: r.currentStatus,
+                status: r.status,
+                submittedAt: r.submittedAt,
+                reviewedAt: r.reviewedAt,
+                adminRemarks: r.adminRemarks,
+            })));
+        } catch {
+            setReopenRequests([]);
+        } finally {
+            setReopenLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (USE_MOCK_DATA) {
             // ── Load mock data for smart task routing testing ──
@@ -4136,6 +4166,7 @@ export default function OpsAdminDashboard() {
         fetchBinRecords();
         fetchTeamMembers();
         fetchLeaveRecords();
+        fetchReopenRequests();
         const t = localStorage.getItem('authToken');
         if (!t) return;
         fetch('/api/profile/view-profile', {
@@ -4322,34 +4353,63 @@ export default function OpsAdminDashboard() {
 
     // ── Approve Reopen Request ──
     const handleApproveReopen = async (requestId: string, adminRemarks: string) => {
-        setReopenRequests(prev => prev.map(r =>
-            r.requestId === requestId
-                ? { ...r, status: 'Approved', adminRemarks, reviewedAt: new Date().toISOString() }
-                : r
-        ));
-        const req = reopenRequests.find(r => r.requestId === requestId);
-        if (req) {
-            try {
-                await fetch(`/api/task/${req.taskId}/reopen`, {
-                    method: 'PATCH',
-                    headers: { Authorization: `Bearer ${token()}` },
-                });
-                await fetchTasks();
-            } catch { /* non-critical */ }
+        try {
+            const res = await fetch(`/api/task/reopen-requests/${requestId}/review`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({
+                    ApprovalDecision: 'Approve',
+                    AdminRemarks: adminRemarks,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to approve reopen request.');
+            }
+            setReopenRequests(prev => prev.map(r =>
+                r.requestId === requestId
+                    ? { ...r, status: 'Approved', adminRemarks, reviewedAt: new Date().toISOString() }
+                    : r
+            ));
+            await fetchTasks();
+            setReviewingRequest(null);
+            success('Reopening request approved · Task reopened · Task history preserved · Audit Log entry generated.');
+        } catch (err: any) {
+            error(err.message ?? 'Failed to approve reopen request.');
         }
-        setReviewingRequest(null);
-        success('Reopening request approved · Task reopened · Task history preserved · Audit Log entry generated.');
     };
 
     // ── Reject Reopen Request ──
     const handleRejectReopen = async (requestId: string, adminRemarks: string) => {
-        setReopenRequests(prev => prev.map(r =>
-            r.requestId === requestId
-                ? { ...r, status: 'Rejected', adminRemarks, reviewedAt: new Date().toISOString() }
-                : r
-        ));
-        setReviewingRequest(null);
-        success('Reopening request rejected · Original task preserved · Audit Log entry generated.');
+        try {
+            const res = await fetch(`/api/task/reopen-requests/${requestId}/review`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({
+                    ApprovalDecision: 'Reject',
+                    AdminRemarks: adminRemarks,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to reject reopen request.');
+            }
+            setReopenRequests(prev => prev.map(r =>
+                r.requestId === requestId
+                    ? { ...r, status: 'Rejected', adminRemarks, reviewedAt: new Date().toISOString() }
+                    : r
+            ));
+            setReviewingRequest(null);
+            success('Reopening request rejected · Original task preserved · Audit Log entry generated.');
+        } catch (err: any) {
+            error(err.message ?? 'Failed to reject reopen request.');
+        }
     };
 
     const handleDeleteTask = (taskId: string) => {

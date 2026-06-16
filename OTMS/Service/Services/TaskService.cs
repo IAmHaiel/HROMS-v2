@@ -333,6 +333,24 @@ namespace OTMS.Service.Services
                 throw new Exception("Reopening reason is required.");
             }
 
+            if (request.Reason.Length > 500)
+            {
+                throw new Exception("Reopening reason must not exceed 500 characters.");
+            }
+
+            if (request.SupportingEvidence != null)
+            {
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png" };
+                if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
+                {
+                    throw new Exception("Only PDF, DOCX, JPG, and PNG files are allowed.");
+                }
+                if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
+                {
+                    throw new Exception("File size must not exceed 20MB.");
+                }
+            }
+
             bool canManageTasks = permissions.Contains("Permissions.Tasks.Manage");
             bool canViewTasks = permissions.Contains("Permissions.Tasks.View");
 
@@ -441,6 +459,11 @@ namespace OTMS.Service.Services
             if (string.IsNullOrWhiteSpace(request.AdminRemarks))
             {
                 throw new Exception("Admin remarks are required.");
+            }
+
+            if (request.AdminRemarks.Length > 500)
+            {
+                throw new Exception("Admin remarks must not exceed 500 characters.");
             }
 
             reopenReq.Status = request.ApprovalDecision;
@@ -584,6 +607,15 @@ namespace OTMS.Service.Services
 
             if (request.SupportingEvidence != null)
             {
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png" };
+                if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
+                {
+                    throw new Exception("Only PDF, DOCX, JPG, and PNG files are allowed.");
+                }
+                if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
+                {
+                    throw new Exception("File size must not exceed 20MB.");
+                }
                 task.ProgressEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
@@ -1175,6 +1207,44 @@ namespace OTMS.Service.Services
                 CreatedByEmployee = string.Join(" ", new[] { task.Creator.Employee.FirstName, task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = task.CreatedAt
             };
+        }
+
+        public async Task<List<ReopenRequestListDTO>> GetReopenRequestsAsync()
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
+            if (!permissions.Contains("Permissions.Tasks.Manage"))
+            {
+                throw new UnauthorizedAccessException("Only Operations Admin can view reopen requests.");
+            }
+
+            var requests = await context.TaskReopenRequests
+                .Include(r => r.Task)
+                .Include(r => r.RequestedBy)
+                    .ThenInclude(a => a.Employee)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ReopenRequestListDTO
+                {
+                    RequestId = r.RequestId,
+                    TaskId = r.TaskId,
+                    TaskTitle = r.Task.TaskTitle,
+                    EmployeeName = string.Join(" ", new[] { r.RequestedBy.Employee.FirstName, r.RequestedBy.Employee.MiddleName, r.RequestedBy.Employee.LastName, r.RequestedBy.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
+                    EmployeeId = r.RequestedBy.Employee.EmployeeNumber,
+                    Reason = r.Reason,
+                    SupportingEvidence = r.EvidenceUrl,
+                    CurrentStatus = r.Task.TaskStatus,
+                    Status = r.Status,
+                    SubmittedAt = r.CreatedAt,
+                    ReviewedAt = null,
+                    AdminRemarks = r.AdminRemarks
+                })
+                .ToListAsync();
+
+            return requests;
         }
 
         public async Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request)
