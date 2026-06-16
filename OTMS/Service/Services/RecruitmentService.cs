@@ -19,14 +19,15 @@ namespace OTMS.Service.Services
         IOnboardingService onboardingService
         ) : IRecruitmentService
     {
-        private static readonly string[] AllowedStatuses = { "Pending Review", "Interview Scheduled", "Job Offered", "Rejected" };
+        private static readonly string[] AllowedStatuses = { "Pending Review", "Interview Scheduled", "Job Offered", "Rejected", "Hired/Converted" };
 
         private static readonly Dictionary<string, string[]> ValidTransitions = new()
         {
             { "Pending Review", new[] { "Interview Scheduled", "Rejected" } },
             { "Interview Scheduled", new[] { "Job Offered", "Rejected" } },
-            { "Job Offered", new[] { "Rejected" } },
-            { "Rejected", Array.Empty<string>() }
+            { "Job Offered", new[] { "Rejected", "Hired/Converted" } },
+            { "Rejected", Array.Empty<string>() },
+            { "Hired/Converted", Array.Empty<string>() }
         };
 
         public async Task<ApiResponseDTO<PaginationResponseDTO<ApplicantRecordDTO>>> GetDashboardApplicantsAsync(ApplicantDashboardFilterDTO filter)

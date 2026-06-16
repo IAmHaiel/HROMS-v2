@@ -31,5 +31,6 @@ namespace OTMS.Common.Constraints
         public const string OnboardingLinkResent = "Onboarding Link Resent";
         public const string OnboardingCompleted = "Onboarding Completed";
         public const string Onboarding201FileSubmitted = "Onboarding 201 File Submitted";
+        public const string AccountProvisioned = "Account Provisioned";
     }
 }

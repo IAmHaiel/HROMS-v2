@@ -126,6 +126,7 @@ builder.Services.AddScoped<IPublicApplicationService, PublicApplicationService>(
 builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
 builder.Services.AddScoped<IRecruitmentService, RecruitmentService>();
 builder.Services.AddScoped<IOnboardingService, OnboardingService>();
+builder.Services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();
