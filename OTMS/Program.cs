@@ -110,6 +110,7 @@ builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 builder.Services.AddScoped<IRolesService, RolesService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IEmergencyOverrideService, EmergencyOverrideService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
