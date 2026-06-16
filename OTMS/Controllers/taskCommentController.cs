@@ -9,7 +9,7 @@ namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize(Policy = "Permissions.Tasks.View")]
     public class taskCommentController(ITaskCommentService taskCommentService) : ControllerBase
     {
         [HttpPost]
