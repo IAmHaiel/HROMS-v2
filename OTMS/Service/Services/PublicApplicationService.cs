@@ -135,20 +135,24 @@ namespace OTMS.Service.Services
 
         private async System.Threading.Tasks.Task DispatchApplicationNotificationAsync(ApplicantRecord applicant)
         {
-            var sysAdmin = await context.Accounts
+            var adminAccounts = await context.Accounts
                 .Include(a => a.Employee)
                 .Include(a => a.Role)
-                .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == Roles.SystemAdmin);
+                .Where(a => a.Role != null && (a.Role.Name == Roles.SystemAdmin || a.Role.Name == Roles.HRAdmin))
+                .ToListAsync();
 
-            if (sysAdmin == null) return;
+            if (adminAccounts.Count == 0) return;
 
             var notificationMessage = $"A new job application has been submitted by {applicant.FullName} ({applicant.EmailAddress}) for position {applicant.JobPosition.Title}. Status: {applicant.Status}.";
 
-            await notificationService.CreateGeneralNotificationAsync(
-                sysAdmin.AccountId,
-                NotificationTypes.ApplicationSubmitted,
-                notificationMessage
-            );
+            foreach (var admin in adminAccounts)
+            {
+                await notificationService.CreateGeneralNotificationAsync(
+                    admin.AccountId,
+                    NotificationTypes.ApplicationSubmitted,
+                    notificationMessage
+                );
+            }
         }
     }
 }
