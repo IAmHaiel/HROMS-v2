@@ -3,17 +3,20 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OTMS.Data;
 
 #nullable disable
 
-namespace OTMS.Migrations
+namespace OTMS.Data.Migrations
 {
     [DbContext(typeof(OTMSDbContext))]
-    partial class OTMSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260616022339_AddApprovalRoutingEngine")]
+    partial class AddApprovalRoutingEngine
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -227,9 +230,6 @@ namespace OTMS.Migrations
                     b.Property<int>("CurrentTierLevel")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("LastNotifiedAccountId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<string>("RequestType")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -250,13 +250,6 @@ namespace OTMS.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("StatusTrackingText")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("TotalTierCount")
-                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -684,49 +677,6 @@ namespace OTMS.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("Notifications");
-                });
-
-            modelBuilder.Entity("OTMS.Entities.Models.NotificationAuditLog", b =>
-                {
-                    b.Property<Guid>("AuditId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ApprovalRequestId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Channel")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("NotificationType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<Guid>("RecipientAccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("AuditId");
-
-                    b.HasIndex("ApprovalRequestId");
-
-                    b.HasIndex("RecipientAccountId");
-
-                    b.ToTable("NotificationAuditLogs");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Permission", b =>
@@ -1264,25 +1214,6 @@ namespace OTMS.Migrations
                     b.Navigation("Announcement");
 
                     b.Navigation("Task");
-                });
-
-            modelBuilder.Entity("OTMS.Entities.Models.NotificationAuditLog", b =>
-                {
-                    b.HasOne("OTMS.Entities.Models.ApprovalRequest", "ApprovalRequest")
-                        .WithMany()
-                        .HasForeignKey("ApprovalRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("OTMS.Entities.Models.Account", "Recipient")
-                        .WithMany()
-                        .HasForeignKey("RecipientAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ApprovalRequest");
-
-                    b.Navigation("Recipient");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.RolePermission", b =>

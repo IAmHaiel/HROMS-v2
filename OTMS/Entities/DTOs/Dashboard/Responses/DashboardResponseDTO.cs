@@ -11,5 +11,6 @@ namespace OTMS.Entities.DTOs.Dashboard.Responses
         public double AverageTasksPerEmployee { get; set; }
         public List<EmployeeWorkloadDTO> EmployeeWorkloadDistribution { get; set; } = new List<EmployeeWorkloadDTO>();
         public Dictionary<string, int> TaskAssignmentDistribution { get; set; } = new Dictionary<string, int>();
+        public List<WorkflowTrackerDTO> WorkflowTrackers { get; set; } = new List<WorkflowTrackerDTO>();
     }
 }
