@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Approval.Responses;
@@ -14,10 +15,11 @@ namespace OTMS.Service.Services
 {
     public class WorkloadDashboardService(
         OTMSDbContext context,
-        IApprovalRoutingEngine approvalEngine
+        IApprovalRoutingEngine approvalEngine,
+        IActivityLogService activityLogService
         ) : IWorkloadDashboardService
     {
-        public async Task<ApiResponseDTO<DashboardResponseDTO>> GetWorkloadDashboardAsync(DashboardFilterDTO filter)
+        public async Task<ApiResponseDTO<DashboardResponseDTO>> GetWorkloadDashboardAsync(DashboardFilterDTO filter, Guid accountId)
         {
             var query = context.Tasks
                 .Include(t => t.Assignee)
@@ -112,6 +114,8 @@ namespace OTMS.Service.Services
                 .GroupBy(t => t.TaskStatus)
                 .ToDictionary(g => g.Key, g => g.Count());
 
+            await activityLogService.LogActivityAsync(accountId, ActivityTypes.DashboardViewed, "Workload dashboard accessed");
+
             return new ApiResponseDTO<DashboardResponseDTO>
             {
                 IsSuccess = true,
@@ -123,6 +127,47 @@ namespace OTMS.Service.Services
         public async Task<ApiResponseDTO<List<WorkflowTrackerDTO>>> GetEmployeeWorkflowTrackersAsync(Guid accountId)
         {
             return await approvalEngine.GetMyTrackersAsync(accountId);
+        }
+
+        public async Task<ApiResponseDTO<List<EmployeeFilterDTO>>> GetFilterEmployeesAsync()
+        {
+            var employeeData = await context.Employees
+                .Where(e => e.Account != null && e.EmploymentStatus == "Active")
+                .OrderBy(e => e.LastName)
+                .ToListAsync();
+
+            var employees = employeeData.Select(e => new EmployeeFilterDTO
+            {
+                EmployeeId = e.EmployeeId,
+                EmployeeName = string.Join(" ", new[] { e.FirstName, e.MiddleName, e.LastName, e.Suffix }.Where(n => !string.IsNullOrEmpty(n)))
+            }).ToList();
+
+            return new ApiResponseDTO<List<EmployeeFilterDTO>>
+            {
+                IsSuccess = true,
+                Message = employees.Any() ? "Employees retrieved." : "No employees available.",
+                Data = employees
+            };
+        }
+
+        public async Task<ApiResponseDTO<List<DepartmentFilterDTO>>> GetFilterDepartmentsAsync()
+        {
+            var departments = await context.Departments
+                .Where(d => d.IsActive)
+                .OrderBy(d => d.Name)
+                .Select(d => new DepartmentFilterDTO
+                {
+                    DepartmentId = d.DepartmentId,
+                    DepartmentName = d.Name
+                })
+                .ToListAsync();
+
+            return new ApiResponseDTO<List<DepartmentFilterDTO>>
+            {
+                IsSuccess = true,
+                Message = departments.Any() ? "Departments retrieved." : "No departments available.",
+                Data = departments
+            };
         }
     }
 }
