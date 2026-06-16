@@ -16,6 +16,7 @@ namespace OTMS.Service.Interfaces
         Task<TaskResponseDTO> UpdateTaskProgressAsync(Guid taskId, UpdateTaskProgressDTO request);
         Task<TaskResponseDTO> ReviewTaskAsync(Guid taskId, ReviewTaskDTO request);
         Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request);
+        Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasksAsync(PaginationDTO pagination);
         Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request);
         Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId);
         Task<ApiResponseDTO<TaskResponseDTO>> RestoreTaskAsync(Guid taskId);

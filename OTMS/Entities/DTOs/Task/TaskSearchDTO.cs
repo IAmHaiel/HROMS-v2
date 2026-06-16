@@ -13,7 +13,5 @@ namespace OTMS.Entities.DTOs.Task
         public DateTime? DeadlineStartDate { get; set; }
         public DateTime? DeadlineEndDate { get; set; }
         
-        public string? SortBy { get; set; }
-        public string? SortOrder { get; set; } // "Ascending" or "Descending"
     }
 }

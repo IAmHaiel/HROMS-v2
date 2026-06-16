@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     ClipboardList,
     CheckCircle2,
@@ -769,7 +769,13 @@ const TasksTab: React.FC<{
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
     onNewTask: () => void;
-}> = ({ tasks, allTasks, binTasks, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
+    sortBy: string;
+    sortOrder: string;
+    onSortChange: (sortBy: string, sortOrder: string) => void;
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+}> = ({ tasks, allTasks, binTasks, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask, sortBy, sortOrder, onSortChange, currentPage, totalPages, onPageChange }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
@@ -805,10 +811,24 @@ const TasksTab: React.FC<{
                         </select>
                         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
                             <option value="">All Priorities</option>
+                            <option value="Critical">Critical</option>
                             <option value="High">High</option>
                             <option value="Medium">Medium</option>
                             <option value="Low">Low</option>
                         </select>
+                        <select value={sortBy} onChange={e => onSortChange(e.target.value, sortOrder)}
+                            style={{ borderLeft: '2px solid var(--border)', paddingLeft: 12, borderRadius: 0 }}>
+                            <option value="">Sort: Priority</option>
+                            <option value="deadline">Sort: Deadline</option>
+                            <option value="status">Sort: Status</option>
+                            <option value="title">Sort: Title</option>
+                        </select>
+                        {sortBy && (
+                            <button className="btn btn-sm" onClick={() => onSortChange(sortBy, sortOrder === 'Ascending' ? 'Descending' : 'Ascending')}
+                                style={{ fontSize: 11, padding: '4px 8px' }}>
+                                {sortOrder === 'Ascending' ? '▲ Asc' : '▼ Desc'}
+                            </button>
+                        )}
                     </>
                 ) : (
                     deletedTasks.length > 0 ? (
@@ -833,6 +853,9 @@ const TasksTab: React.FC<{
                 loading={loading}
                 emptyIcon={subTab === 'bin' ? <Trash2 size={24} /> : <Package size={20} />}
                 emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No tasks match filters'}
+                currentPage={subTab === 'active' ? currentPage : undefined}
+                totalPages={subTab === 'active' ? totalPages : undefined}
+                onPageChange={subTab === 'active' ? onPageChange : undefined}
             >
                 {subTab === 'active' ? (
                     <div style={{ padding: '0 20px 20px' }}>
@@ -2007,37 +2030,66 @@ export default function OpsAdminDashboard() {
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); 
     const [binTasks, setBinTasks] = useState<Task[]>([]);
 
+    // Pagination & sort state
+    const [taskPage, setTaskPage] = useState(1);
+    const [taskTotalPages, setTaskTotalPages] = useState(1);
+    const [taskTotalRecords, setTaskTotalRecords] = useState(0);
+    const [taskSortBy, setTaskSortBy] = useState('');
+    const [taskSortOrder, setTaskSortOrder] = useState('Descending');
+    const TASK_PAGE_SIZE = 20;
+
     // Fetch Leave records
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
 
     // ── Update fetchTasks ──
-    const fetchTasks = async () => {
+    const fetchTasks = useCallback(async (page?: number, sortBy?: string, sortOrder?: string) => {
         setLoadingTasks(true);
         try {
-            const res = await fetch('/api/task/all-tasks', {
+            const p = page ?? taskPage;
+            const sb = sortBy ?? taskSortBy;
+            const so = sortOrder ?? taskSortOrder;
+            const params = new URLSearchParams();
+            params.append('pageNumber', String(p));
+            params.append('pageSize', String(TASK_PAGE_SIZE));
+            if (sb) params.append('sortBy', sb);
+            if (so) params.append('sortOrder', so);
+            const res = await fetch(`/api/task/all-tasks?${params}`, {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: any[] = await res.json();
-            console.log('Raw API response:', JSON.stringify(data[0])); // inspect first task's raw shape
+            const body = await res.json();
+            const paginatedData = body?.data;
+            const tasksList: any[] = paginatedData?.data ?? paginatedData ?? [];
 
-            // Normalize: map Deleted → deleted regardless of casing
-            const normalized: Task[] = data.map(t => ({
+            const normalized: Task[] = tasksList.map(t => ({
                 ...t,
                 deleted: deletedTaskIds.has(t.taskId),
             }));
 
-            console.log('Tasks with deleted flags:', normalized.map(t => ({ title: t.taskTitle, deleted: t.deleted })));
-
             setAllTasks(normalized);
             setTasks(normalized.filter(t => !t.deleted));
+            setTaskTotalPages(paginatedData?.totalPages ?? 1);
+            setTaskTotalRecords(paginatedData?.totalRecords ?? 0);
+            setTaskPage(p);
         } catch {
             setAllTasks([]);
             setTasks([]);
         } finally {
             setLoadingTasks(false);
         }
+    }, [taskPage, taskSortBy, taskSortOrder, deletedTaskIds]);
+
+    const handleTaskSort = (sortBy: string, sortOrder: string) => {
+        setTaskSortBy(sortBy);
+        setTaskSortOrder(sortOrder);
+        setTaskPage(1);
+        fetchTasks(1, sortBy, sortOrder);
+    };
+
+    const handleTaskPageChange = (page: number) => {
+        setTaskPage(page);
+        fetchTasks(page);
     };
 
     const fetchBinRecords = async () => {
@@ -2435,6 +2487,12 @@ export default function OpsAdminDashboard() {
                         onRestore={handleRestoreTask}
                         onEmptyBin={handleEmptyBin}
                         onNewTask={() => setShowNew(true)}
+                        sortBy={taskSortBy}
+                        sortOrder={taskSortOrder}
+                        onSortChange={handleTaskSort}
+                        currentPage={taskPage}
+                        totalPages={taskTotalPages}
+                        onPageChange={handleTaskPageChange}
                     />
                 )}
                 {activeTab === 'team' && (

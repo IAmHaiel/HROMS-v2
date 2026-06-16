@@ -26,5 +26,6 @@ namespace OTMS.Common.Constraints
         public const string ApprovalTierRejected = "Approval Tier Rejected";
         public const string ApprovalRequestFullyApproved = "Approval Request Fully Approved";
         public const string ApprovalRequestRouted = "Approval Request Routed";
+        public const string TaskSorted = "Task Sorted";
     }
 }

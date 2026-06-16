@@ -227,54 +227,18 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpGet("all-tasks")]
-        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasks([FromServices] OTMSDbContext context, [FromQuery] PaginationDTO pagination)
+        public async Task<ActionResult<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>>> GetAllTasks([FromQuery] PaginationDTO pagination)
         {
             try
             {
-                var query = context.Tasks
-                    .Include(t => t.Assignee)
-                        .ThenInclude(a => a.Employee)
-                    .Include(t => t.Creator)
-                        .ThenInclude(c => c.Employee)
-                    .Where(t => !t.Deleted && !t.PermanentlyDeleted)
-                    .OrderByDescending(t => t.Priority == "Critical" ? 4 :
-                                            t.Priority == "High" ? 3 :
-                                            t.Priority == "Medium" ? 2 :
-                                            t.Priority == "Low" ? 1 : 0)
-                    .ThenBy(t => t.DueAt);
+                var result = await taskService.GetAllTasksAsync(pagination);
 
-                var totalRecords = await query.CountAsync();
-
-                var data = await query
-                    .Skip((pagination.PageNumber - 1) * pagination.PageSize)
-                    .Take(pagination.PageSize)
-                    .Select(t => new TaskResponseDTO
-                    {
-                        TaskId = t.TaskId,
-                        TaskTitle = t.TaskTitle,
-                        TaskDescription = t.TaskDescription,
-                        Priority = t.Priority,
-                        DueAt = t.DueAt,
-                        TaskStatus = t.TaskStatus,
-                        AssignedEmployee = string.Join(" ", new[]
-                            {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                        CreatedByEmployee = string.Join(" ", new[]
-                            {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                        CreatedAt = t.CreatedAt
-                    }).ToListAsync();
-
-                return Ok(new PaginationResponseDTO<TaskResponseDTO>
+                if (!result.IsSuccess)
                 {
-                    IsSuccess = true,
-                    Message = "Tasks retrieved successfully",
-                    Data = data,
-                    PageNumber = pagination.PageNumber,
-                    PageSize = pagination.PageSize,
-                    TotalRecords = totalRecords,
-                    TotalPages = (int)Math.Ceiling(totalRecords / (double)pagination.PageSize)
-                });
+                    return BadRequest(result);
+                }
 
-
+                return Ok(result);
             }
             catch (Exception ex)
             {
