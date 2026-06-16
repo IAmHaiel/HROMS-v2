@@ -340,10 +340,10 @@ namespace OTMS.Service.Services
 
             if (request.SupportingEvidence != null)
             {
-                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png" };
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/jpeg", "image/png" };
                 if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
                 {
-                    throw new Exception("Only PDF, DOCX, JPG, and PNG files are allowed.");
+                    throw new Exception("Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.");
                 }
                 if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
                 {
@@ -605,12 +605,22 @@ namespace OTMS.Service.Services
                 task.ProgressNotes = request.ProgressNotes;
             }
 
+            if (!string.IsNullOrWhiteSpace(request.ProgressNotes) && request.ProgressNotes.Length > 1000)
+            {
+                throw new Exception("Progress notes must not exceed 1000 characters.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.TaskRemarks) && request.TaskRemarks.Length > 1000)
+            {
+                throw new Exception("Remarks must not exceed 1000 characters.");
+            }
+
             if (request.SupportingEvidence != null)
             {
-                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png" };
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/jpeg", "image/png" };
                 if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
                 {
-                    throw new Exception("Only PDF, DOCX, JPG, and PNG files are allowed.");
+                    throw new Exception("Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.");
                 }
                 if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
                 {
