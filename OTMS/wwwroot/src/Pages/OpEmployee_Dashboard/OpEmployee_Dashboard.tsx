@@ -940,9 +940,15 @@ interface MyTasksTabProps {
     onView: (id: string) => void;
     onUpdate: (id: string) => void;
     onRetry: () => void;
+    sortBy: string;
+    sortOrder: string;
+    onSortChange: (sortBy: string, sortOrder: string) => void;
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
 }
 
-const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, onUpdate, onRetry }) => {
+const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, onUpdate, onRetry, sortBy, sortOrder, onSortChange, currentPage, totalPages, onPageChange }) => {
     const [filter, setFilter] = useState<'all' | TaskStatus>('all');
 
     const filters: { key: 'all' | TaskStatus; label: string; count: number }[] = [
@@ -1011,6 +1017,21 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
                         {f.label}<span className="fp-count">{f.count}</span>
                     </button>
                 ))}
+                <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                    <select value={sortBy} onChange={e => onSortChange(e.target.value, sortOrder)}
+                        style={{ fontSize: 12, padding: '4px 8px', border: '1.5px solid var(--border)', borderRadius: 6, background: '#fff', outline: 'none', fontFamily: 'inherit' }}>
+                        <option value="">Sort: Priority</option>
+                        <option value="deadline">Sort: Deadline</option>
+                        <option value="status">Sort: Status</option>
+                        <option value="title">Sort: Title</option>
+                    </select>
+                    {sortBy && (
+                        <button className="btn btn-sm" onClick={() => onSortChange(sortBy, sortOrder === 'Ascending' ? 'Descending' : 'Ascending')}
+                            style={{ fontSize: 11, padding: '4px 8px' }}>
+                            {sortOrder === 'Ascending' ? '▲ Asc' : '▼ Desc'}
+                        </button>
+                    )}
+                </div>
             </div>
             {sorted.length === 0 ? (
                 <div className="card">
@@ -1019,6 +1040,20 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             ) : (
                 <div className="task-grid">
                     {sorted.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
+                </div>
+            )}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 16, padding: '8px 0' }}>
+                    <button className="btn btn-sm" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)} style={{ opacity: currentPage <= 1 ? 0.4 : 1 }}>‹ Prev</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                        <button key={p}
+                            className={`btn btn-sm${p === currentPage ? ' btn-primary' : ''}`}
+                            onClick={() => onPageChange(p)}
+                            style={{ minWidth: 32, fontWeight: p === currentPage ? 700 : 400 }}>
+                            {p}
+                        </button>
+                    ))}
+                    <button className="btn btn-sm" disabled={currentPage >= totalPages} onClick={() => onPageChange(currentPage + 1)} style={{ opacity: currentPage >= totalPages ? 0.4 : 1 }}>Next ›</button>
                 </div>
             )}
         </div>
@@ -2190,22 +2225,54 @@ export default function EmployeeDashboard() {
         navigate('/');
     };
 
-    const fetchTasks = async () => {
+    const [taskPage, setTaskPage] = useState(1);
+    const [taskTotalPages, setTaskTotalPages] = useState(1);
+    const [taskTotalRecords, setTaskTotalRecords] = useState(0);
+    const [taskSortBy, setTaskSortBy] = useState('');
+    const [taskSortOrder, setTaskSortOrder] = useState('Descending');
+    const TASK_PAGE_SIZE = 20;
+
+    const fetchTasks = async (page?: number, sortBy?: string, sortOrder?: string) => {
         setTasksLoading(true);
         setTasksError('');
         try {
-            const res = await fetch('/api/task/my-tasks', { headers: authHeader() });
+            const p = page ?? taskPage;
+            const sb = sortBy ?? taskSortBy;
+            const so = sortOrder ?? taskSortOrder;
+            const params = new URLSearchParams();
+            params.append('pageNumber', String(p));
+            params.append('pageSize', String(TASK_PAGE_SIZE));
+            if (sb) params.append('sortBy', sb);
+            if (so) params.append('sortOrder', so);
+            const res = await fetch(`/api/task/my-tasks?${params}`, { headers: authHeader() });
             if (res.status === 401) { handleLogout(); return; }
             if (!res.ok) {
                 throw new Error(`API error (${res.status})`);
             }
-            const data: TaskResponseDTO[] = await res.json();
-            setTasks(data.map(dtoToTask));
-        } catch {
-            setTasks(MOCK_TASKS);
+            const body = await res.json();
+            const paginatedData = body?.data ?? body;
+            const tasksList: any[] = paginatedData?.data ?? [];
+            setTasks(tasksList.map(dtoToTask));
+            setTaskTotalPages(paginatedData?.totalPages ?? 1);
+            setTaskTotalRecords(paginatedData?.totalRecords ?? 0);
+            setTaskPage(p);
+        } catch (err: any) {
+            setTasksError(err.message ?? 'Unable to load tasks. Check your connection and try again.');
         } finally {
             setTasksLoading(false);
         }
+    };
+
+    const handleTaskSort = (sortBy: string, sortOrder: string) => {
+        setTaskSortBy(sortBy);
+        setTaskSortOrder(sortOrder);
+        setTaskPage(1);
+        fetchTasks(1, sortBy, sortOrder);
+    };
+
+    const handleTaskPageChange = (page: number) => {
+        setTaskPage(page);
+        fetchTasks(page);
     };
 
     const fetchLeaveRecords = async () => {
@@ -2421,7 +2488,13 @@ export default function EmployeeDashboard() {
                     <MyTasksTab
                         tasks={tasks} loading={tasksLoading} error={tasksError}
                         onView={setViewingId} onUpdate={setUpdatingId}
-                        onRetry={fetchTasks}
+                        onRetry={() => fetchTasks()}
+                        sortBy={taskSortBy}
+                        sortOrder={taskSortOrder}
+                        onSortChange={handleTaskSort}
+                        currentPage={taskPage}
+                        totalPages={taskTotalPages}
+                        onPageChange={handleTaskPageChange}
                     />
                 )}
                 {activeTab === 'leave' && (

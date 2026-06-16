@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Task = System.Threading.Tasks.Task;
 using OTMS.Common.Constraints;
 using OTMS.Common.Exceptions;
 using OTMS.Common.Helpers;
@@ -735,12 +736,9 @@ namespace OTMS.Service.Services
                             || t.CreatedBy == loggedInAccountId
                         )
                         && !t.Deleted
-                        && !t.PermanentlyDeleted)
-                .OrderByDescending(t => t.Priority == "Critical" ? 4 :
-                                        t.Priority == "High" ? 3 :
-                                        t.Priority == "Medium" ? 2 :
-                                        t.Priority == "Low" ? 1 : 0)
-                .ThenBy(t => t.DueAt);
+                        && !t.PermanentlyDeleted);
+
+            query = ApplySorting(query, request);
 
             var totalRecords = await query.CountAsync();
 
@@ -764,6 +762,8 @@ namespace OTMS.Service.Services
                     IsDeleted = t.Deleted
                 }).ToListAsync();
 
+            await LogSortActivity(loggedInAccountId, request);
+
             return new PaginationResponseDTO<TaskResponseDTO>
             {
                 IsSuccess = true,
@@ -775,6 +775,114 @@ namespace OTMS.Service.Services
                 TotalPages = (int)Math.Ceiling((double)totalRecords / request.PageSize)
             };
 
+        }
+
+        public async Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> GetAllTasksAsync(PaginationDTO pagination)
+        {
+            var accountIdClaim = httpContextAccessor
+                .HttpContext?
+                .User
+                .FindFirst(ClaimTypes.NameIdentifier)?
+                .Value;
+
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+
+            var query = context.Tasks
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                .Include(t => t.Creator)
+                    .ThenInclude(c => c.Employee)
+                .Where(t => !t.Deleted && !t.PermanentlyDeleted);
+
+            query = ApplySorting(query, pagination);
+
+            var totalRecords = await query.CountAsync();
+
+            var data = await query
+                .Skip((pagination.PageNumber - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .Select(t => new TaskResponseDTO
+                {
+                    TaskId = t.TaskId,
+                    TaskTitle = t.TaskTitle,
+                    TaskDescription = t.TaskDescription,
+                    Priority = t.Priority,
+                    DueAt = t.DueAt,
+                    TaskStatus = t.TaskStatus,
+                    AssignedEmployee = string.Join(" ", new[]
+                        {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    CreatedByEmployee = string.Join(" ", new[]
+                        {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    CreatedAt = t.CreatedAt
+                }).ToListAsync();
+
+            await LogSortActivity(loggedInAccountId, pagination);
+
+            return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Tasks retrieved successfully.",
+                Data = new PaginationResponseDTO<TaskResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Tasks retrieved successfully.",
+                    Data = data,
+                    PageNumber = pagination.PageNumber,
+                    PageSize = pagination.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling((double)totalRecords / pagination.PageSize)
+                }
+            };
+        }
+
+        private static IQueryable<Entities.Models.Task> ApplySorting(IQueryable<Entities.Models.Task> query, PaginationDTO request)
+        {
+            bool isDescending = string.Equals(request.SortOrder, "Descending", StringComparison.OrdinalIgnoreCase);
+
+            switch (request.SortBy?.ToLower())
+            {
+                case "deadline":
+                    query = isDescending
+                        ? query.OrderByDescending(t => t.DueAt)
+                        : query.OrderBy(t => t.DueAt);
+                    break;
+                case "status":
+                    query = isDescending
+                        ? query.OrderByDescending(t => t.TaskStatus)
+                        : query.OrderBy(t => t.TaskStatus);
+                    break;
+                case "title":
+                    query = isDescending
+                        ? query.OrderByDescending(t => t.TaskTitle)
+                        : query.OrderBy(t => t.TaskTitle);
+                    break;
+                case "assigned employee":
+                    query = isDescending
+                        ? query.OrderByDescending(t => t.Assignee.Employee.FirstName)
+                        : query.OrderBy(t => t.Assignee.Employee.FirstName);
+                    break;
+                default:
+                    query = query.OrderByDescending(t => t.Priority == "Critical" ? 4 :
+                                                          t.Priority == "High" ? 3 :
+                                                          t.Priority == "Medium" ? 2 :
+                                                          t.Priority == "Low" ? 1 : 0)
+                                 .ThenBy(t => t.DueAt);
+                    break;
+            }
+
+            return query;
+        }
+
+        private async Task LogSortActivity(Guid accountId, PaginationDTO request)
+        {
+            var sortBy = string.IsNullOrEmpty(request.SortBy) ? "priority" : request.SortBy;
+            var sortOrder = string.IsNullOrEmpty(request.SortOrder) ? "Descending" : request.SortOrder;
+            await activityLogService.LogActivityAsync(accountId, ActivityTypes.TaskSorted, $"Tasks sorted by {sortBy} in {sortOrder} order");
         }
 
         public async Task<TaskDeleteResponseDTO> DeleteTaskAsync(Guid taskId)
