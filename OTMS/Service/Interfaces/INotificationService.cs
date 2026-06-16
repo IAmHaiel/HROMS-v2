@@ -26,5 +26,6 @@ namespace OTMS.Service.Interfaces
         System.Threading.Tasks.Task DispatchApproverNotificationAsync(Guid approverAccountId, ApprovalRequest request);
         System.Threading.Tasks.Task DispatchRequesterNotificationAsync(Guid requesterAccountId, ApprovalRequest request, string outcome);
         System.Threading.Tasks.Task LogNotificationDispatchAsync(Guid approvalRequestId, Guid recipientId, string notificationType, string channel, string status, string? errorMessage = null);
+        System.Threading.Tasks.Task<bool> SendEmailWithStatusAsync(string toEmail, string subject, string body);
     }
 }

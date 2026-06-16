@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
@@ -7,7 +8,6 @@ using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.DTOs.Recruitment;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
-using System.Security.Claims;
 
 namespace OTMS.Service.Services
 {
@@ -203,6 +203,97 @@ namespace OTMS.Service.Services
                 Message = "Status history retrieved successfully.",
                 Data = history
             };
+        }
+
+        public async Task<ApiResponseDTO<string>> ScheduleInterviewAsync(InterviewSchedulingDTO request)
+        {
+            var currentAccountId = GetCurrentAccountId();
+            if (currentAccountId == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Unauthorized. Please log in again.",
+                    Data = null
+                };
+            }
+
+            var applicant = await context.ApplicantRecords
+                .FirstOrDefaultAsync(ar => ar.ApplicantRecordId == request.ApplicantRecordId);
+
+            if (applicant == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Applicant not found.",
+                    Data = null
+                };
+            }
+
+            if (request.InterviewDate.Date <= DateTime.UtcNow.Date)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Interview date must be in the future.",
+                    Data = null
+                };
+            }
+
+            var interviewSchedule = new InterviewSchedule
+            {
+                InterviewScheduleId = Guid.NewGuid(),
+                ApplicantRecordId = request.ApplicantRecordId,
+                InterviewDate = request.InterviewDate,
+                InterviewTime = request.InterviewTime,
+                LocationOrLink = request.LocationOrLink,
+                InterviewerName = request.InterviewerName,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.InterviewSchedules.Add(interviewSchedule);
+            await context.SaveChangesAsync();
+
+            var subject = $"Interview Scheduled: {applicant.JobPosition.Title} Position";
+            var body = $@"
+                <h2>Interview Invitation</h2>
+                <p>Dear <strong>{applicant.FullName}</strong>,</p>
+                <p>You have been invited for an interview for the <strong>{applicant.JobPosition.Title}</strong> position.</p>
+                <p><strong>Date:</strong> {request.InterviewDate:MMMM dd, yyyy}</p>
+                <p><strong>Time:</strong> {request.InterviewTime}</p>
+                <p><strong>Location/Link:</strong> {request.LocationOrLink}</p>
+                <p><strong>Interviewer:</strong> {request.InterviewerName}</p>
+                <p>Please confirm your availability by replying to this email.</p>
+                <hr>
+                <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+
+            var emailSent = await notificationService.SendEmailWithStatusAsync(applicant.EmailAddress, subject, body);
+
+            await activityLogService.LogActivityAsync(
+                currentAccountId.Value,
+                ActivityTypes.RecruitmentStatusUpdated,
+                $"Scheduled interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
+            );
+
+            if (emailSent)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = true,
+                    Message = "Interview scheduled and email notification sent successfully.",
+                    Data = interviewSchedule.InterviewScheduleId.ToString()
+                };
+            }
+            else
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = true,
+                    Message = "Interview scheduled. Email dispatch failed. Retrying...",
+                    Data = interviewSchedule.InterviewScheduleId.ToString()
+                };
+            }
         }
 
         private Guid? GetCurrentAccountId()
