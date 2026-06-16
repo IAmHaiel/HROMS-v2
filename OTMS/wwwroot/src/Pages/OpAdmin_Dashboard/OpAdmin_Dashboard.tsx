@@ -124,6 +124,7 @@ interface CreateTaskDTO {
     priority: Priority;
     dueAt: string | null;
     assignedTo: string;      // accountId Guid
+    recommendedEmployeeId?: string;
     IsDuplicateAcknowledged?: boolean;
 }
 
@@ -606,6 +607,9 @@ interface WorkloadInfo {
     accountId: string;
     availabilityStatus: string;
     workload: number;
+    role: string;
+    isRecommended: boolean;
+    recommendationReason: string;
 }
 
 interface Recommendation {
@@ -650,30 +654,43 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
 
     useEffect(() => {
         if (mode !== 'new') return;
-        const eligible = teamMembers.filter(m =>
-            m.presenceStatus !== 'Offline' && m.presenceStatus !== 'On Leave'
-        );
-        const withWorkload = eligible.map(m => ({
-            employeeName: m.employeeName,
-            accountId: m.accountId,
-            availabilityStatus: m.presenceStatus || 'Active',
-            workload: tasks.filter(t =>
-                t.assignedEmployee === m.employeeName &&
-                t.taskStatus !== 'Completed'
-            ).length,
-        }));
-        withWorkload.sort((a, b) => a.workload - b.workload);
-        setEligibleEmployees(withWorkload);
-        if (withWorkload.length > 0) {
-            const best = withWorkload[0];
-            setRecommendation({
-                ...best,
-                reason: `Lowest active workload (${best.workload} tasks) among eligible team members. Availability: ${best.availabilityStatus}.`,
-            });
-            if (resolvedAssignedTo === '') {
-                setForm(prev => ({ ...prev, assignedTo: best.accountId }));
+        const fetchRecommendations = async () => {
+            try {
+                const token = localStorage.getItem('authToken');
+                const res = await fetch('/api/task/assignable-employees?pageNumber=1&pageSize=50', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (json.isSuccess && json.data?.data) {
+                    const mapped: WorkloadInfo[] = json.data.data.map((emp: any) => ({
+                        employeeName: emp.displayName.replace(/ \(\d+ tasks\)( - Recommended)?$/, ''),
+                        accountId: emp.accountId,
+                        availabilityStatus: emp.availabilityStatus || 'Active',
+                        workload: emp.activeTaskCount,
+                        role: emp.role,
+                        isRecommended: emp.isRecommended,
+                        recommendationReason: emp.recommendationReason,
+                    }));
+                    setEligibleEmployees(mapped);
+                    const recommended = mapped.find(e => e.isRecommended);
+                    if (recommended) {
+                        setRecommendation({
+                            employeeName: recommended.employeeName,
+                            accountId: recommended.accountId,
+                            availabilityStatus: recommended.availabilityStatus,
+                            workload: recommended.workload,
+                            reason: recommended.recommendationReason,
+                        });
+                        if (resolvedAssignedTo === '') {
+                            setForm(prev => ({ ...prev, assignedTo: recommended.accountId }));
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch smart routing recommendations:', err);
             }
-        }
+        };
+        fetchRecommendations();
     }, []);
 
     // ── Per-field live validator ──────────────────────────────────────────
@@ -742,6 +759,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
             priority: form.priority,
             dueAt: form.dueAt || null,
             assignedTo: form.assignedTo,
+            recommendedEmployeeId: recommendation?.accountId || undefined,
             taskRemarks: form.taskRemarks.trim() || undefined,
         });
         if (mode === 'new' && showSuccess) {
