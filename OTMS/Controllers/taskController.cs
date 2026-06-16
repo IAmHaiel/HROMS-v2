@@ -172,6 +172,24 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
+        /// Gets all reopen requests for review by Operations Admin.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpGet("reopen-requests")]
+        public async Task<ActionResult<List<ReopenRequestListDTO>>> GetReopenRequests()
+        {
+            try
+            {
+                var result = await taskService.GetReopenRequestsAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// System/Operations Admin overrides a "Completed" task, providing reasons and unlocking its status.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
@@ -266,7 +284,7 @@ namespace OTMS.Controllers
                 {
                     return Ok(result.Data);
                 }
-                
+
                 return BadRequest(new { message = result.Message });
             }
             catch (Exception ex)

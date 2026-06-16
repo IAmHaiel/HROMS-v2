@@ -16,6 +16,7 @@ import EmailVerificationPage from './Pages/email_verification_page/email_verific
 import { ToastProvider } from './components/Toast/Toast'
 import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
 import OnboardingPage from './Pages/onboarding_page/onboarding_page'
+import PublicApplicationPortal from './Pages/public_application_portal/public_application_portal'
 
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="/change-password" element={<ChangePassword />} />
                     <Route path="/verify-email" element={<EmailVerificationPage />} />
                     <Route path="/onboarding" element={<OnboardingPage />} />
+                    <Route path="/apply" element={<PublicApplicationPortal />} />
 
                     {/* System Admin routes */}
                     <Route element={<ProtectedRoute allowedRoles={['System Admin', 'SystemAdmin']} />}>

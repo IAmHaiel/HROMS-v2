@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -10,8 +12,6 @@ using OTMS.Entities.DTOs.Pagination;
 using OTMS.Entities.DTOs.Pagination.Response;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
-using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
@@ -29,9 +29,9 @@ namespace OTMS.Service.Services
             return account?.Employee?.Email ?? string.Empty;
         }
 
-        private async System.Threading.Tasks.Task SendEmailAsync(string toEmail, string subject, string body)
+        private async System.Threading.Tasks.Task<bool> SendEmailAsync(string toEmail, string subject, string body)
         {
-            if (string.IsNullOrWhiteSpace(toEmail)) return;
+            if (string.IsNullOrWhiteSpace(toEmail)) return false;
 
             try
             {
@@ -58,10 +58,11 @@ namespace OTMS.Service.Services
                 await client.AuthenticateAsync(account, password);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
+                return true;
             }
             catch
             {
-                // Silently fail - email delivery failure should not break the flow
+                return false;
             }
         }
 
@@ -69,6 +70,28 @@ namespace OTMS.Service.Services
         {
             var email = await GetEmployeeEmailAsync(accountId);
             await SendEmailAsync(email, subject, body);
+        }
+
+        public async System.Threading.Tasks.Task<bool> SendEmailWithStatusAsync(string toEmail, string subject, string body)
+        {
+            var sent = await SendEmailAsync(toEmail, subject, body);
+            if (!sent)
+            {
+                var queueRecord = new EmailQueueRecord
+                {
+                    EmailQueueRecordId = Guid.NewGuid(),
+                    ToEmail = toEmail,
+                    Subject = subject,
+                    Body = body,
+                    Status = "Pending",
+                    RetryCount = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    LastAttemptAt = DateTime.UtcNow
+                };
+                context.EmailQueueRecords.Add(queueRecord);
+                await context.SaveChangesAsync();
+            }
+            return sent;
         }
 
         public async System.Threading.Tasks.Task DispatchApproverNotificationAsync(Guid approverAccountId, ApprovalRequest request)
@@ -295,7 +318,7 @@ namespace OTMS.Service.Services
                 }
             }
         }
-        
+
         public async System.Threading.Tasks.Task CreateTaskReviewRequestedNotificationAsync(Entities.Models.Task task)
         {
             var adminNotification = new Notification
@@ -350,7 +373,7 @@ namespace OTMS.Service.Services
             await context.Notifications.AddAsync(assigneeNotification);
             await context.SaveChangesAsync();
         }
-    
+
 
         public async System.Threading.Tasks.Task<PaginationResponseDTO<NotificationResponseDTO>> GetMyNotificationsAsync(PaginationDTO request)
         {

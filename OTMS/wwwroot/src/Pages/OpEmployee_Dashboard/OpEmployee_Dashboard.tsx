@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -31,6 +31,11 @@ import {
     RefreshCw,
     LogOut,
     Mail,
+    Upload,
+    File,
+    Paperclip,
+    RotateCcw,
+    ThumbsUp,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -43,19 +48,24 @@ import LeaveRequestModal, {
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
-import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView';
+import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
+import TaskComments from '../../components/TaskComments/TaskComments';
+import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
+import { useToast } from '../../components/Toast/Toast';
+import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
-type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
-type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
+type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue' | 'pending-admin-review';
+type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201' | 'approvals';
 
 interface Task {
     id: string;
     name: string;
     description: string;
     deadline: string;
+    createdAt: string;
     priority: Priority;
     status: TaskStatus;
     progress: number;
@@ -126,17 +136,19 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         High: 'high', Medium: 'medium', Low: 'low',
     };
     const statusMap: Record<string, TaskStatus> = {
-        Pending: 'pending', 'In Progress': 'in-progress', Completed: 'completed',
+        Draft: 'pending', Pending: 'pending', Assigned: 'assigned',
+        'In Progress': 'in-progress', Done: 'done', Completed: 'completed',
     };
     const status: TaskStatus = statusMap[dto.taskStatus] ?? 'pending';
     const defaultProgress: Record<TaskStatus, number> = {
-        pending: 0, 'in-progress': 50, completed: 100, overdue: 0,
+        pending: 0, assigned: 0, 'in-progress': 50, 'pending-admin-review': 90, done: 90, completed: 100, overdue: 0,
     };
     return {
         id: dto.taskId,
         name: dto.taskTitle,
         description: dto.taskDescription ?? '',
         deadline: dto.dueAt ? dto.dueAt.split('T')[0] : '',
+        createdAt: dto.createdAt ? dto.createdAt.split('T')[0] : '',
         priority: priorityMap[dto.priority] ?? 'medium',
         status,
         progress: defaultProgress[status],
@@ -154,7 +166,7 @@ const fmtDate = (d: string): string => {
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.status !== 'completed' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
+    t.status !== 'completed' && t.status !== 'done' && t.status !== 'assigned' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
 
 const effectiveStatus = (t: Task): TaskStatus =>
     isEffectivelyOverdue(t) ? 'overdue' : t.status;
@@ -173,11 +185,24 @@ const getInitials = (name: string): string => {
 
 // ─── Meta Maps ────────────────────────────────────────────────────────────────
 
-const statusMeta: Record<TaskStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+const statusMeta: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
+    assigned: { label: 'Assigned', cls: 'badge-purple', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
+    done: { label: 'Done', cls: 'badge-blue', icon: <CheckCircle2 size={11} /> },
     completed: { label: 'Completed', cls: 'badge-green', icon: <CheckCircle2 size={11} /> },
     overdue: { label: 'Overdue', cls: 'badge-red', icon: <AlertCircle size={11} /> },
+    'pending-admin-review': { label: 'Pending Admin Review', cls: 'badge-purple', icon: <Shield size={11} /> },
+};
+
+const FSM_EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
+    pending: ['in-progress'],
+    assigned: ['in-progress'],
+    'in-progress': ['done', 'pending-admin-review'],
+    'pending-admin-review': [],
+    completed: [],
+    done: [],
+    overdue: ['in-progress'],
 };
 
 const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
@@ -195,6 +220,58 @@ const leaveStatusMeta: Record<LeaveStatus, { label: string; cls: string; icon: R
 const leaveTypeLabel = (key: LeaveType) =>
     LEAVE_TYPES.find(lt => lt.key === key)?.label ?? key;
 
+// ─── Mock Data for Testing ─────────────────────────────────────────────────────
+const MOCK_TASKS: Task[] = [
+    {
+        id: 'mock-001', name: 'Prepare Q3 Financial Report',
+        description: 'Compile quarterly financial data and create summary report for board review.',
+        deadline: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0],
+        priority: 'high', status: 'in-progress', progress: 65,
+        assignedBy: 'Operations Admin',
+    },
+    {
+        id: 'mock-002', name: 'Update Employee Handbook',
+        description: 'Review and update policies for remote work, leave policies, and code of conduct.',
+        deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
+        priority: 'medium', status: 'in-progress', progress: 40,
+        assignedBy: 'Operations Admin',
+    },
+    {
+        id: 'mock-003', name: 'Client Onboarding - Acme Corp',
+        description: 'Set up new client account, configure access, and schedule kickoff meeting.',
+        deadline: new Date(Date.now() + 1 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
+        priority: 'high', status: 'in-progress', progress: 30,
+        assignedBy: 'Operations Admin',
+    },
+    {
+        id: 'mock-004', name: 'Security Audit Preparation',
+        description: 'Gather documentation and evidence for upcoming SOC2 audit.',
+        deadline: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
+        priority: 'high', status: 'assigned', progress: 0,
+        assignedBy: 'Operations Admin',
+    },
+    {
+        id: 'mock-005', name: 'Database Migration - Legacy to Cloud',
+        description: 'Plan and execute migration of on-premise databases to Azure SQL.',
+        deadline: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0],
+        priority: 'high', status: 'pending', progress: 0,
+        assignedBy: 'Operations Admin',
+    },
+    {
+        id: 'mock-006', name: 'Weekly Inventory Report - March',
+        description: 'Compile and submit the weekly inventory report for the first week of March. All entries have been verified and approved.',
+        deadline: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 12 * 86400000).toISOString().split('T')[0],
+        priority: 'medium', status: 'completed', progress: 100,
+        assignedBy: 'Operations Admin',
+    },
+];
+
 // ─── Nav Config ───────────────────────────────────────────────────────────────
 
 const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; label: string }[] }[] = [
@@ -209,6 +286,7 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
         label: 'PERSONAL',
         items: [
             { tab: 'digital_201', icon: FileText, label: 'Digital 201 File' },
+            { tab: 'approvals', icon: Shield, label: 'Approvals' },
             { tab: 'leave', icon: CalendarDays, label: 'Leave' },
             { tab: 'profile', icon: UserCircle2, label: 'Profile' },
         ],
@@ -220,17 +298,21 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
 interface TaskDetailProps {
     task: Task;
     onUpdate: () => void;
+    onSubmitForReview: () => void;
     onClose: () => void;
 }
 
-const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
+const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForReview, onClose }) => {
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
+    const canSubmitForReview = task.status === 'in-progress';
+    const [detailTab, setDetailTab] = useState<'details' | 'comments'>('details');
+    const currentEmployeeId = localStorage.getItem('employeeId') ?? '';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
                 <div className="modal-head">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span
@@ -247,45 +329,89 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
 
-                <div style={{ padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {task.description && (
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
-                        </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        {[
-                            { label: 'Deadline', value: fmtDate(task.deadline) },
-                            { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
-                            { label: 'Assigned by', value: task.assignedBy },
-                            { label: 'Progress', value: `${task.progress}%` },
-                        ].map(({ label, value, style }) => (
-                            <div key={label}>
-                                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
-                                <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="tc-bar" style={{ height: 8 }}>
-                        <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
-                    </div>
-                    {task.remarks && (
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
-                        </div>
-                    )}
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)', marginBottom: 12 }}>
+                    <button
+                        className={`filter-pill${detailTab === 'details' ? ' active' : ''}`}
+                        onClick={() => setDetailTab('details')}
+                        style={{ borderRadius: 0, border: 'none', borderBottom: detailTab === 'details' ? '2px solid var(--primary)' : '2px solid transparent', padding: '8px 16px', background: 'none' }}
+                    >
+                        Details
+                    </button>
+                    <button
+                        className={`filter-pill${detailTab === 'comments' ? ' active' : ''}`}
+                        onClick={() => setDetailTab('comments')}
+                        style={{ borderRadius: 0, border: 'none', borderBottom: detailTab === 'comments' ? '2px solid var(--primary)' : '2px solid transparent', padding: '8px 16px', background: 'none' }}
+                    >
+                        Comments
+                    </button>
                 </div>
 
-                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
-                    <button className="btn" onClick={onClose}>Close</button>
-                    {task.status !== 'completed' && (
-                        <button className="btn btn-primary" onClick={onUpdate}>
-                            <Pencil size={13} /> Update Progress
-                        </button>
-                    )}
-                </div>
+                {detailTab === 'details' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {task.description && (
+                            <div>
+                                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
+                                <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
+                            </div>
+                        )}
+                        <div className="field">
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Task ID</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{task.id}</p>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            {[
+                                { label: 'Assigned Date', value: fmtDate(task.createdAt) },
+                                { label: 'Deadline', value: fmtDate(task.deadline) },
+                                { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
+                                { label: 'Assigned by', value: task.assignedBy },
+                                { label: 'Progress', value: `${task.progress}%` },
+                            ].map(({ label, value, style }) => (
+                                <div key={label}>
+                                    <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
+                                    <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="tc-bar" style={{ height: 8 }}>
+                            <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
+                        </div>
+                        {task.remarks && (
+                            <div>
+                                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
+                                <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
+                            </div>
+                        )}
+                        <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 8 }}>
+                            <button className="btn" onClick={onClose}>Close</button>
+                            {task.status !== 'completed' && task.status !== 'done' && task.status !== 'pending-admin-review' && (
+                                <button className="btn btn-primary" onClick={onUpdate}>
+                                    <Pencil size={13} /> Update Progress
+                                </button>
+                            )}
+                            {canSubmitForReview && (
+                                <button className="btn btn-primary" style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={onSubmitForReview}>
+                                    <CheckCircle2 size={13} /> Mark as Complete
+                                </button>
+                            )}
+                            {task.status === 'pending-admin-review' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
+                                    <Shield size={13} /> Submitted for Admin Review
+                                </div>
+                            )}
+                            {task.status === 'completed' && (
+                                <button className="btn btn-primary" onClick={onSubmitForReview}
+                                    style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }}>
+                                    <RotateCcw size={13} /> Request Reopen
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{ minHeight: 250 }}>
+                        <TaskComments taskId={task.id} currentEmployeeId={currentEmployeeId} />
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -297,26 +423,44 @@ interface ProgressModalProps {
     task: Task;
     onSave: (id: string, status: TaskStatus, progress: number, remarks: string) => Promise<void>;
     onClose: () => void;
+    onSubmitForReview?: () => void;
 }
 
-const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
-    const [status, setStatus] = useState<TaskStatus>(task.status === 'overdue' ? 'in-progress' : task.status);
+const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, onSubmitForReview }) => {
+    const baseStatus = task.status === 'overdue' ? 'in-progress' : task.status;
+    const [status, setStatus] = useState<TaskStatus>(baseStatus);
     const [progress, setProgress] = useState(task.progress);
     const [remarks, setRemarks] = useState(task.remarks ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fsmError, setFsmError] = useState('');
 
     const handleStatusChange = (s: TaskStatus) => {
+        const validNext = FSM_EMPLOYEE_TRANSITIONS[baseStatus] ?? [];
+        if (!validNext.includes(s)) {
+            setFsmError(`Invalid transition: cannot move from "${statusMeta[baseStatus]?.label ?? baseStatus}" to "${statusMeta[s]?.label ?? s}". Status sequence violation detected.`);
+            return;
+        }
+        setFsmError('');
         setStatus(s);
-        if (s === 'completed') setProgress(100);
-        if (s === 'pending') setProgress(0);
+            if (s === 'done' && progress < 100) setProgress(100);
+            if (s === 'pending-admin-review' && progress < 90) setProgress(90);
+            if (s === 'in-progress' && progress === 0) setProgress(25);
     };
 
     const handleSave = async () => {
+        if (status === baseStatus && (!remarks.trim() || remarks.trim() === (task.remarks ?? '').trim())) {
+            setFsmError('No changes detected. Update the status or remarks to proceed.');
+            return;
+        }
+        if (status === 'pending-admin-review') {
+            onSubmitForReview?.();
+            return;
+        }
         setError('');
         setSaving(true);
         try {
-            await onSave(task.id, status, progress, remarks);
+            await onSave(task.id, validNext.length > 0 ? status : baseStatus, progress, remarks);
             onClose();
         } catch (err: any) {
             setError(err.message ?? 'Failed to save. Please try again.');
@@ -325,11 +469,11 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
         }
     };
 
-    const statusOptions: { value: TaskStatus; label: string }[] = [
-        { value: 'pending', label: 'Pending' },
-        { value: 'in-progress', label: 'In Progress' },
-        { value: 'completed', label: 'Completed' },
-    ];
+    const validNext = FSM_EMPLOYEE_TRANSITIONS[baseStatus] ?? [];
+    const statusOptions: { value: TaskStatus; label: string }[] = validNext.map(s => ({
+        value: s,
+        label: statusMeta[s]?.label ?? s,
+    }));
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -343,34 +487,44 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                 </div>
 
                 {error && (
-                    <div className="form-api-error" style={{ marginBottom: 14 }}>
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
                         <AlertCircle size={14} /><span>{error}</span>
                     </div>
                 )}
-
-                <div className="field">
-                    <label>Status</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {statusOptions.map(opt => (
-                            <button
-                                key={opt.value}
-                                className={`filter-pill${status === opt.value ? ' active' : ''}`}
-                                onClick={() => handleStatusChange(opt.value)}
-                            >
-                                {statusMeta[opt.value].icon} {opt.label}
-                            </button>
-                        ))}
+                {fsmError && (
+                    <div className="form-api-error" style={{ marginBottom: 10, background: 'rgba(238,93,80,0.1)', color: 'var(--status-failed)' }}>
+                        <AlertCircle size={14} /><span>{fsmError}</span>
                     </div>
-                </div>
+                )}
 
-                <div className="field">
-                    <label>Progress — {progress}%</label>
-                    <input
-                        type="range" min={0} max={100} step={5} value={progress}
-                        disabled={status === 'completed'}
-                        onChange={e => setProgress(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: 'var(--primary)' }}
-                    />
+                {validNext.length === 0 ? (
+                    <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <AlertCircle size={18} style={{ marginBottom: 6 }} />
+                        <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. The Operations Admin will review it.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="field">
+                            <label>Task Status <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
+                            <select
+                                className="report-select"
+                                value={status}
+                                onChange={e => handleStatusChange(e.target.value as TaskStatus)}
+                            >
+                                <option value={baseStatus}>{statusMeta[baseStatus]?.label ?? baseStatus} (current)</option>
+                                {statusOptions.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="field">
+                            <label>Progress — {progress}%</label>
+                            <input
+                                type="range" min={0} max={100} step={5} value={progress}
+                                onChange={e => setProgress(Number(e.target.value))}
+                                style={{ width: '100%', accentColor: 'var(--primary)' }}
+                            />
                     <div className="tc-bar" style={{ marginTop: 6, height: 8 }}>
                         <div
                             className={`tc-fill ${priorityMeta[task.priority].bar}`}
@@ -378,16 +532,18 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         />
                     </div>
                 </div>
+                        </>
+                )}
 
                 <div className="field">
                     <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                     <textarea
-                        className="leave-reason-textarea" rows={3} maxLength={300}
+                        className="leave-reason-textarea" rows={3} maxLength={1000}
                         placeholder="Add any notes about your progress…"
                         value={remarks}
                         onChange={e => setRemarks(e.target.value)}
                     />
-                    <div className="leave-char-count">{remarks.length} / 300</div>
+                    <div className="leave-char-count">{remarks.length} / 1000</div>
                 </div>
 
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
@@ -395,7 +551,200 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
                         {saving
                             ? <><Loader2 size={13} className="spin" /> Saving…</>
-                            : <><Save size={13} /> Save Progress</>
+                            : status === 'pending-admin-review'
+                                ? <><Save size={13} /> Submit for Review</>
+                                : <><Save size={13} /> Save Progress</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Submit for Review Modal ────────────────────────────────────────────────────
+
+interface SubmitForReviewModalProps {
+    task: Task;
+    onSave: (id: string, formData: FormData) => Promise<void>;
+    onClose: () => void;
+}
+
+const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSave, onClose }) => {
+    const [completionNotes, setCompletionNotes] = useState('');
+    const [attachment, setAttachment] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [dragActive, setDragActive] = useState(false);
+
+    const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'];
+    const MAX_SIZE = 20 * 1024 * 1024;
+
+    const handleFileChange = (file: File | null) => {
+        if (!file) { setAttachment(null); return; }
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            setError('Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.');
+            return;
+        }
+        if (file.size > MAX_SIZE) {
+            setError('File size must not exceed 20MB.');
+            return;
+        }
+        setAttachment(file);
+        setError('');
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files.length > 0) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    };
+
+    const removeAttachment = () => {
+        setAttachment(null);
+    };
+
+    const handleSave = async () => {
+        if (!completionNotes.trim()) {
+            setError('Completion notes are required to submit for review.');
+            return;
+        }
+        if (completionNotes.length > 500) {
+            setError('Completion notes must not exceed 500 characters.');
+            return;
+        }
+        setError('');
+        setSaving(true);
+        try {
+            const formData = new FormData();
+            formData.append('TaskStatus', 'Pending Admin Review');
+            formData.append('ProgressNotes', completionNotes.trim());
+            if (attachment) {
+                formData.append('SupportingEvidence', attachment);
+            }
+            await onSave(task.id, formData);
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit for review. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card submit-review-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                    <div>
+                        <h3>Submit for Admin Review</h3>
+                        <p className="modal-sub">{task.name}</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                <div className="field">
+                    <label>Task ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated, Read-only)</span></label>
+                    <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                        <span className="if-icon"><Hash size={15} /></span>
+                        <input type="text" value={task.id} readOnly style={{ color: 'var(--text-secondary)' }} />
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Proof of Work / Attachment <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/XLSX/JPG/PNG, Max 20MB)</span></label>
+                    <div
+                        className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <input
+                            type="file"
+                            id="evidence-upload"
+                            style={{ display: 'none' }}
+                            accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                            onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
+                        />
+                        {attachment ? (
+                            <div className="file-selected" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <File size={20} color="var(--primary)" />
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{attachment.name}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{(attachment.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={removeAttachment}
+                                    style={{ color: 'var(--status-failed)' }}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 8 }}>
+                                <Upload size={28} color="var(--primary)" />
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, textAlign: 'center' }}>
+                                    Drag & drop a file here, or click to browse
+                                </p>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={e => { e.stopPropagation(); document.getElementById('evidence-upload')?.click(); }}
+                                    style={{ marginTop: 8 }}
+                                >
+                                    <Paperclip size={13} /> Choose File
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Completion Notes <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                    <textarea
+                        className="leave-reason-textarea"
+                        rows={4}
+                        maxLength={500}
+                        placeholder="Describe the work completed, any issues encountered, and handover details…"
+                        value={completionNotes}
+                        onChange={e => { setCompletionNotes(e.target.value); setError(''); }}
+                    />
+                    <div className="leave-char-count" style={{ color: completionNotes.length > 450 ? 'var(--status-failed)' : 'var(--text-muted)' }}>
+                        {completionNotes.length} / 500
+                    </div>
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><Save size={13} /> Submit for Review</>
                         }
                     </button>
                 </div>
@@ -616,6 +965,17 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             ? tasks.filter(t => effectiveStatus(t) === 'overdue')
             : tasks.filter(t => t.status === filter);
 
+    const priorityWeight: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
+    const sorted = [...filtered].sort((a, b) => {
+        const pa = priorityWeight[a.priority] ?? 0;
+        const pb = priorityWeight[b.priority] ?? 0;
+        if (pa !== pb) return pb - pa;
+        const da = a.deadline ? new Date(a.deadline + 'T00:00:00').getTime() : Infinity;
+        const db = b.deadline ? new Date(b.deadline + 'T00:00:00').getTime() : Infinity;
+        if (da !== db) return da - db;
+        return a.name.localeCompare(b.name);
+    });
+
     if (loading) {
         return (
             <div className="tab-content">
@@ -673,13 +1033,13 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
                     )}
                 </div>
             </div>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
                 <div className="card">
                     <div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div>
                 </div>
             ) : (
                 <div className="task-grid">
-                    {filtered.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
+                    {sorted.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
                 </div>
             )}
             {totalPages > 1 && (
@@ -971,6 +1331,147 @@ const LeaveTab: React.FC<{
                     onSubmit={handleSubmit}
                 />
             )}
+        </div>
+    );
+};
+
+// ─── Approvals Tab ───────────────────────────────────────────────────────────
+
+const APPROVAL_REQUEST_TYPES = ['Leave', 'Asset', 'Resignation'];
+const SOURCE_ENTITY_TYPES = ['leaveRequest', 'assetRequest', 'resignationRequest'];
+
+const ApprovalsTab: React.FC = () => {
+    const { success, error: showError } = useToast();
+    const [myRequests, setMyRequests] = useState<TrackerData[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showSubmit, setShowSubmit] = useState(false);
+    const [reqType, setReqType] = useState('Leave');
+    const [sourceType, setSourceType] = useState('leaveRequest');
+    const [sourceId, setSourceId] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const connectionRef = useRef<HubConnection | null>(null);
+
+    const fetchMyRequests = async () => {
+        try {
+            const res = await fetch('/api/approvalrequests/my-trackers', { headers: authHeader() });
+            if (res.ok) {
+                const json = await res.json();
+                setMyRequests(json.data ?? json ?? []);
+            }
+        } catch { /* ignore */ }
+        finally { setLoading(false); }
+    };
+
+    // Initial fetch + SignalR connection for real-time updates
+    useEffect(() => {
+        fetchMyRequests();
+
+        const employeeId = localStorage.getItem('employeeId');
+        if (!employeeId) return;
+
+        const conn = new HubConnectionBuilder()
+            .withUrl('/hubs/workflow')
+            .withAutomaticReconnect()
+            .build();
+
+        conn.on('TrackerUpdated', () => {
+            fetchMyRequests();
+        });
+
+        conn.start().then(() => {
+            conn.invoke('JoinUserGroup', employeeId).catch(() => {});
+        }).catch(() => {});
+
+        connectionRef.current = conn;
+
+        return () => {
+            conn.stop().catch(() => {});
+        };
+    }, []);
+
+    const handleSubmit = async () => {
+        if (!sourceId.trim()) { showError('Source Entity ID is required.'); return; }
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/approvalrequests/submit', {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ RequestType: reqType, SourceEntityType: sourceType, SourceEntityId: sourceId.trim() }),
+            });
+            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Failed to submit.'); }
+            setShowSubmit(false);
+            success('Request submitted and routed for approval.');
+            await fetchMyRequests();
+        } catch (err: any) { showError(err.message); }
+        finally { setSubmitting(false); }
+    };
+
+    return (
+        <div className="tab-content">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <button className="btn btn-primary" onClick={() => setShowSubmit(true)}>
+                    <Plus size={14} /> Submit Request
+                </button>
+            </div>
+
+            {showSubmit && (
+                <div className="modal-overlay" onClick={() => setShowSubmit(false)}>
+                    <div className="modal-card" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-head">
+                            <div><h3>Submit Approval Request</h3><p className="modal-sub">Select the request type and provide details.</p></div>
+                            <button className="icon-btn" onClick={() => setShowSubmit(false)}><X size={16} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div className="field">
+                                <label>Request Type</label>
+                                <select className="report-select" value={reqType} onChange={e => setReqType(e.target.value)}>
+                                    {APPROVAL_REQUEST_TYPES.map(t => <option key={t} value={t}>{t} Request</option>)}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Source Entity Type</label>
+                                <select className="report-select" value={sourceType} onChange={e => setSourceType(e.target.value)}>
+                                    {SOURCE_ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Source Entity ID <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <input type="text" className="report-input" value={sourceId} onChange={e => setSourceId(e.target.value)}
+                                    placeholder="e.g. leave-request-guid" />
+                            </div>
+                            <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                                <button className="btn" onClick={() => setShowSubmit(false)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                                    {submitting ? <><Loader2 size={13} className="spin" /> Submitting...</> : <><Save size={13} /> Submit</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card-header-layout" style={{ padding: '14px 20px', margin: 0 }}>
+                    <h3>My Approval Requests</h3>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{myRequests.length} request{myRequests.length !== 1 ? 's' : ''}</span>
+                </div>
+                {loading ? (
+                    <div className="empty-state" style={{ padding: '32px 0' }}><Loader2 size={20} className="spin" /><p>Loading requests...</p></div>
+                ) : myRequests.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '32px 0' }}>
+                        <FileText size={24} /><p>No approval requests yet.</p>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Click "Submit Request" to start a new approval workflow.</span>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        {myRequests.map(r => (
+                            <div key={r.approvalRequestId} style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                                <ApprovalTracker tracker={r} compact />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -1498,11 +1999,197 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     );
 };
 
+// ─── Reopen Request Modal ──────────────────────────────────────────────────────
+
+interface ReopenRequestModalProps {
+    task: Task;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, onSuccess }) => {
+    const [reason, setReason] = useState('');
+    const [evidence, setEvidence] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [dragActive, setDragActive] = useState(false);
+    const { success, error: showError } = useToast();
+
+    const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'];
+    const MAX_SIZE = 20 * 1024 * 1024;
+
+    const handleFileChange = (file: File | null) => {
+        if (!file) { setEvidence(null); return; }
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            setError('Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.');
+            return;
+        }
+        if (file.size > MAX_SIZE) {
+            setError('File size must not exceed 20MB.');
+            return;
+        }
+        setEvidence(file);
+        setError('');
+    };
+
+    const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(true); };
+    const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); };
+    const handleDrop = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (e.dataTransfer.files.length > 0) handleFileChange(e.dataTransfer.files[0]); };
+
+    const handleSubmit = async () => {
+        if (!reason.trim()) { setError('Reopening reason is required.'); return; }
+        if (reason.trim().length > 500) { setError('Reopening reason must not exceed 500 characters.'); return; }
+        setError('');
+        setSaving(true);
+        try {
+            const formData = new FormData();
+            formData.append('Reason', reason.trim());
+            if (evidence) formData.append('SupportingEvidence', evidence);
+
+            const res = await fetch(`/api/task/${task.id}/reopen-request`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+                body: formData,
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any).message || 'Failed to submit reopen request.');
+            }
+            success('Reopen request submitted successfully.');
+            onSuccess();
+            onClose();
+        } catch (err: any) {
+            showError(err.message ?? 'Failed to submit reopen request.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                    <div>
+                        <h3>Request Task Reopening</h3>
+                        <p className="modal-sub">Submit a request to reopen this completed task.</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div className="field">
+                        <label>Task ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated Reference)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><Hash size={15} /></span>
+                            <input type="text" value={task.id} readOnly style={{ color: 'var(--text-secondary)' }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Task Title <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Display Field)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><ClipboardList size={15} /></span>
+                            <input type="text" value={task.name} readOnly style={{ color: 'var(--text-secondary)' }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Current Task Status <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Display Field)</span></label>
+                        <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                            <span className="if-icon"><CheckCircle2 size={15} /></span>
+                            <input type="text" value="Completed" readOnly style={{ color: 'var(--status-success, #05cd99)', fontWeight: 600 }} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Reason for Reopening <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                        <textarea
+                            className="leave-reason-textarea"
+                            rows={4}
+                            maxLength={500}
+                            placeholder="Explain why this task needs to be reopened..."
+                            value={reason}
+                            onChange={e => { setReason(e.target.value); setError(''); }}
+                        />
+                        <div className="leave-char-count" style={{ color: reason.length > 450 ? 'var(--status-failed)' : 'var(--text-muted)' }}>
+                            {reason.length} / 500
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Supporting Evidence <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/XLSX/JPG/PNG, Max 20MB)</span></label>
+                        <div
+                            className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                        >
+                            <input
+                                type="file"
+                                id="reopen-evidence"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                                onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
+                            />
+                            {evidence ? (
+                                <div className="file-selected" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <File size={20} color="var(--primary)" />
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{evidence.name}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{(evidence.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                        </div>
+                                    </div>
+                                    <button type="button" className="icon-btn" onClick={() => setEvidence(null)} style={{ color: 'var(--status-failed)' }}><X size={16} /></button>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 8 }}>
+                                    <Upload size={28} color="var(--primary)" />
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, textAlign: 'center' }}>
+                                        Drag & drop a file here, or click to browse
+                                    </p>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm"
+                                        onClick={e => { e.stopPropagation(); document.getElementById('reopen-evidence')?.click(); }}
+                                        style={{ marginTop: 8 }}
+                                    >
+                                        <Paperclip size={13} /> Choose File
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><RotateCcw size={13} /> Submit Reopen Request</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeDashboard() {
     const navigate = useNavigate();
     usePreventBackNav();
+
+    const { success, error: showError } = useToast();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -1510,6 +2197,8 @@ export default function EmployeeDashboard() {
     const [tasksError, setTasksError] = useState('');
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [submittingForReviewId, setSubmittingForReviewId] = useState<string | null>(null);
+    const [reopeningId, setReopeningId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -1558,8 +2247,7 @@ export default function EmployeeDashboard() {
             const res = await fetch(`/api/task/my-tasks?${params}`, { headers: authHeader() });
             if (res.status === 401) { handleLogout(); return; }
             if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error((err as any).message || `Failed to load tasks (${res.status}).`);
+                throw new Error(`API error (${res.status})`);
             }
             const body = await res.json();
             const paginatedData = body?.data ?? body;
@@ -1645,19 +2333,20 @@ export default function EmployeeDashboard() {
     }, []);
 
     const toBackendStatus = (status: TaskStatus): string => ({
-        pending: 'Pending', 'in-progress': 'In Progress', completed: 'Completed', overdue: 'In Progress',
-    }[status]);
+        pending: 'Pending', assigned: 'Assigned', 'in-progress': 'In Progress',
+        'pending-admin-review': 'Pending Admin Review', done: 'Done', completed: 'Completed', overdue: 'In Progress',
+    }[status] ?? 'Assigned');
 
     const handleSaveProgress = async (
-        id: string, status: TaskStatus, progress: number, remarks: string
+        id: string, status: TaskStatus, _progress: number, remarks: string
     ): Promise<void> => {
+        const formData = new FormData();
+        formData.append('TaskStatus', toBackendStatus(status));
+        if (remarks.trim()) formData.append('TaskRemarks', remarks.trim());
         const res = await fetch(`/api/task/${id}/progress`, {
             method: 'PATCH',
-            headers: authHeader(),
-            body: JSON.stringify({
-                TaskStatus: toBackendStatus(status),
-                TaskRemarks: remarks.trim() || undefined,
-            }),
+            headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+            body: formData,
         });
         if (res.status === 401) { handleLogout(); return; }
         if (!res.ok) {
@@ -1667,13 +2356,39 @@ export default function EmployeeDashboard() {
         setTasks(ts => ts.map(t => t.id === id ? {
             ...t,
             status: status === 'overdue' ? 'in-progress' : status,
-            progress: status === 'completed' ? 100 : progress,
+            progress: status === 'done' ? 100 : status === 'completed' ? 100 : _progress,
             remarks: remarks.trim() || t.remarks,
         } : t));
+        success('Task progress updated successfully.');
+    };
+
+    const handleSubmitForReview = async (
+        id: string, formData: FormData
+    ): Promise<void> => {
+        const res = await fetch(`/api/task/${id}/progress`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
+            },
+            body: formData,
+        });
+        if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as any).message || 'Failed to submit for review.');
+        }
+        setTasks(ts => ts.map(t => t.id === id ? {
+            ...t,
+            status: 'pending-admin-review',
+            progress: 90,
+        } : t));
+        success('Task submitted for admin review.');
     };
 
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
+    const submittingForReviewTask = submittingForReviewId != null ? tasks.find(t => t.id === submittingForReviewId) ?? null : null;
+    const reopeningTask = reopeningId != null ? tasks.find(t => t.id === reopeningId) ?? null : null;
     const pendingLeaveCount = leaveRecords.filter(r => r.status === 'Pending').length;
     const initials = getInitials(user.fullName);
 
@@ -1683,6 +2398,7 @@ export default function EmployeeDashboard() {
         leave: 'Leave Requests',
         profile: 'My Profile',
         digital_201: 'My Digital 201 File',
+        approvals: 'Approvals',
     };
 
     const today = new Date().toLocaleDateString('en-US', {
@@ -1788,6 +2504,7 @@ export default function EmployeeDashboard() {
                         onNewRecord={r => setLeaveRecords(prev => [r, ...prev])}
                     />
                 )}
+                {activeTab === 'approvals' && <ApprovalsTab />}
                 {activeTab === 'profile' && (
                     <ProfileTab user={user} onUpdateUser={setUser} />
                 )}
@@ -1807,6 +2524,14 @@ export default function EmployeeDashboard() {
                     task={viewingTask}
                     onUpdate={() => { setUpdatingId(viewingTask.id); setViewingId(null); }}
                     onClose={() => setViewingId(null)}
+                    onSubmitForReview={() => {
+                        if (viewingTask.status === 'completed') {
+                            setReopeningId(viewingTask.id);
+                        } else {
+                            setSubmittingForReviewId(viewingTask.id);
+                        }
+                        setViewingId(null);
+                    }}
                 />
             )}
             {updatingTask && (
@@ -1814,6 +2539,21 @@ export default function EmployeeDashboard() {
                     task={updatingTask}
                     onSave={handleSaveProgress}
                     onClose={() => setUpdatingId(null)}
+                    onSubmitForReview={() => { setSubmittingForReviewId(updatingTask.id); setUpdatingId(null); }}
+                />
+            )}
+            {submittingForReviewTask && (
+                <SubmitForReviewModal
+                    task={submittingForReviewTask}
+                    onSave={handleSubmitForReview}
+                    onClose={() => setSubmittingForReviewId(null)}
+                />
+            )}
+            {reopeningTask && (
+                <ReopenRequestModal
+                    task={reopeningTask}
+                    onClose={() => setReopeningId(null)}
+                    onSuccess={() => fetchTasks()}
                 />
             )}
         </div>

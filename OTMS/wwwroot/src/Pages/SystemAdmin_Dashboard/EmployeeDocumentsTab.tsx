@@ -1,27 +1,3 @@
-/**
- * EmployeeDocumentsTab.jsx
- *
- * Drop-in replacement for the Employee Documents section inside ManageEmployeesTab.
- * Satisfies all 5 contract-repository criteria:
- *   1. Centralized repository linked to each employee's Digital 201 File
- *   2. Chronological display by Effective Start Date
- *   3. Upload requires explicit Effective Start Date
- *   4. Previous contracts auto-archived when a newer one is uploaded
- *   5. PDF-only uploads enforced (non-editable format)
- *
- * Usage inside ManageEmployeesTab (replace the existing documents branch):
- *
- *   import EmployeeDocumentsTab from './EmployeeDocumentsTab';
- *
- *   // Inside <TableCard> or wherever you render subTab === 'documents':
- *   {subTab === 'documents' && (
- *     <EmployeeDocumentsTab
- *       employees={employees}
- *       onOpenDigital201={onOpenDigital201}
- *     />
- *   )}
- */
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     FileText, Download, Eye, Upload, Search, Filter,

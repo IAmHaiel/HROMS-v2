@@ -13,6 +13,7 @@ namespace OTMS.Service.Interfaces
         Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> SearchTasksAsync(TaskSearchDTO request);
         Task<TaskResponseDTO> RequestReopenTaskAsync(Guid taskId, RequestReopenDTO request);
         Task<TaskResponseDTO> ReviewReopenRequestAsync(Guid requestId, ReviewReopenDTO request);
+        Task<List<ReopenRequestListDTO>> GetReopenRequestsAsync();
         Task<TaskResponseDTO> UpdateTaskProgressAsync(Guid taskId, UpdateTaskProgressDTO request);
         Task<TaskResponseDTO> ReviewTaskAsync(Guid taskId, ReviewTaskDTO request);
         Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request);

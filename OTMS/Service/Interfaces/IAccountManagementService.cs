@@ -22,5 +22,7 @@ namespace OTMS.Service.Interfaces
         Task<ApiResponseDTO<object>> ArchiveEmployeeDocument(Guid attachmentId);
         Task<ApiResponseDTO<EmployeeAttachmentDTO>> UploadEmploymentContract(string employeeNumber, UploadEmploymentContractDTO request);
         Task<ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>> GetAllEmploymentContracts(PaginationDTO request, string? search, bool? isArchived);
+        Task<ApiResponseDTO<string>> UpdateStatutoryRecordsAsync(UpdateStatutoryRecordsDTO request);
+        Task<ApiResponseDTO<IEnumerable<StatutorySyncRecordResponseDTO>>> GetStatutorySyncRecordsAsync(string employeeNumber);
     }
 }

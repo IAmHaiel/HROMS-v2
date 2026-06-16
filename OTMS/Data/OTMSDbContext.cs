@@ -1,6 +1,6 @@
+using System;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Entities.Models;
-using System;
 
 namespace OTMS.Data
 {
@@ -20,7 +20,7 @@ namespace OTMS.Data
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<EmergencyOverrideRequest> EmergencyOverrideRequests { get; set; }
         public DbSet<EmployeeAttachment> EmployeeAttachments { get; set; }
-        
+
         public DbSet<Department> Departments { get; set; }
         public DbSet<JobPosition> JobPositions { get; set; }
         public DbSet<Role> Roles { get; set; }
@@ -31,6 +31,13 @@ namespace OTMS.Data
         public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
         public DbSet<ApprovalDecision> ApprovalDecisions { get; set; }
         public DbSet<NotificationAuditLog> NotificationAuditLogs { get; set; }
+        public DbSet<ApplicantRecord> ApplicantRecords { get; set; }
+        public DbSet<ApplicantStatusRecord> ApplicantStatusRecords { get; set; }
+        public DbSet<InterviewSchedule> InterviewSchedules { get; set; }
+        public DbSet<EmailQueueRecord> EmailQueueRecords { get; set; }
+        public DbSet<OnboardingToken> OnboardingTokens { get; set; }
+        public DbSet<Employee201FileData> Employee201FileDatas { get; set; }
+        public DbSet<StatutorySyncRecord> StatutorySyncRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -280,6 +287,62 @@ namespace OTMS.Data
                 .WithMany()
                 .HasForeignKey(n => n.RecipientAccountId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // ApplicantRecord -> JobPosition
+            modelBuilder.Entity<ApplicantRecord>()
+                .HasOne(ar => ar.JobPosition)
+                .WithMany()
+                .HasForeignKey(ar => ar.JobPositionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ApplicantRecord -> StatusHistory
+            modelBuilder.Entity<ApplicantRecord>()
+                .HasMany(ar => ar.StatusHistory)
+                .WithOne(asr => asr.ApplicantRecord)
+                .HasForeignKey(asr => asr.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ApplicantStatusRecord -> Updater
+            modelBuilder.Entity<ApplicantStatusRecord>()
+                .HasOne(asr => asr.Updater)
+                .WithMany()
+                .HasForeignKey(asr => asr.UpdatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // InterviewSchedule -> ApplicantRecord
+            modelBuilder.Entity<InterviewSchedule>()
+                .HasOne(i => i.ApplicantRecord)
+                .WithMany()
+                .HasForeignKey(i => i.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // OnboardingToken -> ApplicantRecord
+            modelBuilder.Entity<OnboardingToken>()
+                .HasOne(ot => ot.ApplicantRecord)
+                .WithMany()
+                .HasForeignKey(ot => ot.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // OnboardingToken -> CreatedByAccount
+            modelBuilder.Entity<OnboardingToken>()
+                .HasOne(ot => ot.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(ot => ot.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Employee201FileData -> Employee (1:1)
+            modelBuilder.Entity<Employee201FileData>()
+                .HasOne(e => e.Employee)
+                .WithOne()
+                .HasForeignKey<Employee201FileData>(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // StatutorySyncRecord -> Employee
+            modelBuilder.Entity<StatutorySyncRecord>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

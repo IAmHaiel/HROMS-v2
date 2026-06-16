@@ -32,6 +32,9 @@ namespace OTMS.Data
                 "Permissions.Approvals.Submit",
                 "Permissions.Approvals.Process",
                 "Permissions.Approvals.Manage",
+                "Permissions.Recruitment.View",
+                "Permissions.Recruitment.Manage",
+                "Permissions.Dashboard.View",
             };
 
             foreach (var perm in permissions)
@@ -53,8 +56,9 @@ namespace OTMS.Data
             var operationAdminRoleName = "OperationAdmin";
             var coordinatorRoleName = "Coordinator";
             var encoderRoleName = "Encoder";
+            var hrAdminRoleName = "HRAdmin";
 
-            var rolesToCreate = new[] { systemAdminRoleName, operationAdminRoleName, coordinatorRoleName, encoderRoleName };
+            var rolesToCreate = new[] { systemAdminRoleName, operationAdminRoleName, coordinatorRoleName, encoderRoleName, hrAdminRoleName };
 
             foreach (var roleName in rolesToCreate)
             {
@@ -74,6 +78,7 @@ namespace OTMS.Data
             // 3. Assign Permissions to Roles
             var systemAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == systemAdminRoleName);
             var operationAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == operationAdminRoleName);
+            var hrAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == hrAdminRoleName);
 
             var allDbPermissions = await context.Permissions.ToListAsync();
 
@@ -97,13 +102,29 @@ namespace OTMS.Data
                     p.Name.StartsWith("Permissions.Users.") ||
                     p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
-                    p.Name.StartsWith("Permissions.JobPositions.View"));
+                    p.Name.StartsWith("Permissions.JobPositions.View") ||
+                    p.Name.StartsWith("Permissions.Dashboard."));
 
                 foreach (var perm in opPermissions)
                 {
                     if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == operationAdminRole.RoleId && rp.PermissionId == perm.PermissionId))
                     {
                         context.RolePermissions.Add(new RolePermission { RoleId = operationAdminRole.RoleId, PermissionId = perm.PermissionId });
+                    }
+                }
+            }
+
+            if (hrAdminRole != null)
+            {
+                // HR Admin gets Recruitment permissions
+                var hrPermissions = allDbPermissions.Where(p =>
+                    p.Name.StartsWith("Permissions.Recruitment."));
+
+                foreach (var perm in hrPermissions)
+                {
+                    if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == hrAdminRole.RoleId && rp.PermissionId == perm.PermissionId))
+                    {
+                        context.RolePermissions.Add(new RolePermission { RoleId = hrAdminRole.RoleId, PermissionId = perm.PermissionId });
                     }
                 }
             }

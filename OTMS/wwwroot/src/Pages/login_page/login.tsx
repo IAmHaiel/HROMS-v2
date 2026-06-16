@@ -81,7 +81,6 @@ export default function Login() {
     const validateEmployeeId = (value: string): string => {
         if (!value.trim()) return 'Employee ID is required.';
         if (value.trim().length > 20) return 'Employee ID must not exceed 20 characters.';
-        // Allow digits-only (regular employees) OR SPDX-SPR-XXX format (super admins)
         const isDigitsOnly = /^\d{1,5}$/.test(value.trim());
         const isSuperAdmin = /^SPDX-SPR-\d{2,}$/.test(value.trim());
         if (!isDigitsOnly && !isSuperAdmin) {
@@ -151,7 +150,6 @@ export default function Login() {
                     return;
                 }
 
-                // Catches unverified email (ArgumentException → 400) and any other error
                 updateStatus(data?.message || 'Invalid Employee ID or password.', 'error');
                 return;
             }
@@ -168,14 +166,11 @@ export default function Login() {
             localStorage.setItem('isPasswordChanged', data.isPasswordChanged.toString());
             localStorage.setItem('contactNumber', data.contactNumber ?? data.contact ?? data.phoneNumber ?? '');
             localStorage.setItem('email', data.email ?? '');
-
-            // Save name parts
             localStorage.setItem('firstName', data.firstName ?? '');
             localStorage.setItem('middleName', data.middleName ?? '');
             localStorage.setItem('lastName', data.lastName ?? '');
             localStorage.setItem('suffix', data.suffix ?? '');
 
-            // Build full display name as fallback
             const fullName = [data.firstName, data.middleName, data.lastName, data.suffix]
                 .map(s => (s ?? '').trim())
                 .filter(Boolean)
@@ -248,6 +243,22 @@ export default function Login() {
                         />
                     </div>
 
+                    {/* ── Careers CTA (left panel) ── */}
+                    <div className="careers-cta">
+                        <div className="careers-cta-inner">
+                            <div className="careers-cta-badge">
+                                <span className="careers-dot" />
+                                We're Hiring
+                            </div>
+                            <p className="careers-cta-text">
+                                Interested in joining Speedex? Apply for open positions online.
+                            </p>
+                            <Link to="/apply" className="careers-cta-link">
+                                View open positions →
+                            </Link>
+                        </div>
+                    </div>
+
                 </div>
             </aside>
 
@@ -255,7 +266,7 @@ export default function Login() {
             <main className="login-right">
                 <div className="login-card">
 
-                    {/* Card header — stacks vertically via CSS */}
+                    {/* Card header */}
                     <div className="card-header">
                         <span className="header-badge">LOGIN PORTAL</span>
                         <h1 className="card-title">Welcome!</h1>
@@ -370,10 +381,30 @@ export default function Login() {
 
                     </form>
 
-                    <div className="login-terms">
-                        By using this service, you understand and agree to the PUP Online Services <a href="#" className="terms-link">Terms of Use</a> and <a href="#" className="terms-link">Privacy Statement</a>.
+                    {/* ── Applicant portal divider ── */}
+                    <div className="applicant-divider">
+                        <span className="applicant-divider-line" />
+                        <span className="applicant-divider-text">Not an employee?</span>
+                        <span className="applicant-divider-line" />
                     </div>
-                    {/* Add the new links here */}
+
+                    {/* ── Apply now banner ── */}
+                    <Link to="/apply" className="applicant-portal-btn">
+                        <span className="applicant-portal-icon">
+                            <BriefcaseIcon />
+                        </span>
+                        <span className="applicant-portal-content">
+                            <span className="applicant-portal-label">Apply for a position</span>
+                            <span className="applicant-portal-sub">Browse open roles at Speedex Courier</span>
+                        </span>
+                        <span className="applicant-portal-arrow">→</span>
+                    </Link>
+
+                    <div className="login-terms">
+                        By using this service, you understand and agree to the PUP Online Services{' '}
+                        <a href="#" className="terms-link">Terms of Use</a> and{' '}
+                        <a href="#" className="terms-link">Privacy Statement</a>.
+                    </div>
 
                     <p className="right-footer">
                         © 2026 Speedex Courier &amp; Forwarder, Inc. All rights reserved.
@@ -381,7 +412,6 @@ export default function Login() {
                 </div>
             </main>
         </div>
-
     );
 }
 
@@ -398,44 +428,20 @@ function FeatureItem({ title, description }: { title: string; description: strin
 
 function StatusIcon({ type }: { type: StatusType }) {
     if (type === 'error') return (
-        <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            style={{ flexShrink: 0 }}
-        >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
             <circle cx="12" cy="12" r="10" opacity="0.2" />
-            <line
-                x1="15"
-                y1="9"
-                x2="9"
-                y2="15"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-            />
-            <line
-                x1="9"
-                y1="9"
-                x2="15"
-                y2="15"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-            />
+            <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
     );
     if (type === 'success') return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
             <circle cx="12" cy="12" r="10" />
             <path d="M9 12l2 2 4-4" />
         </svg>
     );
     return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -456,8 +462,7 @@ function PackageIcon() {
 
 function IdIcon() {
     return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="2" y="7" width="20" height="14" rx="2" />
             <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
             <line x1="12" y1="12" x2="12" y2="16" />
@@ -468,8 +473,7 @@ function IdIcon() {
 
 function LockIcon() {
     return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="3" y="11" width="18" height="11" rx="2" />
             <path d="M7 11V7a5 5 0 0110 0v4" />
         </svg>
@@ -478,8 +482,7 @@ function LockIcon() {
 
 function EyeIcon() {
     return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
             <circle cx="12" cy="12" r="3" />
         </svg>
@@ -488,11 +491,21 @@ function EyeIcon() {
 
 function EyeOffIcon() {
     return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.8">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
             <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
             <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+    );
+}
+
+function BriefcaseIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
+            <line x1="12" y1="12" x2="12" y2="12" />
+            <path d="M2 12h20" />
         </svg>
     );
 }

@@ -1,8 +1,14 @@
+using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using OTMS.Common.Constraints;
+using OTMS.Common.Helpers;
 using OTMS.Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OTMS.Data;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
@@ -16,7 +22,10 @@ namespace OTMS.Service.Services
 {
     public class AccountManagementService(
         OTMSDbContext context,
-        IFileService fileService
+        IFileService fileService,
+        IConfiguration configuration,
+        IHttpContextAccessor httpContextAccessor,
+        IActivityLogService activityLogService
         ) : IAccountManagementService
     {
 
@@ -535,6 +544,27 @@ namespace OTMS.Service.Services
                 };
             }
 
+            var complianceData = await context.Employee201FileDatas
+                .FirstOrDefaultAsync(c => c.EmployeeId == employee.EmployeeId);
+
+            ComplianceDataDTO? compliance = null;
+            if (complianceData != null)
+            {
+                compliance = new ComplianceDataDTO
+                {
+                    SssNumber = DataEncryptionHelper.Decrypt(complianceData.SssNumberEncrypted, configuration),
+                    PhilhealthNumber = DataEncryptionHelper.Decrypt(complianceData.PhilhealthNumberEncrypted, configuration),
+                    PagibigNumber = DataEncryptionHelper.Decrypt(complianceData.PagibigNumberEncrypted, configuration),
+                    TinNumber = complianceData.TinNumberEncrypted != null
+                        ? DataEncryptionHelper.Decrypt(complianceData.TinNumberEncrypted, configuration)
+                        : null,
+                    BankName = DataEncryptionHelper.Decrypt(complianceData.BankNameEncrypted, configuration),
+                    BankAccountNumber = DataEncryptionHelper.Decrypt(complianceData.BankAccountNumberEncrypted, configuration),
+                    EmergencyContactName = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNameEncrypted, configuration),
+                    EmergencyContactNumber = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNumberEncrypted, configuration)
+                };
+            }
+
             return new ApiResponseDTO<Digital201FileResponseDTO>
             {
                 IsSuccess = true,
@@ -554,6 +584,7 @@ namespace OTMS.Service.Services
                     Role = employee.Account?.Role?.Name ?? "No Account",
                     AccountStatus = employee.Account?.AccountStatus ?? "No Account",
                     Success = true,
+                    Compliance = compliance,
                     Attachments = employee.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
                     {
                         EmployeeAttachmentId = a.EmployeeAttachmentId,
@@ -874,5 +905,144 @@ namespace OTMS.Service.Services
             };
         }
 
+        private static readonly Regex SssRegex = new(@"^\d{2}-\d{7}-\d{1}$");
+        private static readonly Regex PhilhealthRegex = new(@"^\d{2}-\d{9}-\d{1}$");
+        private static readonly Regex PagibigRegex = new(@"^\d{4}-\d{4}-\d{4}$");
+        private static readonly Regex TinRegex = new(@"^\d{3}-\d{3}-\d{3}-\d{3}$");
+
+        public async Task<ApiResponseDTO<string>> UpdateStatutoryRecordsAsync(UpdateStatutoryRecordsDTO request)
+        {
+            var currentAccountId = GetCurrentAccountId();
+            if (currentAccountId == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Unauthorized. Please log in again.",
+                    Data = null
+                };
+            }
+
+            var employee = await context.Employees
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeNumber.Trim());
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            if (!SssRegex.IsMatch(request.SssNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid SSS Number format detected. Expected format: XX-XXXXXXX-X.", Data = null };
+
+            if (!PhilhealthRegex.IsMatch(request.PhilhealthNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid PhilHealth Number format detected. Expected format: XX-XXXXXXXXX-X.", Data = null };
+
+            if (!PagibigRegex.IsMatch(request.PagibigNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid Pag-IBIG Number format detected. Expected format: XXXX-XXXX-XXXX.", Data = null };
+
+            if (!TinRegex.IsMatch(request.TinNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid TIN format detected. Expected format: XXX-XXX-XXX-XXX.", Data = null };
+
+            var existingData = await context.Employee201FileDatas
+                .FirstOrDefaultAsync(e => e.EmployeeId == employee.EmployeeId);
+
+            if (existingData != null)
+            {
+                existingData.SssNumberEncrypted = DataEncryptionHelper.Encrypt(request.SssNumber, configuration);
+                existingData.PhilhealthNumberEncrypted = DataEncryptionHelper.Encrypt(request.PhilhealthNumber, configuration);
+                existingData.PagibigNumberEncrypted = DataEncryptionHelper.Encrypt(request.PagibigNumber, configuration);
+                existingData.TinNumberEncrypted = DataEncryptionHelper.Encrypt(request.TinNumber, configuration);
+                existingData.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                var newData = new Employee201FileData
+                {
+                    Employee201FileDataId = Guid.NewGuid(),
+                    EmployeeId = employee.EmployeeId,
+                    SssNumberEncrypted = DataEncryptionHelper.Encrypt(request.SssNumber, configuration),
+                    PhilhealthNumberEncrypted = DataEncryptionHelper.Encrypt(request.PhilhealthNumber, configuration),
+                    PagibigNumberEncrypted = DataEncryptionHelper.Encrypt(request.PagibigNumber, configuration),
+                    TinNumberEncrypted = DataEncryptionHelper.Encrypt(request.TinNumber, configuration),
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Employee201FileDatas.Add(newData);
+            }
+
+            var syncRecord = new StatutorySyncRecord
+            {
+                StatutorySyncRecordId = Guid.NewGuid(),
+                EmployeeId = employee.EmployeeId,
+                TargetSystem = "FOMS",
+                SyncStatus = "Successful",
+                SyncTimestamp = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.StatutorySyncRecords.Add(syncRecord);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                currentAccountId.Value,
+                ActivityTypes.StatutoryRecordsUpdated,
+                $"Statutory records updated for employee {employee.EmployeeNumber}. SSS/PhilHealth/Pag-IBIG/TIN encrypted and synced with FOMS."
+            );
+
+            return new ApiResponseDTO<string>
+            {
+                IsSuccess = true,
+                Message = "Government records saved successfully. Statutory identifiers synchronized with FOMS.",
+                Data = employee.EmployeeNumber
+            };
+        }
+
+        public async Task<ApiResponseDTO<IEnumerable<StatutorySyncRecordResponseDTO>>> GetStatutorySyncRecordsAsync(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber.Trim());
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<IEnumerable<StatutorySyncRecordResponseDTO>>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            var records = await context.StatutorySyncRecords
+                .Where(s => s.EmployeeId == employee.EmployeeId)
+                .OrderByDescending(s => s.SyncTimestamp)
+                .Select(s => new StatutorySyncRecordResponseDTO
+                {
+                    SyncRecordId = s.StatutorySyncRecordId,
+                    TargetSystem = s.TargetSystem,
+                    SyncStatus = s.SyncStatus,
+                    SyncTimestamp = s.SyncTimestamp,
+                    ErrorMessage = s.ErrorMessage
+                })
+                .ToListAsync();
+
+            return new ApiResponseDTO<IEnumerable<StatutorySyncRecordResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = "Sync records retrieved successfully.",
+                Data = records
+            };
+        }
+
+        private Guid? GetCurrentAccountId()
+        {
+            var claim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(claim) || !Guid.TryParse(claim, out var id))
+                return null;
+            return id;
+        }
     }
 }

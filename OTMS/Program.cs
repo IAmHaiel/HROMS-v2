@@ -1,6 +1,10 @@
+using System;
+using System.Data;
+using System.Reflection;
+using System.Text;
 using Azure.Core;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,10 +17,6 @@ using OTMS.Data;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using OTMS.Service.Services;
-using System;
-using System.Data;
-using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -111,6 +111,7 @@ builder.Services.AddScoped<ILeaveRequest, LeaveRequestService>();
 builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 builder.Services.AddScoped<IRolesService, RolesService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<IDashboardNotificationService, DashboardNotificationService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -122,9 +123,15 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddScoped<IApprovalRoutingEngine, ApprovalRoutingEngine>();
+builder.Services.AddScoped<IPublicApplicationService, PublicApplicationService>();
+builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
+builder.Services.AddScoped<IRecruitmentService, RecruitmentService>();
+builder.Services.AddScoped<IOnboardingService, OnboardingService>();
+builder.Services.AddScoped<IEmployeeNumberGenerator, EmployeeNumberGenerator>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();
+builder.Services.AddHostedService<EmailRetryBackgroundService>();
 
 builder.Services.AddMailKit(config =>
 {

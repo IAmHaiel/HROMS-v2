@@ -16,7 +16,7 @@ using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
 {
-    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService, IFileService fileService) : ITaskService
+    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService, IFileService fileService, IDashboardNotificationService dashboardNotificationService) : ITaskService
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
@@ -191,6 +191,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request)
@@ -300,6 +302,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> RequestReopenTaskAsync(Guid taskId, RequestReopenDTO request)
@@ -332,6 +336,24 @@ namespace OTMS.Service.Services
             if (string.IsNullOrWhiteSpace(request.Reason))
             {
                 throw new Exception("Reopening reason is required.");
+            }
+
+            if (request.Reason.Length > 500)
+            {
+                throw new Exception("Reopening reason must not exceed 500 characters.");
+            }
+
+            if (request.SupportingEvidence != null)
+            {
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/jpeg", "image/png" };
+                if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
+                {
+                    throw new Exception("Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.");
+                }
+                if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
+                {
+                    throw new Exception("File size must not exceed 20MB.");
+                }
             }
 
             bool canManageTasks = permissions.Contains("Permissions.Tasks.Manage");
@@ -398,6 +420,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> ReviewReopenRequestAsync(Guid requestId, ReviewReopenDTO request)
@@ -444,6 +468,11 @@ namespace OTMS.Service.Services
                 throw new Exception("Admin remarks are required.");
             }
 
+            if (request.AdminRemarks.Length > 500)
+            {
+                throw new Exception("Admin remarks must not exceed 500 characters.");
+            }
+
             reopenReq.Status = request.ApprovalDecision;
             reopenReq.AdminRemarks = request.AdminRemarks;
 
@@ -461,6 +490,8 @@ namespace OTMS.Service.Services
                 $"Reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed. Remarks: {request.AdminRemarks}");
 
             await notificationService.CreateGeneralNotificationAsync(reopenReq.RequestedById, "Task Reopen Decision", $"Your reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed.");
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
@@ -514,9 +545,11 @@ namespace OTMS.Service.Services
                 throw new Exception("Task not found.");
             }
 
+            bool isAdmin = permissions.Contains("Permissions.Tasks.Manage");
+
             // SECURITY CHECK
-            // Only assigned employee can update progress
-            if (task.AssignedTo != loggedInAccountId)
+            // Only assigned employee can update progress (admins bypass for approvals)
+            if (!isAdmin && task.AssignedTo != loggedInAccountId)
             {
                 throw new UnauthorizedAccessException(
                     "You can only update tasks assigned to you.");
@@ -529,7 +562,7 @@ namespace OTMS.Service.Services
             }
 
             // Intercept action and explicitly prevent status from changing to "Completed" for non-admins
-            if (request.TaskStatus == "Completed" && !permissions.Contains("Permissions.Tasks.Manage"))
+            if (request.TaskStatus == "Completed" && !isAdmin)
             {
                 request.TaskStatus = "Pending Admin Review";
             }
@@ -555,7 +588,10 @@ namespace OTMS.Service.Services
                 }
                 else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
                 {
-                    // Fallback for previous FSM
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "Done" && request.TaskStatus == "Completed" && isAdmin)
+                {
                     isValidTransition = true;
                 }
                 else
@@ -583,8 +619,27 @@ namespace OTMS.Service.Services
                 task.ProgressNotes = request.ProgressNotes;
             }
 
+            if (!string.IsNullOrWhiteSpace(request.ProgressNotes) && request.ProgressNotes.Length > 1000)
+            {
+                throw new Exception("Progress notes must not exceed 1000 characters.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.TaskRemarks) && request.TaskRemarks.Length > 1000)
+            {
+                throw new Exception("Remarks must not exceed 1000 characters.");
+            }
+
             if (request.SupportingEvidence != null)
             {
+                var allowedTypes = new[] { "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "image/jpeg", "image/png" };
+                if (!allowedTypes.Contains(request.SupportingEvidence.ContentType))
+                {
+                    throw new Exception("Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.");
+                }
+                if (request.SupportingEvidence.Length > 20 * 1024 * 1024)
+                {
+                    throw new Exception("File size must not exceed 20MB.");
+                }
                 task.ProgressEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
@@ -640,6 +695,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request)
@@ -846,6 +903,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             // Return a response indicating successful deletion
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
+
             return new TaskDeleteResponseDTO
             {
                 IsDeleted = true,
@@ -869,6 +928,8 @@ namespace OTMS.Service.Services
 
             task.Deleted = false;
             await context.SaveChangesAsync();
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new ApiResponseDTO<TaskResponseDTO>
             {
@@ -976,6 +1037,8 @@ namespace OTMS.Service.Services
                     && !t.PermanentlyDeleted)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(t => t.PermanentlyDeleted, true));
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new ApiResponseDTO<object>
             {
@@ -1274,6 +1337,8 @@ namespace OTMS.Service.Services
                 throw new Exception("Invalid Admin Decision.");
             }
 
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
@@ -1283,6 +1348,44 @@ namespace OTMS.Service.Services
                 CreatedByEmployee = string.Join(" ", new[] { task.Creator.Employee.FirstName, task.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = task.CreatedAt
             };
+        }
+
+        public async Task<List<ReopenRequestListDTO>> GetReopenRequestsAsync()
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim))
+            {
+                throw new UnauthorizedAccessException("Invalid user session.");
+            }
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
+            if (!permissions.Contains("Permissions.Tasks.Manage"))
+            {
+                throw new UnauthorizedAccessException("Only Operations Admin can view reopen requests.");
+            }
+
+            var requests = await context.TaskReopenRequests
+                .Include(r => r.Task)
+                .Include(r => r.RequestedBy)
+                    .ThenInclude(a => a.Employee)
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new ReopenRequestListDTO
+                {
+                    RequestId = r.RequestId,
+                    TaskId = r.TaskId,
+                    TaskTitle = r.Task.TaskTitle,
+                    EmployeeName = string.Join(" ", new[] { r.RequestedBy.Employee.FirstName, r.RequestedBy.Employee.MiddleName, r.RequestedBy.Employee.LastName, r.RequestedBy.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
+                    EmployeeId = r.RequestedBy.Employee.EmployeeNumber,
+                    Reason = r.Reason,
+                    SupportingEvidence = r.EvidenceUrl,
+                    CurrentStatus = r.Task.TaskStatus,
+                    Status = r.Status,
+                    SubmittedAt = r.CreatedAt,
+                    ReviewedAt = null,
+                    AdminRemarks = r.AdminRemarks
+                })
+                .ToListAsync();
+
+            return requests;
         }
 
         public async Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request)
@@ -1338,6 +1441,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(loggedInAccountId, "Task Override", $"Operations Admin overrode task '{task.TaskTitle}' from Completed to {task.TaskStatus}. Reason: {request.OverrideReason}");
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
