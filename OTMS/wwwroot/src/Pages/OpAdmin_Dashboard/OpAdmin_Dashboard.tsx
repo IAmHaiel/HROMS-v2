@@ -1416,25 +1416,15 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
 
                     <div className="field">
                         <label>Admin Decision <span style={{ color: 'var(--danger)' }}>*</span></label>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            {(['Approve & Close', 'Return for Rework'] as const).map(opt => (
-                                <button
-                                    key={opt}
-                                    className={`filter-pill${decision === opt ? ' active' : ''}`}
-                                    onClick={() => { setDecision(opt); setError(''); }}
-                                    style={{
-                                        flex: 1, justifyContent: 'center', padding: '10px 14px',
-                                        background: decision === opt && opt === 'Approve & Close' ? '#05cd99' :
-                                            decision === opt && opt === 'Return for Rework' ? '#ee5d50' : undefined,
-                                        color: decision === opt ? '#fff' : undefined,
-                                        borderColor: decision === opt ? 'transparent' : undefined,
-                                    }}
-                                >
-                                    {opt === 'Approve & Close' ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />}
-                                    {opt}
-                                </button>
-                            ))}
-                        </div>
+                        <select
+                            className="report-select"
+                            value={decision}
+                            onChange={e => { setDecision(e.target.value as 'Approve & Close' | 'Return for Rework'); setError(''); }}
+                        >
+                            <option value="">Select decision</option>
+                            <option value="Approve & Close">Approve & Close</option>
+                            <option value="Return for Rework">Return for Rework</option>
+                        </select>
                     </div>
 
                     <div className="field">
