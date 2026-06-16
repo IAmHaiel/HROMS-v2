@@ -39,5 +39,55 @@ namespace OTMS.Controllers
 
             return Ok(result);
         }
+
+        /// <summary>
+        /// Returns operational summary report data as JSON for preview.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [ProducesResponseType(typeof(ApiResponseDTO<OperationalSummaryReportDTO>), 200)]
+        [HttpGet("operational-summary")]
+        public async Task<IActionResult> GetOperationalSummaryPreview([FromQuery] OperationalSummaryReportFilterDTO filter)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await reportingService.GetOperationalSummaryPreviewAsync(filter);
+
+            if (!result.IsSuccess)
+            {
+                if (result.Message == "Invalid date range selected. Start date must not be later than end date.")
+                    return BadRequest(result);
+
+                return Ok(result);
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Generates and downloads the operational summary report in PDF or Excel format.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [HttpGet("operational-summary/download")]
+        public async Task<IActionResult> DownloadOperationalSummary([FromQuery] OperationalSummaryReportFilterDTO filter)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var (fileBytes, contentType, fileName) = await reportingService.GenerateOperationalSummaryDownloadAsync(filter);
+                return File(fileBytes, contentType, fileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = null
+                });
+            }
+        }
     }
 }

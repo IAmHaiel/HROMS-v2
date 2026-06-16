@@ -26,6 +26,7 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddSignalR();
 
 // for frontend development, allowing cross-origin requests from the frontend development server
 builder.Services.AddCors(options =>
@@ -34,7 +35,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:5173")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -119,6 +121,9 @@ builder.Services.AddScoped<ISystemAdminService, SystemAdminService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
+builder.Services.AddScoped<IApprovalRoutingEngine, ApprovalRoutingEngine>();
+builder.Services.AddScoped<IPublicApplicationService, PublicApplicationService>();
+builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();
@@ -165,6 +170,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<OTMS.Hubs.WorkflowHub>("/hubs/workflow");
 
 app.MapFallbackToFile("index.html");
 

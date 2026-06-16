@@ -1,8 +1,28 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties, DragEvent, ChangeEvent } from 'react';
+import axios from 'axios';
 
-
-// ── Types ────────────────────────────────────────────────────────────────────
+declare global {
+    interface Window {
+        google?: {
+            accounts: {
+                id: {
+                    initialize: (config: {
+                        client_id: string;
+                        callback: (response: { credential: string }) => void;
+                        auto_select?: boolean;
+                        cancel_on_tap_outside?: boolean;
+                    }) => void;
+                    renderButton: (
+                        element: HTMLElement,
+                        options: { theme?: string; size?: string; text?: string; width?: string }
+                    ) => void;
+                    prompt: () => void;
+                };
+            };
+        };
+    }
+}
 
 type Stage = 'landing' | 'auth' | 'form' | 'success';
 
@@ -12,13 +32,16 @@ interface ApplicationForm {
     fullName: string;
     email: string;
     contactNumber: string;
-    position: string;
+    positionId: string;
     resume: File | null;
 }
 
 type FormErrors = Partial<Record<FormKey, string>>;
 
-// ── Icon components (inline SVG) ─────────────────────────────────────────────
+interface JobPositionDTO {
+    jobPositionId: string;
+    title: string;
+}
 
 const GoogleIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -69,30 +92,13 @@ const AlertIcon = () => (
     </svg>
 );
 
-// ── Mock data ────────────────────────────────────────────────────────────────
-
-const OPEN_POSITIONS: string[] = [
-    'Operations Manager',
-    'Logistics Coordinator',
-    'Delivery Driver',
-    'Warehouse Staff',
-    'Customer Service Representative',
-    'Finance Analyst',
-    'IT Support Specialist',
-    'Administrative Officer',
-    'HR Coordinator',
-    'Data Entry Specialist',
-];
-
 const EMPTY_FORM: ApplicationForm = {
     fullName: '',
-    email: 'hannabelle.reyes@gmail.com',
+    email: '',
     contactNumber: '',
-    position: '',
+    positionId: '',
     resume: null,
 };
-
-// ── Inject fonts + keyframes once ────────────────────────────────────────────
 
 if (typeof document !== 'undefined' && !document.getElementById('portal-styles')) {
     const style = document.createElement('style');
@@ -104,8 +110,6 @@ if (typeof document !== 'undefined' && !document.getElementById('portal-styles')
     document.head.appendChild(style);
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 export default function PublicApplicationPortal() {
     const [stage, setStage] = useState<Stage>('landing');
     const [authLoading, setAuthLoading] = useState(false);
@@ -113,18 +117,77 @@ export default function PublicApplicationPortal() {
     const [dragOver, setDragOver] = useState(false);
     const [form, setForm] = useState<ApplicationForm>({ ...EMPTY_FORM });
     const [errors, setErrors] = useState<FormErrors>({});
+    const [positions, setPositions] = useState<JobPositionDTO[]>([]);
+    const [positionsLoading, setPositionsLoading] = useState(true);
+    const [googleClientId, setGoogleClientId] = useState('');
+    const [configLoading, setConfigLoading] = useState(true);
+    const [googleToken, setGoogleToken] = useState('');
+    const [submitError, setSubmitError] = useState('');
+    const gsiInitialized = useRef(false);
 
-    // ── Google OAuth simulation ───────────────────────────────────────────────
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const configRes = await axios.get<{ googleClientId: string }>('/api/public/apply/config');
+                setGoogleClientId(configRes.data.googleClientId);
 
-    const handleGoogleAuth = () => {
-        setAuthLoading(true);
-        setTimeout(() => {
-            setAuthLoading(false);
-            setStage('form');
-        }, 1800);
+                if (configRes.data.googleClientId && configRes.data.googleClientId !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com') {
+                    loadGsiScript(configRes.data.googleClientId);
+                }
+            } catch {
+                // Config endpoint unavailable
+            } finally {
+                setConfigLoading(false);
+            }
+
+            try {
+                const positionsRes = await axios.get<{ data: JobPositionDTO[] }>('/api/public/apply/active-positions');
+                setPositions(positionsRes.data.data ?? []);
+            } catch {
+                setPositions([]);
+            } finally {
+                setPositionsLoading(false);
+            }
+        };
+        init();
+    }, []);
+
+    const loadGsiScript = (clientId: string) => {
+        if (gsiInitialized.current) return;
+        gsiInitialized.current = true;
+
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            if (window.google?.accounts?.id) {
+                window.google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: handleGoogleCredentialResponse,
+                    auto_select: false,
+                    cancel_on_tap_outside: false,
+                });
+            }
+        };
+        document.head.appendChild(script);
     };
 
-    // ── Validation ────────────────────────────────────────────────────────────
+    const handleGoogleCredentialResponse = (response: { credential: string }) => {
+        setGoogleToken(response.credential);
+        setAuthLoading(false);
+        setStage('form');
+    };
+
+    const openGoogleAuth = () => {
+        if (!window.google?.accounts?.id) {
+            setSubmitError('Google Sign-In is not available. Please try again later.');
+            return;
+        }
+        setAuthLoading(true);
+        setSubmitError('');
+        window.google.accounts.id.prompt();
+    };
 
     const validateField = (key: FormKey, value: string | File | null): string => {
         if (key === 'fullName') {
@@ -146,13 +209,20 @@ export default function PublicApplicationPortal() {
         return '';
     };
 
-    const handleChange = (key: keyof Pick<ApplicationForm, 'fullName' | 'contactNumber' | 'position'>) =>
-        (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (key: keyof Pick<ApplicationForm, 'fullName' | 'contactNumber'>) =>
+        (e: ChangeEvent<HTMLInputElement>) => {
             const val = e.target.value;
             setForm(p => ({ ...p, [key]: val }));
             const err = validateField(key as FormKey, val);
             setErrors(p => ({ ...p, [key]: err || undefined }));
         };
+
+    const handlePositionChange = (e: ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        setForm(p => ({ ...p, positionId: val }));
+        const err = validateField('position', val);
+        setErrors(p => ({ ...p, position: err || undefined }));
+    };
 
     const handleFile = (file: File | undefined) => {
         if (!file) return;
@@ -179,16 +249,44 @@ export default function PublicApplicationPortal() {
         handleFile(e.dataTransfer.files[0]);
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const newErrors: FormErrors = {};
         const keys: FormKey[] = ['fullName', 'contactNumber', 'position', 'resume'];
         keys.forEach(k => {
-            const err = validateField(k, form[k]);
+            const val = k === 'position' ? form.positionId : form[k];
+            const err = validateField(k, val);
             if (err) newErrors[k] = err;
         });
         if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+
         setSubmitLoading(true);
-        setTimeout(() => { setSubmitLoading(false); setStage('success'); }, 2000);
+        setSubmitError('');
+
+        try {
+            const formData = new FormData();
+            formData.append('GoogleToken', googleToken);
+            formData.append('FullName', form.fullName.trim());
+            formData.append('ContactNumber', form.contactNumber.trim());
+            formData.append('JobPositionId', form.positionId);
+            if (form.resume) {
+                formData.append('Resume', form.resume);
+            }
+
+            await axios.post('/api/public/apply/submit', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+
+            setSubmitLoading(false);
+            setStage('success');
+        } catch (err: unknown) {
+            setSubmitLoading(false);
+            if (axios.isAxiosError(err) && err.response?.data) {
+                const data = err.response.data as { message?: string };
+                setSubmitError(data.message ?? 'An error occurred. Please try again.');
+            } else {
+                setSubmitError('An error occurred. Please try again.');
+            }
+        }
     };
 
     const formatBytes = (b: number): string => {
@@ -201,16 +299,17 @@ export default function PublicApplicationPortal() {
         setStage('landing');
         setForm({ ...EMPTY_FORM });
         setErrors({});
+        setGoogleToken('');
+        setSubmitError('');
     };
 
-    // ── Render ────────────────────────────────────────────────────────────────
+    const openPositionsCount = positions.length;
 
     return (
         <div style={s.root}>
             <div style={s.bgPattern} />
             <div style={s.bgGlow} />
 
-            {/* Header */}
             <header style={s.header}>
                 <div style={s.headerInner}>
                     <div style={s.headerLogo}>
@@ -256,11 +355,11 @@ export default function PublicApplicationPortal() {
                             <div style={s.trustRow}>
                                 {[
                                     { value: '500+', label: 'Active Employees' },
-                                    { value: '12', label: 'Open Roles' },
+                                    { value: `${openPositionsCount}`, label: 'Open Roles' },
                                     { value: 'NCR', label: 'Primary Location' },
                                 ].map(({ value, label }) => (
                                     <div key={label} style={s.trustStat}>
-                                        <span style={s.trustValue}>{value}</span>
+                                        <span style={s.trustValue}>{!positionsLoading ? value : '...'}</span>
                                         <span style={s.trustLabel}>{label}</span>
                                     </div>
                                 ))}
@@ -290,12 +389,13 @@ export default function PublicApplicationPortal() {
                             </div>
                             <button
                                 style={s.googleBtn}
-                                onClick={() => setStage('auth')}
+                                onClick={openGoogleAuth}
+                                disabled={configLoading || !googleClientId || googleClientId === 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'}
                                 onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 8px 30px rgba(67,24,255,0.25)')}
                                 onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,24,255,0.15)')}
                             >
                                 <GoogleIcon />
-                                <span>Continue with Google</span>
+                                <span>{configLoading ? 'Loading...' : 'Continue with Google'}</span>
                             </button>
                             <p style={s.privacyNote}>
                                 <ShieldIcon />
@@ -325,18 +425,11 @@ export default function PublicApplicationPortal() {
                                         Sign in to Speedex Careers
                                     </p>
                                     <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Choose an account to continue</p>
-                                    <div style={s.mockAccount}>
-                                        <div style={s.mockAvatar}>H</div>
-                                        <div>
-                                            <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>Hannabelle Reyes</div>
-                                            <div style={{ fontSize: 12, color: '#64748b' }}>hannabelle.reyes@gmail.com</div>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             <button
                                 style={s.googleBtn}
-                                onClick={handleGoogleAuth}
+                                onClick={openGoogleAuth}
                                 disabled={authLoading}
                                 onMouseEnter={e => { if (!authLoading) e.currentTarget.style.boxShadow = '0 8px 30px rgba(67,24,255,0.25)'; }}
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,24,255,0.15)'; }}
@@ -344,7 +437,7 @@ export default function PublicApplicationPortal() {
                                 {authLoading ? (
                                     <><div style={s.spinner} /><span>Verifying…</span></>
                                 ) : (
-                                    <><GoogleIcon /><span>Continue as Hannabelle</span></>
+                                    <><GoogleIcon /><span>Continue with Google</span></>
                                 )}
                             </button>
                             <button style={s.ghostBtn} onClick={() => setStage('landing')}>← Back</button>
@@ -355,7 +448,6 @@ export default function PublicApplicationPortal() {
                 {/* ══ FORM ═════════════════════════════════════════════════════════ */}
                 {stage === 'form' && (
                     <div style={s.formWrap}>
-                        {/* Sidebar */}
                         <div style={s.formSide}>
                             <span style={s.eyebrow}>Application Form</span>
                             <h2 style={s.formSideTitle}>Tell us about yourself</h2>
@@ -381,19 +473,17 @@ export default function PublicApplicationPortal() {
                                 <div style={s.verifiedDot} />
                                 <div>
                                     <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>Authenticated</div>
-                                    <div style={{ fontSize: 12, color: '#64748b' }}>{form.email}</div>
+                                    <div style={{ fontSize: 12, color: '#64748b' }}>{form.email || 'Verified via Google'}</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Form card */}
                         <div style={s.formCard}>
                             <div style={s.formCardHeader}>
                                 <h3 style={s.formCardTitle}>Job Application</h3>
                                 <span style={s.formCardSub}>All fields marked * are required</span>
                             </div>
 
-                            {/* Personal Info */}
                             <div style={s.sectionLabel}>Personal Information</div>
                             <div style={{ marginBottom: 16 }}>
                                 <div style={s.field}>
@@ -438,22 +528,21 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
-                            {/* Position */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Position Applied For</div>
                             <div style={s.field}>
                                 <label style={s.label}>Select Position <span style={s.req}>*</span></label>
                                 <select
-                                    value={form.position}
-                                    onChange={handleChange('position')}
+                                    value={form.positionId}
+                                    onChange={handlePositionChange}
                                     style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}
                                 >
                                     <option value="">Choose a position…</option>
-                                    {OPEN_POSITIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                                    {positions.length === 0 && <option value="" disabled>No positions available</option>}
+                                    {positions.map(p => <option key={p.jobPositionId} value={p.jobPositionId}>{p.title}</option>)}
                                 </select>
                                 {errors.position && <span style={s.errMsg}><AlertIcon />{errors.position}</span>}
                             </div>
 
-                            {/* Resume */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Resume / CV</div>
 
                             {!form.resume ? (
@@ -495,7 +584,13 @@ export default function PublicApplicationPortal() {
                             )}
                             {errors.resume && <span style={{ ...s.errMsg, marginTop: 6 }}><AlertIcon />{errors.resume}</span>}
 
-                            {/* Submit */}
+                            {submitError && (
+                                <div style={s.errorBanner}>
+                                    <AlertIcon />
+                                    <span>{submitError}</span>
+                                </div>
+                            )}
+
                             <button
                                 style={{ ...s.submitBtn, ...(submitLoading ? { opacity: 0.8, cursor: 'not-allowed' } : {}) }}
                                 onClick={handleSubmit}
@@ -528,12 +623,11 @@ export default function PublicApplicationPortal() {
                                 Thank you for applying to Speedex Courier. Your application has been received and is currently under review.
                             </p>
                             <div style={s.successDetails}>
-                                {([
+                                {[
                                     { label: 'Applicant', value: form.fullName },
                                     { label: 'Email', value: form.email },
-                                    { label: 'Position', value: form.position },
-                                    { label: 'Status', value: 'Pending Review', highlight: true },
-                                ] as const).map(({ label, value, highlight }) => (
+                                    { label: 'Status', value: 'Pending Review', highlight: true as const },
+                                ].map(({ label, value, highlight }) => (
                                     <div key={label} style={s.successRow}>
                                         <span style={s.successLabel}>{label}</span>
                                         <span style={{ ...s.successValue, ...(highlight ? s.successBadge : {}) }}>{value}</span>
@@ -560,7 +654,6 @@ export default function PublicApplicationPortal() {
                 )}
             </main>
 
-            {/* Footer */}
             <footer style={s.footer}>
                 <span>© 2026 Speedex Courier Inc. · All rights reserved.</span>
                 <span style={s.footerRight}>Powered by OTMS · Recruitment Module</span>
@@ -568,8 +661,6 @@ export default function PublicApplicationPortal() {
         </div>
     );
 }
-
-// ── Styles ───────────────────────────────────────────────────────────────────
 
 const s: Record<string, CSSProperties> = {
     root: {
@@ -601,7 +692,6 @@ const s: Record<string, CSSProperties> = {
         zIndex: 0,
     },
 
-    // Header
     header: {
         position: 'relative',
         zIndex: 10,
@@ -633,7 +723,6 @@ const s: Record<string, CSSProperties> = {
         background: '#f1f5f9', borderRadius: 999, padding: '6px 12px',
     },
 
-    // Main
     main: {
         flex: 1,
         position: 'relative',
@@ -645,7 +734,6 @@ const s: Record<string, CSSProperties> = {
         boxSizing: 'border-box',
     },
 
-    // Landing
     landingWrap: { display: 'flex', gap: 64, alignItems: 'flex-start', flexWrap: 'wrap' },
     landingLeft: { flex: '1 1 400px', maxWidth: 560 },
     eyebrow: {
@@ -671,7 +759,6 @@ const s: Record<string, CSSProperties> = {
     trustValue: { fontSize: 28, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' },
     trustLabel: { fontSize: 12, color: '#64748b', fontWeight: 500 },
 
-    // Landing card
     landingCard: {
         flex: '0 0 380px',
         background: 'white', border: '1px solid #e2e8f0',
@@ -699,7 +786,6 @@ const s: Record<string, CSSProperties> = {
     },
     authText: { fontSize: 13, color: '#334155', fontWeight: 500 },
 
-    // Buttons
     googleBtn: {
         width: '100%',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -718,7 +804,6 @@ const s: Record<string, CSSProperties> = {
         fontSize: 11, color: '#94a3b8', lineHeight: 1.5, marginTop: 14,
     },
 
-    // Auth / Success centered layout
     centeredStage: { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: 16 },
     authCard: {
         background: 'white', border: '1px solid #e2e8f0', borderRadius: 24,
@@ -745,19 +830,7 @@ const s: Record<string, CSSProperties> = {
         padding: '20px 20px 16px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
     },
-    mockAccount: {
-        display: 'flex', alignItems: 'center', gap: 12, marginTop: 12,
-        background: 'white', border: '1px solid #e2e8f0', borderRadius: 10,
-        padding: '10px 14px', width: '100%', boxSizing: 'border-box', cursor: 'pointer',
-    },
-    mockAvatar: {
-        width: 36, height: 36, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #4318ff, #868cff)',
-        color: 'white', fontWeight: 700, fontSize: 16,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    },
 
-    // Spinner
     spinner: {
         width: 16, height: 16, borderRadius: '50%',
         border: '2px solid rgba(255,255,255,0.3)',
@@ -766,7 +839,6 @@ const s: Record<string, CSSProperties> = {
         flexShrink: 0,
     },
 
-    // Form layout
     formWrap: { display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' },
     formSide: { flex: '0 0 260px' },
     formSideTitle: { fontSize: 26, fontWeight: 800, color: '#0f172a', margin: '14px 0 10px', lineHeight: 1.2 },
@@ -791,7 +863,6 @@ const s: Record<string, CSSProperties> = {
         boxShadow: '0 0 0 3px rgba(5,205,153,0.2)',
     },
 
-    // Form card
     formCard: {
         flex: 1, background: 'white', border: '1px solid #e2e8f0',
         borderRadius: 24, padding: 36,
@@ -827,7 +898,6 @@ const s: Record<string, CSSProperties> = {
     hint: { fontSize: 11, color: '#94a3b8' },
     errMsg: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#ef4444', fontWeight: 500 },
 
-    // Dropzone
     dropzone: {
         border: '2px dashed #e2e8f0', borderRadius: 14, padding: '32px 20px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -861,7 +931,13 @@ const s: Record<string, CSSProperties> = {
         color: '#94a3b8', padding: 6, borderRadius: 8, display: 'flex', alignItems: 'center',
     },
 
-    // Submit
+    errorBanner: {
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: '#fef2f2', border: '1px solid #fecaca',
+        borderRadius: 10, padding: '12px 16px', marginTop: 16,
+        fontSize: 13, color: '#dc2626', fontWeight: 500,
+    },
+
     submitBtn: {
         width: '100%', marginTop: 28,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -871,7 +947,6 @@ const s: Record<string, CSSProperties> = {
     },
     submitNote: { fontSize: 12, color: '#94a3b8', lineHeight: 1.5, textAlign: 'center', marginTop: 14 },
 
-    // Success
     successCard: {
         background: 'white', border: '1px solid #e2e8f0', borderRadius: 24, padding: '48px 40px',
         boxShadow: '0 8px 40px rgba(15,23,42,0.08)', width: '100%', maxWidth: 520,
@@ -902,7 +977,6 @@ const s: Record<string, CSSProperties> = {
         borderRadius: 12, padding: '14px 16px', marginBottom: 24,
     },
 
-    // Footer
     footer: {
         position: 'relative', zIndex: 1, borderTop: '1px solid #e2e8f0', padding: '16px 32px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

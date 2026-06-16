@@ -21,5 +21,10 @@ namespace OTMS.Common.Constraints
         public const string TaskCommentAdded = "Task Comment Added";
         public const string TaskCommentUpdated = "Task Comment Updated";
         public const string TaskCommentDeleted = "Task Comment Deleted";
+        public const string ApprovalRequestSubmitted = "Approval Request Submitted";
+        public const string ApprovalTierApproved = "Approval Tier Approved";
+        public const string ApprovalTierRejected = "Approval Tier Rejected";
+        public const string ApprovalRequestFullyApproved = "Approval Request Fully Approved";
+        public const string ApprovalRequestRouted = "Approval Request Routed";
     }
 }

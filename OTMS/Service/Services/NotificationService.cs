@@ -1,5 +1,8 @@
+using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using MimeKit;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs.Notification.Responses;
@@ -12,8 +15,202 @@ using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
-    public class NotificationService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor) : INotificationService
+    public class NotificationService(
+        OTMSDbContext context,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration
+        ) : INotificationService
     {
+        private async Task<string> GetEmployeeEmailAsync(Guid accountId)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == accountId);
+            return account?.Employee?.Email ?? string.Empty;
+        }
+
+        private async System.Threading.Tasks.Task SendEmailAsync(string toEmail, string subject, string body)
+        {
+            if (string.IsNullOrWhiteSpace(toEmail)) return;
+
+            try
+            {
+                var smtpServer = configuration["MailKitOptions:Server"] ?? "smtp.gmail.com";
+                var smtpPort = int.TryParse(configuration["MailKitOptions:Port"], out var port) ? port : 587;
+                var senderName = configuration["MailKitOptions:SenderName"] ?? "Operational Management System";
+                var senderEmail = configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
+                var account = configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
+                var password = configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
+                var useSsl = bool.TryParse(configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
+
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(senderName, senderEmail));
+                message.To.Add(new MailboxAddress("", toEmail));
+                message.Subject = subject;
+
+                message.Body = new TextPart("html")
+                {
+                    Text = body
+                };
+
+                using var client = new SmtpClient();
+                await client.ConnectAsync(smtpServer, smtpPort, useSsl);
+                await client.AuthenticateAsync(account, password);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+            }
+            catch
+            {
+                // Silently fail - email delivery failure should not break the flow
+            }
+        }
+
+        public async System.Threading.Tasks.Task CreateEmailNotificationAsync(Guid accountId, string subject, string body)
+        {
+            var email = await GetEmployeeEmailAsync(accountId);
+            await SendEmailAsync(email, subject, body);
+        }
+
+        public async System.Threading.Tasks.Task DispatchApproverNotificationAsync(Guid approverAccountId, ApprovalRequest request)
+        {
+            var approver = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == approverAccountId);
+
+            if (approver == null) return;
+
+            var requester = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == request.RequesterAccountId);
+
+            var requesterName = requester != null
+                ? string.Join(" ", new[] { requester.Employee.FirstName, requester.Employee.MiddleName, requester.Employee.LastName, requester.Employee.Suffix }
+                    .Where(n => !string.IsNullOrEmpty(n)))
+                : "Unknown";
+
+            var subject = $"Action Required: {request.RequestType} Request Pending Your Approval";
+            var body = $@"
+                <h2>Approval Request</h2>
+                <p>A <strong>{request.RequestType}</strong> request requires your approval.</p>
+                <p><strong>Submitted by:</strong> {requesterName}</p>
+                <p><strong>Current Tier:</strong> {request.CurrentTierLevel} of {request.TotalTierCount}</p>
+                <p><strong>Status:</strong> {request.StatusTrackingText ?? "Pending Approval"}</p>
+                <p>Please log in to the system to review and make a decision.</p>
+                <hr>
+                <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+
+            // In-app notification
+            await CreateGeneralNotificationAsync(
+                approverAccountId,
+                NotificationTypes.ApprovalRequestPending,
+                $"A new {request.RequestType} request from {requesterName} requires your approval at Tier {request.CurrentTierLevel}."
+            );
+
+            // Email notification
+            await CreateEmailNotificationAsync(approverAccountId, subject, body);
+
+            // Audit log
+            await LogNotificationDispatchAsync(request.ApprovalRequestId, approverAccountId,
+                NotificationTypes.ApprovalRequestPending, "InApp", "Sent");
+            await LogNotificationDispatchAsync(request.ApprovalRequestId, approverAccountId,
+                NotificationTypes.ApprovalRequestPending, "Email", "Sent");
+
+            request.LastNotifiedAccountId = approverAccountId;
+            await context.SaveChangesAsync();
+        }
+
+        public async System.Threading.Tasks.Task DispatchRequesterNotificationAsync(Guid requesterAccountId, ApprovalRequest request, string outcome)
+        {
+            var requester = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == requesterAccountId);
+
+            if (requester == null) return;
+
+            string subject, body;
+
+            switch (outcome)
+            {
+                case "Approved":
+                    subject = $"Your {request.RequestType} Request Has Been Fully Approved";
+                    body = $@"
+                        <h2>Request Approved</h2>
+                        <p>Your <strong>{request.RequestType}</strong> request has been fully approved and processed.</p>
+                        <p><strong>Submitted on:</strong> {request.CreatedAt:MM/dd/yyyy}</p>
+                        <hr>
+                        <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+                    break;
+
+                case "Rejected":
+                    subject = $"Your {request.RequestType} Request Has Been Rejected";
+                    var rejectDecision = request.Decisions
+                        .OrderByDescending(d => d.TierLevel)
+                        .FirstOrDefault(d => d.Decision == "Rejected");
+                    body = $@"
+                        <h2>Request Rejected</h2>
+                        <p>Your <strong>{request.RequestType}</strong> request has been rejected.</p>
+                        <p><strong>Submitted on:</strong> {request.CreatedAt:MM/dd/yyyy}</p>
+                        <p><strong>Remarks:</strong> {rejectDecision?.Remarks ?? "No remarks provided."}</p>
+                        <hr>
+                        <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+                    break;
+
+                case "TierApproved":
+                    subject = $"Your {request.RequestType} Request Has Been Approved at Tier {request.CurrentTierLevel - 1}";
+                    body = $@"
+                        <h2>Request Approved at Current Tier</h2>
+                        <p>Your <strong>{request.RequestType}</strong> request has been approved at Tier {request.CurrentTierLevel - 1} and routed to the next level.</p>
+                        <p><strong>Current Status:</strong> {request.StatusTrackingText ?? "Routed to next approver"}</p>
+                        <hr>
+                        <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+                    break;
+
+                default:
+                    return;
+            }
+
+            // In-app notification
+            var notifType = outcome switch
+            {
+                "Approved" => NotificationTypes.ApprovalRequestFinalApproved,
+                "Rejected" => NotificationTypes.ApprovalRequestRejected,
+                "TierApproved" => NotificationTypes.ApprovalTierApproved,
+                _ => NotificationTypes.ApprovalRequestPending
+            };
+
+            var message = outcome switch
+            {
+                "Approved" => $"Your {request.RequestType} request has been fully approved and processed.",
+                "Rejected" => $"Your {request.RequestType} request has been rejected.",
+                "TierApproved" => $"Your {request.RequestType} request has been approved at Tier {request.CurrentTierLevel - 1} and routed to the next level.",
+                _ => ""
+            };
+
+            await CreateGeneralNotificationAsync(requesterAccountId, notifType, message);
+            await CreateEmailNotificationAsync(requesterAccountId, subject, body);
+
+            await LogNotificationDispatchAsync(request.ApprovalRequestId, requesterAccountId, notifType, "InApp", "Sent");
+            await LogNotificationDispatchAsync(request.ApprovalRequestId, requesterAccountId, notifType, "Email", "Sent");
+        }
+
+        public async System.Threading.Tasks.Task LogNotificationDispatchAsync(
+            Guid approvalRequestId, Guid recipientId, string notificationType, string channel, string status, string? errorMessage = null)
+        {
+            var auditLog = new NotificationAuditLog
+            {
+                AuditId = Guid.NewGuid(),
+                ApprovalRequestId = approvalRequestId,
+                RecipientAccountId = recipientId,
+                NotificationType = notificationType,
+                Channel = channel,
+                Status = status,
+                ErrorMessage = errorMessage,
+                SentAt = DateTime.UtcNow
+            };
+
+            context.NotificationAuditLogs.Add(auditLog);
+            await context.SaveChangesAsync();
+        }
         public async System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task)
         {
             var notification = new Notification

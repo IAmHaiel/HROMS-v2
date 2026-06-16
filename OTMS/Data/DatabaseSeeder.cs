@@ -28,7 +28,10 @@ namespace OTMS.Data
                 "Permissions.JobPositions.Manage",
                 "Permissions.Tasks.View",
                 "Permissions.Tasks.Manage",
-                // add more as needed
+                "Permissions.Approvals.View",
+                "Permissions.Approvals.Submit",
+                "Permissions.Approvals.Process",
+                "Permissions.Approvals.Manage",
             };
 
             foreach (var perm in permissions)
@@ -92,6 +95,7 @@ namespace OTMS.Data
                 var opPermissions = allDbPermissions.Where(p => 
                     p.Name.StartsWith("Permissions.Tasks.") || 
                     p.Name.StartsWith("Permissions.Users.") ||
+                    p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
                     p.Name.StartsWith("Permissions.JobPositions.View"));
 
@@ -102,6 +106,125 @@ namespace OTMS.Data
                         context.RolePermissions.Add(new RolePermission { RoleId = operationAdminRole.RoleId, PermissionId = perm.PermissionId });
                     }
                 }
+            }
+
+            await context.SaveChangesAsync();
+
+            // 4. Seed Default Approval Routing Matrices
+            await SeedApprovalRoutingMatricesAsync(context);
+        }
+
+        private static async System.Threading.Tasks.Task SeedApprovalRoutingMatricesAsync(OTMSDbContext context)
+        {
+            // Leave Request Routing Matrix (Employee -> Supervisor -> HR Admin)
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "Leave"))
+            {
+                var leaveMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "Leave",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                leaveMatrix.Tiers = new List<ApprovalTier>
+                {
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = leaveMatrix.RoutingMatrixId,
+                        TierLevel = 1,
+                        ApproverRole = "Supervisor",
+                        FallbackApproverRole = "OperationAdmin",
+                        IsFinalTier = false,
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = leaveMatrix.RoutingMatrixId,
+                        TierLevel = 2,
+                        ApproverRole = "OperationAdmin",
+                        IsFinalTier = true,
+                        CreatedAt = DateTime.UtcNow
+                    }
+                };
+
+                context.ApprovalRoutingMatrices.Add(leaveMatrix);
+            }
+
+            // Asset Request Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "Asset"))
+            {
+                var assetMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "Asset",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                assetMatrix.Tiers = new List<ApprovalTier>
+                {
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = assetMatrix.RoutingMatrixId,
+                        TierLevel = 1,
+                        ApproverRole = "Supervisor",
+                        FallbackApproverRole = "OperationAdmin",
+                        IsFinalTier = false,
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = assetMatrix.RoutingMatrixId,
+                        TierLevel = 2,
+                        ApproverRole = "OperationAdmin",
+                        IsFinalTier = true,
+                        CreatedAt = DateTime.UtcNow
+                    }
+                };
+
+                context.ApprovalRoutingMatrices.Add(assetMatrix);
+            }
+
+            // Resignation Request Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "Resignation"))
+            {
+                var resignMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "Resignation",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                resignMatrix.Tiers = new List<ApprovalTier>
+                {
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = resignMatrix.RoutingMatrixId,
+                        TierLevel = 1,
+                        ApproverRole = "Supervisor",
+                        FallbackApproverRole = "OperationAdmin",
+                        IsFinalTier = false,
+                        CreatedAt = DateTime.UtcNow
+                    },
+                    new ApprovalTier
+                    {
+                        TierId = Guid.NewGuid(),
+                        RoutingMatrixId = resignMatrix.RoutingMatrixId,
+                        TierLevel = 2,
+                        ApproverRole = "OperationAdmin",
+                        IsFinalTier = true,
+                        CreatedAt = DateTime.UtcNow
+                    }
+                };
+
+                context.ApprovalRoutingMatrices.Add(resignMatrix);
             }
 
             await context.SaveChangesAsync();
