@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Pencil, X, Package, Send, CheckCircle2,
+    Pencil, X, Package, CheckCircle2,
     XCircle, Clock, AlertTriangle, ThumbsUp, RotateCcw,
 } from 'lucide-react';
+import TaskComments from '../TaskComments/TaskComments';
 import './TaskView.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'Critical' | 'High' | 'Medium' | 'Low';
-type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Done' | 'Completed' | 'Overdue';
+type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Pending Admin Review' | 'Done' | 'Completed' | 'Overdue';
 type ReviewState = 'none' | 'pending_review' | 'approved' | 'rejected';
 
 export interface TaskViewTask {
@@ -77,6 +78,7 @@ const statusBadgeClass = (s: string): string =>
     'Completed': 'tv-badge tv-badge-green',
     'Overdue': 'tv-badge tv-badge-red',
     'Pending Review': 'tv-badge tv-badge-purple',
+    'Pending Admin Review': 'tv-badge tv-badge-purple',
 }[s] ?? 'tv-badge tv-badge-blue');
 
 const priorityDotClass = (p: Priority): string =>
@@ -87,21 +89,6 @@ const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
         {p}
     </span>
 );
-
-// ─── Mock seed data ───────────────────────────────────────────────────────────
-
-const MOCK_COMMENTS: Comment[] = [
-    {
-        id: '1', author: 'Operations Admin', role: 'admin', type: 'message',
-        text: 'Please review the task details and confirm once you start working on this.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-    },
-    {
-        id: '2', author: 'Assigned Employee', role: 'employee', type: 'message',
-        text: "Got it! I'll begin shortly and update the status once in progress.",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    },
-];
 
 // ─── Reject Modal ─────────────────────────────────────────────────────────────
 
@@ -150,76 +137,25 @@ const RejectModal: React.FC<{
 const TaskView: React.FC<TaskViewProps> = ({
     task, onEdit, onReopen, onClose, onApprove, onReject,
 }) => {
-    const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
-    const [newComment, setNewComment] = useState('');
-    const [sending, setSending] = useState(false);
     const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
     const [reviewState, setReviewState] = useState<ReviewState>(
         task.taskStatus === 'Completed' ? 'approved' :
-            task.taskStatus === 'In Progress' ? 'pending_review' : 'none'
+            (task.taskStatus === 'In Progress' || task.taskStatus === 'Pending Admin Review') ? 'pending_review' : 'none'
     );
     const [reviewHistory, setReviewHistory] = useState<ReviewHistoryEntry[]>([]);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [localStatus, setLocalStatus] = useState<TaskStatus>(task.taskStatus);
 
-    const commentsEndRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const currentUser = localStorage.getItem('employeeName') ?? 'Admin';
 
     const od = isEffectivelyOverdue({ ...task, taskStatus: localStatus });
     const effectiveStatus = od ? 'Overdue' : localStatus;
 
     useEffect(() => {
-        commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [comments, activeTab]);
-
-    useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [onClose]);
-
-    // ── Comment helpers ──
-    const addSystemComment = (text: string) => {
-        setComments(prev => [...prev, {
-            id: Date.now().toString(),
-            author: 'System',
-            role: 'admin',
-            type: 'system',
-            text,
-            timestamp: new Date().toISOString(),
-        }]);
-    };
-
-    const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setNewComment(e.target.value);
-        const ta = textareaRef.current;
-        if (ta) {
-            ta.style.height = 'auto';
-            ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-        }
-    };
-
-    const handleSend = () => {
-        const text = newComment.trim();
-        if (!text || sending) return;
-        setSending(true);
-        setComments(prev => [...prev, {
-            id: Date.now().toString(),
-            author: currentUser,
-            role: 'admin',
-            type: 'message',
-            text,
-            timestamp: new Date().toISOString(),
-        }]);
-        setNewComment('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
-        setSending(false);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-    };
 
     // ── Review actions ──
     const handleRequestReview = () => {
@@ -229,7 +165,6 @@ const TaskView: React.FC<TaskViewProps> = ({
             action: 'submitted', by: task.assignedEmployee,
             at: new Date().toISOString(),
         }]);
-        addSystemComment(`${task.assignedEmployee} submitted this task for completion review.`);
     };
 
     const handleApprove = () => {
@@ -239,7 +174,6 @@ const TaskView: React.FC<TaskViewProps> = ({
             action: 'approved', by: currentUser,
             at: new Date().toISOString(),
         }]);
-        addSystemComment(`✓ ${currentUser} approved completion of this task.`);
         onApprove?.(task.taskId);
     };
 
@@ -251,7 +185,6 @@ const TaskView: React.FC<TaskViewProps> = ({
             action: 'rejected', by: currentUser,
             at: new Date().toISOString(), note: reason,
         }]);
-        addSystemComment(`✗ ${currentUser} rejected completion: "${reason}"`);
         onReject?.(task.taskId, reason);
     };
 
@@ -262,7 +195,6 @@ const TaskView: React.FC<TaskViewProps> = ({
             action: 'reopened', by: currentUser,
             at: new Date().toISOString(),
         }]);
-        addSystemComment(`${currentUser} reopened this task.`);
         onReopen();
     };
 
@@ -379,7 +311,7 @@ const TaskView: React.FC<TaskViewProps> = ({
                         onClick={() => setActiveTab('details')}>Details</button>
                     <button className={`tv-tab${activeTab === 'comments' ? ' active' : ''}`}
                         onClick={() => setActiveTab('comments')}>
-                        Comments <span className="tv-tab-count">{comments.length}</span>
+                        Comments
                     </button>
                 </div>
 
@@ -485,72 +417,7 @@ const TaskView: React.FC<TaskViewProps> = ({
 
                     {/* ── Right: Comments ── */}
                     <div className={`tv-comments${activeTab === 'comments' ? ' tv-mobile-visible' : ''}`}>
-                        <div className="tv-comments-header">
-                            <span className="tv-comments-title">Comments</span>
-                            <span className="tv-comments-count">{comments.filter(c => c.type !== 'system').length}</span>
-                        </div>
-
-                        <div className="tv-thread">
-                            {comments.length === 0 ? (
-                                <div className="tv-thread-empty">
-                                    <Package size={22} strokeWidth={1.5} />
-                                    <p>No comments yet.</p>
-                                    <span>Start the conversation below.</span>
-                                </div>
-                            ) : comments.map(c => {
-                                if (c.type === 'system') return (
-                                    <div key={c.id} className="tv-system-msg">
-                                        <span className="tv-system-dot" />
-                                        <span>{c.text}</span>
-                                        <span className="tv-system-time">{fmtDateTime(c.timestamp)}</span>
-                                    </div>
-                                );
-                                const isMe = c.author === currentUser;
-                                return (
-                                    <div key={c.id} className={`tv-msg${isMe ? ' tv-msg-mine' : ' tv-msg-theirs'}`}>
-                                        {!isMe && (
-                                            <div className="tv-msg-avatar">{c.author.charAt(0).toUpperCase()}</div>
-                                        )}
-                                        <div className="tv-msg-body">
-                                            {!isMe && <span className="tv-msg-author">{c.author}</span>}
-                                            <div className={`tv-bubble${isMe ? ' tv-bubble-mine' : ' tv-bubble-theirs'}`}>
-                                                {c.text}
-                                            </div>
-                                            <span className="tv-msg-time">{fmtDateTime(c.timestamp)}</span>
-                                        </div>
-                                        {isMe && (
-                                            <div className="tv-msg-avatar tv-avatar-self">
-                                                {c.author.charAt(0).toUpperCase()}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            <div ref={commentsEndRef} />
-                        </div>
-
-                        <div className="tv-input-area">
-                            <div className="tv-input-row">
-                                <div className="tv-self-avatar">{currentUser.charAt(0).toUpperCase()}</div>
-                                <div className="tv-input-box">
-                                    <textarea
-                                        ref={textareaRef}
-                                        className="tv-textarea"
-                                        placeholder="Write a comment… (Enter to send)"
-                                        value={newComment}
-                                        onChange={handleCommentChange}
-                                        onKeyDown={handleKeyDown}
-                                        rows={1}
-                                        disabled={sending}
-                                    />
-                                    <button className="tv-send-btn" onClick={handleSend}
-                                        disabled={!newComment.trim() || sending} aria-label="Send">
-                                        <Send size={14} />
-                                    </button>
-                                </div>
-                            </div>
-                            <p className="tv-input-hint">Shift + Enter for new line</p>
-                        </div>
+                        <TaskComments taskId={task.taskId} currentEmployeeId={task.assignedTo} />
                     </div>
                 </div>
             </div>
