@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import {
     CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, ArrowLeft,
     User, Lock, Upload, FileText, Trash2, ShieldCheck, CreditCard, Phone
@@ -60,6 +61,41 @@ function applyTIN(raw: string): string {
 
 export default function OnboardingPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const onboardingToken = searchParams.get('token') || '';
+
+    const [tokenValidating, setTokenValidating] = useState(true);
+    const [tokenError, setTokenError] = useState('');
+    const [applicantInfo, setApplicantInfo] = useState<{ fullName: string; email: string; position: string } | null>(null);
+
+    useEffect(() => {
+        if (!onboardingToken) {
+            setTokenValidating(false);
+            setTokenError('Missing onboarding token. Please check your email for a valid link.');
+            return;
+        }
+        axios.post('/api/onboarding/validate', { token: onboardingToken })
+            .then((res) => {
+                const data = res.data as any;
+                if (data?.isSuccess && data.data) {
+                    setApplicantInfo({
+                        fullName: data.data.fullName,
+                        email: data.data.emailAddress,
+                        position: data.data.jobPositionName,
+                    });
+                    setTokenValidating(false);
+                } else {
+                    setTokenError(data?.message || 'Invalid or expired link.');
+                    setTokenValidating(false);
+                }
+            })
+            .catch((err) => {
+                const msg = err?.response?.data?.message || 'Failed to validate onboarding link.';
+                setTokenError(msg);
+                setTokenValidating(false);
+            });
+    }, [onboardingToken]);
+
     const [step, setStep] = useState<Step>('welcome');
 
     // ── Profile state ──
@@ -331,7 +367,14 @@ export default function OnboardingPage() {
                 body: JSON.stringify(payload),
             });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Failed to submit 201 File.'); }
-            // Token is invalidated server-side upon successful submission
+            // Mark onboarding token as used
+            if (onboardingToken) {
+                await fetch('/api/onboarding/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: onboardingToken }),
+                });
+            }
             setStep('done');
         } catch (err: any) { setApi201Error(err.message ?? 'Something went wrong. Please try again.'); }
         finally { setSaving201(false); }
@@ -448,6 +491,26 @@ export default function OnboardingPage() {
                     <img src="/src/assets/SpeedexLogo.jpg" alt="Speedex" style={{ height: 40, objectFit: 'contain' }} />
                 </div>
 
+                {tokenValidating && (
+                    <div style={{ background: 'white', borderRadius: 20, padding: '48px 32px', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
+                        <Loader2 size={32} color="#4318ff" className="spin-icon" style={{ margin: '0 auto 16px' }} />
+                        <p style={{ fontSize: 14, color: '#64748b', margin: 0 }}>Validating your onboarding link…</p>
+                    </div>
+                )}
+
+                {tokenError && (
+                    <div style={{ background: 'white', borderRadius: 20, padding: '48px 32px', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(238,93,80,0.1)', border: '2px solid rgba(238,93,80,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                            <AlertCircle size={28} color="#ee5d50" />
+                        </div>
+                        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>Link Invalid or Expired</h2>
+                        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 24px', lineHeight: 1.6 }}>{tokenError}</p>
+                        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>Please contact the HR department or your recruiter for assistance.</p>
+                    </div>
+                )}
+
+                {!tokenValidating && !tokenError && (
+                <>
                 {/* ── Progress bar ── */}
                 {step !== 'welcome' && step !== 'done' && (
                     <div style={{ marginBottom: 24 }}>
@@ -897,6 +960,7 @@ export default function OnboardingPage() {
                     )}
 
                 </div>
+                </>)}
 
                 <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
                     © {new Date().getFullYear()} Speedex Courier Inc. All rights reserved.

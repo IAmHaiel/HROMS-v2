@@ -1,13 +1,16 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
+using OTMS.Common.Helpers;
 using OTMS.Data;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Profile;
 using OTMS.Entities.DTOs.Profile.Responses;
 using OTMS.Entities.Models;
 using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace OTMS.Service.Services
 {
@@ -15,7 +18,8 @@ namespace OTMS.Service.Services
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
         IActivityLogService activityLogService,
-        IFileService fileService
+        IFileService fileService,
+        IConfiguration configuration
         ) : IProfileService
     {
         public async Task<ChangePasswordResponseDTO?> ChangePassword(ChangePasswordDTO request)
@@ -186,6 +190,116 @@ namespace OTMS.Service.Services
 
         }
 
+
+        private static readonly Regex SssRegex = new(@"^\d{2}-\d{7}-\d{1}$");
+        private static readonly Regex PhilhealthRegex = new(@"^\d{2}-\d{9}-\d{1}$");
+        private static readonly Regex PagibigRegex = new(@"^\d{4}-\d{4}-\d{4}$");
+        private static readonly Regex TinRegex = new(@"^\d{3}-\d{3}-\d{3}-\d{3}$");
+        private static readonly Regex BankAccountRegex = new(@"^\d+$");
+        private static readonly Regex PhMobileRegex = new(@"^09\d{9}$");
+
+        public async Task<ApiResponseDTO<string>> Submit201FileAsync(Submit201FileDTO request)
+        {
+            var accountId = GetCurrentAccountId();
+            if (accountId == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Unauthorized. Please log in again.",
+                    Data = null
+                };
+            }
+
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account.AccountId == accountId.Value);
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            var existing = await context.Employee201FileDatas
+                .AnyAsync(e => e.EmployeeId == employee.EmployeeId);
+
+            if (existing)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "201 File data has already been submitted.",
+                    Data = null
+                };
+            }
+
+            // Validate formats
+            if (!SssRegex.IsMatch(request.SssNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid SSS format. Expected format: XX-XXXXXXX-X.", Data = null };
+
+            if (!PhilhealthRegex.IsMatch(request.PhilhealthNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid PhilHealth format. Expected format: XX-XXXXXXXXX-X.", Data = null };
+
+            if (!PagibigRegex.IsMatch(request.PagibigNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid Pag-IBIG format. Expected format: XXXX-XXXX-XXXX.", Data = null };
+
+            if (!string.IsNullOrEmpty(request.TinNumber) && !TinRegex.IsMatch(request.TinNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid TIN format. Expected format: XXX-XXX-XXX-XXX.", Data = null };
+
+            if (!BankAccountRegex.IsMatch(request.BankAccountNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Bank account number must be numeric only.", Data = null };
+
+            if (!PhMobileRegex.IsMatch(request.EmergencyContactNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Emergency contact number must be 11 digits starting with 09.", Data = null };
+
+            // Encrypt fields
+            var config = configuration;
+            var data = new Employee201FileData
+            {
+                Employee201FileDataId = Guid.NewGuid(),
+                EmployeeId = employee.EmployeeId,
+                SssNumberEncrypted = DataEncryptionHelper.Encrypt(request.SssNumber, config),
+                PhilhealthNumberEncrypted = DataEncryptionHelper.Encrypt(request.PhilhealthNumber, config),
+                PagibigNumberEncrypted = DataEncryptionHelper.Encrypt(request.PagibigNumber, config),
+                TinNumberEncrypted = !string.IsNullOrEmpty(request.TinNumber)
+                    ? DataEncryptionHelper.Encrypt(request.TinNumber, config)
+                    : null,
+                BankNameEncrypted = DataEncryptionHelper.Encrypt(request.BankName, config),
+                BankAccountNumberEncrypted = DataEncryptionHelper.Encrypt(request.BankAccountNumber, config),
+                EmergencyContactNameEncrypted = DataEncryptionHelper.Encrypt(request.EmergencyContactName, config),
+                EmergencyContactNumberEncrypted = DataEncryptionHelper.Encrypt(request.EmergencyContactNumber, config),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.Employee201FileDatas.Add(data);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                accountId.Value,
+                ActivityTypes.Onboarding201FileSubmitted,
+                $"Employee '{employee.FirstName} {employee.LastName}' submitted their 201 File data."
+            );
+
+            return new ApiResponseDTO<string>
+            {
+                IsSuccess = true,
+                Message = "201 File submitted successfully.",
+                Data = employee.EmployeeId.ToString()
+            };
+        }
+
+        private Guid? GetCurrentAccountId()
+        {
+            var claim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(claim) || !Guid.TryParse(claim, out var id))
+                return null;
+            return id;
+        }
 
         public async Task<ViewProfileResponseDTO?> ViewProfile()
         {

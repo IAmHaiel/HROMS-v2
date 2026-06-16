@@ -1195,6 +1195,22 @@ interface ApplicantDetailModalProps {
 
 function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantDetailModalProps) {
     const hasTransitions = STATUS_TRANSITIONS[applicant.currentStatus].length > 0;
+    const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (applicant.currentStatus === 'Job Offered') {
+            axios.get(`/api/recruitment/${applicant.applicantId}/onboarding-link`)
+                .then((res) => {
+                    const data = res.data as any;
+                    if (data?.isSuccess && data.data) {
+                        setOnboardingStatus(data.data.tokenStatus);
+                    } else {
+                        setOnboardingStatus(null);
+                    }
+                })
+                .catch(() => setOnboardingStatus(null));
+        }
+    }, [applicant.applicantId, applicant.currentStatus]);
 
     return (
         <div className="rec-overlay" onClick={onClose}>
@@ -1242,6 +1258,41 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                         <>
                             <span className="rec-section-label">Interview Scheduled</span>
                             <InterviewCard details={applicant.interviewDetails} />
+                        </>
+                    )}
+
+                    {/* Onboarding status */}
+                    {applicant.currentStatus === 'Job Offered' && (
+                        <>
+                            <span className="rec-section-label">Onboarding Link</span>
+                            <div className="rec-interview-card" style={{ background: 'rgba(5,205,153,0.04)', border: '1px solid rgba(5,205,153,0.18)' }}>
+                                <div className="rec-interview-rows">
+                                    <div className="rec-interview-row">
+                                        <Mail size={13} className="rec-interview-row-icon" style={{ color: '#065f46' }} />
+                                        <span>
+                                            Status: <strong>{onboardingStatus ?? 'Not generated yet'}</strong>
+                                        </span>
+                                    </div>
+                                    {onboardingStatus === 'Active' && (
+                                        <div className="rec-modal-success" style={{ margin: '8px 0 0' }}>
+                                            <CheckCircle2 size={14} />
+                                            <span>Onboarding link has been sent to the applicant.</span>
+                                        </div>
+                                    )}
+                                    {onboardingStatus === 'Used' && (
+                                        <div className="rec-modal-success" style={{ margin: '8px 0 0' }}>
+                                            <CheckCircle2 size={14} />
+                                            <span>Applicant has completed onboarding.</span>
+                                        </div>
+                                    )}
+                                    {onboardingStatus === 'Expired' && (
+                                        <div className="rec-modal-warn" style={{ margin: '8px 0 0' }}>
+                                            <AlertCircle size={14} />
+                                            <span>Onboarding link has expired. Resend a new link.</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </>
                     )}
 
@@ -1516,10 +1567,28 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                                                 <button className="rec-action-btn" onClick={() => setDetailApplicant(a)}>
                                                     <Eye size={12} /> View
                                                 </button>
-                                                {STATUS_TRANSITIONS[a.currentStatus].length > 0 && (
+                                                {STATUS_TRANSITIONS[a.currentStatus].length > 0 && a.currentStatus !== 'Job Offered' && (
                                                     <button className="rec-action-btn rec-action-btn--primary"
                                                         onClick={() => setUpdateApplicant(a)}>
                                                         <RefreshCw size={12} /> Update
+                                                    </button>
+                                                )}
+                                                {a.currentStatus === 'Job Offered' && (
+                                                    <button className="rec-action-btn rec-action-btn--primary"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await axios.post(`/api/recruitment/${a.applicantId}/resend-onboarding`);
+                                                                const apiResult = res.data as any;
+                                                                if (apiResult?.isSuccess) {
+                                                                    showToast('Onboarding link resent successfully.');
+                                                                } else {
+                                                                    showToast(apiResult?.message || 'Failed to resend onboarding link.', 'error');
+                                                                }
+                                                            } catch {
+                                                                showToast('Failed to resend onboarding link.', 'error');
+                                                            }
+                                                        }}>
+                                                        <Mail size={12} /> Resend Onboarding
                                                     </button>
                                                 )}
                                             </div>

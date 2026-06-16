@@ -594,6 +594,60 @@ namespace OTMS.Migrations
                     b.ToTable("Employees");
                 });
 
+            modelBuilder.Entity("OTMS.Entities.Models.Employee201FileData", b =>
+                {
+                    b.Property<Guid>("Employee201FileDataId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BankAccountNumberEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("BankNameEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EmergencyContactNameEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EmergencyContactNumberEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PagibigNumberEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhilhealthNumberEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SssNumberEncrypted")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TinNumberEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Employee201FileDataId");
+
+                    b.HasIndex("EmployeeId")
+                        .IsUnique();
+
+                    b.ToTable("Employee201FileDatas");
+                });
+
             modelBuilder.Entity("OTMS.Entities.Models.EmployeeAttachment", b =>
                 {
                     b.Property<Guid>("EmployeeAttachmentId")
@@ -676,8 +730,7 @@ namespace OTMS.Migrations
 
                     b.Property<string>("LocationOrLink")
                         .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("InterviewScheduleId");
 
@@ -872,6 +925,44 @@ namespace OTMS.Migrations
                     b.HasIndex("RecipientAccountId");
 
                     b.ToTable("NotificationAuditLogs");
+                });
+
+            modelBuilder.Entity("OTMS.Entities.Models.OnboardingToken", b =>
+                {
+                    b.Property<Guid>("OnboardingTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicantRecordId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("OnboardingTokenId");
+
+                    b.HasIndex("ApplicantRecordId");
+
+                    b.HasIndex("CreatedByAccountId");
+
+                    b.ToTable("OnboardingTokens");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Permission", b =>
@@ -1372,6 +1463,17 @@ namespace OTMS.Migrations
                     b.Navigation("JobPosition");
                 });
 
+            modelBuilder.Entity("OTMS.Entities.Models.Employee201FileData", b =>
+                {
+                    b.HasOne("OTMS.Entities.Models.Employee", "Employee")
+                        .WithOne()
+                        .HasForeignKey("OTMS.Entities.Models.Employee201FileData", "EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+                });
+
             modelBuilder.Entity("OTMS.Entities.Models.EmployeeAttachment", b =>
                 {
                     b.HasOne("OTMS.Entities.Models.Employee", "Employee")
@@ -1469,6 +1571,25 @@ namespace OTMS.Migrations
                     b.Navigation("ApprovalRequest");
 
                     b.Navigation("Recipient");
+                });
+
+            modelBuilder.Entity("OTMS.Entities.Models.OnboardingToken", b =>
+                {
+                    b.HasOne("OTMS.Entities.Models.ApplicantRecord", "ApplicantRecord")
+                        .WithMany()
+                        .HasForeignKey("ApplicantRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OTMS.Entities.Models.Account", "CreatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("CreatedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ApplicantRecord");
+
+                    b.Navigation("CreatedByAccount");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.RolePermission", b =>

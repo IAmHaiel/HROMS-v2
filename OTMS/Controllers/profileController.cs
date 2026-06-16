@@ -53,6 +53,21 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
+        /// Submits 201 File data (government IDs, bank details, emergency contacts). Fields are encrypted at rest.
+        /// </summary>
+        [Authorize]
+        [HttpPost("submit-201-file")]
+        public async Task<IActionResult> Submit201File([FromBody] Submit201FileDTO request)
+        {
+            var result = await profileService.Submit201FileAsync(request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Changes Password of the User's Account to the System. Only accessible to users that are within the scoped role and authenticated.
         /// </summary>
         [Authorize]

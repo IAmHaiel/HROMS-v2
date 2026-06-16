@@ -15,7 +15,8 @@ namespace OTMS.Service.Services
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
         IActivityLogService activityLogService,
-        INotificationService notificationService
+        INotificationService notificationService,
+        IOnboardingService onboardingService
         ) : IRecruitmentService
     {
         private static readonly string[] AllowedStatuses = { "Pending Review", "Interview Scheduled", "Job Offered", "Rejected" };
@@ -160,6 +161,12 @@ namespace OTMS.Service.Services
             );
 
             await DispatchStatusUpdateNotificationAsync(applicant, oldStatus);
+
+            if (request.NewStatus == "Job Offered")
+            {
+                await onboardingService.GenerateAndSendOnboardingLinkAsync(
+                    applicant.ApplicantRecordId, currentAccountId.Value);
+            }
 
             return new ApiResponseDTO<string>
             {

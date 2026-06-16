@@ -27,5 +27,9 @@ namespace OTMS.Common.Constraints
         public const string ApprovalRequestFullyApproved = "Approval Request Fully Approved";
         public const string ApprovalRequestRouted = "Approval Request Routed";
         public const string RecruitmentStatusUpdated = "Recruitment Status Updated";
+        public const string OnboardingLinkSent = "Onboarding Link Sent";
+        public const string OnboardingLinkResent = "Onboarding Link Resent";
+        public const string OnboardingCompleted = "Onboarding Completed";
+        public const string Onboarding201FileSubmitted = "Onboarding 201 File Submitted";
     }
 }

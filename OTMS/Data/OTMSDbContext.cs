@@ -35,6 +35,8 @@ namespace OTMS.Data
         public DbSet<ApplicantStatusRecord> ApplicantStatusRecords { get; set; }
         public DbSet<InterviewSchedule> InterviewSchedules { get; set; }
         public DbSet<EmailQueueRecord> EmailQueueRecords { get; set; }
+        public DbSet<OnboardingToken> OnboardingTokens { get; set; }
+        public DbSet<Employee201FileData> Employee201FileDatas { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -311,6 +313,27 @@ namespace OTMS.Data
                 .HasOne(i => i.ApplicantRecord)
                 .WithMany()
                 .HasForeignKey(i => i.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // OnboardingToken -> ApplicantRecord
+            modelBuilder.Entity<OnboardingToken>()
+                .HasOne(ot => ot.ApplicantRecord)
+                .WithMany()
+                .HasForeignKey(ot => ot.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // OnboardingToken -> CreatedByAccount
+            modelBuilder.Entity<OnboardingToken>()
+                .HasOne(ot => ot.CreatedByAccount)
+                .WithMany()
+                .HasForeignKey(ot => ot.CreatedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Employee201FileData -> Employee (1:1)
+            modelBuilder.Entity<Employee201FileData>()
+                .HasOne(e => e.Employee)
+                .WithOne()
+                .HasForeignKey<Employee201FileData>(e => e.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

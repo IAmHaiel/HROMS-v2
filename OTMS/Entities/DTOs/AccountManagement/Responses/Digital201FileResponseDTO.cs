@@ -24,5 +24,7 @@ namespace OTMS.Entities.DTOs.AccountManagement.Responses
         public bool Success { get; set; }
 
         public List<EmployeeAttachmentDTO> Attachments { get; set; } = new List<EmployeeAttachmentDTO>();
+
+        public ComplianceDataDTO? Compliance { get; set; }
     }
 }

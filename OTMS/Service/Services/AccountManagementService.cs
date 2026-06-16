@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.HttpResults;
+using OTMS.Common.Helpers;
 using OTMS.Entities.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OTMS.Data;
 using OTMS.Entities.DTOs.AccountManagement;
 using OTMS.Entities.DTOs.AccountManagement.Responses;
@@ -16,7 +18,8 @@ namespace OTMS.Service.Services
 {
     public class AccountManagementService(
         OTMSDbContext context,
-        IFileService fileService
+        IFileService fileService,
+        IConfiguration configuration
         ) : IAccountManagementService
     {
 
@@ -535,6 +538,27 @@ namespace OTMS.Service.Services
                 };
             }
 
+            var complianceData = await context.Employee201FileDatas
+                .FirstOrDefaultAsync(c => c.EmployeeId == employee.EmployeeId);
+
+            ComplianceDataDTO? compliance = null;
+            if (complianceData != null)
+            {
+                compliance = new ComplianceDataDTO
+                {
+                    SssNumber = DataEncryptionHelper.Decrypt(complianceData.SssNumberEncrypted, configuration),
+                    PhilhealthNumber = DataEncryptionHelper.Decrypt(complianceData.PhilhealthNumberEncrypted, configuration),
+                    PagibigNumber = DataEncryptionHelper.Decrypt(complianceData.PagibigNumberEncrypted, configuration),
+                    TinNumber = complianceData.TinNumberEncrypted != null
+                        ? DataEncryptionHelper.Decrypt(complianceData.TinNumberEncrypted, configuration)
+                        : null,
+                    BankName = DataEncryptionHelper.Decrypt(complianceData.BankNameEncrypted, configuration),
+                    BankAccountNumber = DataEncryptionHelper.Decrypt(complianceData.BankAccountNumberEncrypted, configuration),
+                    EmergencyContactName = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNameEncrypted, configuration),
+                    EmergencyContactNumber = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNumberEncrypted, configuration)
+                };
+            }
+
             return new ApiResponseDTO<Digital201FileResponseDTO>
             {
                 IsSuccess = true,
@@ -554,6 +578,7 @@ namespace OTMS.Service.Services
                     Role = employee.Account?.Role?.Name ?? "No Account",
                     AccountStatus = employee.Account?.AccountStatus ?? "No Account",
                     Success = true,
+                    Compliance = compliance,
                     Attachments = employee.Attachments.Select(a => new OTMS.Entities.DTOs.EmployeeAttachmentDTO
                     {
                         EmployeeAttachmentId = a.EmployeeAttachmentId,
