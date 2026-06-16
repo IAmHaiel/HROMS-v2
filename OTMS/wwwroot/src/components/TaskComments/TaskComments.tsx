@@ -60,7 +60,14 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
         setError('');
         try {
             const res = await fetch(`${apiBase}/task/${taskId}`, { headers: authHeader() });
-            if (res.status === 404) { setComments([]); return; }
+            if (res.status === 404) {
+                const errBody = await res.json().catch(() => ({}));
+                if (errBody.message === 'Task not found.') {
+                    setError('Task not found.');
+                }
+                setComments([]);
+                return;
+            }
             if (!res.ok) throw new Error('Failed to load comments.');
             const json = await res.json();
             setComments(json.data ?? []);
@@ -182,6 +189,9 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
             <div className="tc-header">
                 <span className="tc-title">Comments</span>
                 <span className="tc-count">{comments.length}</span>
+                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                    Task ID: {taskId.slice(0, 8)}...
+                </span>
             </div>
 
             {successMsg && (

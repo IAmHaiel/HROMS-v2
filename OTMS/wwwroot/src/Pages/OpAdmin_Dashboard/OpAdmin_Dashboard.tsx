@@ -121,6 +121,7 @@ interface CreateTaskDTO {
     priority: Priority;
     dueAt: string | null;
     assignedTo: string;      // accountId Guid
+    IsDuplicateAcknowledged?: boolean;
 }
 
 interface UpdateTaskDTO {
@@ -130,6 +131,14 @@ interface UpdateTaskDTO {
     dueAt: string | null;
     assignedTo: string;
     taskRemarks?: string;
+}
+
+// DTO from backend for duplicate warnings
+interface DuplicateWarningDTO {
+    existingTaskTitle: string;
+    existingTaskId: string;
+    existingTaskStatus: string;
+    similarityPercentage: number;
 }
 
 // ─── Reopen Request Types ──────────────────────────────────────────────────────
@@ -3537,6 +3546,80 @@ const ReopenTab: React.FC<{
     );
 };
 
+// ─── Duplicate Warning Modal ──────────────────────────────────────────────────
+
+interface DuplicateWarningModalProps {
+    duplicates: DuplicateWarningDTO[];
+    onContinue: () => void;
+    onCancel: () => void;
+}
+
+const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicates, onContinue, onCancel }) => (
+    <div className="modal-overlay" onClick={onCancel}>
+        <div className="modal-card" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AlertCircle size={22} color="#ffb547" />
+                    <div>
+                        <h3>Potential duplicate task detected.</h3>
+                        <p className="modal-sub">
+                            The system found {duplicates.length} similar task{duplicates.length !== 1 ? 's' : ''} in existing records. Review the matches below.
+                        </p>
+                    </div>
+                </div>
+                <button className="icon-btn" onClick={onCancel}><X size={16} /></button>
+            </div>
+
+            <div style={{ overflowX: 'auto', margin: '8px 0 4px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                        <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Existing Task Title</th>
+                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Task ID</th>
+                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Status</th>
+                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Similarity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {duplicates.map((d, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    {d.existingTaskTitle}
+                                </td>
+                                <td style={{ padding: '10px 8px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                    {d.existingTaskId.length > 8 ? d.existingTaskId.slice(0, 8) + '...' : d.existingTaskId}
+                                </td>
+                                <td style={{ padding: '10px 8px' }}>
+                                    <span className={statusBadgeClass(d.existingTaskStatus)} style={{ fontSize: 11 }}>
+                                        {d.existingTaskStatus}
+                                    </span>
+                                </td>
+                                <td style={{
+                                    padding: '10px 8px', fontWeight: 700,
+                                    color: d.similarityPercentage >= 90 ? '#ee5d50' :
+                                        d.similarityPercentage >= 80 ? '#c05c00' :
+                                        d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)',
+                                }}>
+                                    {d.similarityPercentage}%
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 12 }}>
+                <button className="btn" onClick={onCancel}>
+                    <X size={13} /> Cancel
+                </button>
+                <button className="btn btn-primary" onClick={onContinue}>
+                    <CheckCircle2 size={13} /> Continue Anyway
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function OpsAdminDashboard() {
@@ -3579,6 +3662,10 @@ export default function OpsAdminDashboard() {
     // Reopen Requests state
     const [reopenRequests, setReopenRequests] = useState<ReopenRequest[]>(MOCK_REOPEN_REQUESTS);
     const [reviewingRequest, setReviewingRequest] = useState<ReopenRequest | null>(null);
+
+    // Duplicate warning state
+    const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarningDTO[]>([]);
+    const [pendingTaskData, setPendingTaskData] = useState<CreateTaskDTO | null>(null);
 
     // ── Update fetchTasks ──
     const fetchTasks = async () => {
@@ -3787,6 +3874,15 @@ export default function OpsAdminDashboard() {
                 },
                 body: JSON.stringify(data),
             });
+            if (res.status === 409) {
+                const errBody = await res.json().catch(() => ({}));
+                if (errBody.data && Array.isArray(errBody.data) && errBody.data.length > 0) {
+                    setDuplicateWarnings(errBody.data);
+                    setPendingTaskData(data);
+                    return;
+                }
+                throw new Error(errBody.message || 'Potential duplicate task detected.');
+            }
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Failed to create task.');
@@ -4167,7 +4263,7 @@ export default function OpsAdminDashboard() {
                     teamMembers={teamMembers}
                     tasks={tasks}
                     onSave={data => handleNewTask(data as CreateTaskDTO)}
-                    onClose={() => setShowNew(false)}
+                    onClose={() => { setShowNew(false); setDuplicateWarnings([]); setPendingTaskData(null); }}
                     showSuccess={success}
                 />
             )}
@@ -4224,6 +4320,22 @@ export default function OpsAdminDashboard() {
                     onApprove={handleApproveReopen}
                     onReject={handleRejectReopen}
                     onClose={() => setReviewingRequest(null)}
+                />
+            )}
+            {duplicateWarnings.length > 0 && pendingTaskData && (
+                <DuplicateWarningModal
+                    duplicates={duplicateWarnings}
+                    onContinue={() => {
+                        const task = pendingTaskData;
+                        setDuplicateWarnings([]);
+                        setPendingTaskData(null);
+                        handleNewTask({ ...task, IsDuplicateAcknowledged: true });
+                    }}
+                    onCancel={() => {
+                        setDuplicateWarnings([]);
+                        setPendingTaskData(null);
+                        setShowNew(false);
+                    }}
                 />
             )}
 
