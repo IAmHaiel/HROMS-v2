@@ -43,7 +43,7 @@ import LeaveRequestModal, {
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
-import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView';
+import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

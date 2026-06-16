@@ -24,10 +24,10 @@ import {
     Download,
 } from 'lucide-react';
 import './EmployeeDetailPanel.css';
-import { useToast } from '../../components/Toast/Toast';
-import FormModal from '../../components/FormModal/FormModal';
-import Digital201FileView from './Digital201FileView';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { useToast } from '../../../components/Toast/Toast';
+import FormModal from '../../../components/FormModal/FormModal';
+import Digital201FileView from './../Digital201FileView/Digital201FileView';
+import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 
 interface ConfirmModalState {
     isOpen: boolean;

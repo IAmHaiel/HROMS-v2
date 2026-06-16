@@ -24,11 +24,11 @@ import {
     Lock,
     Calendar,
 } from 'lucide-react';
-import { useToast } from '../../components/Toast/Toast';
-import StatCard from '../../components/StatCard/StatCard';
-import { TableCard, ActionsDropdown } from '../../components/TableCard/TableCard';
-import FormModal from '../../components/FormModal/FormModal';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { useToast } from '../../../components/Toast/Toast';
+import StatCard from '../../../components/StatCard/StatCard';
+import { TableCard, ActionsDropdown } from '../../../components/TableCard/TableCard';
+import FormModal from '../../../components/FormModal/FormModal';
+import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 import './RoleManagementTab.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

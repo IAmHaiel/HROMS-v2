@@ -42,22 +42,24 @@ import './SystemAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import { useToast } from '../../components/Toast/Toast';
-import EmployeeDetailPanel from './EmployeeDetailPanel';
+import EmployeeDetailPanel from './EmployeeDetailPanel/EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import FormModal from '../../components/FormModal/FormModal';
-import RoleManagementTab, { DepartmentResponseDTO, JobPositionResponseDTO } from './RoleManagementTab';
+import RoleManagementTab, { DepartmentResponseDTO, JobPositionResponseDTO } from './RoleManagementTab/RoleManagementTab';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
-import EmployeeDocumentsTab from './EmployeeDocumentsTab';
+import EmployeeDocumentsTab from './EmployeeDocumentsTab/EmployeeDocumentsTab';
+import RecruitmentTab from './RecruitmentTab/RecruitmentTab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type NavTab =
     | 'dashboard'
     | 'employees'
+    | 'recruitment'
     | 'delivery'
     | 'analytics'
     | 'settings'
@@ -244,6 +246,7 @@ const NAV_GROUPS = [
             { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
             { tab: 'employees' as NavTab, icon: Users, label: 'Manage Employee' },
             { tab: 'emergency_override' as NavTab, icon: FileText, label: 'Emergency Override' },
+            { tab: 'recruitment' as NavTab, icon: ClipboardList, label: 'Recruitment' },
         ],
     },
     {
@@ -2783,7 +2786,7 @@ export default function Dashboard() {
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
         delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
-        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile',
+        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment'
     };
 
     return (
@@ -2871,6 +2874,13 @@ export default function Dashboard() {
                             rolesList={rolesList}
                         />
                     )
+                )}
+
+                {activeTab === 'recruitment' && (
+                    <RecruitmentTab
+                        onSuccess={msg => success(msg)}
+                        onError={msg => error(msg)}
+                    />
                 )}
 
                 {(activeTab === 'profile' || activeTab === 'settings') && <ProfileTab onProfileUpdate={setEmployeeName} />}

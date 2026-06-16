@@ -21,9 +21,9 @@ import {
     Lock
 } from 'lucide-react';
 import './Digital201FileView.css';
-import { useToast } from '../../components/Toast/Toast';
-import FormModal from '../../components/FormModal/FormModal';
-import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { useToast } from '../../../components/Toast/Toast';
+import FormModal from '../../../components/FormModal/FormModal';
+import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 
 interface ConfirmModalState {
     isOpen: boolean;
