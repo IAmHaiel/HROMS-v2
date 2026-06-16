@@ -36,5 +36,6 @@ namespace OTMS.Common.Constraints
         public const string StatutoryRecordsUpdated = "Statutory Records Updated";
         public const string DashboardViewed = "Dashboard Viewed";
         public const string DashboardFiltered = "Dashboard Filtered";
+        public const string ReportGeneration = "Report Generation";
     }
 }

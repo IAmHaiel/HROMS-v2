@@ -133,7 +133,7 @@ namespace OTMS.Service.Services
 
             await activityLogService.LogActivityAsync(
                 loggedInAccountId,
-                "Report Generation",
+                ActivityTypes.ReportGeneration,
                 "Generated Task Completion Report."
             );
 
@@ -252,6 +252,11 @@ namespace OTMS.Service.Services
                 });
             }
 
+            await activityLogService.LogActivityAsync(
+                Guid.Parse(accountIdClaim),
+                ActivityTypes.ReportGeneration,
+                "Viewed Operational Summary Report preview.");
+
             return new ApiResponseDTO<OperationalSummaryReportDTO>
             {
                 IsSuccess = true,
@@ -293,7 +298,7 @@ namespace OTMS.Service.Services
 
             await activityLogService.LogActivityAsync(
                 loggedInAccountId,
-                "Report Generation",
+                ActivityTypes.ReportGeneration,
                 $"Generated Operational Summary Report in {format} format."
             );
 

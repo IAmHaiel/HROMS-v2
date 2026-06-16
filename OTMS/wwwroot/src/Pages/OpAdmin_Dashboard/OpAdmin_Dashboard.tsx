@@ -212,6 +212,40 @@ interface ReportFilter {
     taskCategory: string;
 }
 
+interface OperationalEmployeePerformance {
+    employeeName: string;
+    assigned: number;
+    completed: number;
+    overdue: number;
+    completionRate: number;
+}
+
+interface WorkloadDistribution {
+    categoryName: string;
+    taskCount: number;
+    percentage: number;
+}
+
+interface OperationalSummaryReport {
+    totalTasks: number;
+    completedTasks: number;
+    pendingTasks: number;
+    overdueTasks: number;
+    taskCompletionRate: number;
+    employeePerformanceSummary: OperationalEmployeePerformance[];
+    workloadByCategory: WorkloadDistribution[];
+    workloadByDepartment: WorkloadDistribution[];
+    workloadByPriority: WorkloadDistribution[];
+}
+
+interface OperationalSummaryFilter {
+    dateRangeStart: string;
+    dateRangeEnd: string;
+    departmentId: string;
+    employeeId: string;
+    reportFormat: string;
+}
+
 interface TaskCompletionReport {
     totalTasksAssigned: number;
     totalTasksCompleted: number;
@@ -314,6 +348,41 @@ function mockTaskCompletionReport(filter: ReportFilter): TaskCompletionReport {
             { employeeName: 'Franco Mendoza', totalAssigned: 7, totalCompleted: 4, completionRate: 57, averageCompletionTimeHours: 5.3 },
             { employeeName: 'Daniel Cruz', totalAssigned: 3, totalCompleted: 1, completionRate: 33, averageCompletionTimeHours: 6.7 },
             { employeeName: 'Elena Bautista', totalAssigned: 2, totalCompleted: 1, completionRate: 50, averageCompletionTimeHours: 4.0 },
+        ],
+    };
+}
+
+function mockOperationalSummaryReport(filter: OperationalSummaryFilter): OperationalSummaryReport {
+    return {
+        totalTasks: 42,
+        completedTasks: 28,
+        pendingTasks: 11,
+        overdueTasks: 3,
+        taskCompletionRate: 66.7,
+        employeePerformanceSummary: [
+            { employeeName: 'Ana Reyes', assigned: 12, completed: 9, overdue: 1, completionRate: 75 },
+            { employeeName: 'Ben Villanueva', assigned: 10, completed: 7, overdue: 1, completionRate: 70 },
+            { employeeName: 'Clara Santos', assigned: 8, completed: 6, overdue: 0, completionRate: 75 },
+            { employeeName: 'Franco Mendoza', assigned: 7, completed: 4, overdue: 1, completionRate: 57.1 },
+            { employeeName: 'Daniel Cruz', assigned: 3, completed: 1, overdue: 0, completionRate: 33.3 },
+            { employeeName: 'Elena Bautista', assigned: 2, completed: 1, overdue: 0, completionRate: 50 },
+        ],
+        workloadByCategory: [
+            { categoryName: 'Delivery', taskCount: 20, percentage: 47.6 },
+            { categoryName: 'Warehouse', taskCount: 12, percentage: 28.6 },
+            { categoryName: 'Administrative', taskCount: 7, percentage: 16.7 },
+            { categoryName: 'Maintenance', taskCount: 3, percentage: 7.1 },
+        ],
+        workloadByDepartment: [
+            { categoryName: 'Logistics', taskCount: 22, percentage: 52.4 },
+            { categoryName: 'Operations', taskCount: 15, percentage: 35.7 },
+            { categoryName: 'Administration', taskCount: 5, percentage: 11.9 },
+        ],
+        workloadByPriority: [
+            { categoryName: 'Critical', taskCount: 5, percentage: 11.9 },
+            { categoryName: 'High', taskCount: 15, percentage: 35.7 },
+            { categoryName: 'Medium', taskCount: 17, percentage: 40.5 },
+            { categoryName: 'Low', taskCount: 5, percentage: 11.9 },
         ],
     };
 }
@@ -1307,6 +1376,40 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
                         </span>
                     </div>
 
+                    <div className="field">
+                        <label>Admin Remarks *</label>
+                        <textarea className={errors.remarks ? 'report-input report-input-error' : 'report-input'}
+                            rows={3} maxLength={500} value={remarks}
+                            onChange={e => { setRemarks(e.target.value); setErrors(p => ({ ...p, remarks: '' })); }}
+                            placeholder="Document the reason for this override..." />
+                        {errors.remarks && <span className="report-field-error">{errors.remarks}</span>}
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                            {remarks.length}/500
+                        </span>
+                    </div>
+
+                    <div className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <input type="checkbox" id="override-confirm" checked={confirmed}
+                            onChange={e => { setConfirmed(e.target.checked); setErrors(p => ({ ...p, confirmed: '' })); }}
+                            style={{ marginTop: 3 }} />
+                        <label htmlFor="override-confirm" style={{ fontSize: 13, fontWeight: 500, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
+                            I confirm this admin override. I understand this action will be recorded in the Audit Log.
+                        </label>
+                    </div>
+                    {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
+
+                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                        <button className="btn" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-danger" onClick={handleSubmit} disabled={!confirmed}>
+                            <RotateCcw size={13} /> Execute Override
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const TasksTab: React.FC<{
     tasks: Task[];
     allTasks: Task[];
@@ -1330,59 +1433,13 @@ const TasksTab: React.FC<{
     const [filterPriority, setFilterPriority] = useState('');
     const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
 
-                    <div className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <input type="checkbox" id="override-confirm" checked={confirmed}
-                            onChange={e => { setConfirmed(e.target.checked); setErrors(p => ({ ...p, confirmed: '' })); }}
-                            style={{ marginTop: 3 }} />
-                        <label htmlFor="override-confirm" style={{ fontSize: 13, fontWeight: 500, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
-                            I confirm this admin override. I understand this action will be recorded in the Audit Log and the task will be reopened for modification.
-                        </label>
-                    </div>
-                    {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
+    const deletedTasks = binTasks;
 
-                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-                        <button className="btn" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSubmit}
-                            style={{ background: 'var(--status-failed)', borderColor: 'var(--status-failed)' }}>
-                            <Shield size={14} /> Submit Override
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    const filtered = tasks.filter(t =>
+        (!filterStatus || t.taskStatus === filterStatus) &&
+        (!filterPriority || t.priority === filterPriority) &&
+        (!searchQuery || t.taskTitle.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-};
-
-// ─── Task Review Modal (Approve & Close / Return for Rework) ──────────────────
-interface TaskReviewModalProps {
-    task: Task;
-    onSubmit: (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => Promise<void>;
-    onClose: () => void;
-}
-
-const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClose }) => {
-    const [decision, setDecision] = useState<'Approve & Close' | 'Return for Rework' | ''>('');
-    const [remarks, setRemarks] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleSubmit = async () => {
-        if (!decision) { setError('Please select an admin decision.'); return; }
-        if (decision === 'Return for Rework' && !remarks.trim()) {
-            setError('Reviewer Remarks are required when returning a task for rework.');
-            return;
-        }
-        setError('');
-        setSubmitting(true);
-        try {
-            await onSubmit(task.taskId, decision, remarks.trim());
-            onClose();
-        } catch (err: any) {
-            setError(err.message ?? 'Failed to submit review decision.');
-        } finally {
-            setSubmitting(false);
-        }
-    };
 
     return (
         <div className="dashboard-content">
@@ -1460,7 +1517,7 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
                 )}
                 {subTab === 'active' ? (
                     <div style={{ padding: '0 20px 20px' }}>
-                        {sorted.map(t => (
+                        {filtered.map(t => (
                             <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
                         ))}
                     </div>
@@ -1504,7 +1561,78 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
     );
 };
 
+// ─── Task Review Modal (Approve & Close / Return for Rework) ──────────────────
+interface TaskReviewModalProps {
+    task: Task;
+    onSubmit: (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => Promise<void>;
+    onClose: () => void;
+}
 
+const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClose }) => {
+    const [decision, setDecision] = useState<'Approve & Close' | 'Return for Rework' | ''>('');
+    const [remarks, setRemarks] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async () => {
+        if (!decision) { setError('Please select an admin decision.'); return; }
+        if (decision === 'Return for Rework' && !remarks.trim()) {
+            setError('Reviewer Remarks are required when returning a task for rework.');
+            return;
+        }
+        setError('');
+        setSubmitting(true);
+        try {
+            await onSubmit(task.taskId, decision, remarks.trim());
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit review decision.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ width: 460 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3>Task Review</h3>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+                <div className="modal-form">
+                    <div className="view-modal-meta" style={{ marginBottom: 16 }}>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Task</span>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>{task.taskTitle}</span>
+                        </div>
+                    </div>
+                    <div className="field">
+                        <label>Admin Decision *</label>
+                        <select value={decision} onChange={e => setDecision(e.target.value as any)} className="report-input">
+                            <option value="">Select decision</option>
+                            <option value="Approve & Close">Approve & Close</option>
+                            <option value="Return for Rework">Return for Rework</option>
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Reviewer Remarks</label>
+                        <textarea className="report-input" rows={3} value={remarks}
+                            onChange={e => setRemarks(e.target.value)}
+                            placeholder="Provide feedback or instructions..." />
+                    </div>
+                    {error && <div className="report-error-msg">{error}</div>}
+                    <div className="modal-actions">
+                        <button className="btn" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                            {submitting ? <Loader2 size={13} className="spin" /> : <CheckCircle2 size={13} />}
+                            {' '}{submitting ? 'Submitting...' : 'Submit Review'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ─── Task Template Tab ─────────────────────────────────────────────────────────
 
@@ -1906,8 +2034,13 @@ const TeamTab: React.FC<{
 
 // ─── Reports Tab ──────────────────────────────────────────────────────────────
 
+type ReportSubTab = 'task-completion' | 'operational-summary';
+
 const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
     const { success, error } = useToast();
+    const [subTab, setSubTab] = useState<ReportSubTab>('task-completion');
+
+    // ── Task Completion Report ──
     const [filter, setFilter] = useState<ReportFilter>({
         dateRangeStart: '',
         dateRangeEnd: '',
@@ -1923,6 +2056,24 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
     const [generatedAt, setGeneratedAt] = useState('');
     const [errors, setErrors] = useState<{ dateRangeStart?: string; dateRangeEnd?: string }>({});
 
+    // ── Operational Summary Report ──
+    const [opsFilter, setOpsFilter] = useState<OperationalSummaryFilter>({
+        dateRangeStart: '',
+        dateRangeEnd: '',
+        departmentId: '',
+        employeeId: '',
+        reportFormat: 'PDF',
+    });
+    const [opsReport, setOpsReport] = useState<OperationalSummaryReport | null>(null);
+    const [opsLoading, setOpsLoading] = useState(false);
+    const [opsError, setOpsError] = useState('');
+    const [opsNoRecords, setOpsNoRecords] = useState(false);
+    const [opsGeneratedAt, setOpsGeneratedAt] = useState('');
+    const [opsFormErrors, setOpsFormErrors] = useState<{ dateRangeStart?: string; dateRangeEnd?: string }>({});
+    const [opsEmployeePage, setOpsEmployeePage] = useState(1);
+    const OPS_EMPLOYEE_PAGE_SIZE = 5;
+
+    // ── Validation ──
     const validate = (): boolean => {
         const e: { dateRangeStart?: string; dateRangeEnd?: string } = {};
         if (!filter.dateRangeStart) e.dateRangeStart = 'Date range start is required.';
@@ -1934,6 +2085,18 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         return Object.keys(e).length === 0;
     };
 
+    const validateOps = (): boolean => {
+        const e: { dateRangeStart?: string; dateRangeEnd?: string } = {};
+        if (!opsFilter.dateRangeStart) e.dateRangeStart = 'Date range start is required.';
+        if (!opsFilter.dateRangeEnd) e.dateRangeEnd = 'Date range end is required.';
+        if (opsFilter.dateRangeStart && opsFilter.dateRangeEnd && opsFilter.dateRangeEnd < opsFilter.dateRangeStart) {
+            e.dateRangeEnd = 'End date must not be earlier than start date.';
+        }
+        setOpsFormErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    // ── Task Completion handlers ──
     const handleGenerate = async () => {
         if (!validate()) return;
         setLoading(true);
@@ -1949,7 +2112,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                 setLoading(false);
                 return;
             }
-
             const params = new URLSearchParams();
             params.set('DateRangeStart', filter.dateRangeStart);
             params.set('DateRangeEnd', filter.dateRangeEnd);
@@ -1957,45 +2119,79 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
             if (filter.taskPriorityLevel) params.set('TaskPriorityLevel', filter.taskPriorityLevel);
             if (filter.taskStatus) params.set('TaskStatus', filter.taskStatus);
             if (filter.taskCategory) params.set('TaskCategory', filter.taskCategory);
-
             const res = await fetch(`/api/reporting/task-completion?${params}`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
             });
-
-            if (res.status === 400) {
-                setFetchError('Invalid date range selected.');
-                setLoading(false);
-                return;
-            }
-            if (!res.ok) {
-                setFetchError('Failed to generate report. Please try again.');
-                setLoading(false);
-                return;
-            }
-
+            if (res.status === 400) { setFetchError('Invalid date range selected.'); setLoading(false); return; }
+            if (!res.ok) { setFetchError('Failed to generate report. Please try again.'); setLoading(false); return; }
             const data = await res.json();
-            if (data.isSuccess && data.data) {
-                setReport(data.data);
-                setGeneratedAt(new Date().toLocaleString());
-            } else {
-                setNoRecords(true);
-            }
-        } catch {
-            setFetchError('Failed to generate report. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+            if (data.isSuccess && data.data) { setReport(data.data); setGeneratedAt(new Date().toLocaleString()); }
+            else { setNoRecords(true); }
+        } catch { setFetchError('Failed to generate report. Please try again.'); }
+        finally { setLoading(false); }
     };
 
     const handleReset = () => {
         setFilter({ dateRangeStart: '', dateRangeEnd: '', employeeId: '', taskPriorityLevel: '', taskStatus: '', taskCategory: '' });
-        setReport(null);
-        setFetchError('');
-        setNoRecords(false);
-        setErrors({});
-        setGeneratedAt('');
+        setReport(null); setFetchError(''); setNoRecords(false); setErrors({}); setGeneratedAt('');
     };
 
+    // ── Operational Summary handlers ──
+    const handleOpsGenerate = async () => {
+        if (!validateOps()) return;
+        setOpsLoading(true); setOpsError(''); setOpsNoRecords(false); setOpsReport(null); setOpsEmployeePage(1);
+        try {
+            if (USE_MOCK_REPORT) {
+                await new Promise(r => setTimeout(r, 600));
+                setOpsReport(mockOperationalSummaryReport(opsFilter));
+                setOpsGeneratedAt(new Date().toLocaleString()); setOpsLoading(false); return;
+            }
+            const params = new URLSearchParams();
+            params.set('DateRangeStart', opsFilter.dateRangeStart);
+            params.set('DateRangeEnd', opsFilter.dateRangeEnd);
+            if (opsFilter.departmentId) params.set('DepartmentId', opsFilter.departmentId);
+            if (opsFilter.employeeId) params.set('EmployeeId', opsFilter.employeeId);
+            const res = await fetch(`/api/reporting/operational-summary?${params}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (res.status === 400) { setOpsError('Invalid date range selected.'); setOpsLoading(false); return; }
+            if (!res.ok) { setOpsError('Failed to generate report. Please try again.'); setOpsLoading(false); return; }
+            const body = await res.json();
+            if (body.isSuccess && body.data) { setOpsReport(body.data); setOpsGeneratedAt(new Date().toLocaleString()); }
+            else { setOpsNoRecords(true); }
+        } catch { setOpsError('Failed to generate report. Please try again.'); }
+        finally { setOpsLoading(false); }
+    };
+
+    const handleOpsReset = () => {
+        setOpsFilter({ dateRangeStart: '', dateRangeEnd: '', departmentId: '', employeeId: '', reportFormat: 'PDF' });
+        setOpsReport(null); setOpsError(''); setOpsNoRecords(false); setOpsFormErrors({}); setOpsGeneratedAt('');
+    };
+
+    const handleOpsDownload = async (format: string) => {
+        if (!opsFilter.dateRangeStart || !opsFilter.dateRangeEnd) { setOpsError('Date range is required to download.'); return; }
+        try {
+            const params = new URLSearchParams();
+            params.set('DateRangeStart', opsFilter.dateRangeStart);
+            params.set('DateRangeEnd', opsFilter.dateRangeEnd);
+            params.set('ReportFormat', format);
+            if (opsFilter.departmentId) params.set('DepartmentId', opsFilter.departmentId);
+            if (opsFilter.employeeId) params.set('EmployeeId', opsFilter.employeeId);
+            const res = await fetch(`/api/reporting/operational-summary/download?${params}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (!res.ok) { const errBody = await res.json().catch(() => null); setOpsError(errBody?.message || 'No records found for selected criteria.'); return; }
+            const blob = await res.blob();
+            const ext = format === 'EXCEL' ? 'xlsx' : 'pdf';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `OperationalSummaryReport_${new Date().toISOString().slice(0, 10)}.${ext}`;
+            a.click(); URL.revokeObjectURL(url);
+            success(`Report downloaded as ${format}.`);
+        } catch { setOpsError('Failed to download report. Please try again.'); }
+    };
+
+    // ── Task Completion helpers ──
     const exportCSV = () => {
         if (!report) return;
         const rows: string[] = [];
@@ -2019,10 +2215,8 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `task-completion-report-${filter.dateRangeStart}-to-${filter.dateRangeEnd}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        a.href = url; a.download = `task-completion-report-${filter.dateRangeStart}-to-${filter.dateRangeEnd}.csv`;
+        a.click(); URL.revokeObjectURL(url);
         success('CSV exported successfully.');
     };
 
@@ -2041,150 +2235,343 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         ].filter(d => d.value > 0)
         : [];
 
+    const paginatedEmployees = opsReport
+        ? opsReport.employeePerformanceSummary.slice(
+            (opsEmployeePage - 1) * OPS_EMPLOYEE_PAGE_SIZE,
+            opsEmployeePage * OPS_EMPLOYEE_PAGE_SIZE
+        )
+        : [];
+    const opsTotalEmployeePages = opsReport
+        ? Math.max(1, Math.ceil(opsReport.employeePerformanceSummary.length / OPS_EMPLOYEE_PAGE_SIZE))
+        : 1;
+
+    // ── Render ──
     return (
         <div className="dashboard-content">
-            <div className="card report-filter-card">
-                <div className="card-header-layout">
-                    <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
-                </div>
-                <div className="report-filter-grid">
-                    <div className="field">
-                        <label>Date Start *</label>
-                        <input type="date" className={inputClass('dateRangeStart')}
-                            value={filter.dateRangeStart}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
-                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Date End *</label>
-                        <input type="date" className={inputClass('dateRangeEnd')}
-                            value={filter.dateRangeEnd}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
-                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Employee</label>
-                        <select className="report-select"
-                            value={filter.employeeId}
-                            onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
-                            <option value="">All Employees</option>
-                            {teamMembers.map(m => (
-                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Priority</label>
-                        <select className="report-select"
-                            value={filter.taskPriorityLevel}
-                            onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
-                            <option value="">All Priorities</option>
-                            {PRIORITY_LEVELS.map(p => (
-                                <option key={p} value={p}>{p}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Status</label>
-                        <select className="report-select"
-                            value={filter.taskStatus}
-                            onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
-                            <option value="">All Statuses</option>
-                            {TASK_STATUSES_FILTER.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Category</label>
-                        <select className="report-select"
-                            value={filter.taskCategory}
-                            onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
-                            <option value="">All Categories</option>
-                            {TASK_CATEGORIES.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div className="report-filter-actions">
-                    <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
-                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
-                        {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
-                        {' '}{loading ? 'Generating...' : 'Generate Report'}
-                    </button>
-                </div>
+            {/* Sub-tab Navigation */}
+            <div className="report-subtabs">
+                <button className={`filter-pill${subTab === 'task-completion' ? ' active' : ''}`}
+                    onClick={() => setSubTab('task-completion')}>
+                    <BarChart3 size={14} /> Task Completion
+                </button>
+                <button className={`filter-pill${subTab === 'operational-summary' ? ' active' : ''}`}
+                    onClick={() => setSubTab('operational-summary')}>
+                    <ClipboardList size={14} /> Operational Summary
+                </button>
             </div>
 
-            {fetchError && <div className="report-error-msg">{fetchError}</div>}
-            {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
-
-            {report && (
+            {subTab === 'task-completion' && (
                 <>
-                    <div className="report-summary-grid">
-                        <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
-                        <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
-                        <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
-                        <StatCard icon={<Eye size={20} strokeWidth={2.3} />} variant="primary" label="PENDING REVIEW" value={String(report.totalTasksPendingReview)} subtext="Awaiting review" />
-                        <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(report.totalOverdueTasks)} subtext="Past deadline" />
-                        <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${report.taskCompletionRate}%`} subtext="Overall rate" />
-                        <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
-                    </div>
-
-                    <div className="card">
-                        <div className="card-header-layout"><h3>Employee Performance Summary</h3></div>
-                        {report.employeePerformanceSummary.length === 0 ? (
-                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No employee data for selected criteria.</p></div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <table className="data-table report-perf-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Employee</th>
-                                            <th>Assigned</th>
-                                            <th>Completed</th>
-                                            <th>Rate</th>
-                                            <th>Avg Time (h)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {report.employeePerformanceSummary.map(ep => (
-                                            <tr key={ep.employeeName}>
-                                                <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
-                                                <td>{ep.totalAssigned}</td>
-                                                <td>{ep.totalCompleted}</td>
-                                                <td>{ep.completionRate}%</td>
-                                                <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    <div className="card report-filter-card">
+                        <div className="card-header-layout">
+                            <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
+                        </div>
+                        <div className="report-filter-grid">
+                            <div className="field">
+                                <label>Date Start *</label>
+                                <input type="date" className={inputClass('dateRangeStart')}
+                                    value={filter.dateRangeStart}
+                                    onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
+                                {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
                             </div>
-                        )}
+                            <div className="field">
+                                <label>Date End *</label>
+                                <input type="date" className={inputClass('dateRangeEnd')}
+                                    value={filter.dateRangeEnd}
+                                    onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
+                                {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
+                            </div>
+                            <div className="field">
+                                <label>Employee</label>
+                                <select className="report-select"
+                                    value={filter.employeeId}
+                                    onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                                    <option value="">All Employees</option>
+                                    {teamMembers.map(m => (
+                                        <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Priority</label>
+                                <select className="report-select"
+                                    value={filter.taskPriorityLevel}
+                                    onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
+                                    <option value="">All Priorities</option>
+                                    {PRIORITY_LEVELS.map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Status</label>
+                                <select className="report-select"
+                                    value={filter.taskStatus}
+                                    onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
+                                    <option value="">All Statuses</option>
+                                    {TASK_STATUSES_FILTER.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Category</label>
+                                <select className="report-select"
+                                    value={filter.taskCategory}
+                                    onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
+                                    <option value="">All Categories</option>
+                                    {TASK_CATEGORIES.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="report-filter-actions">
+                            <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
+                            <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+                                {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                                {' '}{loading ? 'Generating...' : 'Generate Report'}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="card">
-                        <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
-                        {statusChartData.length === 0 ? (
-                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No status data available.</p></div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height={220}>
-                                <BarChart data={statusChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#a3aed0' }} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
+                    {fetchError && <div className="report-error-msg">{fetchError}</div>}
+                    {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
+
+                    {report && (
+                        <>
+                            <div className="report-summary-grid">
+                                <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
+                                <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
+                                <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
+                                <StatCard icon={<Eye size={20} strokeWidth={2.3} />} variant="primary" label="PENDING REVIEW" value={String(report.totalTasksPendingReview)} subtext="Awaiting review" />
+                                <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(report.totalOverdueTasks)} subtext="Past deadline" />
+                                <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${report.taskCompletionRate}%`} subtext="Overall rate" />
+                                <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
+                            </div>
+
+                            <div className="card">
+                                <div className="card-header-layout"><h3>Employee Performance Summary</h3></div>
+                                {report.employeePerformanceSummary.length === 0 ? (
+                                    <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No employee data for selected criteria.</p></div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table className="data-table">
+                                            <thead><tr><th>Employee</th><th>Assigned</th><th>Completed</th><th>Rate</th><th>Avg Time (h)</th></tr></thead>
+                                            <tbody>
+                                                {report.employeePerformanceSummary.map(ep => (
+                                                    <tr key={ep.employeeName}>
+                                                        <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                                        <td>{ep.totalAssigned}</td>
+                                                        <td>{ep.totalCompleted}</td>
+                                                        <td>{ep.completionRate}%</td>
+                                                        <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card">
+                                <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
+                                {statusChartData.length === 0 ? (
+                                    <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No status data available.</p></div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <BarChart data={statusChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#a3aed0' }} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+
+                            <div className="report-export-row">
+                                <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {generatedAt}</span>
+                                <button className="btn btn-primary" onClick={exportCSV}><Download size={14} /> Export CSV</button>
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {subTab === 'operational-summary' && (
+                <>
+                    <div className="card report-filter-card">
+                        <div className="card-header-layout">
+                            <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Operational Summary Report</h3>
+                        </div>
+                        <div className="report-filter-grid">
+                            <div className="field">
+                                <label>Date Start *</label>
+                                <input type="date" className={opsFormErrors.dateRangeStart ? 'report-input report-input-error' : 'report-input'}
+                                    value={opsFilter.dateRangeStart}
+                                    onChange={e => setOpsFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
+                                {opsFormErrors.dateRangeStart && <span className="report-field-error">{opsFormErrors.dateRangeStart}</span>}
+                            </div>
+                            <div className="field">
+                                <label>Date End *</label>
+                                <input type="date" className={opsFormErrors.dateRangeEnd ? 'report-input report-input-error' : 'report-input'}
+                                    value={opsFilter.dateRangeEnd}
+                                    onChange={e => setOpsFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
+                                {opsFormErrors.dateRangeEnd && <span className="report-field-error">{opsFormErrors.dateRangeEnd}</span>}
+                            </div>
+                            <div className="field">
+                                <label>Department</label>
+                                <select className="report-select" value={opsFilter.departmentId}
+                                    onChange={e => setOpsFilter(p => ({ ...p, departmentId: e.target.value }))}>
+                                    <option value="">All Departments</option>
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Employee</label>
+                                <select className="report-select" value={opsFilter.employeeId}
+                                    onChange={e => setOpsFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                                    <option value="">All Employees</option>
+                                    {teamMembers.map(m => (
+                                        <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Format</label>
+                                <select className="report-select" value={opsFilter.reportFormat}
+                                    onChange={e => setOpsFilter(p => ({ ...p, reportFormat: e.target.value }))}>
+                                    <option value="PDF">PDF</option>
+                                    <option value="EXCEL">Excel</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="report-filter-actions">
+                            <button className="btn" onClick={handleOpsReset}><RotateCcw size={14} /> Reset</button>
+                            <button className="btn btn-primary" onClick={handleOpsGenerate} disabled={opsLoading}>
+                                {opsLoading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                                {' '}{opsLoading ? 'Generating...' : 'Generate Preview'}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="report-export-row">
-                        <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {generatedAt}</span>
-                        <button className="btn btn-primary" onClick={exportCSV}>
-                            <Download size={14} /> Export CSV
-                        </button>
-                    </div>
+                    {opsError && <div className="report-error-msg">{opsError}</div>}
+                    {opsNoRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
+
+                    {opsReport && (
+                        <>
+                            <div className="report-summary-grid">
+                                <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="TOTAL TASKS" value={String(opsReport.totalTasks)} subtext="All tasks" />
+                                <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(opsReport.completedTasks)} subtext="Tasks finished" />
+                                <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="PENDING" value={String(opsReport.pendingTasks)} subtext="Incomplete" />
+                                <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(opsReport.overdueTasks)} subtext="Past deadline" />
+                                <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${opsReport.taskCompletionRate.toFixed(1)}%`} subtext="Overall" />
+                            </div>
+
+                            <div className="card">
+                                <div className="card-header-layout"><h3>Employee Performance Summary</h3></div>
+                                {opsReport.employeePerformanceSummary.length === 0 ? (
+                                    <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No employee data.</p></div>
+                                ) : (
+                                    <div>
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table className="data-table">
+                                                <thead><tr><th>Employee</th><th>Assigned</th><th>Completed</th><th>Overdue</th><th>Rate</th></tr></thead>
+                                                <tbody>
+                                                    {paginatedEmployees.map(ep => (
+                                                        <tr key={ep.employeeName}>
+                                                            <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                                            <td>{ep.assigned}</td>
+                                                            <td>{ep.completed}</td>
+                                                            <td style={{ color: ep.overdue > 0 ? '#ee5d50' : 'inherit' }}>{ep.overdue}</td>
+                                                            <td>{ep.completionRate.toFixed(1)}%</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {opsTotalEmployeePages > 1 && (
+                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: '12px 0 4px' }}>
+                                                <button className="btn btn-sm" disabled={opsEmployeePage <= 1}
+                                                    onClick={() => setOpsEmployeePage(p => Math.max(1, p - 1))}
+                                                    style={{ opacity: opsEmployeePage <= 1 ? 0.4 : 1 }}>‹ Prev</button>
+                                                {Array.from({ length: opsTotalEmployeePages }, (_, i) => i + 1).map(p => (
+                                                    <button key={p}
+                                                        className={`btn btn-sm${p === opsEmployeePage ? ' btn-primary' : ''}`}
+                                                        onClick={() => setOpsEmployeePage(p)}
+                                                        style={{ minWidth: 32, fontWeight: p === opsEmployeePage ? 700 : 400 }}>
+                                                        {p}
+                                                    </button>
+                                                ))}
+                                                <button className="btn btn-sm" disabled={opsEmployeePage >= opsTotalEmployeePages}
+                                                    onClick={() => setOpsEmployeePage(p => Math.min(opsTotalEmployeePages, p + 1))}
+                                                    style={{ opacity: opsEmployeePage >= opsTotalEmployeePages ? 0.4 : 1 }}>Next ›</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                                <div className="card" style={{ padding: '16px 20px' }}>
+                                    <div className="card-header-layout"><h3 style={{ fontSize: 13 }}>By Category</h3></div>
+                                    {opsReport.workloadByCategory.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 12 }}>No data</div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height={opsReport.workloadByCategory.length * 30 + 20}>
+                                            <BarChart data={opsReport.workloadByCategory.map(w => ({ name: w.categoryName, value: w.taskCount }))} layout="vertical" barSize={12}>
+                                                <CartesianGrid horizontal={false} stroke="transparent" />
+                                                <XAxis hide type="number" />
+                                                <YAxis hide type="category" dataKey="name" />
+                                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', fontSize: 12 }} />
+                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#4318ff" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                                <div className="card" style={{ padding: '16px 20px' }}>
+                                    <div className="card-header-layout"><h3 style={{ fontSize: 13 }}>By Department</h3></div>
+                                    {opsReport.workloadByDepartment.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 12 }}>No data</div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height={opsReport.workloadByDepartment.length * 30 + 20}>
+                                            <BarChart data={opsReport.workloadByDepartment.map(w => ({ name: w.categoryName, value: w.taskCount }))} layout="vertical" barSize={12}>
+                                                <CartesianGrid horizontal={false} stroke="transparent" />
+                                                <XAxis hide type="number" />
+                                                <YAxis hide type="category" dataKey="name" />
+                                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', fontSize: 12 }} />
+                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#05cd99" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                                <div className="card" style={{ padding: '16px 20px' }}>
+                                    <div className="card-header-layout"><h3 style={{ fontSize: 13 }}>By Priority</h3></div>
+                                    {opsReport.workloadByPriority.length === 0 ? (
+                                        <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 12 }}>No data</div>
+                                    ) : (
+                                        <ResponsiveContainer width="100%" height={opsReport.workloadByPriority.length * 30 + 20}>
+                                            <BarChart data={opsReport.workloadByPriority.map(w => ({ name: w.categoryName, value: w.taskCount }))} layout="vertical" barSize={12}>
+                                                <CartesianGrid horizontal={false} stroke="transparent" />
+                                                <XAxis hide type="number" />
+                                                <YAxis hide type="category" dataKey="name" />
+                                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', fontSize: 12 }} />
+                                                <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#ffb547" />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="report-export-row">
+                                <span className="report-generated-badge"><Calendar size={12} /> Preview generated at: {opsGeneratedAt}</span>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <button className="btn btn-primary" onClick={() => handleOpsDownload('PDF')}><Download size={14} /> Download PDF</button>
+                                    <button className="btn btn-primary" onClick={() => handleOpsDownload('EXCEL')}><Download size={14} /> Download Excel</button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </>
             )}
         </div>
