@@ -31,6 +31,9 @@ import {
     RefreshCw,
     LogOut,
     Mail,
+    Upload,
+    File,
+    Paperclip,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -48,7 +51,7 @@ import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digi
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
-type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue';
+type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue' | 'pending-admin-review';
 type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
 
 interface Task {
@@ -131,7 +134,7 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
     };
     const status: TaskStatus = statusMap[dto.taskStatus] ?? 'pending';
     const defaultProgress: Record<TaskStatus, number> = {
-        pending: 0, assigned: 0, 'in-progress': 50, done: 90, completed: 100, overdue: 0,
+        pending: 0, assigned: 0, 'in-progress': 50, 'pending-admin-review': 90, done: 90, completed: 100, overdue: 0,
     };
     return {
         id: dto.taskId,
@@ -181,13 +184,14 @@ const statusMeta: Record<string, { label: string; cls: string; icon: React.React
     done: { label: 'Done', cls: 'badge-blue', icon: <CheckCircle2 size={11} /> },
     completed: { label: 'Completed', cls: 'badge-green', icon: <CheckCircle2 size={11} /> },
     overdue: { label: 'Overdue', cls: 'badge-red', icon: <AlertCircle size={11} /> },
+    'pending-admin-review': { label: 'Pending Admin Review', cls: 'badge-purple', icon: <Shield size={11} /> },
 };
 
 const FSM_EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
     pending: ['in-progress'],
     assigned: ['in-progress'],
-    'in-progress': ['done'],
-    done: [],
+    'in-progress': ['pending-admin-review'],
+    'pending-admin-review': [],
     completed: [],
     overdue: [],
 };
@@ -232,13 +236,15 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
 interface TaskDetailProps {
     task: Task;
     onUpdate: () => void;
+    onSubmitForReview: () => void;
     onClose: () => void;
 }
 
-const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
+const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForReview, onClose }) => {
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
+    const canSubmitForReview = task.status === 'in-progress' || task.status === 'assigned';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -292,10 +298,20 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
                     <button className="btn" onClick={onClose}>Close</button>
-                    {task.status !== 'completed' && task.status !== 'done' && (
+                    {task.status !== 'completed' && task.status !== 'done' && task.status !== 'pending-admin-review' && (
                         <button className="btn btn-primary" onClick={onUpdate}>
                             <Pencil size={13} /> Update Progress
                         </button>
+                    )}
+                    {canSubmitForReview && (
+                        <button className="btn btn-primary" style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={onSubmitForReview}>
+                            <CheckCircle2 size={13} /> Mark as Complete
+                        </button>
+                    )}
+                    {task.status === 'pending-admin-review' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
+                            <Shield size={13} /> Submitted for Admin Review
+                        </div>
                     )}
                 </div>
             </div>
@@ -309,9 +325,10 @@ interface ProgressModalProps {
     task: Task;
     onSave: (id: string, status: TaskStatus, progress: number, remarks: string) => Promise<void>;
     onClose: () => void;
+    onSubmitForReview?: () => void;
 }
 
-const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
+const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, onSubmitForReview }) => {
     const baseStatus = task.status === 'overdue' ? 'in-progress' : task.status;
     const [status, setStatus] = useState<TaskStatus>(baseStatus);
     const [progress, setProgress] = useState(task.progress);
@@ -328,13 +345,17 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
         }
         setFsmError('');
         setStatus(s);
-        if (s === 'done') setProgress(100);
+        if (s === 'pending-admin-review' && progress < 90) setProgress(90);
         if (s === 'in-progress' && progress === 0) setProgress(25);
     };
 
     const handleSave = async () => {
         if (status === baseStatus && (!remarks.trim() || remarks.trim() === (task.remarks ?? '').trim())) {
             setFsmError('No changes detected. Update the status or remarks to proceed.');
+            return;
+        }
+        if (status === 'pending-admin-review') {
+            onSubmitForReview?.();
             return;
         }
         setError('');
@@ -413,7 +434,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         />
                     </div>
                 </div>
-                    </>
+                        </>
                 )}
 
                 <div className="field">
@@ -432,7 +453,193 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
                         {saving
                             ? <><Loader2 size={13} className="spin" /> Saving…</>
-                            : <><Save size={13} /> Save Progress</>
+                            : status === 'pending-admin-review'
+                                ? <><Save size={13} /> Submit for Review</>
+                                : <><Save size={13} /> Save Progress</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Submit for Review Modal ────────────────────────────────────────────────────
+
+interface SubmitForReviewModalProps {
+    task: Task;
+    onSave: (id: string, formData: FormData) => Promise<void>;
+    onClose: () => void;
+}
+
+const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSave, onClose }) => {
+    const [completionNotes, setCompletionNotes] = useState('');
+    const [attachment, setAttachment] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [dragActive, setDragActive] = useState(false);
+
+    const handleFileChange = (file: File | null) => {
+        if (file) {
+            if (file.size > 10 * 1024 * 1024) {
+                setError('File size must be less than 10MB');
+                return;
+            }
+            setAttachment(file);
+            setError('');
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files.length > 0) {
+            handleFileChange(e.dataTransfer.files[0]);
+        }
+    };
+
+    const removeAttachment = () => {
+        setAttachment(null);
+    };
+
+    const handleSave = async () => {
+        if (!completionNotes.trim()) {
+            setError('Completion notes are required to submit for review.');
+            return;
+        }
+        if (completionNotes.length > 500) {
+            setError('Completion notes must not exceed 500 characters.');
+            return;
+        }
+        setError('');
+        setSaving(true);
+        try {
+            const formData = new FormData();
+            formData.append('TaskStatus', 'Pending Admin Review');
+            formData.append('ProgressNotes', completionNotes.trim());
+            if (attachment) {
+                formData.append('SupportingEvidence', attachment);
+            }
+            await onSave(task.id, formData);
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit for review. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card submit-review-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-head">
+                    <div>
+                        <h3>Submit for Admin Review</h3>
+                        <p className="modal-sub">{task.name}</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                {error && (
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
+                        <AlertCircle size={14} /><span>{error}</span>
+                    </div>
+                )}
+
+                <div className="field">
+                    <label>Task ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(System Generated, Read-only)</span></label>
+                    <div className="if-input-wrap" style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }}>
+                        <span className="if-icon"><Hash size={15} /></span>
+                        <input type="text" value={task.id} readOnly style={{ color: 'var(--text-secondary)' }} />
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Proof of Work / Attachment <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, Max 10MB)</span></label>
+                    <div
+                        className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <input
+                            type="file"
+                            id="evidence-upload"
+                            style={{ display: 'none' }}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.txt,.zip"
+                            onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
+                        />
+                        {attachment ? (
+                            <div className="file-selected" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <File size={20} color="var(--primary)" />
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{attachment.name}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{(attachment.size / (1024 * 1024)).toFixed(2)} MB</div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={removeAttachment}
+                                    style={{ color: 'var(--status-failed)' }}
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 8 }}>
+                                <Upload size={28} color="var(--primary)" />
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, textAlign: 'center' }}>
+                                    Drag & drop a file here, or click to browse
+                                </p>
+                                <button
+                                    type="button"
+                                    className="btn btn-sm"
+                                    onClick={e => { e.stopPropagation(); document.getElementById('evidence-upload')?.click(); }}
+                                    style={{ marginTop: 8 }}
+                                >
+                                    <Paperclip size={13} /> Choose File
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="field">
+                    <label>Completion Notes <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                    <textarea
+                        className="leave-reason-textarea"
+                        rows={4}
+                        maxLength={500}
+                        placeholder="Describe the work completed, any issues encountered, and handover details…"
+                        value={completionNotes}
+                        onChange={e => { setCompletionNotes(e.target.value); setError(''); }}
+                    />
+                    <div className="leave-char-count" style={{ color: completionNotes.length > 450 ? 'var(--status-failed)' : 'var(--text-muted)' }}>
+                        {completionNotes.length} / 500
+                    </div>
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><Save size={13} /> Submit for Review</>
                         }
                     </button>
                 </div>
@@ -1512,6 +1719,7 @@ export default function EmployeeDashboard() {
     const [tasksError, setTasksError] = useState('');
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [submittingForReviewId, setSubmittingForReviewId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -1616,7 +1824,7 @@ export default function EmployeeDashboard() {
 
     const toBackendStatus = (status: TaskStatus): string => ({
         pending: 'Pending', assigned: 'Assigned', 'in-progress': 'In Progress',
-        done: 'Done', completed: 'Completed', overdue: 'In Progress',
+        'pending-admin-review': 'Pending Admin Review', done: 'Done', completed: 'Completed', overdue: 'In Progress',
     }[status] ?? 'Assigned');
 
     const handleSaveProgress = async (
@@ -1643,8 +1851,31 @@ export default function EmployeeDashboard() {
         } : t));
     };
 
+    const handleSubmitForReview = async (
+        id: string, formData: FormData
+    ): Promise<void> => {
+        const res = await fetch(`/api/task/${id}/progress`, {
+            method: 'PATCH',
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
+            },
+            body: formData,
+        });
+        if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as any).message || 'Failed to submit for review.');
+        }
+        setTasks(ts => ts.map(t => t.id === id ? {
+            ...t,
+            status: 'pending-admin-review',
+            progress: 90,
+        } : t));
+    };
+
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
+    const submittingForReviewTask = submittingForReviewId != null ? tasks.find(t => t.id === submittingForReviewId) ?? null : null;
     const pendingLeaveCount = leaveRecords.filter(r => r.status === 'Pending').length;
     const initials = getInitials(user.fullName);
 
@@ -1772,6 +2003,7 @@ export default function EmployeeDashboard() {
                     task={viewingTask}
                     onUpdate={() => { setUpdatingId(viewingTask.id); setViewingId(null); }}
                     onClose={() => setViewingId(null)}
+                    onSubmitForReview={() => { setSubmittingForReviewId(viewingTask.id); setViewingId(null); }}
                 />
             )}
             {updatingTask && (
@@ -1779,6 +2011,14 @@ export default function EmployeeDashboard() {
                     task={updatingTask}
                     onSave={handleSaveProgress}
                     onClose={() => setUpdatingId(null)}
+                    onSubmitForReview={() => { setSubmittingForReviewId(updatingTask.id); setUpdatingId(null); }}
+                />
+            )}
+            {submittingForReviewTask && (
+                <SubmitForReviewModal
+                    task={submittingForReviewTask}
+                    onSave={handleSubmitForReview}
+                    onClose={() => setSubmittingForReviewId(null)}
                 />
             )}
         </div>
