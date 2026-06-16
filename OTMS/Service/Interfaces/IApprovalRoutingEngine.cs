@@ -24,6 +24,8 @@ namespace OTMS.Service.Interfaces
 
         Task<ApiResponseDTO<List<WorkflowTrackerDTO>>> GetMyTrackersAsync(Guid requesterAccountId);
 
+        Task<ApiResponseDTO<RecentTrackersResponseDTO>> GetMyRecentTrackersAsync(Guid requesterAccountId);
+
         Task<ApiResponseDTO<ApprovalRequestResponseDTO>> CancelRequestAsync(Guid approvalRequestId, CancelApprovalRequestDTO dto);
 
         Task<ApiResponseDTO<List<RoutingMatrixResponseDTO>>> GetAllMatricesAsync();

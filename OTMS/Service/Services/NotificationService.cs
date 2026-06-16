@@ -410,6 +410,9 @@ namespace OTMS.Service.Services
                     CreatedAt = n.CreatedAt
                 }).ToListAsync();
 
+            var totalUnread = await context.Notifications
+                .CountAsync(n => n.EmployeeId == accountId && !n.IsRead);
+
             return new PaginationResponseDTO<NotificationResponseDTO>
             {
                 IsSuccess = true,
@@ -418,7 +421,8 @@ namespace OTMS.Service.Services
                 PageNumber = request.PageNumber,
                 PageSize = request.PageSize,
                 TotalRecords = totalItems,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)request.PageSize)
+                TotalPages = (int)Math.Ceiling(totalItems / (double)request.PageSize),
+                TotalUnread = totalUnread
             };
 
         }

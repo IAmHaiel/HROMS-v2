@@ -751,6 +751,39 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<RecentTrackersResponseDTO>> GetMyRecentTrackersAsync(Guid requesterAccountId)
+        {
+            var requests = await context.ApprovalRequests
+                .Include(ar => ar.Decisions)
+                    .ThenInclude(d => d.Approver)
+                        .ThenInclude(a => a.Employee)
+                .Include(ar => ar.Requester)
+                    .ThenInclude(a => a.Employee)
+                .Include(ar => ar.CurrentApprover)
+                    .ThenInclude(a => a.Employee)
+                .Where(ar => ar.RequesterAccountId == requesterAccountId)
+                .OrderByDescending(ar => ar.CreatedAt)
+                .ToListAsync();
+
+            var activeCount = requests.Count(r => r.Status == "Pending");
+            var recentTrackers = new List<WorkflowTrackerDTO>();
+            foreach (var request in requests.Take(5))
+            {
+                recentTrackers.Add(await MapToTrackerDTOAsync(request));
+            }
+
+            return new ApiResponseDTO<RecentTrackersResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Recent trackers retrieved.",
+                Data = new RecentTrackersResponseDTO
+                {
+                    ActiveCount = activeCount,
+                    RecentTrackers = recentTrackers
+                }
+            };
+        }
+
         private async Task<WorkflowTrackerDTO> MapToTrackerDTOAsync(ApprovalRequest approvalRequest)
         {
             var requesterEmp = approvalRequest.Requester?.Employee;
