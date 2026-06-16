@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using OTMS.Common.Constraints;
@@ -7,6 +8,7 @@ using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Recruitment;
 using OTMS.Entities.Models;
+using OTMS.Service.Helper;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
@@ -16,7 +18,9 @@ namespace OTMS.Service.Services
         IConfiguration configuration,
         INotificationService notificationService,
         IActivityLogService activityLogService,
-        IHttpContextAccessor httpContextAccessor
+        IHttpContextAccessor httpContextAccessor,
+        IAuthService authService,
+        IEmployeeNumberGenerator employeeNumberGenerator
         ) : IOnboardingService
     {
         private const int TokenExpiryHours = 72;
@@ -128,11 +132,11 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<ApiResponseDTO<ApplicantRecordDTO>> ValidateOnboardingTokenAsync(string token)
+        public async Task<ApiResponseDTO<OnboardingValidationResponseDTO>> ValidateOnboardingTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
-                return new ApiResponseDTO<ApplicantRecordDTO>
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
                     IsSuccess = false,
                     Message = "Token is required.",
@@ -149,7 +153,7 @@ namespace OTMS.Service.Services
 
             if (onboardingToken == null)
             {
-                return new ApiResponseDTO<ApplicantRecordDTO>
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
                     IsSuccess = false,
                     Message = "Invalid or expired link.",
@@ -165,7 +169,7 @@ namespace OTMS.Service.Services
                     "Expired" => "This link has expired.",
                     _ => "Invalid or expired link."
                 };
-                return new ApiResponseDTO<ApplicantRecordDTO>
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
                     IsSuccess = false,
                     Message = errorMsg,
@@ -178,7 +182,7 @@ namespace OTMS.Service.Services
                 onboardingToken.Status = "Expired";
                 await context.SaveChangesAsync();
 
-                return new ApiResponseDTO<ApplicantRecordDTO>
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
                     IsSuccess = false,
                     Message = "This link has expired.",
@@ -186,19 +190,120 @@ namespace OTMS.Service.Services
                 };
             }
 
-            return new ApiResponseDTO<ApplicantRecordDTO>
+            // Check if an employee account already exists for this applicant
+            var existingEmployee = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+                .FirstOrDefaultAsync(e => e.Email == onboardingToken.ApplicantRecord.EmailAddress && e.Account != null);
+
+            if (existingEmployee != null)
+            {
+                var jwt = authService.CreateToken(existingEmployee);
+
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Token is valid. Existing session resumed.",
+                    Data = new OnboardingValidationResponseDTO
+                    {
+                        AccessToken = jwt,
+                        EmployeeNumber = existingEmployee.EmployeeNumber,
+                        EmployeeId = existingEmployee.EmployeeId,
+                        FullName = onboardingToken.ApplicantRecord.FullName,
+                        EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
+                        JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? ""
+                    }
+                };
+            }
+
+            // First-time validation — provision employee account
+            var applicant = onboardingToken.ApplicantRecord;
+
+            var employeeNumber = await employeeNumberGenerator.GenerateNextEmployeeNumberAsync();
+
+            var defaultRoleName = configuration["AppSettings:DefaultNewHireRole"] ?? "Coordinator";
+            var targetRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == defaultRoleName);
+            if (targetRole == null)
+            {
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
+                {
+                    IsSuccess = false,
+                    Message = $"Default role '{defaultRoleName}' not found. Please contact system administrator.",
+                    Data = null
+                };
+            }
+
+            var nameParts = applicant.FullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var firstName = nameParts.Length > 0 ? nameParts[0] : string.Empty;
+            var lastName = nameParts.Length > 1 ? string.Join(" ", nameParts.Skip(1)) : string.Empty;
+
+            var tempPassword = PasswordGenerator.Generate();
+
+            var employee = new Employee
+            {
+                EmployeeId = Guid.NewGuid(),
+                EmployeeNumber = employeeNumber,
+                FirstName = firstName,
+                MiddleName = null,
+                LastName = lastName,
+                Suffix = null,
+                ContactNumber = applicant.ContactNumber,
+                EmploymentStatus = "Active",
+                CreatedAt = DateTime.UtcNow,
+                Email = applicant.EmailAddress,
+                IsEmailVerified = true,
+                DepartmentId = applicant.JobPosition?.DepartmentId,
+                JobPositionId = applicant.JobPositionId
+            };
+
+            var account = new Account
+            {
+                AccountId = Guid.NewGuid(),
+                EmployeeId = employee.EmployeeId,
+                RoleId = targetRole.RoleId,
+                Role = targetRole,
+                AccountStatus = "Active",
+                CreatedAt = DateTime.UtcNow,
+                IsPasswordChanged = false
+            };
+
+            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, tempPassword);
+            employee.Account = account;
+
+            context.Employees.Add(employee);
+            context.Accounts.Add(account);
+            await context.SaveChangesAsync();
+
+            // Reload with role + permissions for JWT
+            var provisionedEmployee = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+                .FirstAsync(e => e.EmployeeId == employee.EmployeeId);
+
+            var accessToken = authService.CreateToken(provisionedEmployee);
+
+            await activityLogService.LogActivityAsync(
+                onboardingToken.CreatedByAccountId,
+                ActivityTypes.AccountProvisioned,
+                $"Automated provisioning: Employee {employeeNumber} created from applicant '{applicant.FullName}' (Role: {targetRole.Name}). Temporary password generated (blind)."
+            );
+
+            return new ApiResponseDTO<OnboardingValidationResponseDTO>
             {
                 IsSuccess = true,
-                Message = "Token is valid.",
-                Data = new ApplicantRecordDTO
+                Message = "Onboarding access granted. Employee account provisioned.",
+                Data = new OnboardingValidationResponseDTO
                 {
-                    ApplicantRecordId = onboardingToken.ApplicantRecord.ApplicantRecordId,
-                    FullName = onboardingToken.ApplicantRecord.FullName,
-                    EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
-                    ContactNumber = onboardingToken.ApplicantRecord.ContactNumber,
-                    JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? "",
-                    Status = onboardingToken.ApplicantRecord.Status,
-                    CreatedAt = onboardingToken.ApplicantRecord.CreatedAt
+                    AccessToken = accessToken,
+                    EmployeeNumber = employeeNumber,
+                    EmployeeId = employee.EmployeeId,
+                    FullName = applicant.FullName,
+                    EmailAddress = applicant.EmailAddress,
+                    JobPositionName = applicant.JobPosition?.Title ?? ""
                 }
             };
         }
@@ -261,18 +366,63 @@ namespace OTMS.Service.Services
 
             onboardingToken.Status = "Used";
             onboardingToken.UsedAt = DateTime.UtcNow;
+
+            // Update applicant status to Hired/Converted
+            var applicant = onboardingToken.ApplicantRecord;
+            var oldStatus = applicant.Status;
+            applicant.Status = "Hired/Converted";
+
+            context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
+            {
+                ApplicantStatusRecordId = Guid.NewGuid(),
+                ApplicantRecordId = applicant.ApplicantRecordId,
+                OldStatus = oldStatus,
+                NewStatus = "Hired/Converted",
+                Remarks = "Automated account conversion upon onboarding completion.",
+                UpdatedById = onboardingToken.CreatedByAccountId,
+                UpdatedAt = DateTime.UtcNow
+            });
+
             await context.SaveChangesAsync();
+
+            // Find the provisioned employee to send credentials email
+            var provisionedEmployee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == applicant.EmailAddress && e.Account != null);
+
+            if (provisionedEmployee != null)
+            {
+                var frontendBaseUrl = configuration["FrontendBaseUrl"] ?? "http://localhost:5173";
+                var subject = "Your Employee Account Has Been Created";
+                var body = $@"
+                    <h2>Welcome to the Team!</h2>
+                    <p>Dear <strong>{applicant.FullName}</strong>,</p>
+                    <p>Your employee account has been created. You can now log in with the temporary password that was set during the onboarding process.</p>
+                    <p><strong>Employee Number:</strong> {provisionedEmployee.EmployeeNumber}</p>
+                    <p><strong>Login URL:</strong> <a href='{frontendBaseUrl}'>{frontendBaseUrl}</a></p>
+                    <p>Please change your password after your first login.</p>
+                    <hr>
+                    <p><small>This is an automated message from the Operational Task Management System.</small></p>";
+
+                await notificationService.SendEmailWithStatusAsync(applicant.EmailAddress, subject, body);
+
+                await activityLogService.LogActivityAsync(
+                    onboardingToken.CreatedByAccountId,
+                    ActivityTypes.AccountProvisioned,
+                    $"Employee {provisionedEmployee.EmployeeNumber} account provisioned and credentials sent to {applicant.EmailAddress}."
+                );
+            }
 
             await activityLogService.LogActivityAsync(
                 onboardingToken.CreatedByAccountId,
                 ActivityTypes.OnboardingCompleted,
-                $"Applicant '{onboardingToken.ApplicantRecord.FullName}' completed onboarding."
+                $"Applicant '{onboardingToken.ApplicantRecord.FullName}' completed onboarding. Status updated to Hired/Converted."
             );
 
             return new ApiResponseDTO<string>
             {
                 IsSuccess = true,
-                Message = "Onboarding completed successfully.",
+                Message = "Onboarding completed successfully. Employee account has been activated.",
                 Data = onboardingToken.ApplicantRecordId.ToString()
             };
         }

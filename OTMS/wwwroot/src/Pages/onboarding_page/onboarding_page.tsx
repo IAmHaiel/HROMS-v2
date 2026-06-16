@@ -78,6 +78,13 @@ export default function OnboardingPage() {
             .then((res) => {
                 const data = res.data as any;
                 if (data?.isSuccess && data.data) {
+                    // Store JWT and employee info for subsequent API calls
+                    if (data.data.accessToken) {
+                        localStorage.setItem('authToken', data.data.accessToken);
+                    }
+                    if (data.data.employeeNumber) {
+                        localStorage.setItem('employeeId', data.data.employeeNumber);
+                    }
                     setApplicantInfo({
                         fullName: data.data.fullName,
                         email: data.data.emailAddress,
