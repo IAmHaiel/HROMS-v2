@@ -245,7 +245,7 @@ const TEMPLATE_STATUSES = ['Active', 'Inactive'];
 const RECURRENCE_LABELS: Record<string, string> = { Daily: 'Every day', Weekly: 'Every week', Monthly: 'Every month' };
 
 // ─── Mock Template Data (toggle to test without backend) ──────────────────────
-const USE_MOCK_TEMPLATES = true;
+const USE_MOCK_TEMPLATES = false;
 
 const MOCK_TEMPLATES: TaskTemplateDTO[] = [
     { templateId: 'tpl-001', templateName: 'Weekly Warehouse Inventory', templateDescription: 'Full inventory count of all warehouse stock items, including pallets, bins, and cold storage.', priorityLevel: 'High', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-15T00:00:00', nextGenerationDate: '2026-06-22T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-003', assignedEmployeeName: 'Clara Santos', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-01T00:00:00' },
@@ -2028,8 +2028,9 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                 headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
             });
             if (!res.ok) throw new Error('Failed to fetch templates.');
-            const data = await res.json();
-            setTemplates(data.items ?? data.data ?? []);
+            const body = await res.json();
+            const paginated = body.data;
+            setTemplates(paginated?.data ?? []);
         } catch {
         } finally {
             setLoading(false);
@@ -2095,12 +2096,14 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
             return;
         }
         if (templateId) {
+            const { recurrenceStartDate: _, ...updateData } = data;
             const res = await fetch(`/api/taskTemplate/${templateId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-                body: JSON.stringify(data),
+                body: JSON.stringify(updateData),
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update template.'); }
+            success('Task template updated successfully.');
         } else {
             const res = await fetch('/api/taskTemplate', {
                 method: 'POST',
@@ -2108,6 +2111,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                 body: JSON.stringify(data),
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create template.'); }
+            success('Task template created successfully.');
         }
         await fetchTemplates();
         setShowModal(false);
