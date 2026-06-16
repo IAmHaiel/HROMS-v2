@@ -34,6 +34,9 @@ import {
     FileText,
     Calendar,
     Filter,
+    Repeat,
+    ToggleLeft,
+    Copy,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -84,7 +87,8 @@ type NavTab =
     | 'leave'
     | 'reports'
     | 'profile'
-    | 'reopen';
+    | 'reopen'
+    | 'templates';
 
 interface TeamMember {
     accountId: string;  
@@ -191,6 +195,51 @@ const TASK_STATUSES_FILTER = [
 ];
 
 const PRIORITY_LEVELS = ['Critical', 'High', 'Medium', 'Low'];
+
+// ─── Task Template Types ───────────────────────────────────────────────────────
+
+interface TaskTemplateDTO {
+    templateId: string;
+    templateName: string;
+    templateDescription: string;
+    priorityLevel: string;
+    recurrenceType: string;
+    recurrenceStartDate: string;
+    assignedEmployeeId: string | null;
+    assignedEmployeeName: string | null;
+    templateStatus: string;
+    nextGenerationDate: string | null;
+    lastGeneratedDate: string | null;
+    createdBy: string;
+    createdByName: string | null;
+    createdAt: string;
+}
+
+interface CreateTemplateDTO {
+    templateName: string;
+    templateDescription: string;
+    priorityLevel: string;
+    recurrenceType: string;
+    recurrenceStartDate: string;
+    assignedEmployee: string | null;
+    templateStatus: string;
+}
+
+const RECURRENCE_TYPES = ['Daily', 'Weekly', 'Monthly'];
+const TEMPLATE_STATUSES = ['Active', 'Inactive'];
+const RECURRENCE_LABELS: Record<string, string> = { Daily: 'Every day', Weekly: 'Every week', Monthly: 'Every month' };
+
+// ─── Mock Template Data (toggle to test without backend) ──────────────────────
+const USE_MOCK_TEMPLATES = true;
+
+const MOCK_TEMPLATES: TaskTemplateDTO[] = [
+    { templateId: 'tpl-001', templateName: 'Weekly Warehouse Inventory', templateDescription: 'Full inventory count of all warehouse stock items, including pallets, bins, and cold storage.', priorityLevel: 'High', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-15T00:00:00', nextGenerationDate: '2026-06-22T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-003', assignedEmployeeName: 'Clara Santos', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-01T00:00:00' },
+    { templateId: 'tpl-002', templateName: 'Daily Delivery Route Review', templateDescription: 'Review and optimize daily delivery routes for all couriers based on pending orders and traffic data.', priorityLevel: 'Medium', recurrenceType: 'Daily', recurrenceStartDate: '2026-06-01T00:00:00', nextGenerationDate: '2026-06-17T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-001', assignedEmployeeName: 'Ana Reyes', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-15T00:00:00' },
+    { templateId: 'tpl-003', templateName: 'Monthly Fleet Maintenance', templateDescription: 'Scheduled maintenance check for all delivery vehicles including oil change, tire pressure, brake inspection, and fluid levels.', priorityLevel: 'Critical', recurrenceType: 'Monthly', recurrenceStartDate: '2026-01-01T00:00:00', nextGenerationDate: '2026-07-01T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-004', assignedEmployeeName: 'Franco Mendoza', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2025-12-20T00:00:00' },
+    { templateId: 'tpl-004', templateName: 'Customer Feedback Follow-Up', templateDescription: 'Call customers who received deliveries in the past week to collect satisfaction feedback and resolve issues.', priorityLevel: 'Low', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-10T00:00:00', nextGenerationDate: '2026-06-24T00:00:00', lastGeneratedDate: null, assignedEmployeeId: null, assignedEmployeeName: null, templateStatus: 'Inactive', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-06-01T00:00:00' },
+    { templateId: 'tpl-005', templateName: 'End-of-Day Reconciliation', templateDescription: 'Reconcile all deliveries completed for the day, including proof of delivery photos, signatures, and payment collection.', priorityLevel: 'Medium', recurrenceType: 'Daily', recurrenceStartDate: '2026-06-01T00:00:00', nextGenerationDate: '2026-06-17T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-002', assignedEmployeeName: 'Ben Villanueva', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-10T00:00:00' },
+    { templateId: 'tpl-006', templateName: 'Safety Compliance Audit', templateDescription: 'Bi-weekly audit of safety compliance across warehouse and delivery operations, including PPE checks and incident log review.', priorityLevel: 'High', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-08T00:00:00', nextGenerationDate: '2026-06-22T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-006', assignedEmployeeName: 'Elena Bautista', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-04-01T00:00:00' },
+];
 
 // ─── Mock Report Data (toggle to test without backend) ────────────────────────
 const USE_MOCK_REPORT = true;
@@ -383,6 +432,12 @@ const NAV_GROUPS = [
             { tab: 'dashboard' as NavTab, icon: LayoutDashboard, label: 'Dashboard' },
             { tab: 'tasks' as NavTab, icon: Package, label: 'Tasks' },
             { tab: 'team' as NavTab, icon: Users, label: 'Team' },
+        ],
+    },
+    {
+        label: 'TEMPLATES',
+        items: [
+            { tab: 'templates' as NavTab, icon: Copy, label: 'Task Templates' },
         ],
     },
     {
@@ -1468,6 +1523,329 @@ const TasksTab: React.FC<{
 };
 
 
+
+// ─── Task Template Tab ─────────────────────────────────────────────────────────
+
+const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
+    const { success, error } = useToast();
+    const [templates, setTemplates] = useState<TaskTemplateDTO[]>(USE_MOCK_TEMPLATES ? [...MOCK_TEMPLATES] : []);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<TaskTemplateDTO | null>(null);
+
+    const fetchTemplates = async () => {
+        setLoading(true);
+        if (USE_MOCK_TEMPLATES) {
+            setTemplates([...MOCK_TEMPLATES]);
+            setLoading(false);
+            return;
+        }
+        try {
+            const res = await fetch('/api/taskTemplate?pageNumber=1&pageSize=50', {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (!res.ok) throw new Error('Failed to fetch templates.');
+            const data = await res.json();
+            setTemplates(data.items ?? data.data ?? []);
+        } catch {
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchTemplates(); }, []);
+
+    const handleToggle = async (templateId: string) => {
+        if (USE_MOCK_TEMPLATES) {
+            setTemplates(prev => prev.map(t => t.templateId === templateId ? { ...t, templateStatus: t.templateStatus === 'Active' ? 'Inactive' : 'Active' } : t));
+            success('Template status toggled successfully.');
+            return;
+        }
+        try {
+            const res = await fetch(`/api/taskTemplate/${templateId}/toggle-status`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (!res.ok) throw new Error('Failed to toggle template status.');
+            success('Template status toggled successfully.');
+            await fetchTemplates();
+        } catch (err: any) {
+            error(err.message ?? 'Failed to toggle template status.');
+        }
+    };
+
+    const handleSave = async (data: CreateTemplateDTO, templateId?: string) => {
+        if (USE_MOCK_TEMPLATES) {
+            if (templateId) {
+                setTemplates(prev => prev.map(t => t.templateId === templateId ? {
+                    ...t,
+                    templateName: data.templateName,
+                    templateDescription: data.templateDescription,
+                    priorityLevel: data.priorityLevel,
+                    recurrenceType: data.recurrenceType,
+                    recurrenceStartDate: data.recurrenceStartDate,
+                    assignedEmployeeId: data.assignedEmployee,
+                    assignedEmployeeName: data.assignedEmployee ? teamMembers.find(m => m.accountId === data.assignedEmployee)?.employeeName ?? null : null,
+                    templateStatus: data.templateStatus,
+                } : t));
+            } else {
+                const newTemplate: TaskTemplateDTO = {
+                    templateId: `tpl-mock-${Date.now()}`,
+                    templateName: data.templateName,
+                    templateDescription: data.templateDescription,
+                    priorityLevel: data.priorityLevel,
+                    recurrenceType: data.recurrenceType,
+                    recurrenceStartDate: data.recurrenceStartDate,
+                    nextGenerationDate: data.recurrenceStartDate,
+                    assignedEmployeeId: data.assignedEmployee,
+                    assignedEmployeeName: data.assignedEmployee ? teamMembers.find(m => m.accountId === data.assignedEmployee)?.employeeName ?? null : null,
+                    lastGeneratedDate: null,
+                    templateStatus: data.templateStatus,
+                    createdBy: 'admin',
+                    createdByName: 'System Admin',
+                    createdAt: new Date().toISOString(),
+                };
+                setTemplates(prev => [newTemplate, ...prev]);
+            }
+            setShowModal(false);
+            setEditingTemplate(null);
+            return;
+        }
+        if (templateId) {
+            const res = await fetch(`/api/taskTemplate/${templateId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update template.'); }
+        } else {
+            const res = await fetch('/api/taskTemplate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create template.'); }
+        }
+        await fetchTemplates();
+        setShowModal(false);
+        setEditingTemplate(null);
+    };
+
+    const openEdit = (t: TaskTemplateDTO) => {
+        setEditingTemplate(t);
+        setShowModal(true);
+    };
+
+    const fmtTemplateDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    return (
+        <div className="dashboard-content">
+            <TableCard
+                title="Task Templates"
+                totalResults={templates.length}
+                actionButton={{ label: 'Create Template', icon: <Plus size={14} />, onClick: () => { setEditingTemplate(null); setShowModal(true); } }}
+                loading={loading}
+                emptyMessage="No task templates found."
+                emptyIcon={<Copy size={20} />}
+                headers={['TEMPLATE NAME', 'PRIORITY', 'RECURRENCE', 'NEXT GENERATION', 'ASSIGNEE', 'STATUS', 'ACTIONS']}
+            >
+                {templates.map(t => (
+                    <tr key={t.templateId}>
+                        <td>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{t.templateName}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.templateDescription}</div>
+                        </td>
+                        <td><PrioBadge p={t.priorityLevel as Priority} /></td>
+                        <td>
+                            <span style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Repeat size={12} /> {RECURRENCE_LABELS[t.recurrenceType] ?? t.recurrenceType}
+                            </span>
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtTemplateDate(t.nextGenerationDate)}</td>
+                        <td style={{ fontSize: 13 }}>{t.assignedEmployeeName || 'Auto-assign'}</td>
+                        <td>
+                            <span className={`badge ${t.templateStatus === 'Active' ? 'badge-green' : 'badge-gray'}`}>{t.templateStatus}</span>
+                        </td>
+                        <td>
+                            <ActionsDropdown
+                                actions={[
+                                    { label: 'Edit', icon: <Pencil size={12} />, onClick: () => openEdit(t) },
+                                    {
+                                        label: t.templateStatus === 'Active' ? 'Deactivate' : 'Activate',
+                                        icon: <ToggleLeft size={12} />,
+                                        onClick: () => handleToggle(t.templateId),
+                                        variant: 'default' as const,
+                                    },
+                                ]}
+                            />
+                        </td>
+                    </tr>
+                ))}
+            </TableCard>
+
+            {showModal && (
+                <TemplateModal
+                    template={editingTemplate}
+                    teamMembers={teamMembers}
+                    onSave={handleSave}
+                    onClose={() => { setShowModal(false); setEditingTemplate(null); }}
+                />
+            )}
+        </div>
+    );
+};
+
+// ─── Template Create/Edit Modal ──────────────────────────────────────────────
+
+interface TemplateModalProps {
+    template: TaskTemplateDTO | null;
+    teamMembers: TeamMember[];
+    onSave: (data: CreateTemplateDTO, templateId?: string) => Promise<void>;
+    onClose: () => void;
+}
+
+const TemplateModal: React.FC<TemplateModalProps> = ({ template, teamMembers, onSave, onClose }) => {
+    const isEdit = !!template;
+    const [form, setForm] = useState({
+        templateName: template?.templateName ?? '',
+        templateDescription: template?.templateDescription ?? '',
+        priorityLevel: template?.priorityLevel ?? 'Medium',
+        recurrenceType: template?.recurrenceType ?? 'Daily',
+        recurrenceStartDate: template?.recurrenceStartDate ? template.recurrenceStartDate.substring(0, 10) : '',
+        assignedEmployee: template?.assignedEmployeeId ?? '',
+        templateStatus: template?.templateStatus ?? 'Active',
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+    const [apiError, setApiError] = useState('');
+
+    const validate = (): boolean => {
+        const e: Record<string, string> = {};
+        if (!form.templateName.trim()) e.templateName = 'Template name is required.';
+        else if (form.templateName.length > 150) e.templateName = 'Must not exceed 150 characters.';
+        if (!form.templateDescription.trim()) e.templateDescription = 'Description is required.';
+        else if (form.templateDescription.length > 2000) e.templateDescription = 'Must not exceed 2000 characters.';
+        if (!form.recurrenceStartDate) e.recurrenceStartDate = 'Start date is required.';
+        setErrors(e);
+        return Object.keys(e).length === 0;
+    };
+
+    const handleSubmit = async () => {
+        if (!validate()) return;
+        setSubmitting(true);
+        setApiError('');
+        try {
+            await onSave({
+                templateName: form.templateName.trim(),
+                templateDescription: form.templateDescription.trim(),
+                priorityLevel: form.priorityLevel,
+                recurrenceType: form.recurrenceType,
+                recurrenceStartDate: form.recurrenceStartDate,
+                assignedEmployee: form.assignedEmployee || null,
+                templateStatus: form.templateStatus,
+            }, template?.templateId);
+        } catch (err: any) {
+            setApiError(err.message ?? 'Operation failed.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        setForm(p => ({ ...p, [key]: e.target.value }));
+        setErrors(p => ({ ...p, [key]: '' }));
+    };
+
+    const FieldErr = ({ name }: { name: string }) => errors[name] ? <span className="report-field-error">{errors[name]}</span> : null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div>
+                        <h3>{isEdit ? 'Edit Task Template' : 'Create Task Template'}</h3>
+                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                            {isEdit ? 'Update the template details below.' : 'Fill in the details to create a recurring task template.'}
+                        </p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                <div className="modal-form">
+                    {apiError && (
+                        <div className="report-error-msg" style={{ marginBottom: 14 }}>{apiError}</div>
+                    )}
+
+                    <div className="field">
+                        <label>Template Name *</label>
+                        <input type="text" className={errors.templateName ? 'report-input report-input-error' : 'report-input'}
+                            value={form.templateName} onChange={set('templateName')} maxLength={150} placeholder="e.g. Weekly Warehouse Inventory" />
+                        <FieldErr name="templateName" />
+                    </div>
+
+                    <div className="field">
+                        <label>Template Description *</label>
+                        <textarea className={errors.templateDescription ? 'report-input report-input-error' : 'report-input'}
+                            rows={3} value={form.templateDescription} onChange={set('templateDescription')} maxLength={2000} placeholder="Describe the recurring task..." />
+                        <FieldErr name="templateDescription" />
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: 'var(--text-secondary)' }}>{form.templateDescription.length}/2000</span>
+                    </div>
+
+                    <div className="field-row">
+                        <div className="field">
+                            <label>Priority Level</label>
+                            <select className="report-select" value={form.priorityLevel} onChange={set('priorityLevel')}>
+                                {PRIORITY_LEVELS.map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </div>
+                        <div className="field">
+                            <label>Recurrence Type</label>
+                            <select className="report-select" value={form.recurrenceType} onChange={set('recurrenceType')}>
+                                {RECURRENCE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="field-row">
+                        <div className="field">
+                            <label>Recurrence Start Date *</label>
+                            <input type="date" className={errors.recurrenceStartDate ? 'report-input report-input-error' : 'report-input'}
+                                value={form.recurrenceStartDate} onChange={set('recurrenceStartDate')} />
+                            <FieldErr name="recurrenceStartDate" />
+                        </div>
+                        <div className="field">
+                            <label>Assigned Employee</label>
+                            <select className="report-select" value={form.assignedEmployee} onChange={set('assignedEmployee')}>
+                                <option value="">Auto-assign (unassigned)</option>
+                                {teamMembers.map(m => <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Template Status</label>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            {TEMPLATE_STATUSES.map(s => (
+                                <button key={s} type="button"
+                                    className={`filter-pill${form.templateStatus === s ? ' active' : ''}`}
+                                    onClick={() => { setForm(p => ({ ...p, templateStatus: s })); }}>
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                        <button className="btn" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                            {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> {isEdit ? 'Update Template' : 'Create Template'}</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
 
@@ -3463,6 +3841,7 @@ export default function OpsAdminDashboard() {
         profile: 'My Profile',
         leave: 'Leave Requests',
         reopen: 'Reopen Requests',
+        templates: 'Task Templates',
     };
 
     return (
@@ -3583,6 +3962,7 @@ export default function OpsAdminDashboard() {
                         onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
                     />
                 )}
+                {activeTab === 'templates' && <TemplateTab teamMembers={teamMembers} />}
                 {activeTab === 'reports' && <ReportsTab teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
                 {activeTab === 'leave' && (
