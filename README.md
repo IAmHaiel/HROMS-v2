@@ -4,7 +4,7 @@
 
 The Human Resources and Operational Management System (HROMS) is a full-stack web application designed to streamline human resources and operational workflows. The solution consists of a React-based frontend client and an ASP.NET Core 8.0 backend API, backed by a Microsoft SQL Server database.
 
-## OTMS Development Team
+## HROMS Development Team
 | Roles  | Name |
 | ------------- | ------------- |
 | Project Manager | Vanessa Reuteras  |
