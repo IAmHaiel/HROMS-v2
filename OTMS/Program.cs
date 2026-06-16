@@ -124,6 +124,7 @@ builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddScoped<IApprovalRoutingEngine, ApprovalRoutingEngine>();
 builder.Services.AddScoped<IPublicApplicationService, PublicApplicationService>();
 builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
+builder.Services.AddScoped<IRecruitmentService, RecruitmentService>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();

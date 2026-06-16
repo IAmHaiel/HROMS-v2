@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback, ReactNode } from 'react';
+import axios from 'axios';
 import {
     Search, Users, Clock, CheckCircle2, XCircle,
     CalendarCheck, Briefcase, ChevronLeft, ChevronRight,
@@ -379,11 +380,11 @@ Recruitment Team`;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ALL_STATUSES: RecruitmentStatus[] = [
+export const ALL_STATUSES: RecruitmentStatus[] = [
     'Pending Review', 'Interview Scheduled', 'Job Offered', 'Rejected',
 ];
 
-const STATUS_TRANSITIONS: Record<RecruitmentStatus, RecruitmentStatus[]> = {
+export const STATUS_TRANSITIONS: Record<RecruitmentStatus, RecruitmentStatus[]> = {
     'Pending Review': ['Interview Scheduled', 'Rejected'],
     'Interview Scheduled': ['Job Offered', 'Rejected'],
     'Job Offered': ['Rejected'],
@@ -421,7 +422,7 @@ const STATUS_META: Record<RecruitmentStatus, StatusMeta> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPageNumbers(total: number, current: number): (number | '...')[] {
+export function getPageNumbers(total: number, current: number): (number | '...')[] {
     const pages: (number | '...')[] = [];
     if (total <= 5) {
         for (let i = 1; i <= total; i++) pages.push(i);
@@ -437,12 +438,12 @@ function getPageNumbers(total: number, current: number): (number | '...')[] {
     return pages;
 }
 
-function fmtDate(d: string): string {
+export function fmtDate(d: string): string {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtDateTime(d: string, t: string): string {
+export function fmtDateTime(d: string, t: string): string {
     return new Date(`${d}T${t}`).toLocaleString('en-US', {
         weekday: 'short', month: 'short', day: 'numeric',
         year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -627,7 +628,7 @@ const css = `
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: RecruitmentStatus }) {
+export function StatusBadge({ status }: { status: RecruitmentStatus }) {
     const m = STATUS_META[status];
     return <span className={m.badgeCls}>{m.icon}{status}</span>;
 }
@@ -1285,6 +1286,18 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     const [scheduleApplicant, setScheduleApplicant] = useState<ApplicantRecord | null>(null);
 
     const [toast, setToast] = useState<ToastState | null>(null);
+    const [positions, setPositions] = useState<{ id: string; name: string }[]>([]);
+
+    useEffect(() => {
+        axios.get('/api/public/apply/active-positions')
+            .then((res) => {
+                const body = res.data as any;
+                if (body?.isSuccess && Array.isArray(body.data)) {
+                    setPositions(body.data.map((p: any) => ({ id: p.jobPositionId, name: p.title })));
+                }
+            })
+            .catch(() => { /* positions remain empty */ });
+    }, []);
 
     const showToast = (msg: string, variant: ToastVariant = 'success'): void => {
         setToast({ msg, variant });
@@ -1295,10 +1308,40 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     const fetchApplicants = useCallback(async (p: number = 1): Promise<void> => {
         setLoading(true);
         try {
-            const result = await mockFetchApplicants({ search, filterStatus, filterPosition, page: p, pageSize: PAGE_SIZE });
-            setApplicants(result.data);
-            setTotalPages(result.totalPages);
-            setTotalCount(result.totalCount);
+            const params: Record<string, string | number> = { pageNumber: p, pageSize: PAGE_SIZE };
+            if (filterStatus) params.currentStatus = filterStatus;
+            if (filterPosition && positions.length > 0) {
+                const match = positions.find((pos) => pos.name === filterPosition);
+                if (match) params.jobPositionId = match.id;
+            }
+            if (search) params.search = search;
+
+            const res = await axios.get('/api/recruitment/dashboard', { params });
+            const apiResult = res.data as any;
+            if (apiResult?.isSuccess && apiResult.data) {
+                const paginated = apiResult.data;
+                const mapped: ApplicantRecord[] = (paginated.data || []).map((item: any) => ({
+                    applicantId: item.applicantRecordId,
+                    fullName: item.fullName,
+                    email: item.emailAddress,
+                    contactNumber: item.contactNumber,
+                    position: item.jobPositionName,
+                    currentStatus: item.status as RecruitmentStatus,
+                    submittedAt: item.createdAt,
+                    updatedAt: null,
+                    adminRemarks: null,
+                    resumeUrl: null,
+                    statusHistory: [],
+                    interviewDetails: null,
+                }));
+                setApplicants(mapped);
+                setTotalPages(paginated.totalPages ?? 1);
+                setTotalCount(paginated.totalRecords ?? 0);
+            } else {
+                setApplicants([]);
+                setTotalPages(1);
+                setTotalCount(0);
+            }
             setPage(p);
         } catch (err) {
             console.error('Failed to fetch applicants:', err);
@@ -1306,14 +1349,14 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         } finally {
             setLoading(false);
         }
-    }, [search, filterStatus, filterPosition]);
+    }, [search, filterStatus, filterPosition, positions]);
 
     useEffect(() => {
         const t = setTimeout(() => fetchApplicants(1), 300);
         return () => clearTimeout(t);
     }, [fetchApplicants]);
 
-    // Called after UpdateStatusModal confirms — saves new status optimistically
+    // Called after UpdateStatusModal confirms — updates status via API
     const handleUpdateStatus = async (
         applicantId: string,
         newStatus: RecruitmentStatus,
@@ -1323,27 +1366,17 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         if (!applicant) throw new Error('Applicant not found.');
         if (!STATUS_TRANSITIONS[applicant.currentStatus].includes(newStatus)) throw new Error('Invalid status transition.');
 
-        await new Promise<void>((r) => setTimeout(r, 600));
+        const res = await axios.put('/api/recruitment/status', {
+            applicantRecordId: applicantId,
+            newStatus,
+            remarks: remarks || null,
+        });
+        const apiResult = res.data as any;
+        if (!apiResult?.isSuccess) {
+            throw new Error(apiResult?.message || 'Failed to update status.');
+        }
 
-        const adminName = 'Admin (Demo)';
-        const now = new Date().toISOString();
-
-        setApplicants((prev) =>
-            prev.map((a) =>
-                a.applicantId === applicantId
-                    ? {
-                        ...a,
-                        currentStatus: newStatus,
-                        adminRemarks: remarks || a.adminRemarks,
-                        updatedAt: now,
-                        statusHistory: [
-                            ...(a.statusHistory ?? []),
-                            { status: newStatus, changedAt: now, changedBy: adminName, remarks: remarks || undefined },
-                        ],
-                    }
-                    : a,
-            ),
-        );
+        await fetchApplicants(page);
 
         if (newStatus !== 'Interview Scheduled') {
             showToast('Applicant status updated successfully.');
@@ -1368,14 +1401,14 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         setScheduleApplicant(null);
     };
 
-    const positions: string[] = Array.from(new Set(DUMMY_APPLICANTS.map((a) => a.position))).filter(Boolean).sort();
+    const positionNames: string[] = positions.map((p) => p.name).sort();
 
     const counts = {
         total: totalCount,
-        pending: DUMMY_APPLICANTS.filter((a) => a.currentStatus === 'Pending Review').length,
-        interview: DUMMY_APPLICANTS.filter((a) => a.currentStatus === 'Interview Scheduled').length,
-        offered: DUMMY_APPLICANTS.filter((a) => a.currentStatus === 'Job Offered').length,
-        rejected: DUMMY_APPLICANTS.filter((a) => a.currentStatus === 'Rejected').length,
+        pending: applicants.filter((a) => a.currentStatus === 'Pending Review').length,
+        interview: applicants.filter((a) => a.currentStatus === 'Interview Scheduled').length,
+        offered: applicants.filter((a) => a.currentStatus === 'Job Offered').length,
+        rejected: applicants.filter((a) => a.currentStatus === 'Rejected').length,
     };
 
     const statCards: { iconEl: ReactNode; cls: string; label: string; value: number }[] = [
@@ -1430,7 +1463,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                         <select className="rec-select" value={filterPosition}
                             onChange={(e) => setFilterPosition(e.target.value)}>
                             <option value="">All Positions</option>
-                            {positions.map((p) => <option key={p} value={p}>{p}</option>)}
+                            {positionNames.map((p) => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <span className="rec-result-count">{totalCount} result{totalCount !== 1 ? 's' : ''}</span>
                     </div>
