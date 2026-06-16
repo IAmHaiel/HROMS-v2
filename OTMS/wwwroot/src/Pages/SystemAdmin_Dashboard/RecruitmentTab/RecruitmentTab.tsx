@@ -773,43 +773,48 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
         if (validate()) setStep('preview');
     }
 
-    async function dispatchEmail(retrying = false): Promise<void> {
-        setEmailStatus(retrying ? 'retrying' : 'sending');
-        setEmailError('');
-        const details: InterviewDetails = { date, time, location: location.trim(), interviewer };
-        const subject = `Interview Schedule – ${applicant.position} at Our Company`;
-        const body = buildEmailBody(applicant, details);
-        try {
-            await mockSendEmail(applicant.email, subject, body);
-            setEmailStatus('sent');
-            return;
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Unknown error.';
-            if (!retrying) {
-                setEmailError(`Email dispatch failed. Retrying… (${msg})`);
-                setEmailStatus('retrying');
-                // Auto-retry once after 1.5s
-                setTimeout(() => dispatchEmail(true), 1500);
-            } else {
-                setEmailStatus('failed');
-                setEmailError(`Email dispatch failed after retry. (${msg}) Please resend manually.`);
-            }
-        }
-    }
-
     async function handleSend(): Promise<void> {
         setStep('sending');
         const details: InterviewDetails = {
             date, time, location: location.trim(), interviewer,
         };
 
-        await dispatchEmail(false);
+        setEmailStatus('sending');
+        setEmailError('');
 
-        // Regardless of email outcome, save the schedule
+        try {
+            const payload = {
+                applicantRecordId: applicant.applicantId,
+                interviewDate: date,
+                interviewTime: time,
+                locationOrLink: location.trim(),
+                interviewerName: interviewer,
+            };
+            const res = await axios.post('/api/recruitment/schedule-interview', payload);
+            const apiResult = res.data as any;
+
+            if (apiResult?.isSuccess) {
+                const msg = apiResult.message ?? '';
+                if (msg.includes('failed') || msg.includes('Retrying')) {
+                    setEmailStatus('failed');
+                    setEmailError('Email dispatch failed. Retrying... (saved to retry queue)');
+                } else {
+                    setEmailStatus('sent');
+                }
+            } else {
+                setEmailStatus('failed');
+                setEmailError(apiResult?.message || 'Failed to schedule interview.');
+            }
+        } catch (err: unknown) {
+            setEmailStatus('failed');
+            const msg = err instanceof Error ? err.message : 'Unknown error.';
+            setEmailError(`Failed to schedule interview: ${msg}`);
+        }
+
         const now = new Date().toISOString();
         const finalDetails: InterviewDetails = {
             ...details,
-            emailSentAt: emailStatus !== 'failed' ? now : undefined,
+            emailSentAt: emailStatus === 'sent' ? now : undefined,
         };
 
         onScheduled(applicant.applicantId, finalDetails);

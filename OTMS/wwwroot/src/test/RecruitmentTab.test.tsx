@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import axios from "axios";
 import {
     ALL_STATUSES,
     STATUS_TRANSITIONS,
@@ -9,6 +10,76 @@ import {
     StatusBadge,
     type RecruitmentStatus,
 } from "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab";
+
+vi.mock("axios");
+const mockedAxios = vi.mocked(axios);
+
+function mockDashboardApi() {
+    mockedAxios.get.mockImplementation((url: string, config?: any) => {
+        if (url === "/api/public/apply/active-positions") {
+            return Promise.resolve({ data: { isSuccess: true, data: [] } });
+        }
+        if (url === "/api/recruitment/dashboard") {
+            return Promise.resolve({
+                data: {
+                    isSuccess: true,
+                    data: {
+                        isSuccess: true,
+                        data: [
+                            {
+                                applicantRecordId: "app-001",
+                                fullName: "Juan Dela Cruz",
+                                emailAddress: "juan@test.com",
+                                contactNumber: "09171234567",
+                                jobPositionName: "Frontend Developer",
+                                status: "Pending Review",
+                                createdAt: "2025-06-01T08:30:00Z",
+                            },
+                            {
+                                applicantRecordId: "app-002",
+                                fullName: "Maria Santos",
+                                emailAddress: "maria@test.com",
+                                contactNumber: "09179876543",
+                                jobPositionName: "Backend Developer",
+                                status: "Interview Scheduled",
+                                createdAt: "2025-06-02T10:00:00Z",
+                            },
+                        ],
+                        totalRecords: 2,
+                        totalPages: 1,
+                        pageNumber: 1,
+                        pageSize: 20,
+                    },
+                },
+            });
+        }
+        return Promise.resolve({ data: [] });
+    });
+}
+
+function mockDashboardApiEmpty() {
+    mockedAxios.get.mockImplementation((url: string, config?: any) => {
+        if (url === "/api/public/apply/active-positions") {
+            return Promise.resolve({ data: { isSuccess: true, data: [] } });
+        }
+        if (url === "/api/recruitment/dashboard") {
+            return Promise.resolve({
+                data: {
+                    isSuccess: true,
+                    data: {
+                        isSuccess: true,
+                        data: [],
+                        totalRecords: 0,
+                        totalPages: 0,
+                        pageNumber: 1,
+                        pageSize: 20,
+                    },
+                },
+            });
+        }
+        return Promise.resolve({ data: [] });
+    });
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -139,5 +210,101 @@ describe("StatusBadge", () => {
     it("renders Rejected badge", () => {
         const { container } = render(<StatusBadge status={"Rejected"} />);
         expect(container.textContent).toContain("Rejected");
+    });
+});
+
+// ─── API Integration ──────────────────────────────────────────────────────
+
+describe("RecruitmentTab API integration", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("renders applicants fetched from dashboard API", async () => {
+        mockDashboardApi();
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Juan Dela Cruz")).toBeTruthy();
+        });
+        expect(screen.getByText("Maria Santos")).toBeTruthy();
+        expect(screen.getByText("Frontend Developer")).toBeTruthy();
+        expect(screen.getByText("Backend Developer")).toBeTruthy();
+    });
+
+    it("shows empty state when API returns no applicants", async () => {
+        mockDashboardApiEmpty();
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        await waitFor(() => {
+            expect(screen.getByText("No applicants match your filters")).toBeTruthy();
+        });
+    });
+
+    it("shows loading spinner initially", async () => {
+        mockedAxios.get.mockImplementation(() => new Promise(() => {}));
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        expect(screen.getByText("Loading applicants…")).toBeTruthy();
+    });
+
+    it("shows status badges for each applicant", async () => {
+        mockDashboardApi();
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        await waitFor(() => {
+            expect(screen.getAllByText("Pending Review").length).toBeGreaterThanOrEqual(1);
+        });
+        expect(screen.getAllByText("Interview Scheduled").length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("fetches both positions and dashboard on mount", async () => {
+        mockDashboardApi();
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Juan Dela Cruz")).toBeTruthy();
+        });
+
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+            "/api/public/apply/active-positions"
+        );
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+            "/api/recruitment/dashboard",
+            expect.objectContaining({ params: expect.objectContaining({ pageNumber: 1, pageSize: 5 }) })
+        );
+    });
+
+    it("handles API failure gracefully", async () => {
+        mockedAxios.get.mockRejectedValue(new Error("Network error"));
+
+        const { default: RecruitmentTab } = await import(
+            "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab"
+        );
+        render(<RecruitmentTab />);
+
+        await waitFor(() => {
+            expect(screen.queryByText("No applicants match your filters")).toBeTruthy();
+        });
     });
 });

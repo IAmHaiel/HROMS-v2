@@ -1,6 +1,6 @@
+using System;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Entities.Models;
-using System;
 
 namespace OTMS.Data
 {
@@ -20,7 +20,7 @@ namespace OTMS.Data
         public DbSet<LeaveRequest> LeaveRequests { get; set; }
         public DbSet<EmergencyOverrideRequest> EmergencyOverrideRequests { get; set; }
         public DbSet<EmployeeAttachment> EmployeeAttachments { get; set; }
-        
+
         public DbSet<Department> Departments { get; set; }
         public DbSet<JobPosition> JobPositions { get; set; }
         public DbSet<Role> Roles { get; set; }
@@ -33,6 +33,8 @@ namespace OTMS.Data
         public DbSet<NotificationAuditLog> NotificationAuditLogs { get; set; }
         public DbSet<ApplicantRecord> ApplicantRecords { get; set; }
         public DbSet<ApplicantStatusRecord> ApplicantStatusRecords { get; set; }
+        public DbSet<InterviewSchedule> InterviewSchedules { get; set; }
+        public DbSet<EmailQueueRecord> EmailQueueRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -303,6 +305,13 @@ namespace OTMS.Data
                 .WithMany()
                 .HasForeignKey(asr => asr.UpdatedById)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // InterviewSchedule -> ApplicantRecord
+            modelBuilder.Entity<InterviewSchedule>()
+                .HasOne(i => i.ApplicantRecord)
+                .WithMany()
+                .HasForeignKey(i => i.ApplicantRecordId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

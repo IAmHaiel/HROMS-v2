@@ -1,6 +1,10 @@
+using System;
+using System.Data;
+using System.Reflection;
+using System.Text;
 using Azure.Core;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,10 +17,6 @@ using OTMS.Data;
 using OTMS.Entities.Models;
 using OTMS.Service.Interfaces;
 using OTMS.Service.Services;
-using System;
-using System.Data;
-using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -128,6 +128,7 @@ builder.Services.AddScoped<IRecruitmentService, RecruitmentService>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();
+builder.Services.AddHostedService<EmailRetryBackgroundService>();
 
 builder.Services.AddMailKit(config =>
 {
