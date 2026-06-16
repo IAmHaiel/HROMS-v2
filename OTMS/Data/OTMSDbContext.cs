@@ -26,6 +26,11 @@ namespace OTMS.Data
         public DbSet<Role> Roles { get; set; }
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<ApprovalRoutingMatrix> ApprovalRoutingMatrices { get; set; }
+        public DbSet<ApprovalTier> ApprovalTiers { get; set; }
+        public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
+        public DbSet<ApprovalDecision> ApprovalDecisions { get; set; }
+        public DbSet<NotificationAuditLog> NotificationAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -226,6 +231,55 @@ namespace OTMS.Data
                 .WithMany(tt => tt.GeneratedTasks)
                 .HasForeignKey(t => t.TaskTemplateId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Approval Routing Matrix -> ApprovalTier
+            modelBuilder.Entity<ApprovalRoutingMatrix>()
+                .HasMany(rm => rm.Tiers)
+                .WithOne(t => t.RoutingMatrix)
+                .HasForeignKey(t => t.RoutingMatrixId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ApprovalRequest -> Requester
+            modelBuilder.Entity<ApprovalRequest>()
+                .HasOne(ar => ar.Requester)
+                .WithMany()
+                .HasForeignKey(ar => ar.RequesterAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ApprovalRequest -> CurrentApprover
+            modelBuilder.Entity<ApprovalRequest>()
+                .HasOne(ar => ar.CurrentApprover)
+                .WithMany()
+                .HasForeignKey(ar => ar.CurrentApproverAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ApprovalRequest -> ApprovalDecision
+            modelBuilder.Entity<ApprovalRequest>()
+                .HasMany(ar => ar.Decisions)
+                .WithOne(d => d.ApprovalRequest)
+                .HasForeignKey(d => d.ApprovalRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ApprovalDecision -> Approver
+            modelBuilder.Entity<ApprovalDecision>()
+                .HasOne(d => d.Approver)
+                .WithMany()
+                .HasForeignKey(d => d.ApproverAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NotificationAuditLog -> ApprovalRequest
+            modelBuilder.Entity<NotificationAuditLog>()
+                .HasOne(n => n.ApprovalRequest)
+                .WithMany()
+                .HasForeignKey(n => n.ApprovalRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // NotificationAuditLog -> Recipient
+            modelBuilder.Entity<NotificationAuditLog>()
+                .HasOne(n => n.Recipient)
+                .WithMany()
+                .HasForeignKey(n => n.RecipientAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

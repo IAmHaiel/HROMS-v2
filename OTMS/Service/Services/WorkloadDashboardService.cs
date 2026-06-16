@@ -5,13 +5,17 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.Approval.Responses;
 using OTMS.Entities.DTOs.Dashboard;
 using OTMS.Entities.DTOs.Dashboard.Responses;
 using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
 {
-    public class WorkloadDashboardService(OTMSDbContext context) : IWorkloadDashboardService
+    public class WorkloadDashboardService(
+        OTMSDbContext context,
+        IApprovalRoutingEngine approvalEngine
+        ) : IWorkloadDashboardService
     {
         public async Task<ApiResponseDTO<DashboardResponseDTO>> GetWorkloadDashboardAsync(DashboardFilterDTO filter)
         {
@@ -114,6 +118,11 @@ namespace OTMS.Service.Services
                 Message = "Dashboard statistics generated.",
                 Data = response
             };
+        }
+
+        public async Task<ApiResponseDTO<List<WorkflowTrackerDTO>>> GetEmployeeWorkflowTrackersAsync(Guid accountId)
+        {
+            return await approvalEngine.GetMyTrackersAsync(accountId);
         }
     }
 }

@@ -18,7 +18,8 @@ namespace OTMS.Service.Services
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
         INotificationService notificationService,
-        IActivityLogService activityLogService
+        IActivityLogService activityLogService,
+        IApprovalRoutingEngine approvalEngine
         ) : ILeaveRequest
     {
         public async Task<LeaveRequestResponseDTO> CreateLeaveRequestAsync(CreateLeaveRequestDTO request)
@@ -62,14 +63,23 @@ namespace OTMS.Service.Services
             context.LeaveRequests.Add(leaveRequest);
             await context.SaveChangesAsync();
 
+            // Submit to multi-tier approval engine
+            var approvalResult = await approvalEngine.SubmitForApprovalAsync(
+                new Entities.DTOs.Approval.SubmitApprovalRequestDTO
+                {
+                    RequestType = "Leave",
+                    SourceEntityType = "LeaveRequest",
+                    SourceEntityId = leaveRequest.LeaveId
+                });
+
             // Send Notification
             await notificationService.CreateLeaveRequestNotificationAsync(leaveRequest);
 
             await activityLogService.LogActivityAsync(
-                leaveRequest.Account.AccountId,
+                leaveRequest.AccountId,
                 ActivityTypes.LeaveRequestSubmitted,
                 $"{string.Join(" ", new[]
-                    {leaveRequest.Account.Employee.FirstName, leaveRequest.Account.Employee.MiddleName, leaveRequest.Account.Employee.LastName, leaveRequest.Account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted a Leave Request at {DateTime.Now:hh:mm tt}");
+                    {profile.Account.Employee.FirstName, profile.Account.Employee.MiddleName, profile.Account.Employee.LastName, profile.Account.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} submitted a Leave Request at {DateTime.Now:hh:mm tt}");
 
             return new LeaveRequestResponseDTO
             {

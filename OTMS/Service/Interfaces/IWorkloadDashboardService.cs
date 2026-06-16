@@ -8,5 +8,7 @@ namespace OTMS.Service.Interfaces
     public interface IWorkloadDashboardService
     {
         Task<ApiResponseDTO<DashboardResponseDTO>> GetWorkloadDashboardAsync(DashboardFilterDTO filter);
+
+        Task<ApiResponseDTO<List<WorkflowTrackerDTO>>> GetEmployeeWorkflowTrackersAsync(Guid accountId);
     }
 }
