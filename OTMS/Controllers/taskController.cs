@@ -237,7 +237,11 @@ namespace OTMS.Controllers
                     .Include(t => t.Creator)
                         .ThenInclude(c => c.Employee)
                     .Where(t => !t.Deleted && !t.PermanentlyDeleted)
-                    .OrderByDescending(t => t.CreatedAt);
+                    .OrderByDescending(t => t.Priority == "Critical" ? 4 :
+                                            t.Priority == "High" ? 3 :
+                                            t.Priority == "Medium" ? 2 :
+                                            t.Priority == "Low" ? 1 : 0)
+                    .ThenBy(t => t.DueAt);
 
                 var totalRecords = await query.CountAsync();
 
