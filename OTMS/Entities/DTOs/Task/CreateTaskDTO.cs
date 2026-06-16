@@ -19,5 +19,7 @@ namespace OTMS.Entities.DTOs.Task
         public DateTime? DueAt { get; set; }
 
         public Guid? RecommendedEmployeeId { get; set; }
+
+        public bool IsDuplicateAcknowledged { get; set; } = false;
     }
 }
