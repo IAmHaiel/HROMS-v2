@@ -65,6 +65,7 @@ interface Task {
     name: string;
     description: string;
     deadline: string;
+    createdAt: string;
     priority: Priority;
     status: TaskStatus;
     progress: number;
@@ -147,6 +148,7 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         name: dto.taskTitle,
         description: dto.taskDescription ?? '',
         deadline: dto.dueAt ? dto.dueAt.split('T')[0] : '',
+        createdAt: dto.createdAt ? dto.createdAt.split('T')[0] : '',
         priority: priorityMap[dto.priority] ?? 'medium',
         status,
         progress: defaultProgress[status],
@@ -196,10 +198,11 @@ const statusMeta: Record<string, { label: string; cls: string; icon: React.React
 const FSM_EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
     pending: ['in-progress'],
     assigned: ['in-progress'],
-    'in-progress': ['pending-admin-review'],
+    'in-progress': ['done', 'pending-admin-review'],
     'pending-admin-review': [],
     completed: [],
-    overdue: [],
+    done: [],
+    overdue: ['in-progress'],
 };
 
 const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
@@ -223,6 +226,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-001', name: 'Prepare Q3 Financial Report',
         description: 'Compile quarterly financial data and create summary report for board review.',
         deadline: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0],
         priority: 'high', status: 'in-progress', progress: 65,
         assignedBy: 'Operations Admin',
     },
@@ -230,6 +234,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-002', name: 'Update Employee Handbook',
         description: 'Review and update policies for remote work, leave policies, and code of conduct.',
         deadline: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
         priority: 'medium', status: 'in-progress', progress: 40,
         assignedBy: 'Operations Admin',
     },
@@ -237,6 +242,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-003', name: 'Client Onboarding - Acme Corp',
         description: 'Set up new client account, configure access, and schedule kickoff meeting.',
         deadline: new Date(Date.now() + 1 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
         priority: 'high', status: 'in-progress', progress: 30,
         assignedBy: 'Operations Admin',
     },
@@ -244,6 +250,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-004', name: 'Security Audit Preparation',
         description: 'Gather documentation and evidence for upcoming SOC2 audit.',
         deadline: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
         priority: 'high', status: 'assigned', progress: 0,
         assignedBy: 'Operations Admin',
     },
@@ -251,6 +258,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-005', name: 'Database Migration - Legacy to Cloud',
         description: 'Plan and execute migration of on-premise databases to Azure SQL.',
         deadline: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 1 * 86400000).toISOString().split('T')[0],
         priority: 'high', status: 'pending', progress: 0,
         assignedBy: 'Operations Admin',
     },
@@ -258,6 +266,7 @@ const MOCK_TASKS: Task[] = [
         id: 'mock-006', name: 'Weekly Inventory Report - March',
         description: 'Compile and submit the weekly inventory report for the first week of March. All entries have been verified and approved.',
         deadline: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
+        createdAt: new Date(Date.now() - 12 * 86400000).toISOString().split('T')[0],
         priority: 'medium', status: 'completed', progress: 100,
         assignedBy: 'Operations Admin',
     },
@@ -297,7 +306,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForRevi
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
-    const canSubmitForReview = task.status === 'in-progress' || task.status === 'assigned';
+    const canSubmitForReview = task.status === 'in-progress';
     const [detailTab, setDetailTab] = useState<'details' | 'comments'>('details');
     const currentEmployeeId = localStorage.getItem('employeeId') ?? '';
 
@@ -346,8 +355,13 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForRevi
                                 <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
                             </div>
                         )}
+                        <div className="field">
+                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Task ID</label>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{task.id}</p>
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             {[
+                                { label: 'Assigned Date', value: fmtDate(task.createdAt) },
                                 { label: 'Deadline', value: fmtDate(task.deadline) },
                                 { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
                                 { label: 'Assigned by', value: task.assignedBy },
@@ -429,8 +443,9 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, on
         }
         setFsmError('');
         setStatus(s);
-        if (s === 'pending-admin-review' && progress < 90) setProgress(90);
-        if (s === 'in-progress' && progress === 0) setProgress(25);
+            if (s === 'done' && progress < 100) setProgress(100);
+            if (s === 'pending-admin-review' && progress < 90) setProgress(90);
+            if (s === 'in-progress' && progress === 0) setProgress(25);
     };
 
     const handleSave = async () => {
@@ -490,18 +505,17 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, on
                 ) : (
                     <>
                         <div className="field">
-                            <label>Status — <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <label>Task Status <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
+                            <select
+                                className="report-select"
+                                value={status}
+                                onChange={e => handleStatusChange(e.target.value as TaskStatus)}
+                            >
+                                <option value={baseStatus}>{statusMeta[baseStatus]?.label ?? baseStatus} (current)</option>
                                 {statusOptions.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        className={`filter-pill${status === opt.value ? ' active' : ''}`}
-                                        onClick={() => handleStatusChange(opt.value)}
-                                    >
-                                        {statusMeta[opt.value].icon} {opt.label}
-                                    </button>
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                                 ))}
-                            </div>
+                            </select>
                         </div>
 
                         <div className="field">
@@ -524,12 +538,12 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, on
                 <div className="field">
                     <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
                     <textarea
-                        className="leave-reason-textarea" rows={3} maxLength={300}
+                        className="leave-reason-textarea" rows={3} maxLength={1000}
                         placeholder="Add any notes about your progress…"
                         value={remarks}
                         onChange={e => setRemarks(e.target.value)}
                     />
-                    <div className="leave-char-count">{remarks.length} / 300</div>
+                    <div className="leave-char-count">{remarks.length} / 1000</div>
                 </div>
 
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
@@ -563,15 +577,22 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
     const [error, setError] = useState('');
     const [dragActive, setDragActive] = useState(false);
 
+    const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'];
+    const MAX_SIZE = 20 * 1024 * 1024;
+
     const handleFileChange = (file: File | null) => {
-        if (file) {
-            if (file.size > 10 * 1024 * 1024) {
-                setError('File size must be less than 10MB');
-                return;
-            }
-            setAttachment(file);
-            setError('');
+        if (!file) { setAttachment(null); return; }
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            setError('Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.');
+            return;
         }
+        if (file.size > MAX_SIZE) {
+            setError('File size must not exceed 20MB.');
+            return;
+        }
+        setAttachment(file);
+        setError('');
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -652,7 +673,7 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
                 </div>
 
                 <div className="field">
-                    <label>Proof of Work / Attachment <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, Max 10MB)</span></label>
+                    <label>Proof of Work / Attachment <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/XLSX/JPG/PNG, Max 20MB)</span></label>
                     <div
                         className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
                         onDragOver={handleDragOver}
@@ -663,7 +684,7 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
                             type="file"
                             id="evidence-upload"
                             style={{ display: 'none' }}
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.txt,.zip"
+                            accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
                             onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
                         />
                         {attachment ? (
@@ -1960,13 +1981,13 @@ const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, 
     const { success, error: showError } = useToast();
 
     const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'image/jpeg', 'image/png'];
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'];
     const MAX_SIZE = 20 * 1024 * 1024;
 
     const handleFileChange = (file: File | null) => {
         if (!file) { setEvidence(null); return; }
         if (!ALLOWED_TYPES.includes(file.type)) {
-            setError('Only PDF, DOCX, JPG, and PNG files are allowed.');
+            setError('Only PDF, DOCX, XLSX, JPG, and PNG files are allowed.');
             return;
         }
         if (file.size > MAX_SIZE) {
@@ -2068,7 +2089,7 @@ const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, 
                     </div>
 
                     <div className="field">
-                        <label>Supporting Evidence <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/JPG/PNG, Max 20MB)</span></label>
+                        <label>Supporting Evidence <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Optional, PDF/DOCX/XLSX/JPG/PNG, Max 20MB)</span></label>
                         <div
                             className={`file-drop-zone${dragActive ? ' drag-active' : ''}`}
                             onDragOver={handleDragOver}
@@ -2079,7 +2100,7 @@ const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, 
                                 type="file"
                                 id="reopen-evidence"
                                 style={{ display: 'none' }}
-                                accept=".pdf,.docx,.jpg,.jpeg,.png"
+                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
                                 onChange={e => e.target.files && e.target.files.length > 0 && handleFileChange(e.target.files[0])}
                             />
                             {evidence ? (
@@ -2132,6 +2153,8 @@ const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, 
 export default function EmployeeDashboard() {
     const navigate = useNavigate();
     usePreventBackNav();
+
+    const { success, error: showError } = useToast();
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -2248,15 +2271,15 @@ export default function EmployeeDashboard() {
     }[status] ?? 'Assigned');
 
     const handleSaveProgress = async (
-        id: string, status: TaskStatus, progress: number, remarks: string
+        id: string, status: TaskStatus, _progress: number, remarks: string
     ): Promise<void> => {
+        const formData = new FormData();
+        formData.append('TaskStatus', toBackendStatus(status));
+        if (remarks.trim()) formData.append('TaskRemarks', remarks.trim());
         const res = await fetch(`/api/task/${id}/progress`, {
             method: 'PATCH',
-            headers: authHeader(),
-            body: JSON.stringify({
-                TaskStatus: toBackendStatus(status),
-                TaskRemarks: remarks.trim() || undefined,
-            }),
+            headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+            body: formData,
         });
         if (res.status === 401) { handleLogout(); return; }
         if (!res.ok) {
@@ -2266,9 +2289,10 @@ export default function EmployeeDashboard() {
         setTasks(ts => ts.map(t => t.id === id ? {
             ...t,
             status: status === 'overdue' ? 'in-progress' : status,
-            progress: status === 'done' ? 100 : status === 'completed' ? 100 : progress,
+            progress: status === 'done' ? 100 : status === 'completed' ? 100 : _progress,
             remarks: remarks.trim() || t.remarks,
         } : t));
+        success('Task progress updated successfully.');
     };
 
     const handleSubmitForReview = async (
@@ -2291,6 +2315,7 @@ export default function EmployeeDashboard() {
             status: 'pending-admin-review',
             progress: 90,
         } : t));
+        success('Task submitted for admin review.');
     };
 
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;

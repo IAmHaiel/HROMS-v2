@@ -1226,27 +1226,31 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 };
 
 // ─── Admin Override Modal ──────────────────────────────────────────────────────
+const OVERRIDE_TARGETS = ['Assigned', 'In Progress', 'Done'];
+
 interface AdminOverrideModalProps {
     task: Task;
-    onSubmit: (reason: string, remarks: string) => void;
+    onSubmit: (reason: string, remarks: string, requestedStatus: string) => void;
     onClose: () => void;
 }
 
 const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit, onClose }) => {
+    const [requestedStatus, setRequestedStatus] = useState('In Progress');
     const [reason, setReason] = useState('');
     const [remarks, setRemarks] = useState('');
     const [confirmed, setConfirmed] = useState(false);
-    const [errors, setErrors] = useState<{ reason?: string; remarks?: string; confirmed?: string }>({});
+    const [errors, setErrors] = useState<{ reason?: string; remarks?: string; confirmed?: string; requestedStatus?: string }>({});
 
     const handleSubmit = () => {
         const e: typeof errors = {};
+        if (!requestedStatus) e.requestedStatus = 'Target status is required.';
         if (!reason.trim()) e.reason = 'Override reason is required.';
         else if (reason.length > 500) e.reason = 'Override reason must not exceed 500 characters.';
         if (!remarks.trim()) e.remarks = 'Admin remarks are required.';
         else if (remarks.length > 500) e.remarks = 'Admin remarks must not exceed 500 characters.';
         if (!confirmed) e.confirmed = 'You must confirm this override.';
         setErrors(e);
-        if (Object.keys(e).length === 0) onSubmit(reason.trim(), remarks.trim());
+        if (Object.keys(e).length === 0) onSubmit(reason.trim(), remarks.trim(), requestedStatus);
     };
 
     return (
@@ -1275,6 +1279,20 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
                             <span className="view-modal-label">Priority</span>
                             <PrioBadge p={task.priority} />
                         </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Requested Status *</label>
+                        <select
+                            value={requestedStatus}
+                            onChange={e => setRequestedStatus(e.target.value)}
+                            className={errors.requestedStatus ? 'report-input report-input-error' : 'report-input'}
+                        >
+                            {OVERRIDE_TARGETS.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        {errors.requestedStatus && <span className="report-field-error">{errors.requestedStatus}</span>}
                     </div>
 
                     <div className="field">
@@ -4349,13 +4367,12 @@ export default function OpsAdminDashboard() {
             return;
         }
         try {
+            const formData = new FormData();
+            formData.append('TaskStatus', newStatus);
             const res = await fetch(`/api/task/${taskId}/progress`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token()}`,
-                },
-                body: JSON.stringify({ TaskStatus: newStatus }),
+                headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -4399,15 +4416,20 @@ export default function OpsAdminDashboard() {
     };
 
     // ── Admin Override (completed task) ──
-    const handleAdminOverride = async (taskId: string, reason: string, remarks: string) => {
+    const handleAdminOverride = async (taskId: string, reason: string, remarks: string, requestedStatus: string) => {
         try {
-            const res = await fetch(`/api/task/${taskId}/reopen`, {
-                method: 'PATCH',
+            const res = await fetch(`/api/task/${taskId}/override`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token()}`,
                 },
-                body: JSON.stringify({ overrideReason: reason, adminRemarks: remarks }),
+                body: JSON.stringify({
+                    OverrideReason: reason,
+                    AdminRemarks: remarks,
+                    ApprovalConfirmation: true,
+                    RequestedStatus: requestedStatus,
+                }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -4767,7 +4789,7 @@ export default function OpsAdminDashboard() {
             {overrideTask && (
                 <AdminOverrideModal
                     task={overrideTask}
-                    onSubmit={(reason, remarks) => handleAdminOverride(overrideTask.taskId, reason, remarks)}
+                    onSubmit={(reason, remarks, requestedStatus) => handleAdminOverride(overrideTask.taskId, reason, remarks, requestedStatus)}
                     onClose={() => setOverrideTask(null)}
                 />
             )}
