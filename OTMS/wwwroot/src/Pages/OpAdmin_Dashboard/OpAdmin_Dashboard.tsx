@@ -284,209 +284,11 @@ const TEMPLATE_STATUSES = ['Active', 'Inactive'];
 const RECURRENCE_LABELS: Record<string, string> = { Daily: 'Every day', Weekly: 'Every week', Monthly: 'Every month' };
 
 // ─── Mock Template Data (toggle to test without backend) ──────────────────────
-const USE_MOCK_TEMPLATES = false;
 
-const MOCK_TEMPLATES: TaskTemplateDTO[] = [
-    { templateId: 'tpl-001', templateName: 'Weekly Warehouse Inventory', templateDescription: 'Full inventory count of all warehouse stock items, including pallets, bins, and cold storage.', priorityLevel: 'High', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-15T00:00:00', nextGenerationDate: '2026-06-22T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-003', assignedEmployeeName: 'Clara Santos', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-01T00:00:00' },
-    { templateId: 'tpl-002', templateName: 'Daily Delivery Route Review', templateDescription: 'Review and optimize daily delivery routes for all couriers based on pending orders and traffic data.', priorityLevel: 'Medium', recurrenceType: 'Daily', recurrenceStartDate: '2026-06-01T00:00:00', nextGenerationDate: '2026-06-17T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-001', assignedEmployeeName: 'Ana Reyes', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-15T00:00:00' },
-    { templateId: 'tpl-003', templateName: 'Monthly Fleet Maintenance', templateDescription: 'Scheduled maintenance check for all delivery vehicles including oil change, tire pressure, brake inspection, and fluid levels.', priorityLevel: 'Critical', recurrenceType: 'Monthly', recurrenceStartDate: '2026-01-01T00:00:00', nextGenerationDate: '2026-07-01T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-004', assignedEmployeeName: 'Franco Mendoza', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2025-12-20T00:00:00' },
-    { templateId: 'tpl-004', templateName: 'Customer Feedback Follow-Up', templateDescription: 'Call customers who received deliveries in the past week to collect satisfaction feedback and resolve issues.', priorityLevel: 'Low', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-10T00:00:00', nextGenerationDate: '2026-06-24T00:00:00', lastGeneratedDate: null, assignedEmployeeId: null, assignedEmployeeName: null, templateStatus: 'Inactive', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-06-01T00:00:00' },
-    { templateId: 'tpl-005', templateName: 'End-of-Day Reconciliation', templateDescription: 'Reconcile all deliveries completed for the day, including proof of delivery photos, signatures, and payment collection.', priorityLevel: 'Medium', recurrenceType: 'Daily', recurrenceStartDate: '2026-06-01T00:00:00', nextGenerationDate: '2026-06-17T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-002', assignedEmployeeName: 'Ben Villanueva', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-05-10T00:00:00' },
-    { templateId: 'tpl-006', templateName: 'Safety Compliance Audit', templateDescription: 'Bi-weekly audit of safety compliance across warehouse and delivery operations, including PPE checks and incident log review.', priorityLevel: 'High', recurrenceType: 'Weekly', recurrenceStartDate: '2026-06-08T00:00:00', nextGenerationDate: '2026-06-22T00:00:00', lastGeneratedDate: null, assignedEmployeeId: 'mock-006', assignedEmployeeName: 'Elena Bautista', templateStatus: 'Active', createdBy: 'admin', createdByName: 'System Admin', createdAt: '2026-04-01T00:00:00' },
-];
 
-// ─── Mock Report Data (toggle to test without backend) ────────────────────────
-const USE_MOCK_REPORT = true;
 
-function mockTaskCompletionReport(filter: ReportFilter): TaskCompletionReport {
-    return {
-        totalTasksAssigned: 42,
-        totalTasksCompleted: 28,
-        totalTasksInProgress: 8,
-        totalTasksPendingReview: 3,
-        totalOverdueTasks: 3,
-        taskCompletionRate: 67,
-        averageTaskCompletionTimeHours: 4.5,
-        employeePerformanceSummary: [
-            { employeeName: 'Ana Reyes', totalAssigned: 12, totalCompleted: 9, completionRate: 75, averageCompletionTimeHours: 3.2 },
-            { employeeName: 'Ben Villanueva', totalAssigned: 10, totalCompleted: 7, completionRate: 70, averageCompletionTimeHours: 4.1 },
-            { employeeName: 'Clara Santos', totalAssigned: 8, totalCompleted: 6, completionRate: 75, averageCompletionTimeHours: 2.8 },
-            { employeeName: 'Franco Mendoza', totalAssigned: 7, totalCompleted: 4, completionRate: 57, averageCompletionTimeHours: 5.3 },
-            { employeeName: 'Daniel Cruz', totalAssigned: 3, totalCompleted: 1, completionRate: 33, averageCompletionTimeHours: 6.7 },
-            { employeeName: 'Elena Bautista', totalAssigned: 2, totalCompleted: 1, completionRate: 50, averageCompletionTimeHours: 4.0 },
-        ],
-    };
-}
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
 
-const WEEKLY_DATA = [
-    { day: 'Mon', completed: 12, pending: 5 },
-    { day: 'Tue', completed: 18, pending: 8 },
-    { day: 'Wed', completed: 15, pending: 10 },
-    { day: 'Thu', completed: 22, pending: 6 },
-    { day: 'Fri', completed: 28, pending: 4 },
-    { day: 'Sat', completed: 10, pending: 3 },
-    { day: 'Sun', completed: 8, pending: 2 },
-];
-
-// ─── Mock Data Toggle (set to true to test smart task routing) ────────────────
-const USE_MOCK_DATA = true;
-
-const MOCK_TEAM_MEMBERS: TeamMember[] = [
-    { accountId: 'mock-001', employeeName: 'Ana Reyes',        role: 'Courier',          presenceStatus: 'Online'   },
-    { accountId: 'mock-002', employeeName: 'Ben Villanueva',   role: 'Courier',          presenceStatus: 'Online'   },
-    { accountId: 'mock-003', employeeName: 'Clara Santos',     role: 'Warehouse Staff',  presenceStatus: 'Online'   },
-    { accountId: 'mock-004', employeeName: 'Daniel Cruz',      role: 'Courier',          presenceStatus: 'Offline'  },
-    { accountId: 'mock-005', employeeName: 'Elena Bautista',   role: 'Warehouse Staff',  presenceStatus: 'On Leave' },
-    { accountId: 'mock-006', employeeName: 'Franco Mendoza',   role: 'Courier',          presenceStatus: 'Online'   },
-];
-
-const futureDate = (daysFromNow: number): string => {
-    const d = new Date();
-    d.setDate(d.getDate() + daysFromNow);
-    return d.toISOString();
-};
-const pastDate = (daysAgo: number): string => {
-    const d = new Date();
-    d.setDate(d.getDate() - daysAgo);
-    return d.toISOString();
-};
-
-const MOCK_TASKS: Task[] = [
-    // ── Ana Reyes – 3 active tasks (heaviest workload among online members) ──
-    {
-        taskId: 'task-001', taskTitle: 'Deliver parcels to Makati CBD',
-        taskDescription: 'Batch delivery of 15 parcels to Makati commercial district.',
-        priority: 'High', dueAt: futureDate(1), taskStatus: 'In Progress',
-        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-001', createdAt: pastDate(2),
-    },
-    {
-        taskId: 'task-002', taskTitle: 'Sort incoming shipments – Zone A',
-        taskDescription: 'Sort and tag all incoming parcels for Zone A.',
-        priority: 'Medium', dueAt: futureDate(2), taskStatus: 'Pending',
-        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-001', createdAt: pastDate(1),
-    },
-    {
-        taskId: 'task-003', taskTitle: 'Return failed deliveries to hub',
-        taskDescription: 'Bring back 4 undelivered parcels and log return reasons.',
-        priority: 'Low', dueAt: futureDate(3), taskStatus: 'Pending',
-        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-001', createdAt: pastDate(1),
-    },
-
-    // ── Ben Villanueva – 2 active tasks ──
-    {
-        taskId: 'task-004', taskTitle: 'Route optimization for Quezon City',
-        taskDescription: 'Plan optimal delivery route for 20 stops in QC.',
-        priority: 'Critical', dueAt: futureDate(1), taskStatus: 'In Progress',
-        assignedEmployee: 'Ben Villanueva', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-002', createdAt: pastDate(3),
-    },
-    {
-        taskId: 'task-005', taskTitle: 'Vehicle maintenance check – Van 3',
-        taskDescription: 'Coordinate with garage for scheduled maintenance.',
-        priority: 'Medium', dueAt: futureDate(5), taskStatus: 'Pending',
-        assignedEmployee: 'Ben Villanueva', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-002', createdAt: pastDate(2),
-    },
-
-    // ── Clara Santos – 1 active task (should be recommended by smart routing) ──
-    {
-        taskId: 'task-006', taskTitle: 'Inventory audit – Shelf B12',
-        taskDescription: 'Count and reconcile items on shelf B12 against system records.',
-        priority: 'Low', dueAt: futureDate(4), taskStatus: 'Pending',
-        assignedEmployee: 'Clara Santos', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-003', createdAt: pastDate(1),
-    },
-
-    // ── Franco Mendoza – 2 active tasks ──
-    {
-        taskId: 'task-007', taskTitle: 'Pickup from supplier – Pasig warehouse',
-        taskDescription: 'Collect 8 pallets from supplier and transport to main hub.',
-        priority: 'High', dueAt: futureDate(1), taskStatus: 'In Progress',
-        assignedEmployee: 'Franco Mendoza', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-006', createdAt: pastDate(2),
-    },
-    {
-        taskId: 'task-008', taskTitle: 'Deliver fragile items – Taguig',
-        taskDescription: 'Handle with care: electronics delivery to Taguig residential area.',
-        priority: 'Critical', dueAt: futureDate(2), taskStatus: 'Pending',
-        assignedEmployee: 'Franco Mendoza', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-006', createdAt: pastDate(1),
-    },
-
-    // ── Daniel Cruz (Offline) – tasks should NOT count for routing ──
-    {
-        taskId: 'task-009', taskTitle: 'Deliver to Mandaluyong offices',
-        taskDescription: 'Scheduled office deliveries for the week.',
-        priority: 'Medium', dueAt: futureDate(3), taskStatus: 'Pending',
-        assignedEmployee: 'Daniel Cruz', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-004', createdAt: pastDate(4),
-    },
-
-    // ── Elena Bautista (On Leave) – tasks should NOT count for routing ──
-    {
-        taskId: 'task-010', taskTitle: 'Restock packaging materials',
-        taskDescription: 'Order and restock bubble wrap, tape, and boxes.',
-        priority: 'Low', dueAt: futureDate(7), taskStatus: 'Pending',
-        assignedEmployee: 'Elena Bautista', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-005', createdAt: pastDate(5),
-    },
-
-    // ── Completed tasks (should NOT affect workload count) ──
-    {
-        taskId: 'task-011', taskTitle: 'Weekly report submission',
-        taskDescription: 'Submit weekly delivery performance report.',
-        priority: 'Medium', dueAt: pastDate(1), taskStatus: 'Completed',
-        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-001', createdAt: pastDate(7),
-    },
-    {
-        taskId: 'task-012', taskTitle: 'Calibrate weighing scale',
-        taskDescription: 'Annual calibration of warehouse weighing equipment.',
-        priority: 'High', dueAt: pastDate(2), taskStatus: 'Completed',
-        assignedEmployee: 'Clara Santos', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-003', createdAt: pastDate(10),
-    },
-
-    // ── Task awaiting admin review (for testing review workflow) ──
-    {
-        taskId: 'task-013', taskTitle: 'Database Migration - Legacy to Cloud',
-        taskDescription: 'Plan and execute migration of on-premise databases to Azure SQL.',
-        priority: 'Critical', dueAt: futureDate(3), taskStatus: 'Pending Admin Review',
-        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
-        assignedTo: 'mock-001', createdAt: pastDate(1),
-    },
-];
-
-const MOCK_REOPEN_REQUESTS: ReopenRequest[] = [
-    {
-        requestId: 'reopen-001',
-        taskId: 'task-011',
-        taskTitle: 'Weekly report submission',
-        employeeName: 'Ana Reyes',
-        employeeId: 'mock-001',
-        reason: 'Several entries in the weekly report were incorrect. I need to update the delivery counts and add missing data for Friday.',
-        currentStatus: 'Completed',
-        status: 'Pending',
-        submittedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    },
-    {
-        requestId: 'reopen-002',
-        taskId: 'task-012',
-        taskTitle: 'Calibrate weighing scale',
-        employeeName: 'Clara Santos',
-        employeeId: 'mock-003',
-        reason: 'The calibration was done but the certification document was not attached. Need to reopen to upload the certificate.',
-        supportingEvidence: 'calibration_note.pdf',
-        currentStatus: 'Completed',
-        status: 'Pending',
-        submittedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    },
-];
 
 const NAV_GROUPS = [
     {
@@ -2008,18 +1810,13 @@ const TasksTab: React.FC<{
 
 const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
     const { success, error } = useToast();
-    const [templates, setTemplates] = useState<TaskTemplateDTO[]>(USE_MOCK_TEMPLATES ? [...MOCK_TEMPLATES] : []);
+    const [templates, setTemplates] = useState<TaskTemplateDTO[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<TaskTemplateDTO | null>(null);
 
     const fetchTemplates = async () => {
         setLoading(true);
-        if (USE_MOCK_TEMPLATES) {
-            setTemplates([...MOCK_TEMPLATES]);
-            setLoading(false);
-            return;
-        }
         try {
             const res = await fetch('/api/taskTemplate?pageNumber=1&pageSize=50', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
@@ -2037,11 +1834,6 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
     useEffect(() => { fetchTemplates(); }, []);
 
     const handleToggle = async (templateId: string) => {
-        if (USE_MOCK_TEMPLATES) {
-            setTemplates(prev => prev.map(t => t.templateId === templateId ? { ...t, templateStatus: t.templateStatus === 'Active' ? 'Inactive' : 'Active' } : t));
-            success('Template status toggled successfully.');
-            return;
-        }
         try {
             const res = await fetch(`/api/taskTemplate/${templateId}/toggle-status`, {
                 method: 'PATCH',
@@ -2056,42 +1848,6 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
     };
 
     const handleSave = async (data: CreateTemplateDTO, templateId?: string) => {
-        if (USE_MOCK_TEMPLATES) {
-            if (templateId) {
-                setTemplates(prev => prev.map(t => t.templateId === templateId ? {
-                    ...t,
-                    templateName: data.templateName,
-                    templateDescription: data.templateDescription,
-                    priorityLevel: data.priorityLevel,
-                    recurrenceType: data.recurrenceType,
-                    recurrenceStartDate: data.recurrenceStartDate,
-                    assignedEmployeeId: data.assignedEmployee,
-                    assignedEmployeeName: data.assignedEmployee ? teamMembers.find(m => m.accountId === data.assignedEmployee)?.employeeName ?? null : null,
-                    templateStatus: data.templateStatus,
-                } : t));
-            } else {
-                const newTemplate: TaskTemplateDTO = {
-                    templateId: `tpl-mock-${Date.now()}`,
-                    templateName: data.templateName,
-                    templateDescription: data.templateDescription,
-                    priorityLevel: data.priorityLevel,
-                    recurrenceType: data.recurrenceType,
-                    recurrenceStartDate: data.recurrenceStartDate,
-                    nextGenerationDate: data.recurrenceStartDate,
-                    assignedEmployeeId: data.assignedEmployee,
-                    assignedEmployeeName: data.assignedEmployee ? teamMembers.find(m => m.accountId === data.assignedEmployee)?.employeeName ?? null : null,
-                    lastGeneratedDate: null,
-                    templateStatus: data.templateStatus,
-                    createdBy: 'admin',
-                    createdByName: 'System Admin',
-                    createdAt: new Date().toISOString(),
-                };
-                setTemplates(prev => [newTemplate, ...prev]);
-            }
-            setShowModal(false);
-            setEditingTemplate(null);
-            return;
-        }
         if (templateId) {
             const { recurrenceStartDate: _, ...updateData } = data;
             const res = await fetch(`/api/taskTemplate/${templateId}`, {
@@ -2439,15 +2195,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         setNoRecords(false);
         setReport(null);
         try {
-            if (USE_MOCK_REPORT) {
-                await new Promise(r => setTimeout(r, 600));
-                const mockData = mockTaskCompletionReport(filter);
-                setReport(mockData);
-                setGeneratedAt(new Date().toLocaleString());
-                setLoading(false);
-                return;
-            }
-
             const params = new URLSearchParams();
             params.set('DateRangeStart', filter.dateRangeStart);
             params.set('DateRangeEnd', filter.dateRangeEnd);
@@ -4069,8 +3816,6 @@ export default function OpsAdminDashboard() {
             setAllTasks(normalized);
             setTasks(normalized.filter(t => !t.deleted));
         } catch {
-            setAllTasks(MOCK_TASKS);
-            setTasks(MOCK_TASKS);
         } finally {
             setLoadingTasks(false);
         }
@@ -4226,23 +3971,6 @@ export default function OpsAdminDashboard() {
     };
 
     useEffect(() => {
-        if (USE_MOCK_DATA) {
-            // ── Load mock data for smart task routing testing ──
-            setAllTasks(MOCK_TASKS);
-            setTasks(MOCK_TASKS.filter(t => !t.deleted));
-            setTeamMembers(MOCK_TEAM_MEMBERS);
-            setLoadingTasks(false);
-            console.log('[MOCK] Loaded mock data for smart routing test.');
-            console.log('[MOCK] Expected recommendation: Clara Santos (1 active task, Online)');
-            console.log('[MOCK] Workload summary:');
-            console.log('  Ana Reyes     → 3 active (Online)');
-            console.log('  Ben Villanueva→ 2 active (Online)');
-            console.log('  Clara Santos  → 1 active (Online) ← SHOULD BE RECOMMENDED');
-            console.log('  Franco Mendoza→ 2 active (Online)');
-            console.log('  Daniel Cruz   → excluded (Offline)');
-            console.log('  Elena Bautista→ excluded (On Leave)');
-            return;
-        }
         fetchTasks();
         fetchBinRecords();
         fetchTeamMembers();
@@ -4576,7 +4304,6 @@ export default function OpsAdminDashboard() {
 
     // ── SignalR: Auto-refresh dashboard when task data changes ──
     useEffect(() => {
-        if (USE_MOCK_DATA) return;
         const connection = new signalR.HubConnectionBuilder()
             .withUrl('/hubs/workflow')
             .withAutomaticReconnect()
