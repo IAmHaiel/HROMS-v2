@@ -1027,6 +1027,39 @@ namespace OTMS.Migrations
                     b.ToTable("RolePermissions");
                 });
 
+            modelBuilder.Entity("OTMS.Entities.Models.StatutorySyncRecord", b =>
+                {
+                    b.Property<Guid>("StatutorySyncRecordId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SyncTimestamp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TargetSystem")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("StatutorySyncRecordId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("StatutorySyncRecords");
+                });
+
             modelBuilder.Entity("OTMS.Entities.Models.Task", b =>
                 {
                     b.Property<Guid>("TaskId")
@@ -1609,6 +1642,17 @@ namespace OTMS.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("OTMS.Entities.Models.StatutorySyncRecord", b =>
+                {
+                    b.HasOne("OTMS.Entities.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Task", b =>

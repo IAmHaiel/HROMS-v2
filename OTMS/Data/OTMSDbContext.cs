@@ -37,6 +37,7 @@ namespace OTMS.Data
         public DbSet<EmailQueueRecord> EmailQueueRecords { get; set; }
         public DbSet<OnboardingToken> OnboardingTokens { get; set; }
         public DbSet<Employee201FileData> Employee201FileDatas { get; set; }
+        public DbSet<StatutorySyncRecord> StatutorySyncRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -334,6 +335,13 @@ namespace OTMS.Data
                 .HasOne(e => e.Employee)
                 .WithOne()
                 .HasForeignKey<Employee201FileData>(e => e.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // StatutorySyncRecord -> Employee
+            modelBuilder.Entity<StatutorySyncRecord>()
+                .HasOne(s => s.Employee)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }

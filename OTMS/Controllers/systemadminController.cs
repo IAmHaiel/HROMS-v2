@@ -450,5 +450,35 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Updates an employee's statutory government records (SSS, PhilHealth, Pag-IBIG, TIN).
+        /// Validates formats, encrypts at rest, and creates a sync record for FOMS.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.Manage")]
+        [HttpPut("update-statutory-records")]
+        public async Task<IActionResult> UpdateStatutoryRecords([FromBody] UpdateStatutoryRecordsDTO request)
+        {
+            var result = await accountManagementService.UpdateStatutoryRecordsAsync(request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Gets the sync history of statutory record transmissions to FOMS for a given employee.
+        /// </summary>
+        [Authorize(Policy = "Permissions.Users.View")]
+        [HttpGet("{employeeNumber}/statutory-sync-records")]
+        public async Task<IActionResult> GetStatutorySyncRecords(string employeeNumber)
+        {
+            var result = await accountManagementService.GetStatutorySyncRecordsAsync(employeeNumber);
+
+            if (!result.IsSuccess)
+                return NotFound(result);
+
+            return Ok(result);
+        }
     }
 }
