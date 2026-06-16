@@ -11,5 +11,7 @@ namespace OTMS.Entities.Models
         public string ResumeFilePath { get; set; } = string.Empty;
         public string Status { get; set; } = "Pending Review";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public ICollection<ApplicantStatusRecord> StatusHistory { get; set; } = new List<ApplicantStatusRecord>();
     }
 }

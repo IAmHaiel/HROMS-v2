@@ -6,5 +6,6 @@
         public const string OperationAdmin = "OperationAdmin";
         public const string Coordinator = "Coordinator";
         public const string Encoder = "Encoder";
+        public const string HRAdmin = "HRAdmin";
     }
 }
