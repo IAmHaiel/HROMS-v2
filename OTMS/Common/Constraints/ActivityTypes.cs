@@ -18,5 +18,8 @@ namespace OTMS.Common.Constraints
         public const string TaskCreated = "Task Created";
         public const string TaskStatusUpdated = "Task Status Updated";
         public const string TaskStatusUpdateFailed = "Task Status Update Failed";
+        public const string TaskCommentAdded = "Task Comment Added";
+        public const string TaskCommentUpdated = "Task Comment Updated";
+        public const string TaskCommentDeleted = "Task Comment Deleted";
     }
 }

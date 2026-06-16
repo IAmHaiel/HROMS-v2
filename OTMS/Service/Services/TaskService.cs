@@ -2,6 +2,8 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
+using OTMS.Common.Exceptions;
+using OTMS.Common.Helpers;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Pagination;
@@ -68,36 +70,46 @@ namespace OTMS.Service.Services
                 throw new Exception("Creator account not found.");
             }
 
-            // Check for duplicates or similar tasks
-            bool exactDuplicateExists = await context.Tasks
-                .AnyAsync(t => t.TaskTitle.ToLower() == request.TaskTitle.ToLower()
-                    && t.TaskDescription!.ToLower() == request.TaskDescription!.ToLower());
+            // Check for duplicate or similar tasks using Jaccard Similarity (70% threshold)
+            var existingTasks = await context.Tasks
+                .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                .Select(t => new { t.TaskId, t.TaskTitle, t.TaskDescription, t.TaskStatus })
+                .ToListAsync();
 
-            bool similarTaskExists = await context.Tasks
-                .AnyAsync(t => t.TaskTitle.ToLower().Contains(request.TaskTitle.ToLower())
-                    || request.TaskTitle.ToLower().Contains(t.TaskTitle.ToLower()));
+            var duplicates = new List<DuplicateTaskWarningDTO>();
+            const double SimilarityThreshold = 0.70;
 
-            if (exactDuplicateExists)
+            foreach (var existing in existingTasks)
             {
-                await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskDuplicateDetected,
-                $"Duplicated Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
+                double similarity = TextSimilarityHelper.CalculateWeightedSimilarity(
+                    request.TaskTitle, request.TaskDescription,
+                    existing.TaskTitle, existing.TaskDescription);
 
-                throw new Exception(
-                    "A task with the same title and description already exists.");
+                if (similarity >= SimilarityThreshold)
+                {
+                    duplicates.Add(new DuplicateTaskWarningDTO
+                    {
+                        ExistingTaskTitle = existing.TaskTitle,
+                        ExistingTaskId = existing.TaskId,
+                        ExistingTaskStatus = existing.TaskStatus,
+                        SimilarityPercentage = Math.Round(similarity * 100, 2)
+                    });
+                }
             }
 
-            if (similarTaskExists)
+            if (duplicates.Any() && !request.IsDuplicateAcknowledged)
+            {
+                throw new DuplicateTaskException(duplicates);
+            }
+
+            if (duplicates.Any() && request.IsDuplicateAcknowledged)
             {
                 await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskSimilarityDetected,
-                $"Similar Task {request.TaskTitle} detected at {DateTime.Now:hh:mm tt}.");
-
-                throw new Exception(
-                    "A similar task already exists.");
+                    creatorId,
+                    ActivityTypes.TaskDuplicateDetected,
+                    $"Admin proceeded with task creation despite duplicate warnings for '{request.TaskTitle}'.");
             }
+
 
 
             // Create Task
@@ -515,6 +527,12 @@ namespace OTMS.Service.Services
                 throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
+            // Intercept action and explicitly prevent status from changing to "Completed" for non-admins
+            if (request.TaskStatus == "Completed" && !permissions.Contains("Permissions.Tasks.Manage"))
+            {
+                request.TaskStatus = "Pending Admin Review";
+            }
+
             // FSM Validation
             bool isStatusChanged = task.TaskStatus != request.TaskStatus;
             if (isStatusChanged)
@@ -526,8 +544,17 @@ namespace OTMS.Service.Services
                 {
                     isValidTransition = true;
                 }
+                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Pending Admin Review")
+                {
+                    if (string.IsNullOrWhiteSpace(request.ProgressNotes))
+                    {
+                        throw new Exception("Completion notes are required to submit for review.");
+                    }
+                    isValidTransition = true;
+                }
                 else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
                 {
+                    // Fallback for previous FSM
                     isValidTransition = true;
                 }
                 else
@@ -569,6 +596,11 @@ namespace OTMS.Service.Services
             {
                 await notificationService
                     .CreateCompletedTaskUpdateNotificationAsync(task);
+            }
+            else if (task.TaskStatus == "Pending Admin Review")
+            {
+                await notificationService
+                    .CreateTaskReviewRequestedNotificationAsync(task);
             }
             else
             {
@@ -1037,11 +1069,18 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<TaskResponseDTO> ApproveTaskCompletionAsync(Guid taskId)
+        public async Task<TaskResponseDTO> ReviewTaskAsync(Guid taskId, ReviewTaskDTO request)
         {
             var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
             var loggedInAccountId = Guid.Parse(accountIdClaim);
+
+            // Get Logged-In User Permissions
+            var permissions = httpContextAccessor.HttpContext?.User.FindAll("Permission").Select(c => c.Value).ToList() ?? new List<string>();
+            if (!permissions.Contains("Permissions.Tasks.Manage"))
+            {
+                throw new UnauthorizedAccessException("Access Denied: You do not have permission to close this task.");
+            }
 
             var task = await context.Tasks
                 .Include(t => t.Assignee)
@@ -1052,20 +1091,47 @@ namespace OTMS.Service.Services
 
             if (task == null) throw new Exception("Task not found.");
 
-            if (task.TaskStatus != "Done")
+            if (task.TaskStatus != "Pending Admin Review")
             {
-                string failureReason = $"Cannot approve completion. Task is not in 'Done' state. Current status: '{task.TaskStatus}'.";
-                await RecordTaskStatusAsync(taskId, task.TaskStatus, "Completed", loggedInAccountId, false, failureReason);
+                string failureReason = $"Cannot review task. Task is not in 'Pending Admin Review' state. Current status: '{task.TaskStatus}'.";
+                await RecordTaskStatusAsync(taskId, task.TaskStatus, request.AdminDecision == "Approve & Close" ? "Completed" : "In Progress", loggedInAccountId, false, failureReason);
                 throw new Exception(failureReason);
             }
 
-            task.TaskStatus = "Completed";
-            task.UpdatedAt = DateTime.UtcNow;
+            if (request.AdminDecision == "Approve & Close")
+            {
+                task.TaskStatus = "Completed";
+                task.UpdatedAt = DateTime.UtcNow;
 
-            await RecordTaskStatusAsync(taskId, "Done", "Completed", loggedInAccountId, true);
-            await context.SaveChangesAsync();
+                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "Completed", loggedInAccountId, true);
+                await context.SaveChangesAsync();
 
-            await activityLogService.LogActivityAsync(loggedInAccountId, "Task Completed", $"Operations Admin verified and completed task '{task.TaskTitle}'.");
+                await notificationService.CreateTaskApprovedAndClosedNotificationAsync(task);
+                await activityLogService.LogActivityAsync(loggedInAccountId, "Task Completed", $"Operations Admin verified and completed task '{task.TaskTitle}'.");
+            }
+            else if (request.AdminDecision == "Return for Rework")
+            {
+                if (string.IsNullOrWhiteSpace(request.ReviewerRemarks))
+                {
+                    throw new Exception("Reviewer Remarks are required when returning a task for rework.");
+                }
+
+                task.TaskStatus = "In Progress";
+                task.TaskRemarks = string.IsNullOrWhiteSpace(task.TaskRemarks) 
+                    ? request.ReviewerRemarks 
+                    : $"{task.TaskRemarks}\n\n[Admin Rework Review]: {request.ReviewerRemarks}";
+                task.UpdatedAt = DateTime.UtcNow;
+
+                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "In Progress", loggedInAccountId, true);
+                await context.SaveChangesAsync();
+
+                await notificationService.CreateTaskReturnedForReworkNotificationAsync(task);
+                await activityLogService.LogActivityAsync(loggedInAccountId, "Task Returned for Rework", $"Operations Admin returned task '{task.TaskTitle}' for rework.");
+            }
+            else
+            {
+                throw new Exception("Invalid Admin Decision.");
+            }
 
             return new TaskResponseDTO
             {

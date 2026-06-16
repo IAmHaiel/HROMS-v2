@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OTMS.Common.Exceptions;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Pagination;
@@ -31,6 +32,15 @@ namespace OTMS.Controllers
                 var result = await taskService.CreateTaskAsync(request);
 
                 return Ok(result);
+            }
+            catch (DuplicateTaskException ex)
+            {
+                return Conflict(new ApiResponseDTO<List<DuplicateTaskWarningDTO>>
+                {
+                    IsSuccess = false,
+                    Message = ex.Message,
+                    Data = ex.Duplicates
+                });
             }
             catch (Exception ex)
             {
@@ -139,16 +149,17 @@ namespace OTMS.Controllers
         }
 
         /// <summary>
-        /// Operations Admin verifies and approves the completion of a "Done" task.
+        /// Operations Admin reviews a "Pending Admin Review" task.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
-        [HttpPatch("{taskId}/approve-completion")]
-        public async Task<ActionResult<TaskResponseDTO>> ApproveTaskCompletion(Guid taskId)
+        [HttpPost("{taskId}/review")]
+        public async Task<ActionResult<TaskResponseDTO>> ReviewTask(Guid taskId, [FromBody] ReviewTaskDTO request)
         {
             try
             {
-                var result = await taskService.ApproveTaskCompletionAsync(taskId);
-                return Ok(result);
+                var result = await taskService.ReviewTaskAsync(taskId, request);
+                var message = request.AdminDecision == "Approve & Close" ? "Task officially closed and recorded." : "Task returned for rework.";
+                return Ok(new { message = message, data = result });
             }
             catch (UnauthorizedAccessException ex)
             {
