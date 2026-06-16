@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -48,12 +48,15 @@ import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
 import TaskComments from '../../components/TaskComments/TaskComments';
+import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
+import { useToast } from '../../components/Toast/Toast';
+import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue' | 'pending-admin-review';
-type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
+type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201' | 'approvals';
 
 interface Task {
     id: string;
@@ -265,6 +268,7 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
         label: 'PERSONAL',
         items: [
             { tab: 'digital_201', icon: FileText, label: 'Digital 201 File' },
+            { tab: 'approvals', icon: Shield, label: 'Approvals' },
             { tab: 'leave', icon: CalendarDays, label: 'Leave' },
             { tab: 'profile', icon: UserCircle2, label: 'Profile' },
         ],
@@ -919,6 +923,17 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             ? tasks.filter(t => effectiveStatus(t) === 'overdue')
             : tasks.filter(t => t.status === filter);
 
+    const priorityWeight: Record<Priority, number> = { high: 3, medium: 2, low: 1 };
+    const sorted = [...filtered].sort((a, b) => {
+        const pa = priorityWeight[a.priority] ?? 0;
+        const pb = priorityWeight[b.priority] ?? 0;
+        if (pa !== pb) return pb - pa;
+        const da = a.deadline ? new Date(a.deadline + 'T00:00:00').getTime() : Infinity;
+        const db = b.deadline ? new Date(b.deadline + 'T00:00:00').getTime() : Infinity;
+        if (da !== db) return da - db;
+        return a.name.localeCompare(b.name);
+    });
+
     if (loading) {
         return (
             <div className="tab-content">
@@ -961,13 +976,13 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
                     </button>
                 ))}
             </div>
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
                 <div className="card">
                     <div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div>
                 </div>
             ) : (
                 <div className="task-grid">
-                    {filtered.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
+                    {sorted.map(t => <TaskCard key={t.id} task={t} onView={onView} onUpdate={onUpdate} />)}
                 </div>
             )}
         </div>
@@ -1245,6 +1260,147 @@ const LeaveTab: React.FC<{
                     onSubmit={handleSubmit}
                 />
             )}
+        </div>
+    );
+};
+
+// ─── Approvals Tab ───────────────────────────────────────────────────────────
+
+const APPROVAL_REQUEST_TYPES = ['Leave', 'Asset', 'Resignation'];
+const SOURCE_ENTITY_TYPES = ['leaveRequest', 'assetRequest', 'resignationRequest'];
+
+const ApprovalsTab: React.FC = () => {
+    const { success, error: showError } = useToast();
+    const [myRequests, setMyRequests] = useState<TrackerData[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showSubmit, setShowSubmit] = useState(false);
+    const [reqType, setReqType] = useState('Leave');
+    const [sourceType, setSourceType] = useState('leaveRequest');
+    const [sourceId, setSourceId] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const connectionRef = useRef<HubConnection | null>(null);
+
+    const fetchMyRequests = async () => {
+        try {
+            const res = await fetch('/api/approvalrequests/my-trackers', { headers: authHeader() });
+            if (res.ok) {
+                const json = await res.json();
+                setMyRequests(json.data ?? json ?? []);
+            }
+        } catch { /* ignore */ }
+        finally { setLoading(false); }
+    };
+
+    // Initial fetch + SignalR connection for real-time updates
+    useEffect(() => {
+        fetchMyRequests();
+
+        const employeeId = localStorage.getItem('employeeId');
+        if (!employeeId) return;
+
+        const conn = new HubConnectionBuilder()
+            .withUrl('/hubs/workflow')
+            .withAutomaticReconnect()
+            .build();
+
+        conn.on('TrackerUpdated', () => {
+            fetchMyRequests();
+        });
+
+        conn.start().then(() => {
+            conn.invoke('JoinUserGroup', employeeId).catch(() => {});
+        }).catch(() => {});
+
+        connectionRef.current = conn;
+
+        return () => {
+            conn.stop().catch(() => {});
+        };
+    }, []);
+
+    const handleSubmit = async () => {
+        if (!sourceId.trim()) { showError('Source Entity ID is required.'); return; }
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/approvalrequests/submit', {
+                method: 'POST',
+                headers: authHeader(),
+                body: JSON.stringify({ RequestType: reqType, SourceEntityType: sourceType, SourceEntityId: sourceId.trim() }),
+            });
+            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Failed to submit.'); }
+            setShowSubmit(false);
+            success('Request submitted and routed for approval.');
+            await fetchMyRequests();
+        } catch (err: any) { showError(err.message); }
+        finally { setSubmitting(false); }
+    };
+
+    return (
+        <div className="tab-content">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <button className="btn btn-primary" onClick={() => setShowSubmit(true)}>
+                    <Plus size={14} /> Submit Request
+                </button>
+            </div>
+
+            {showSubmit && (
+                <div className="modal-overlay" onClick={() => setShowSubmit(false)}>
+                    <div className="modal-card" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-head">
+                            <div><h3>Submit Approval Request</h3><p className="modal-sub">Select the request type and provide details.</p></div>
+                            <button className="icon-btn" onClick={() => setShowSubmit(false)}><X size={16} /></button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div className="field">
+                                <label>Request Type</label>
+                                <select className="report-select" value={reqType} onChange={e => setReqType(e.target.value)}>
+                                    {APPROVAL_REQUEST_TYPES.map(t => <option key={t} value={t}>{t} Request</option>)}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Source Entity Type</label>
+                                <select className="report-select" value={sourceType} onChange={e => setSourceType(e.target.value)}>
+                                    {SOURCE_ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Source Entity ID <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <input type="text" className="report-input" value={sourceId} onChange={e => setSourceId(e.target.value)}
+                                    placeholder="e.g. leave-request-guid" />
+                            </div>
+                            <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                                <button className="btn" onClick={() => setShowSubmit(false)}>Cancel</button>
+                                <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                                    {submitting ? <><Loader2 size={13} className="spin" /> Submitting...</> : <><Save size={13} /> Submit</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <div className="card-header-layout" style={{ padding: '14px 20px', margin: 0 }}>
+                    <h3>My Approval Requests</h3>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{myRequests.length} request{myRequests.length !== 1 ? 's' : ''}</span>
+                </div>
+                {loading ? (
+                    <div className="empty-state" style={{ padding: '32px 0' }}><Loader2 size={20} className="spin" /><p>Loading requests...</p></div>
+                ) : myRequests.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '32px 0' }}>
+                        <FileText size={24} /><p>No approval requests yet.</p>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Click "Submit Request" to start a new approval workflow.</span>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                        {myRequests.map(r => (
+                            <div key={r.approvalRequestId} style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+                                <ApprovalTracker tracker={r} compact />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -1949,6 +2105,7 @@ export default function EmployeeDashboard() {
         leave: 'Leave Requests',
         profile: 'My Profile',
         digital_201: 'My Digital 201 File',
+        approvals: 'Approvals',
     };
 
     const today = new Date().toLocaleDateString('en-US', {
@@ -2048,6 +2205,7 @@ export default function EmployeeDashboard() {
                         onNewRecord={r => setLeaveRecords(prev => [r, ...prev])}
                     />
                 )}
+                {activeTab === 'approvals' && <ApprovalsTab />}
                 {activeTab === 'profile' && (
                     <ProfileTab user={user} onUpdateUser={setUser} />
                 )}

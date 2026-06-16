@@ -39,18 +39,20 @@ import {
     Copy,
     Clock,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import './OpAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import TaskView, { TaskViewTask } from '../../components/TaskView/TaskView';
 import { useToast } from '../../components/Toast/Toast';
+import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import LeaveRequestModal, {
     LeaveRecord,
     LeaveType,
     LeaveStatus,
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
+import PendingApprovalsTab from './PendingApprovalsTab';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
@@ -89,7 +91,8 @@ type NavTab =
     | 'reports'
     | 'profile'
     | 'reopen'
-    | 'templates';
+    | 'templates'
+    | 'approvals';
 
 interface TeamMember {
     accountId: string;  
@@ -469,6 +472,7 @@ const NAV_GROUPS = [
     {
         label: 'REQUESTS',
         items: [
+            { tab: 'approvals' as NavTab, icon: Shield, label: 'Approvals' },
             { tab: 'reopen' as NavTab, icon: RotateCcw, label: 'Reopen Requests' },
         ],
     },
@@ -1399,99 +1403,379 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: string) => void; onNewTask: () => void }> =
-    ({ tasks, loading, onView, onNewTask }) => {
-        const total = tasks.length;
-        const inProg = tasks.filter(t => t.taskStatus === 'In Progress').length;
-        const done = tasks.filter(t => t.taskStatus === 'Completed').length;
-        const overdue = tasks.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length;
-        const hi = tasks.filter(t => t.priority === 'High').length;
-        const md = tasks.filter(t => t.priority === 'Medium').length;
-        const lo = tasks.filter(t => t.priority === 'Low').length;
-        const pct = total ? Math.round(done / total * 100) : 0;
+interface EmployeeWorkload {
+    employeeName: string;
+    total: number;
+    active: number;
+    completed: number;
+    overdue: number;
+    pendingReview: number;
+}
 
-        return (
-            <div className="dashboard-content">
-                {/* Stat Cards */}
-                <div className="stats-row">
-                    {[
-                        { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'All active tasks' },
-                        { label: 'IN PROGRESS', value: inProg, icon: <Truck size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Assigned & running' },
-                        { label: 'COMPLETED', value: done, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'This period' },
-                        { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Past deadline' },
-                    ].map(s => (
-                        <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
-                    ))}
+const DashboardTab: React.FC<{
+    tasks: Task[];
+    teamMembers: TeamMember[];
+    loading: boolean;
+    onView: (id: string) => void;
+    onNewTask: () => void;
+    onRefresh: () => void;
+}> = ({ tasks, teamMembers, loading, onView, onNewTask, onRefresh }) => {
+    const [filterDateStart, setFilterDateStart] = useState('');
+    const [filterDateEnd, setFilterDateEnd] = useState('');
+    const [filterEmployee, setFilterEmployee] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+
+    useEffect(() => {
+        const interval = setInterval(onRefresh, 30000);
+        return () => clearInterval(interval);
+    }, [onRefresh]);
+
+    const filtered = tasks.filter(t => {
+        if (filterStatus && t.taskStatus !== filterStatus) return false;
+        if (filterEmployee && t.assignedTo !== filterEmployee && t.assignedEmployee !== filterEmployee) return false;
+        if (filterDateStart && t.dueAt && t.dueAt < filterDateStart) return false;
+        if (filterDateEnd && t.dueAt && t.dueAt > filterDateEnd + 'T23:59:59') return false;
+        return true;
+    });
+
+    const total = filtered.length;
+    const active = filtered.filter(t =>
+        t.taskStatus === 'In Progress' || t.taskStatus === 'Assigned' || t.taskStatus === 'Pending'
+    ).length;
+    const completed = filtered.filter(t => t.taskStatus === 'Completed').length;
+    const overdue = filtered.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length;
+    const pendingReview = filtered.filter(t => t.taskStatus === 'Pending Admin Review').length;
+    const avgPerEmployee = teamMembers.length > 0 ? (total / teamMembers.length).toFixed(1) : '0';
+
+    const hi = filtered.filter(t => t.priority === 'High' || t.priority === 'Critical').length;
+    const md = filtered.filter(t => t.priority === 'Medium').length;
+    const lo = filtered.filter(t => t.priority === 'Low').length;
+
+    const workloads: EmployeeWorkload[] = teamMembers.map(m => {
+        const empTasks = filtered.filter(t =>
+            t.assignedEmployee === m.employeeName || t.assignedTo === m.accountId
+        );
+        return {
+            employeeName: m.employeeName,
+            total: empTasks.length,
+            active: empTasks.filter(t =>
+                t.taskStatus === 'In Progress' || t.taskStatus === 'Assigned' || t.taskStatus === 'Pending'
+            ).length,
+            completed: empTasks.filter(t => t.taskStatus === 'Completed').length,
+            overdue: empTasks.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length,
+            pendingReview: empTasks.filter(t => t.taskStatus === 'Pending Admin Review').length,
+        };
+    }).filter(w => w.total > 0 || teamMembers.length <= 5)
+      .sort((a, b) => b.total - a.total);
+
+    const statusChartData = [
+        { name: 'Active', value: active, color: '#ffb547' },
+        { name: 'Pending Review', value: pendingReview, color: '#4318ff' },
+        { name: 'Completed', value: completed, color: '#05cd99' },
+        { name: 'Overdue', value: overdue, color: '#ee5d50' },
+    ].filter(d => d.value > 0);
+
+    const priorityChartData = [
+        { name: 'High', value: hi, color: '#ee5d50' },
+        { name: 'Medium', value: md, color: '#ffb547' },
+        { name: 'Low', value: lo, color: '#05cd99' },
+    ];
+
+    const workloadChartData = workloads.map(w => ({
+        name: w.employeeName.split(' ')[0],
+        Total: w.total,
+        Completed: w.completed,
+        Overdue: w.overdue,
+    }));
+
+    const donutColors = statusChartData.map(d => d.color);
+    const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+    const completionColor = pct >= 80 ? '#05cd99' : pct >= 50 ? '#ffb547' : '#ee5d50';
+
+    return (
+        <div className="dashboard-content">
+            {/* Filters */}
+            <div className="card" style={{ marginBottom: 16, padding: '14px 20px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
+                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE START</label>
+                        <input type="date" value={filterDateStart}
+                            onChange={e => setFilterDateStart(e.target.value)}
+                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                    </div>
+                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
+                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE END</label>
+                        <input type="date" value={filterDateEnd}
+                            onChange={e => setFilterDateEnd(e.target.value)}
+                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                    </div>
+                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 160 }}>
+                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>EMPLOYEE</label>
+                        <select value={filterEmployee}
+                            onChange={e => setFilterEmployee(e.target.value)}
+                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                            <option value="">All Employees</option>
+                            {teamMembers.map(m => (
+                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 150 }}>
+                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>TASK STATUS</label>
+                        <select value={filterStatus}
+                            onChange={e => setFilterStatus(e.target.value)}
+                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                            <option value="">All Statuses</option>
+                            <option value="Assigned">Assigned</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Pending Admin Review">Pending Admin Review</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Overdue">Overdue</option>
+                        </select>
+                    </div>
+                    {(filterDateStart || filterDateEnd || filterEmployee || filterStatus) && (
+                        <button className="btn btn-sm" onClick={() => {
+                            setFilterDateStart(''); setFilterDateEnd('');
+                            setFilterEmployee(''); setFilterStatus('');
+                        }} style={{ marginBottom: 1, alignSelf: 'flex-end' }}>
+                            <X size={12} /> Clear
+                        </button>
+                    )}
                 </div>
+            </div>
 
-                {/* Middle Grid */}
-                <div className="dashboard-grid">
-                    {/* Recent Tasks */}
-                    <div className="card">
-                        <div className="card-header-layout">
-                            <h3>Recent Tasks</h3>
-                            <span className="view-all-link">View all <ChevronRight size={12} /></span>
-                        </div>
-                        {loading ? (
-                            <div className="empty-state"><Loader2 size={20} className="spin" /><p>Loading tasks…</p></div>
-                        ) : tasks.slice(-5).reverse().map(t => (
-                            <TaskRow key={t.taskId} task={t} onView={onView} />
+            {loading ? (
+                <div className="empty-state" style={{ padding: '40px 0' }}>
+                    <Loader2 size={24} className="spin" />
+                    <p style={{ fontWeight: 600 }}>Loading workload data...</p>
+                </div>
+            ) : total === 0 && !loading ? (
+                <div className="empty-state" style={{ padding: '40px 0' }}>
+                    <ClipboardList size={28} color="var(--text-secondary)" />
+                    <p style={{ fontWeight: 600 }}>No workload data available.</p>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Create a new task or adjust filters.</span>
+                </div>
+            ) : (
+                <>
+                    <div className="stats-row">
+                        {[
+                            { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: `Avg ${avgPerEmployee} per employee` },
+                            { label: 'ACTIVE', value: active, icon: <Loader2 size={20} strokeWidth={2.3} />, variant: 'warning' as const, subtext: 'In Progress / Assigned' },
+                            { label: 'COMPLETED', value: completed, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success' as const, subtext: `${pct}% completion rate` },
+                            { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
+                            { label: 'PENDING REVIEW', value: pendingReview, icon: <Eye size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: 'Awaiting admin' },
+                        ].map(s => (
+                            <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                         ))}
                     </div>
 
-                    {/* Priority Breakdown */}
-                    <div className="card">
-                        <div className="card-header-layout">
-                            <h3>Priority Breakdown</h3>
-                        </div>
-                        <div className="perf-bars">
-                            {[
-                                { label: 'High', val: hi, cls: 'fill-red' },
-                                { label: 'Medium', val: md, cls: 'fill-amber' },
-                                { label: 'Low', val: lo, cls: 'fill-green' },
-                            ].map(p => (
-                                <div key={p.label} className="perf-item">
-                                    <span className="perf-label">{p.label}</span>
-                                    <div className="perf-track">
-                                        <div className={`perf-fill ${p.cls}`} style={{ width: `${Math.round(p.val / (Math.max(hi, md, lo) || 1) * 100)}%` }} />
-                                    </div>
-                                    <span className="perf-pct">{p.val}</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
+                            <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                                <svg viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" strokeWidth="6" />
+                                    <circle cx="40" cy="40" r="34" fill="none" stroke={completionColor} strokeWidth="6"
+                                        strokeDasharray={`${2 * Math.PI * 34}`}
+                                        strokeDashoffset={`${2 * Math.PI * 34 * (1 - pct / 100)}`}
+                                        strokeLinecap="round"
+                                        style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+                                </svg>
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>{pct}%</span>
+                                    <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>done</span>
                                 </div>
-                            ))}
-                        </div>
-                        <div style={{ marginTop: 16 }}>
-                            <div style={{ textAlign: 'center' }}>
-                                <span style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}>{pct}%</span>
-                                <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: '2px 0 6px' }}>completion rate</p>
                             </div>
-                            <ProgressBar pct={pct} cls="green" />
+                            <div>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.5px' }}>COMPLETION RATE</span>
+                                <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: '4px 0 0', fontWeight: 500 }}>
+                                    {completed} of {total} tasks completed
+                                </p>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                    {overdue > 0 ? `${overdue} overdue · ` : ''}
+                                    {pendingReview > 0 ? `${pendingReview} pending review` : 'No pending reviews'}
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Bottom Row */}
-                <div className="dashboard-bottom-row">
-                    <div className="card" style={{ flex: 2 }}>
-                        <div className="card-header-layout">
-                            <h3>Delivery Performance</h3>
-                            <span className="badge-week">This Week</span>
-                        </div>
-                        <div className="chart-wrap">
-                            <ResponsiveContainer width="100%" height={180}>
-                                <BarChart data={WEEKLY_DATA} barGap={4}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a3aed0' }} />
-                                    <Tooltip contentStyle={{ borderRadius: 10, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }} />
-                                    <Bar dataKey="completed" fill="#4318ff" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="pending" fill="#ffb547" radius={[4, 4, 0, 0]} />
+                        <div className="card" style={{ padding: '16px 20px' }}>
+                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                                <h3 style={{ fontSize: 13 }}>Priority Distribution</h3>
+                            </div>
+                            <ResponsiveContainer width="100%" height={50}>
+                                <BarChart data={priorityChartData} layout="vertical" barSize={14}>
+                                    <CartesianGrid horizontal={false} stroke="transparent" />
+                                    <XAxis hide type="number" />
+                                    <YAxis hide type="category" dataKey="name" />
+                                    <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                        {priorityChartData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
+                            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
+                                {priorityChartData.map(d => (
+                                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
+                                        <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
+                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{d.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="card" style={{ padding: '16px 20px' }}>
+                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                                <h3 style={{ fontSize: 13 }}>Quick Summary</h3>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12 }}>
+                                {[
+                                    { label: 'Employees', value: workloads.length },
+                                    { label: 'Avg/Employee', value: avgPerEmployee },
+                                    { label: 'Active %', value: total > 0 ? `${Math.round(active / total * 100)}%` : '0%' },
+                                    { label: 'Overdue %', value: total > 0 ? `${Math.round(overdue / total * 100)}%` : '0%' },
+                                    { label: 'Review %', value: total > 0 ? `${Math.round(pendingReview / total * 100)}%` : '0%' },
+                                    { label: 'High Priority', value: hi },
+                                ].map(s => (
+                                    <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
+                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        );
-    };
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }}>
+                        <div className="card" style={{ padding: '16px 20px' }}>
+                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                                <h3>Employee Workload Distribution</h3>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workloads.length} employees</span>
+                            </div>
+                            {workloads.length === 0 ? (
+                                <div className="empty-state" style={{ padding: '20px 0' }}><p>No workload data available.</p></div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={Math.max(120, workloads.length * 48)}>
+                                    <BarChart data={workloadChartData} layout="vertical" barSize={18} barGap={4} margin={{ top: 4, right: 16, left: -8, bottom: 0 }}>
+                                        <CartesianGrid horizontal={false} stroke="transparent" />
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a3aed0' }} />
+                                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#2b3674' }} width={70} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                        <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                                        <Bar dataKey="Total" fill="#4318ff" radius={[0, 4, 4, 0]} stackId="a" />
+                                        <Bar dataKey="Completed" fill="#05cd99" radius={[0, 4, 4, 0]} stackId="a" />
+                                        <Bar dataKey="Overdue" fill="#ee5d50" radius={[0, 4, 4, 0]} stackId="a" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
+
+                        <div className="card" style={{ padding: '16px 20px' }}>
+                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                                <h3>Task Status Distribution</h3>
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{total} total</span>
+                            </div>
+                            {statusChartData.length === 0 ? (
+                                <div className="empty-state" style={{ padding: '20px 0' }}><p>No data to display.</p></div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <ResponsiveContainer width={180} height={180}>
+                                        <PieChart>
+                                            <Pie data={statusChartData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" stroke="none">
+                                                {statusChartData.map((_, idx) => (<Cell key={idx} fill={donutColors[idx]} />))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        {statusChartData.map(d => {
+                                            const pctVal = Math.round(d.value / total * 100);
+                                            return (
+                                                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                                            <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</span>
+                                                            <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{d.value} ({pctVal}%)</span>
+                                                        </div>
+                                                        <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, marginTop: 2, overflow: 'hidden' }}>
+                                                            <div style={{ width: `${pctVal}%`, height: '100%', background: d.color, borderRadius: 2 }} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div className="card-header-layout" style={{ padding: '14px 20px', margin: 0 }}>
+                            <h3>Workload Summary per Employee</h3>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} tasks · {workloads.length} employees</span>
+                        </div>
+                        {workloads.length === 0 ? (
+                            <div className="empty-state" style={{ padding: '24px 0' }}><p>No workload data available.</p></div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <thead>
+                                        <tr style={{ background: 'var(--bg-main)' }}>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'left', letterSpacing: '0.5px' }}>EMPLOYEE</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>TOTAL</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>ACTIVE</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>COMPLETED</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>PENDING REVIEW</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>OVERDUE</th>
+                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'left', letterSpacing: '0.5px' }}>COMPLETION</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {workloads.map((w, idx) => (
+                                            <tr key={w.employeeName} style={{
+                                                borderBottom: '1px solid var(--border)',
+                                                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                                            }}>
+                                                <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{w.employeeName}</td>
+                                                <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700 }}>{w.total}</td>
+                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: '#ffb547', fontWeight: 700 }}>{w.active}</td>
+                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: '#05cd99', fontWeight: 700 }}>{w.completed}</td>
+                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: w.pendingReview > 0 ? '#4318ff' : 'var(--text-muted)', fontWeight: 700 }}>
+                                                    {w.pendingReview || '—'}
+                                                </td>
+                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdue > 0 ? '#ee5d50' : 'var(--text-muted)', fontWeight: 700 }}>
+                                                    {w.overdue || '—'}
+                                                </td>
+                                                <td style={{ padding: '10px 16px' }}>
+                                                    {w.total > 0 ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                                                                <div style={{
+                                                                    width: `${Math.round(w.completed / w.total * 100)}%`, height: '100%',
+                                                                    background: w.completed / w.total >= 0.8 ? '#05cd99' :
+                                                                        w.completed / w.total >= 0.5 ? '#ffb547' : '#ee5d50',
+                                                                    borderRadius: 3,
+                                                                }} />
+                                                            </div>
+                                                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                                                {Math.round(w.completed / w.total * 100)}%
+                                                            </span>
+                                                        </div>
+                                                    ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
 
@@ -4118,6 +4402,7 @@ export default function OpsAdminDashboard() {
         leave: 'Leave Requests',
         reopen: 'Reopen Requests',
         templates: 'Task Templates',
+        approvals: 'Approvals',
     };
 
     return (
@@ -4210,9 +4495,11 @@ export default function OpsAdminDashboard() {
                 {activeTab === 'dashboard' && (
                     <DashboardTab
                         tasks={tasks}
+                        teamMembers={teamMembers}
                         loading={loadingTasks}
                         onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
                         onNewTask={() => setShowNew(true)}
+                        onRefresh={fetchTasks}
                     />
                 )}
                 {activeTab === 'tasks' && (
@@ -4239,6 +4526,7 @@ export default function OpsAdminDashboard() {
                     />
                 )}
                 {activeTab === 'templates' && <TemplateTab teamMembers={teamMembers} />}
+                {activeTab === 'approvals' && <PendingApprovalsTab />}
                 {activeTab === 'reports' && <ReportsTab teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
                 {activeTab === 'leave' && (
