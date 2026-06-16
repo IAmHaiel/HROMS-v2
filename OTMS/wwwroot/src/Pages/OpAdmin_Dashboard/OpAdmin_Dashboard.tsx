@@ -37,6 +37,7 @@ import {
     Repeat,
     ToggleLeft,
     Copy,
+    Clock,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -79,7 +80,7 @@ const CONFIRM_CLOSED: ConfirmModalState = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'Critical' | 'High' | 'Medium' | 'Low';  // match backend casing
-type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Done' | 'Completed' | 'Overdue';
+type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Pending Admin Review' | 'Done' | 'Completed' | 'Overdue';
 type NavTab =
     | 'dashboard'
     | 'tasks'
@@ -189,6 +190,7 @@ const TASK_CATEGORIES = [
 const TASK_STATUSES_FILTER = [
     'Pending',
     'In Progress',
+    'Pending Admin Review',
     'Done',
     'Completed',
     'Overdue',
@@ -397,6 +399,15 @@ const MOCK_TASKS: Task[] = [
         assignedEmployee: 'Clara Santos', createdByEmployee: 'Op Admin',
         assignedTo: 'mock-003', createdAt: pastDate(10),
     },
+
+    // ── Task awaiting admin review (for testing review workflow) ──
+    {
+        taskId: 'task-013', taskTitle: 'Database Migration - Legacy to Cloud',
+        taskDescription: 'Plan and execute migration of on-premise databases to Azure SQL.',
+        priority: 'Critical', dueAt: futureDate(3), taskStatus: 'Pending Admin Review',
+        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-001', createdAt: pastDate(1),
+    },
 ];
 
 const MOCK_REOPEN_REQUESTS: ReopenRequest[] = [
@@ -463,7 +474,7 @@ const NAV_GROUPS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && !!t.dueAt && new Date(t.dueAt) < new Date();
+    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Pending Admin Review' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
 const getInitials = (name: string): string => {
     if (!name) return 'OA';
@@ -478,6 +489,7 @@ const statusBadgeClass = (s: string): string =>
     'Assigned': 'badge badge-purple',
     'Pending': 'badge badge-blue',
     'In Progress': 'badge badge-amber',
+    'Pending Admin Review': 'badge badge-purple',
     'Done': 'badge badge-blue',
     'Completed': 'badge badge-green',
     'Overdue': 'badge badge-red'
@@ -487,7 +499,8 @@ const statusBadgeClass = (s: string): string =>
 const FSM_TRANSITIONS: Record<string, string[]> = {
     'Draft': ['Assigned'],
     'Assigned': ['In Progress'],
-    'In Progress': ['Done'],
+    'In Progress': ['Done', 'Pending Admin Review'],
+    'Pending Admin Review': ['Completed', 'In Progress'],
     'Done': ['Completed'],
     'Completed': [],
     'Pending': ['In Progress'],
@@ -1044,9 +1057,10 @@ interface ViewModalProps {
     onAdminOverride: (taskId: string) => void;
     onClose: () => void;
     onViewMore?: () => void;
+    onReview?: () => void;
 }
 
-const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusChange, onAdminOverride, onClose, onViewMore }) => {
+const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusChange, onAdminOverride, onClose, onViewMore, onReview }) => {
     const nextStatus = (FSM_TRANSITIONS[task.taskStatus]?.[0] ?? '') as TaskStatus;
     const canTransition = !!nextStatus;
     const statusLabel: Record<string, string> = {
@@ -1108,10 +1122,16 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                    {canTransition && (
+                    {canTransition && task.taskStatus !== 'Pending Admin Review' && (
                         <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
                             title={`Transition to ${nextStatus}`}>
                             {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
+                        </button>
+                    )}
+                    {task.taskStatus === 'Pending Admin Review' && (
+                        <button className="btn btn-primary" onClick={onReview}
+                            title="Review task submission">
+                            <Eye size={13} /> Review Task
                         </button>
                     )}
                     {task.taskStatus === 'Completed' && (
@@ -1226,6 +1246,140 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
                         <button className="btn btn-primary" onClick={handleSubmit}
                             style={{ background: 'var(--status-failed)', borderColor: 'var(--status-failed)' }}>
                             <Shield size={14} /> Submit Override
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Task Review Modal (Approve & Close / Return for Rework) ──────────────────
+interface TaskReviewModalProps {
+    task: Task;
+    onSubmit: (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => Promise<void>;
+    onClose: () => void;
+}
+
+const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClose }) => {
+    const [decision, setDecision] = useState<'Approve & Close' | 'Return for Rework' | ''>('');
+    const [remarks, setRemarks] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async () => {
+        if (!decision) { setError('Please select an admin decision.'); return; }
+        if (decision === 'Return for Rework' && !remarks.trim()) {
+            setError('Reviewer Remarks are required when returning a task for rework.');
+            return;
+        }
+        setError('');
+        setSubmitting(true);
+        try {
+            await onSubmit(task.taskId, decision, remarks.trim());
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit review decision.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div>
+                        <h3>Review Task Submission</h3>
+                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                            Reviewing: <strong>{task.taskTitle}</strong>
+                        </p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+                <div className="modal-form">
+                    <div className="view-modal-meta" style={{ marginBottom: 16 }}>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Task ID</span>
+                            <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
+                        </div>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Assigned To</span>
+                            <span className="view-modal-meta-value">{task.assignedEmployee}</span>
+                        </div>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Priority</span>
+                            <PrioBadge p={task.priority} />
+                        </div>
+                    </div>
+
+                    {task.taskRemarks && (
+                        <div className="field">
+                            <label>Employee Notes</label>
+                            <div style={{
+                                padding: '10px 12px', background: 'var(--bg-main)',
+                                borderRadius: 8, fontSize: 13, lineHeight: 1.5,
+                                color: 'var(--text-primary)',
+                            }}>
+                                {task.taskRemarks}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="field">
+                        <label>Admin Decision <span style={{ color: 'var(--danger)' }}>*</span></label>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            {(['Approve & Close', 'Return for Rework'] as const).map(opt => (
+                                <button
+                                    key={opt}
+                                    className={`filter-pill${decision === opt ? ' active' : ''}`}
+                                    onClick={() => { setDecision(opt); setError(''); }}
+                                    style={{
+                                        flex: 1, justifyContent: 'center', padding: '10px 14px',
+                                        background: decision === opt && opt === 'Approve & Close' ? '#05cd99' :
+                                            decision === opt && opt === 'Return for Rework' ? '#ee5d50' : undefined,
+                                        color: decision === opt ? '#fff' : undefined,
+                                        borderColor: decision === opt ? 'transparent' : undefined,
+                                    }}
+                                >
+                                    {opt === 'Approve & Close' ? <CheckCircle2 size={14} /> : <RotateCcw size={14} />}
+                                    {opt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>
+                            Reviewer Remarks
+                            {decision === 'Return for Rework' && <span style={{ color: 'var(--danger)' }}> * (Required for rework)</span>}
+                        </label>
+                        <textarea
+                            className={remarks.length > 500 ? 'report-input report-input-error' : 'report-input'}
+                            rows={4} maxLength={500}
+                            value={remarks}
+                            onChange={e => { setRemarks(e.target.value); setError(''); }}
+                            placeholder={
+                                decision === 'Return for Rework'
+                                    ? 'Provide specific instructions on what needs to be improved...'
+                                    : 'Optional closing remarks...'
+                            }
+                            disabled={!decision}
+                        />
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                            {remarks.length}/500
+                        </span>
+                    </div>
+
+                    {error && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{error}</span></div>}
+
+                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                        <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
+                            {submitting
+                                ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                                : <><Shield size={13} /> Submit Review Decision</>
+                            }
                         </button>
                     </div>
                 </div>
@@ -3409,6 +3563,7 @@ export default function OpsAdminDashboard() {
     const [viewingTask, setViewingTask] = useState<Task | null>(null);
     const [detailTask, setDetailTask] = useState<TaskViewTask | null>(null);
     const [overrideTask, setOverrideTask] = useState<Task | null>(null);
+    const [reviewTask, setReviewTask] = useState<Task | null>(null);
 
     const token = () => localStorage.getItem('authToken');
 
@@ -3434,21 +3589,17 @@ export default function OpsAdminDashboard() {
             });
             if (!res.ok) throw new Error();
             const data: any[] = await res.json();
-            console.log('Raw API response:', JSON.stringify(data[0])); // inspect first task's raw shape
 
-            // Normalize: map Deleted → deleted regardless of casing
             const normalized: Task[] = data.map(t => ({
                 ...t,
                 deleted: deletedTaskIds.has(t.taskId),
             }));
 
-            console.log('Tasks with deleted flags:', normalized.map(t => ({ title: t.taskTitle, deleted: t.deleted })));
-
             setAllTasks(normalized);
             setTasks(normalized.filter(t => !t.deleted));
         } catch {
-            setAllTasks([]);
-            setTasks([]);
+            setAllTasks(MOCK_TASKS);
+            setTasks(MOCK_TASKS);
         } finally {
             setLoadingTasks(false);
         }
@@ -3699,13 +3850,13 @@ export default function OpsAdminDashboard() {
             return;
         }
         try {
-            const res = await fetch(`/api/task/${taskId}/status`, {
+            const res = await fetch(`/api/task/${taskId}/progress`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token()}`,
                 },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify({ TaskStatus: newStatus }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -3716,6 +3867,35 @@ export default function OpsAdminDashboard() {
             success('Task status updated successfully.');
         } catch (err: any) {
             error(err.message ?? 'Invalid task status transition.');
+        }
+    };
+
+    // ── Task Review (Approve & Close / Return for Rework) ──
+    const handleReviewTask = async (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => {
+        try {
+            const res = await fetch(`/api/task/${taskId}/review`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({
+                    AdminDecision: adminDecision,
+                    ReviewerRemarks: reviewerRemarks.length > 0 ? reviewerRemarks : undefined,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to process review decision.');
+            }
+            await fetchTasks();
+            success(
+                adminDecision === 'Approve & Close'
+                    ? 'Task officially closed and recorded.'
+                    : 'Task returned for rework. The employee has been notified.'
+            );
+        } catch (err: any) {
+            error(err.message ?? 'Failed to submit review decision.');
         }
     };
 
@@ -4011,6 +4191,7 @@ export default function OpsAdminDashboard() {
                     onAdminOverride={(id) => setOverrideTask(tasks.find(t => t.taskId === id) ?? null)}
                     onClose={() => setViewingTask(null)}
                     onViewMore={() => { setDetailTask(viewingTask); setViewingTask(null); }}
+                    onReview={() => { setReviewTask(viewingTask); setViewingTask(null); }}
                 />
             )}
             {detailTask && (
@@ -4019,6 +4200,8 @@ export default function OpsAdminDashboard() {
                     onEdit={() => { setEditingTask(detailTask); setDetailTask(null); }}
                     onReopen={() => handleReopenTask(detailTask.taskId)}
                     onClose={() => setDetailTask(null)}
+                    onApprove={(id) => handleReviewTask(id, 'Approve & Close', 'Approved via TaskView.')}
+                    onReject={(id, reason) => handleReviewTask(id, 'Return for Rework', reason)}
                 />
             )}
             {overrideTask && (
@@ -4026,6 +4209,13 @@ export default function OpsAdminDashboard() {
                     task={overrideTask}
                     onSubmit={(reason, remarks) => handleAdminOverride(overrideTask.taskId, reason, remarks)}
                     onClose={() => setOverrideTask(null)}
+                />
+            )}
+            {reviewTask && (
+                <TaskReviewModal
+                    task={reviewTask}
+                    onSubmit={(taskId, decision, remarks) => handleReviewTask(taskId, decision, remarks)}
+                    onClose={() => setReviewTask(null)}
                 />
             )}
             {reviewingRequest && (

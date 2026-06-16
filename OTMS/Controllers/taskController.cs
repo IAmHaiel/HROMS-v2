@@ -302,7 +302,7 @@ namespace OTMS.Controllers
                 {
                     return Ok(result.Data);
                 }
-                
+
                 return BadRequest(new { message = result.Message });
             }
             catch (Exception ex)
