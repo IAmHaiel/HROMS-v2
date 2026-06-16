@@ -51,6 +51,7 @@ import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
+import EmployeeDocumentsTab from './EmployeeDocumentsTab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1459,7 +1460,6 @@ function ManageEmployeesTab({
     leaveRequests, leaveLoading, leavePage, leaveTotalPages, leavePendingCount,
     onLeavePageChange, onLeaveConfirm,
     onEditEmployee, onDeleteEmployee, onViewEmployee, onOpenDigital201,
-    contracts, contractsLoading, contractsPage, contractsTotalPages, onContractsPageChange,
     rolesList = SYSTEM_ROLES,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
@@ -1469,9 +1469,6 @@ function ManageEmployeesTab({
     const [leaveFilterStatus, setLeaveFilterStatus] = useState<'all' | LeaveStatus>('pending');
     const [leaveFilterRole, setLeaveFilterRole] = useState('');
     const [leaveSearch, setLeaveSearch] = useState('');
-    const [docSearch, setDocSearch] = useState('');
-    const [docShowArchived, setDocShowArchived] = useState(false);
-    const [filterDocType, setFilterDocType] = useState('');
     const [actionModal, setActionModal] = useState<{ request: LeaveRequest; action: 'approve' | 'decline' } | null>(null);
     const [detailModal, setDetailModal] = useState<LeaveRequest | null>(null);
 
@@ -1483,271 +1480,293 @@ function ManageEmployeesTab({
         onLeavePageChange(1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch });
     }, [leaveFilterStatus, leaveFilterRole, leaveSearch]);
 
-    useEffect(() => {
-        onContractsPageChange(1, { search: docSearch, isArchived: docShowArchived });
-    }, [docSearch, docShowArchived]);
+    // ── Shared tab bar styles ─────────────────────────────────────────────────
+    const tabBarStyle: React.CSSProperties = {
+        display: 'flex',
+        gap: 0,
+        borderBottom: '1px solid #e2e8f0',
+        marginBottom: 20,
+    };
 
-    const filteredContracts = contracts.filter(doc => {
-        if (!filterDocType) return true;
-        if (filterDocType === 'Other') {
-            return doc.documentType !== 'Employment Contract' && doc.documentType !== 'NDA' && doc.documentType !== 'Job Description';
-        }
-        return doc.documentType === filterDocType;
+    const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '11px 20px',
+        border: 'none',
+        borderBottom: `2px solid ${active ? '#4318ff' : 'transparent'}`,
+        background: 'none',
+        cursor: 'pointer',
+        fontWeight: active ? 700 : 500,
+        color: active ? '#4318ff' : 'var(--text-secondary)',
+        fontSize: 13,
+        transition: 'all 0.15s',
+        marginBottom: -1, // overlap the container border
     });
+
+    // ── Shared toolbar ────────────────────────────────────────────────────────
+    const EmployeesToolbar = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+                <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                    type="text"
+                    placeholder="Search by name or ID…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: 32, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                />
+            </div>
+            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
+                <option value="">All Roles</option>
+                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Deactivated">Deactivated</option>
+            </select>
+            <button className="btn btn-primary" onClick={onAddEmployee}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 9, fontSize: 13, whiteSpace: 'nowrap' }}>
+                <Plus size={14} /> Add Employee
+            </button>
+        </div>
+    );
+
+    const LeaveToolbar = (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+                <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                    type="text"
+                    placeholder="Search leave requests…"
+                    value={leaveSearch}
+                    onChange={e => setLeaveSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: 32, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                />
+            </div>
+            <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}
+                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
+                <option value="pending">Pending</option>
+                <option value="all">All Statuses</option>
+                <option value="approved">Approved</option>
+                <option value="declined">Declined</option>
+            </select>
+            <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}
+                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
+                <option value="">All Roles</option>
+                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+        </div>
+    );
+
+    // ── Shared table card wrapper ──────────────────────────────────────────────
+    const TableWrapper = ({ children, headers, loading: isLoading, emptyMsg, page, totalPages, onPage, resultCount }: {
+        children: React.ReactNode;
+        headers: string[];
+        loading: boolean;
+        emptyMsg: string;
+        page: number;
+        totalPages: number;
+        onPage: (p: number) => void;
+        resultCount: number;
+    }) => (
+        <div className="unified-table-wrap" style={{ background: 'var(--bg-primary,#fff)', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
+            <style>{`
+                .unified-table-wrap td {
+                    padding: 13px 14px;
+                    border-bottom: 1px solid #e2e8f0;
+                    color: var(--text-primary);
+                    font-weight: 500;
+                }
+                .unified-table-wrap tbody tr:last-child td {
+                    border-bottom: none;
+                }
+            `}</style>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 12, color: 'var(--text-secondary)' }}>
+                {resultCount} result{resultCount !== 1 ? 's' : ''} on this page
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr>
+                            {headers.map(h => (
+                                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', padding: '10px 14px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                                    {h}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {isLoading ? (
+                            <tr><td colSpan={headers.length}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8, color: 'var(--text-secondary)' }}>
+                                    <Loader2 size={24} className="spin" /><span style={{ fontSize: 13 }}>Loading…</span>
+                                </div>
+                            </td></tr>
+                        ) : resultCount === 0 ? (
+                            <tr><td colSpan={headers.length}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8, color: 'var(--text-secondary)' }}>
+                                    <Package size={24} style={{ opacity: 0.4 }} /><span style={{ fontSize: 13 }}>{emptyMsg}</span>
+                                </div>
+                            </td></tr>
+                        ) : children}
+                    </tbody>
+                </table>
+            </div>
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '12px 16px', borderTop: '1px solid #f1f5f9', gap: 4 }}>
+                    <button onClick={() => onPage(page - 1)} disabled={page === 1}
+                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: 'transparent', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ChevronLeft size={15} />
+                    </button>
+                    {getPageNumbers(totalPages, page).map((p, i) =>
+                        p === '...' ? <span key={`e${i}`} style={{ width: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>…</span> :
+                            <button key={p} onClick={() => onPage(p as number)}
+                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: page === p ? '#4318ff' : 'transparent', color: page === p ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                                {p}
+                            </button>
+                    )}
+                    <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
+                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: 'transparent', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ChevronRight size={15} />
+                    </button>
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <div className="dashboard-content">
-            <TableCard
-                tabs={[
+            {/* ── Unified tab bar ── */}
+            <div style={tabBarStyle}>
+                {([
                     { key: 'employees', label: 'All Employees', icon: <Users size={14} /> },
                     { key: 'leave', label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: leavePendingCount },
                     { key: 'documents', label: 'Employee Documents', icon: <FileText size={14} /> },
-                ]}
-                activeTab={subTab}
-                onTabChange={key => setSubTab(key as EmployeeSubTab)}
-                searchQuery={
-                    subTab === 'employees' ? search :
-                        subTab === 'leave' ? leaveSearch : docSearch
-                }
-                setSearchQuery={
-                    subTab === 'employees' ? setSearch :
-                        subTab === 'leave' ? setLeaveSearch : setDocSearch
-                }
-                searchPlaceholder={
-                    subTab === 'employees' ? "Search by name or ID…" :
-                        subTab === 'leave' ? "Search leave requests…" : "Search documents or employees…"
-                }
-                totalResults={
-                    subTab === 'employees' ? employees.length :
-                        subTab === 'leave' ? leaveRequests.length : filteredContracts.length
-                }
-                filterElements={
-                    subTab === 'employees' ? (
-                        <>
-                            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-                                <option value="">All Roles</option>
-                                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                                <option value="">All Statuses</option>
-                                <option value="Active">Active</option>
-                                <option value="Deactivated">Deactivated</option>
-                            </select>
-                        </>
-                    ) : subTab === 'leave' ? (
-                        <>
-                            <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}>
-                                <option value="pending">Pending</option>
-                                <option value="all">All Statuses</option>
-                                <option value="approved">Approved</option>
-                                <option value="declined">Declined</option>
-                            </select>
-                            <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}>
-                                <option value="">All Roles</option>
-                                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                        </>
-                    ) : (
-                        <>
-                            <select value={filterDocType} onChange={e => setFilterDocType(e.target.value)}>
-                                <option value="">All Document Types</option>
-                                <option value="Employment Contract">Employment Contract</option>
-                                <option value="NDA">NDA</option>
-                                <option value="Job Description">Job Description</option>
-                                <option value="Other">Other</option>
-                            </select>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', marginLeft: 'auto' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={docShowArchived}
-                                    onChange={(e) => setDocShowArchived(e.target.checked)}
-                                    style={{ width: 14, height: 14, cursor: 'pointer' }}
-                                />
-                                Show Archived Documents
-                            </label>
-                        </>
-                    )
-                }
-                actionButton={subTab === 'employees' ? {
-                    label: 'Add Employee',
-                    icon: <Users size={14} />,
-                    onClick: onAddEmployee
-                } : undefined}
-                headers={
-                    subTab === 'employees' ? ['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION'] :
-                        subTab === 'leave' ? ['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS'] :
-                            ['EMPLOYEE', 'DOCUMENT TYPE', 'FILE NAME', 'SIZE', 'VERSION', 'UPLOADED AT', 'ACTIONS']
-                }
-                loading={
-                    subTab === 'employees' ? loading :
-                        subTab === 'leave' ? leaveLoading : contractsLoading
-                }
-                emptyMessage={
-                    subTab === 'employees' ? 'No employees match your filters' :
-                        subTab === 'leave' ? 'No leave requests match your filters' : 'No documents match your filters'
-                }
-                currentPage={
-                    subTab === 'employees' ? empPage :
-                        subTab === 'leave' ? leavePage : contractsPage
-                }
-                totalPages={
-                    subTab === 'employees' ? empTotalPages :
-                        subTab === 'leave' ? leaveTotalPages : contractsTotalPages
-                }
-                onPageChange={
-                    subTab === 'employees' ? (page) => onEmpPageChange(page, { search, role: filterRole, status: filterStatus }) :
-                        subTab === 'leave' ? (page) => onLeavePageChange(page, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch }) :
-                            (page) => onContractsPageChange(page, { search: docSearch, isArchived: docShowArchived })
-                }
-            >
-                {subTab === 'employees' ? (
-                    employees.map(emp => {
-                        const name = getEmployeeDisplayName(emp);
-                        return (
-                            <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
-                                <td><div className="emp-name-cell"><div style={{ position: 'relative', display: 'inline-block' }}><div className="emp-avatar">{name.charAt(0).toUpperCase()}</div><span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} /></div>{name}</div></td>
-                                <td>{emp.employeeNumber}</td>
-                                <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                <td>{emp.contactNumber}</td>
-                                <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
-                                <td>
-                                    <ActionsDropdown
-                                        actions={[
-                                            {
-                                                label: 'View Details',
-                                                icon: <Eye size={12} />,
-                                                onClick: () => onViewEmployee(emp)
-                                            },
-                                            {
-                                                label: 'Digital 201 File',
-                                                icon: <FileText size={12} />,
-                                                onClick: () => onOpenDigital201(emp)
-                                            },
-                                            {
-                                                label: 'Edit',
-                                                icon: <Pencil size={12} />,
-                                                onClick: () => onEditEmployee(emp)
-                                            },
-                                            {
-                                                label: 'Delete',
-                                                icon: <Trash2 size={12} />,
-                                                onClick: () => onDeleteEmployee(emp),
-                                                variant: 'danger'
-                                            }
-                                        ]}
-                                    />
-                                </td>
-                            </tr>
-                        );
-                    })
-                ) : subTab === 'leave' ? (
-                    leaveRequests.map(r => {
-                        const days = calcDays(r.startDate, r.endDate);
-                        const meta = LEAVE_STATUS_META[r.status];
-                        return (
-                            <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
-                                <td><div className="emp-name-cell"><div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div><div><div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div><div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div></div></div></td>
-                                <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
-                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
-                                <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
-                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
-                                <td><span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{meta.icon}{meta.label}</span></td>
-                                <td onClick={e => e.stopPropagation()}>
-                                    {r.status === 'pending' ? (
-                                        <ActionsDropdown
-                                            actions={[
-                                                {
-                                                    label: 'Approve',
-                                                    icon: <CheckCircle2 size={12} />,
-                                                    onClick: () => setActionModal({ request: r, action: 'approve' }),
-                                                    variant: 'success'
-                                                },
-                                                {
-                                                    label: 'Decline',
-                                                    icon: <X size={12} />,
-                                                    onClick: () => setActionModal({ request: r, action: 'decline' }),
-                                                    variant: 'danger'
-                                                },
-                                                {
-                                                    label: 'View Details',
-                                                    icon: <Eye size={12} />,
-                                                    onClick: () => setDetailModal(r)
-                                                }
-                                            ]}
-                                        />
-                                    ) : (
-                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>{r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}</span>
-                                    )}
-                                </td>
-                            </tr>
-                        );
-                    })
-                ) : (
-                    filteredContracts.map(doc => {
-                        const empName = buildDisplayName(doc.firstName, '', doc.lastName, '');
-                        return (
-                            <tr key={doc.employeeAttachmentId} className="clickable-row">
-                                <td>
-                                    <div className="emp-name-cell">
-                                        <div className="emp-avatar">{empName.charAt(0).toUpperCase()}</div>
-                                        <div>
-                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{empName}</div>
-                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{doc.employeeNumber}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td style={{ fontSize: 13 }}>{doc.documentType}</td>
-                                <td style={{ fontSize: 13 }} title={doc.fileName}>
-                                    <div style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {doc.fileName}
-                                    </div>
-                                </td>
-                                <td style={{ fontSize: 13 }}>{formatBytes(doc.fileSize)}</td>
-                                <td>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(67,24,255,0.08)', color: '#4318ff', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>v{doc.version}</span>
-                                </td>
-                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                    {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </td>
-                                <td onClick={e => e.stopPropagation()}>
-                                    <ActionsDropdown
-                                        actions={[
-                                            {
-                                                label: 'Download File',
-                                                icon: <Download size={12} />,
-                                                onClick: () => window.open(doc.fileUrl, '_blank')
-                                            },
-                                            {
-                                                label: 'View Digital 201',
-                                                icon: <Eye size={12} />,
-                                                onClick: () => {
-                                                    const matchedEmp = employees.find(e => e.employeeNumber === doc.employeeNumber);
-                                                    if (matchedEmp) {
-                                                        onViewEmployee(matchedEmp);
-                                                        onOpenDigital201(matchedEmp);
-                                                    } else {
-                                                        onOpenDigital201({
-                                                            employeeNumber: doc.employeeNumber,
-                                                            employeeName: empName,
-                                                            firstName: doc.firstName,
-                                                            lastName: doc.lastName,
-                                                            contactNumber: '',
-                                                            role: doc.jobPositionTitle || '',
-                                                            accountStatus: 'Active'
-                                                        });
-                                                    }
-                                                }
-                                            }
-                                        ]}
-                                    />
-                                </td>
-                            </tr>
-                        );
-                    })
-                )}
-            </TableCard>
+                ] as const).map(t => (
+                    <button key={t.key} onClick={() => setSubTab(t.key)} style={tabBtnStyle(subTab === t.key)}>
+                        {t.icon}
+                        {t.label}
+                        {'badge' in t && t.badge ? (
+                            <span style={{ background: '#ee5d50', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999 }}>
+                                {t.badge}
+                            </span>
+                        ) : null}
+                    </button>
+                ))}
+            </div>
 
-            {/* Leave Detail Modal */}
+            {/* ── All Employees ── */}
+            {subTab === 'employees' && (
+                <>
+                    {EmployeesToolbar}
+                    <TableWrapper
+                        headers={['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']}
+                        loading={loading}
+                        emptyMsg="No employees match your filters"
+                        page={empPage}
+                        totalPages={empTotalPages}
+                        onPage={p => onEmpPageChange(p, { search, role: filterRole, status: filterStatus })}
+                        resultCount={employees.length}
+                    >
+                        {employees.map(emp => {
+                            const name = getEmployeeDisplayName(emp) || 'Unknown';
+                            return (
+                                <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
+                                    <td>
+                                        <div className="emp-name-cell">
+                                            <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
+                                                <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
+                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary,#fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
+                                            </div>
+                                            {name}
+                                        </div>
+                                    </td>
+                                    <td style={{ fontSize: 13 }}>{emp.employeeNumber}</td>
+                                    <td style={{ fontSize: 13 }}>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
+                                    <td style={{ fontSize: 13 }}>{emp.contactNumber}</td>
+                                    <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
+                                    <td onClick={e => e.stopPropagation()}>
+                                        <ActionsDropdown actions={[
+                                            { label: 'View Details', icon: <Eye size={12} />, onClick: () => onViewEmployee(emp) },
+                                            { label: 'Digital 201 File', icon: <FileText size={12} />, onClick: () => onOpenDigital201(emp) },
+                                            { label: 'Edit', icon: <Pencil size={12} />, onClick: () => onEditEmployee(emp) },
+                                            { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDeleteEmployee(emp), variant: 'danger' },
+                                        ]} />
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </TableWrapper>
+                </>
+            )}
+
+            {/* ── Leave Requests ── */}
+            {subTab === 'leave' && (
+                <>
+                    {LeaveToolbar}
+                    <TableWrapper
+                        headers={['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']}
+                        loading={leaveLoading}
+                        emptyMsg="No leave requests match your filters"
+                        page={leavePage}
+                        totalPages={leaveTotalPages}
+                        onPage={p => onLeavePageChange(p, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })}
+                        resultCount={leaveRequests.length}
+                    >
+                        {leaveRequests.map(r => {
+                            const days = calcDays(r.startDate, r.endDate);
+                            const meta = LEAVE_STATUS_META[r.status];
+                            return (
+                                <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
+                                    <td>
+                                        <div className="emp-name-cell">
+                                            <div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
+                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
+                                    <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
+                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
+                                    <td>
+                                        <span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`}
+                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            {meta.icon}{meta.label}
+                                        </span>
+                                    </td>
+                                    <td onClick={e => e.stopPropagation()}>
+                                        {r.status === 'pending' ? (
+                                            <ActionsDropdown actions={[
+                                                { label: 'Approve', icon: <CheckCircle2 size={12} />, onClick: () => setActionModal({ request: r, action: 'approve' }), variant: 'success' },
+                                                { label: 'Decline', icon: <X size={12} />, onClick: () => setActionModal({ request: r, action: 'decline' }), variant: 'danger' },
+                                                { label: 'View Details', icon: <Eye size={12} />, onClick: () => setDetailModal(r) },
+                                            ]} />
+                                        ) : (
+                                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                                {r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </TableWrapper>
+                </>
+            )}
+
+            {/* ── Employee Documents ── */}
+            {subTab === 'documents' && (
+                <EmployeeDocumentsTab
+                    employees={employees}
+                    onOpenDigital201={onOpenDigital201}
+                />
+            )}
+            {/* ── Leave detail modal ── */}
             {detailModal && (
                 <div className="modal-overlay" onClick={() => setDetailModal(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>

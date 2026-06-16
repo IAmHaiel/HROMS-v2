@@ -2,13 +2,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OTMS.Entities.DTOs.Organization;
 using OTMS.Service.Interfaces;
+using System.Security.Claims;
 
 namespace OTMS.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class organizationController(IOrganizationService orgService) : ControllerBase
+    public class organizationController(
+        IOrganizationService orgService,
+        IActivityLogService activityLogService
+    ) : ControllerBase
     {
+        private Guid? GetActorId() =>
+            Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
+
         [Authorize(Policy = "Permissions.Departments.View")]
         [HttpGet("departments")]
         public async Task<ActionResult<List<DepartmentResponseDTO>>> GetAllDepartments()
@@ -22,7 +29,11 @@ namespace OTMS.Controllers
         {
             try
             {
-                return Ok(await orgService.CreateDepartmentAsync(request));
+                var result = await orgService.CreateDepartmentAsync(request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Create", $"Created department '{result.Name}' (Code: {result.Code})");
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -36,7 +47,11 @@ namespace OTMS.Controllers
         {
             try
             {
-                return Ok(await orgService.UpdateDepartmentAsync(id, request));
+                var result = await orgService.UpdateDepartmentAsync(id, request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Update", $"Updated department '{result.Name}' (Code: {result.Code})");
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -52,6 +67,9 @@ namespace OTMS.Controllers
             {
                 var result = await orgService.DeleteDepartmentAsync(id);
                 if (!result) return NotFound();
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Delete", $"Deleted department ID: {id}");
                 return Ok(new { message = "Department deleted successfully." });
             }
             catch (Exception ex)
@@ -80,7 +98,11 @@ namespace OTMS.Controllers
         {
             try
             {
-                return Ok(await orgService.CreateJobPositionAsync(request));
+                var result = await orgService.CreateJobPositionAsync(request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Create", $"Created job position '{result.Name}' in dept '{result.DepartmentName}'");
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -94,7 +116,11 @@ namespace OTMS.Controllers
         {
             try
             {
-                return Ok(await orgService.UpdateJobPositionAsync(id, request));
+                var result = await orgService.UpdateJobPositionAsync(id, request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Update", $"Updated job position '{result.Name}' in dept '{result.DepartmentName}'");
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -110,6 +136,9 @@ namespace OTMS.Controllers
             {
                 var result = await orgService.DeleteJobPositionAsync(id);
                 if (!result) return NotFound();
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "Delete", $"Deleted job position ID: {id}");
                 return Ok(new { message = "Job Position deleted successfully." });
             }
             catch (Exception ex)

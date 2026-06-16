@@ -33,6 +33,9 @@ namespace OTMS.Service.Services
             if (await context.Departments.AnyAsync(d => d.Name == request.Name))
                 throw new InvalidOperationException("Department already exists.");
 
+            if (await context.Departments.AnyAsync(d => d.Code == request.Code))
+                throw new InvalidOperationException("A department with that code already exists.");
+
             var dept = new Department
             {
                 DepartmentId = Guid.NewGuid(),
@@ -77,6 +80,9 @@ namespace OTMS.Service.Services
             if (dept.Name != request.Name && await context.Departments.AnyAsync(d => d.Name == request.Name))
                 throw new InvalidOperationException("Department with that name already exists.");
 
+            if (dept.Code != request.Code && await context.Departments.AnyAsync(d => d.Code == request.Code))
+                throw new InvalidOperationException("A department with that code already exists.");
+
             dept.Name = request.Name;
             dept.Description = request.Description ?? string.Empty;
             dept.Code = request.Code;
@@ -110,6 +116,9 @@ namespace OTMS.Service.Services
         {
             var dept = await context.Departments.FindAsync(id);
             if (dept == null) return false;
+
+            if (await context.Employees.AnyAsync(e => e.DepartmentId == id))
+                throw new InvalidOperationException("Cannot delete department because it has active employee assignments. Reassign employees first.");
 
             if (await context.JobPositions.AnyAsync(jp => jp.DepartmentId == id))
                 throw new InvalidOperationException("Cannot delete department because it contains job positions.");
@@ -175,6 +184,9 @@ namespace OTMS.Service.Services
             if (await context.JobPositions.AnyAsync(jp => jp.Title == request.Name && jp.DepartmentId == request.DepartmentId))
                 throw new InvalidOperationException("Job position already exists in this department.");
 
+            if (await context.JobPositions.AnyAsync(jp => jp.Code == request.Code))
+                throw new InvalidOperationException("A job position with that code already exists.");
+
             var position = new JobPosition
             {
                 JobPositionId = Guid.NewGuid(),
@@ -224,6 +236,10 @@ namespace OTMS.Service.Services
 
             var dept = await context.Departments.FindAsync(request.DepartmentId);
             if (dept == null) throw new KeyNotFoundException("Department not found.");
+
+            if (position.Code != request.Code && await context.JobPositions.AnyAsync(jp => jp.Code == request.Code))
+                throw new InvalidOperationException("A job position with that code already exists.");
+
 
             position.Title = request.Name;
             position.Description = request.Description ?? string.Empty;
