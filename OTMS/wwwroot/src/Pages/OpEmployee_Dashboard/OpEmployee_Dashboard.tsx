@@ -831,6 +831,28 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     const firstName = user.fullName ? user.fullName.split(' ')[0] : 'Employee';
     const initials = getInitials(user.fullName);
 
+    // Recent workflow trackers
+    const [recentTrackers, setRecentTrackers] = useState<TrackerData[]>([]);
+    const [activeTrackerCount, setActiveTrackerCount] = useState(0);
+    const [trackersLoading, setTrackersLoading] = useState(true);
+
+    const fetchRecentTrackers = async () => {
+        try {
+            const res = await fetch('/api/approvalrequests/my-trackers?pageSize=5', {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const list: TrackerData[] = json?.data?.data ?? json?.data ?? json ?? [];
+                setRecentTrackers(Array.isArray(list) ? list : []);
+                setActiveTrackerCount(json?.data?.activeCount ?? list.filter((t: TrackerData) => t.status === 'Pending').length);
+            }
+        } catch { /* silent */ }
+        finally { setTrackersLoading(false); }
+    };
+
+    useEffect(() => { fetchRecentTrackers(); }, []);
+
     return (
         <div className="tab-content">
             <div className="welcome-banner">
@@ -925,6 +947,32 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                             </div>
                         ))}
                     </div>
+                </div>
+
+                {/* Recent Workflow Trackers */}
+                <div className="card" style={{ marginTop: 16 }}>
+                    <div className="card-header-layout">
+                        <h3><Shield size={15} style={{ marginRight: 6, verticalAlign: 'middle' }} />Pending Approvals</h3>
+                        {activeTrackerCount > 0 && (
+                            <span className="badge badge-purple" style={{ fontSize: 12 }}>{activeTrackerCount} active</span>
+                        )}
+                    </div>
+                    {trackersLoading ? (
+                        <div className="empty-state" style={{ padding: '20px 0' }}><Loader2 size={18} className="spin" /><p>Loading trackers...</p></div>
+                    ) : recentTrackers.length === 0 ? (
+                        <div className="empty-state" style={{ padding: '20px 0' }}>
+                            <Shield size={22} color="var(--text-muted)" />
+                            <p>No approval requests yet</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 0 4px' }}>
+                            {recentTrackers.slice(0, 3).map(t => (
+                                <div key={t.approvalRequestId} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', background: t.status === 'Pending' ? 'rgba(67,24,255,0.03)' : 'transparent' }}>
+                                    <ApprovalTracker tracker={t} compact />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

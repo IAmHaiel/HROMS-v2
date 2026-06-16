@@ -43,33 +43,47 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
     const [loading, setLoading] = useState(true);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
+    const [notifPage, setNotifPage] = useState(1);
+    const [notifTotalPages, setNotifTotalPages] = useState(1);
+    const [notifTotalRecords, setNotifTotalRecords] = useState(0);
+    const [notifTotalUnread, setNotifTotalUnread] = useState(0);
+    const NOTIF_PAGE_SIZE = 10;
     const wrapRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const unreadCount = notifs.filter(n => !n.isRead).length;
+    const unreadCount = notifTotalUnread;
     const baseUrl = apiEndpoint.substring(0, apiEndpoint.lastIndexOf('/'));
 
     const visibleNotifs = activeTab === 'unread'
         ? notifs.filter(n => !n.isRead)
         : notifs;
 
-    const fetchNotifs = async () => {
+    const fetchNotifs = async (page?: number) => {
         try {
+            const p = page ?? notifPage;
             const token = localStorage.getItem('authToken');
-            const res = await fetch(apiEndpoint, {
+            const sep = apiEndpoint.includes('?') ? '&' : '?';
+            const res = await fetch(`${apiEndpoint}${sep}pageNumber=${p}&pageSize=${NOTIF_PAGE_SIZE}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error();
             const json = await res.json();
-            console.log('Notifications API response:', json);
-            const data: NotificationItem[] = Array.isArray(json)
-                ? json
-                : json?.data ?? json?.notifications ?? json?.items ?? [];
+            const paginated = json?.data ?? json;
+            const list: NotificationItem[] = Array.isArray(paginated)
+                ? paginated
+                : paginated?.data ?? paginated?.notifications ?? paginated?.items ?? [];
+            const totalPages = paginated?.totalPages ?? 1;
+            const totalRecords = paginated?.totalRecords ?? list.length;
+            const totalUnread = paginated?.totalUnread ?? list.filter((n: NotificationItem) => !n.isRead).length;
+            setNotifTotalPages(totalPages);
+            setNotifTotalRecords(totalRecords);
+            setNotifTotalUnread(totalUnread);
+            setNotifPage(p);
             setNotifs(prev => {
                 const locallyRead = new Set(
                     prev.filter(n => n.isRead).map(n => n.notificationId)
                 );
-                return data.map(n => ({
+                return list.map(n => ({
                     ...n,
                     isRead: n.isRead || locallyRead.has(n.notificationId),
                 }));
@@ -82,8 +96,8 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
     };
 
     useEffect(() => {
-        fetchNotifs();
-        const interval = setInterval(fetchNotifs, 30000);
+        fetchNotifs(1);
+        const interval = setInterval(() => fetchNotifs(notifPage), 30000);
         return () => clearInterval(interval);
     }, [apiEndpoint]);
 
@@ -267,9 +281,28 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                     </div>
 
                     {/* Footer */}
-                    {notifs.length > 0 && (
+                    {notifTotalRecords > 0 && (
                         <div className="notif-footer">
-                            {notifs.filter(n => n.isRead).length} of {notifs.length} read
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                {notifs.filter(n => n.isRead).length} read · {notifTotalRecords} total
+                            </div>
+                            {notifTotalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                                    <button className="btn btn-sm" disabled={notifPage <= 1}
+                                        onClick={() => fetchNotifs(notifPage - 1)}
+                                        style={{ fontSize: 10, padding: '2px 6px', opacity: notifPage <= 1 ? 0.4 : 1 }}>
+                                        ‹
+                                    </button>
+                                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                        {notifPage} / {notifTotalPages}
+                                    </span>
+                                    <button className="btn btn-sm" disabled={notifPage >= notifTotalPages}
+                                        onClick={() => fetchNotifs(notifPage + 1)}
+                                        style={{ fontSize: 10, padding: '2px 6px', opacity: notifPage >= notifTotalPages ? 0.4 : 1 }}>
+                                        ›
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>,
