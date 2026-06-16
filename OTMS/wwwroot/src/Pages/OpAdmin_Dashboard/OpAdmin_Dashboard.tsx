@@ -54,6 +54,7 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import PendingApprovalsTab from './PendingApprovalsTab';
+import RoutingManagementTab from './RoutingManagementTab';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
@@ -2028,6 +2029,27 @@ const TeamTab: React.FC<{
                         .map(t => <TaskRow key={t.taskId} task={t} onView={onView} />)
                 }
             </div>
+        </div>
+    );
+};
+
+// ─── Approvals Wrapper (sub-tab navigation) ───────────────────────────────────
+
+const ApprovalsWrapper: React.FC = () => {
+    const [subTab, setSubTab] = useState<'pending' | 'matrices'>('pending');
+    return (
+        <div className="dashboard-content">
+            <div className="report-subtabs">
+                <button className={`filter-pill${subTab === 'pending' ? ' active' : ''}`}
+                    onClick={() => setSubTab('pending')}>
+                    <Shield size={14} /> Pending Approvals
+                </button>
+                <button className={`filter-pill${subTab === 'matrices' ? ' active' : ''}`}
+                    onClick={() => setSubTab('matrices')}>
+                    <RotateCcw size={14} /> Routing Config
+                </button>
+            </div>
+            {subTab === 'pending' ? <PendingApprovalsTab /> : <RoutingManagementTab />}
         </div>
     );
 };
@@ -4646,7 +4668,11 @@ export default function OpsAdminDashboard() {
                     />
                 )}
                 {activeTab === 'templates' && <TemplateTab teamMembers={teamMembers} />}
-                {activeTab === 'approvals' && <PendingApprovalsTab />}
+                {activeTab === 'approvals' && (
+                    <>
+                        <ApprovalsWrapper />
+                    </>
+                )}
                 {activeTab === 'reports' && <ReportsTab teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
                 {activeTab === 'leave' && (

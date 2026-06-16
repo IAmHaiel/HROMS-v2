@@ -37,5 +37,14 @@ namespace OTMS.Common.Constraints
         public const string DashboardViewed = "Dashboard Viewed";
         public const string DashboardFiltered = "Dashboard Filtered";
         public const string ReportGeneration = "Report Generation";
+        public const string AssetAllocated = "Asset Allocated";
+        public const string ResignationProcessed = "Resignation Processed";
+        public const string NTEProcessed = "NTE Processed";
+        public const string OffboardingProcessed = "Offboarding Processed";
+        public const string ApprovalRequestCancelled = "Approval Request Cancelled";
+        public const string RoutingMatrixCreated = "Routing Matrix Created";
+        public const string RoutingMatrixUpdated = "Routing Matrix Updated";
+        public const string RoutingMatrixDeleted = "Routing Matrix Deleted";
+        public const string RoutingMatrixToggled = "Routing Matrix Toggled";
     }
 }

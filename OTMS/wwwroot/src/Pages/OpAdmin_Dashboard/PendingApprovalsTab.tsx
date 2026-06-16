@@ -23,19 +23,26 @@ const PendingApprovalsTab: React.FC = () => {
     const { success, error: showError } = useToast();
     const [pending, setPending] = useState<PendingApprovalItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [selectedRequest, setSelectedRequest] = useState<TrackerData | null>(null);
     const [decision, setDecision] = useState<'Approve' | 'Reject' | ''>('');
     const [remarks, setRemarks] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [showDecision, setShowDecision] = useState(false);
+    const PAGE_SIZE = 10;
 
-    const fetchPending = async () => {
+    const fetchPending = async (targetPage?: number) => {
         setLoading(true);
         try {
-            const res = await fetch('/api/approvalrequests/pending', { headers: authHeaders() });
+            const p = targetPage ?? page;
+            const res = await fetch(`/api/approvalrequests/pending?pageNumber=${p}&pageSize=${PAGE_SIZE}`, { headers: authHeaders() });
             if (res.ok) {
                 const json = await res.json();
-                setPending(json.data ?? json ?? []);
+                const list = json.data ?? json ?? [];
+                setPending(Array.isArray(list) ? list : []);
+                setTotalPages(json.totalPages ?? 1);
+                setPage(p);
             } else setPending([]);
         } catch { setPending([]); }
         finally { setLoading(false); }
@@ -153,6 +160,22 @@ const PendingApprovalsTab: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                )}
+                {totalPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, padding: '12px 0 8px', borderTop: '1px solid var(--border)' }}>
+                        <button className="btn btn-sm" disabled={page <= 1} onClick={() => fetchPending(page - 1)}
+                            style={{ opacity: page <= 1 ? 0.4 : 1 }}>‹ Prev</button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                            <button key={p}
+                                className={`btn btn-sm${p === page ? ' btn-primary' : ''}`}
+                                onClick={() => fetchPending(p)}
+                                style={{ minWidth: 32, fontWeight: p === page ? 700 : 400 }}>
+                                {p}
+                            </button>
+                        ))}
+                        <button className="btn btn-sm" disabled={page >= totalPages} onClick={() => fetchPending(page + 1)}
+                            style={{ opacity: page >= totalPages ? 0.4 : 1 }}>Next ›</button>
                     </div>
                 )}
             </div>
