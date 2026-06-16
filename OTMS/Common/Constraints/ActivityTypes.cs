@@ -33,5 +33,7 @@ namespace OTMS.Common.Constraints
         public const string Onboarding201FileSubmitted = "Onboarding 201 File Submitted";
         public const string AccountProvisioned = "Account Provisioned";
         public const string StatutoryRecordsUpdated = "Statutory Records Updated";
+        public const string DashboardViewed = "Dashboard Viewed";
+        public const string DashboardFiltered = "Dashboard Filtered";
     }
 }

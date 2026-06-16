@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
     CheckCircle2,
@@ -78,6 +79,44 @@ const CONFIRM_CLOSED: ConfirmModalState = {
     description: '',
     onConfirm: () => {},
 };
+
+// ─── Dashboard API Types ──────────────────────────────────────────────────────
+
+interface DashboardEmployeeWorkload {
+    employeeId: string;
+    employeeName: string;
+    totalAssigned: number;
+    activeTasks: number;
+    completedTasks: number;
+    overdueTasks: number;
+}
+
+interface DashboardResponse {
+    totalTasksAssigned: number;
+    totalActiveTasks: number;
+    totalCompletedTasks: number;
+    totalOverdueTasks: number;
+    averageTasksPerEmployee: number;
+    employeeWorkloadDistribution: DashboardEmployeeWorkload[];
+    taskAssignmentDistribution: Record<string, number>;
+    workflowTrackers: any[];
+}
+
+interface EmployeeFilterOption {
+    employeeId: string;
+    employeeName: string;
+}
+
+interface DepartmentFilterOption {
+    departmentId: string;
+    departmentName: string;
+}
+
+interface ApiResponse<T> {
+    isSuccess: boolean;
+    message: string;
+    data: T | null;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1421,70 +1460,30 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 
-interface EmployeeWorkload {
-    employeeName: string;
-    total: number;
-    active: number;
-    completed: number;
-    overdue: number;
-    pendingReview: number;
-}
-
 const DashboardTab: React.FC<{
-    tasks: Task[];
-    teamMembers: TeamMember[];
-    loading: boolean;
-    onView: (id: string) => void;
+    dashboardData: DashboardResponse | null;
+    dashboardEmployees: EmployeeFilterOption[];
+    dashboardDepartments: DepartmentFilterOption[];
+    dashboardLoading: boolean;
+    dashboardError: string | null;
+    filters: { dateStart: string; dateEnd: string; employeeId: string; departmentId: string; taskStatus: string };
+    onFilterChange: (filters: { dateStart: string; dateEnd: string; employeeId: string; departmentId: string; taskStatus: string }) => void;
+    onClearFilters: () => void;
     onNewTask: () => void;
-    onRefresh: () => void;
-}> = ({ tasks, teamMembers, loading, onView, onNewTask, onRefresh }) => {
-    const [filterDateStart, setFilterDateStart] = useState('');
-    const [filterDateEnd, setFilterDateEnd] = useState('');
-    const [filterEmployee, setFilterEmployee] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
+}> = ({ dashboardData, dashboardEmployees, dashboardDepartments, dashboardLoading, dashboardError, filters, onFilterChange, onClearFilters, onNewTask }) => {
+    const hasAnyFilter = filters.dateStart || filters.dateEnd || filters.employeeId || filters.departmentId || filters.taskStatus;
+    const td = dashboardData;
 
-    useEffect(() => {
-        const interval = setInterval(onRefresh, 30000);
-        return () => clearInterval(interval);
-    }, [onRefresh]);
-
-    const filtered = tasks.filter(t => {
-        if (filterStatus && t.taskStatus !== filterStatus) return false;
-        if (filterEmployee && t.assignedTo !== filterEmployee && t.assignedEmployee !== filterEmployee) return false;
-        if (filterDateStart && t.dueAt && t.dueAt < filterDateStart) return false;
-        if (filterDateEnd && t.dueAt && t.dueAt > filterDateEnd + 'T23:59:59') return false;
-        return true;
-    });
-
-    const total = filtered.length;
-    const active = filtered.filter(t =>
-        t.taskStatus === 'In Progress' || t.taskStatus === 'Assigned' || t.taskStatus === 'Pending'
-    ).length;
-    const completed = filtered.filter(t => t.taskStatus === 'Completed').length;
-    const overdue = filtered.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length;
-    const pendingReview = filtered.filter(t => t.taskStatus === 'Pending Admin Review').length;
-    const avgPerEmployee = teamMembers.length > 0 ? (total / teamMembers.length).toFixed(1) : '0';
-
-    const hi = filtered.filter(t => t.priority === 'High' || t.priority === 'Critical').length;
-    const md = filtered.filter(t => t.priority === 'Medium').length;
-    const lo = filtered.filter(t => t.priority === 'Low').length;
-
-    const workloads: EmployeeWorkload[] = teamMembers.map(m => {
-        const empTasks = filtered.filter(t =>
-            t.assignedEmployee === m.employeeName || t.assignedTo === m.accountId
-        );
-        return {
-            employeeName: m.employeeName,
-            total: empTasks.length,
-            active: empTasks.filter(t =>
-                t.taskStatus === 'In Progress' || t.taskStatus === 'Assigned' || t.taskStatus === 'Pending'
-            ).length,
-            completed: empTasks.filter(t => t.taskStatus === 'Completed').length,
-            overdue: empTasks.filter(t => t.taskStatus === 'Overdue' || isEffectivelyOverdue(t)).length,
-            pendingReview: empTasks.filter(t => t.taskStatus === 'Pending Admin Review').length,
-        };
-    }).filter(w => w.total > 0 || teamMembers.length <= 5)
-      .sort((a, b) => b.total - a.total);
+    const total = td?.totalTasksAssigned ?? 0;
+    const active = td?.totalActiveTasks ?? 0;
+    const completed = td?.totalCompletedTasks ?? 0;
+    const overdue = td?.totalOverdueTasks ?? 0;
+    const avgPerEmployee = td?.averageTasksPerEmployee?.toFixed(1) ?? '0';
+    const pct = total > 0 ? Math.round(completed / total * 100) : 0;
+    const completionColor = pct >= 80 ? '#05cd99' : pct >= 50 ? '#ffb547' : '#ee5d50';
+    const workloads = td?.employeeWorkloadDistribution ?? [];
+    const taskDist = td?.taskAssignmentDistribution ?? {};
+    const pendingReview = taskDist['Pending Admin Review'] ?? 0;
 
     const statusChartData = [
         { name: 'Active', value: active, color: '#ffb547' },
@@ -1493,22 +1492,14 @@ const DashboardTab: React.FC<{
         { name: 'Overdue', value: overdue, color: '#ee5d50' },
     ].filter(d => d.value > 0);
 
-    const priorityChartData = [
-        { name: 'High', value: hi, color: '#ee5d50' },
-        { name: 'Medium', value: md, color: '#ffb547' },
-        { name: 'Low', value: lo, color: '#05cd99' },
-    ];
-
     const workloadChartData = workloads.map(w => ({
         name: w.employeeName.split(' ')[0],
-        Total: w.total,
-        Completed: w.completed,
-        Overdue: w.overdue,
+        Total: w.totalAssigned,
+        Completed: w.completedTasks,
+        Overdue: w.overdueTasks,
     }));
 
     const donutColors = statusChartData.map(d => d.color);
-    const pct = total > 0 ? Math.round(completed / total * 100) : 0;
-    const completionColor = pct >= 80 ? '#05cd99' : pct >= 50 ? '#ffb547' : '#ee5d50';
 
     return (
         <div className="dashboard-content">
@@ -1517,31 +1508,42 @@ const DashboardTab: React.FC<{
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
                     <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
                         <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE START</label>
-                        <input type="date" value={filterDateStart}
-                            onChange={e => setFilterDateStart(e.target.value)}
+                        <input type="date" value={filters.dateStart}
+                            onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })}
                             style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
                     </div>
                     <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
                         <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE END</label>
-                        <input type="date" value={filterDateEnd}
-                            onChange={e => setFilterDateEnd(e.target.value)}
+                        <input type="date" value={filters.dateEnd}
+                            onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })}
                             style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
                     </div>
                     <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 160 }}>
                         <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>EMPLOYEE</label>
-                        <select value={filterEmployee}
-                            onChange={e => setFilterEmployee(e.target.value)}
+                        <select value={filters.employeeId}
+                            onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}
                             style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
                             <option value="">All Employees</option>
-                            {teamMembers.map(m => (
-                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                            {dashboardEmployees.map(m => (
+                                <option key={m.employeeId} value={m.employeeId}>{m.employeeName}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 150 }}>
+                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DEPARTMENT</label>
+                        <select value={filters.departmentId}
+                            onChange={e => onFilterChange({ ...filters, departmentId: e.target.value })}
+                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                            <option value="">All Departments</option>
+                            {dashboardDepartments.map(d => (
+                                <option key={d.departmentId} value={d.departmentId}>{d.departmentName}</option>
                             ))}
                         </select>
                     </div>
                     <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 150 }}>
                         <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>TASK STATUS</label>
-                        <select value={filterStatus}
-                            onChange={e => setFilterStatus(e.target.value)}
+                        <select value={filters.taskStatus}
+                            onChange={e => onFilterChange({ ...filters, taskStatus: e.target.value })}
                             style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
                             <option value="">All Statuses</option>
                             <option value="Assigned">Assigned</option>
@@ -1551,23 +1553,26 @@ const DashboardTab: React.FC<{
                             <option value="Overdue">Overdue</option>
                         </select>
                     </div>
-                    {(filterDateStart || filterDateEnd || filterEmployee || filterStatus) && (
-                        <button className="btn btn-sm" onClick={() => {
-                            setFilterDateStart(''); setFilterDateEnd('');
-                            setFilterEmployee(''); setFilterStatus('');
-                        }} style={{ marginBottom: 1, alignSelf: 'flex-end' }}>
+                    {hasAnyFilter && (
+                        <button className="btn btn-sm" onClick={onClearFilters} style={{ marginBottom: 1, alignSelf: 'flex-end' }}>
                             <X size={12} /> Clear
                         </button>
                     )}
                 </div>
             </div>
 
-            {loading ? (
+            {dashboardLoading ? (
                 <div className="empty-state" style={{ padding: '40px 0' }}>
                     <Loader2 size={24} className="spin" />
                     <p style={{ fontWeight: 600 }}>Loading workload data...</p>
                 </div>
-            ) : total === 0 && !loading ? (
+            ) : dashboardError ? (
+                <div className="empty-state" style={{ padding: '40px 0' }}>
+                    <ClipboardList size={28} color="var(--text-secondary)" />
+                    <p style={{ fontWeight: 600 }}>{dashboardError}</p>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Create a new task or adjust filters.</span>
+                </div>
+            ) : total === 0 ? (
                 <div className="empty-state" style={{ padding: '40px 0' }}>
                     <ClipboardList size={28} color="var(--text-secondary)" />
                     <p style={{ fontWeight: 600 }}>No workload data available.</p>
@@ -1617,28 +1622,32 @@ const DashboardTab: React.FC<{
 
                         <div className="card" style={{ padding: '16px 20px' }}>
                             <div className="card-header-layout" style={{ marginBottom: 8 }}>
-                                <h3 style={{ fontSize: 13 }}>Priority Distribution</h3>
+                                <h3 style={{ fontSize: 13 }}>Task Assignment Distribution</h3>
                             </div>
-                            <ResponsiveContainer width="100%" height={50}>
-                                <BarChart data={priorityChartData} layout="vertical" barSize={14}>
-                                    <CartesianGrid horizontal={false} stroke="transparent" />
-                                    <XAxis hide type="number" />
-                                    <YAxis hide type="category" dataKey="name" />
-                                    <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
-                                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                        {priorityChartData.map((entry, idx) => (<Cell key={idx} fill={entry.color} />))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
-                                {priorityChartData.map(d => (
-                                    <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
-                                        <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
-                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{d.value}</span>
+                            {Object.keys(taskDist).length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 12 }}>No data</div>
+                            ) : (
+                                <>
+                                    <ResponsiveContainer width="100%" height={Object.keys(taskDist).length * 28 + 20}>
+                                        <BarChart data={Object.entries(taskDist).map(([k, v]) => ({ name: k, value: v }))} layout="vertical" barSize={14}>
+                                            <CartesianGrid horizontal={false} stroke="transparent" />
+                                            <XAxis hide type="number" />
+                                            <YAxis hide type="category" dataKey="name" />
+                                            <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                            <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#4318ff" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
+                                        {Object.entries(taskDist).map(([k, v]) => (
+                                            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4318ff', display: 'inline-block' }} />
+                                                <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
+                                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{v}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
+                                </>
+                            )}
                         </div>
 
                         <div className="card" style={{ padding: '16px 20px' }}>
@@ -1652,7 +1661,6 @@ const DashboardTab: React.FC<{
                                     { label: 'Active %', value: total > 0 ? `${Math.round(active / total * 100)}%` : '0%' },
                                     { label: 'Overdue %', value: total > 0 ? `${Math.round(overdue / total * 100)}%` : '0%' },
                                     { label: 'Review %', value: total > 0 ? `${Math.round(pendingReview / total * 100)}%` : '0%' },
-                                    { label: 'High Priority', value: hi },
                                 ].map(s => (
                                     <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
                                         <span style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
@@ -1731,7 +1739,7 @@ const DashboardTab: React.FC<{
                     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                         <div className="card-header-layout" style={{ padding: '14px 20px', margin: 0 }}>
                             <h3>Workload Summary per Employee</h3>
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} tasks · {workloads.length} employees</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{total} tasks · {workloads.length} employees</span>
                         </div>
                         {workloads.length === 0 ? (
                             <div className="empty-state" style={{ padding: '24px 0' }}><p>No workload data available.</p></div>
@@ -1744,46 +1752,45 @@ const DashboardTab: React.FC<{
                                             <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>TOTAL</th>
                                             <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>ACTIVE</th>
                                             <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>COMPLETED</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>PENDING REVIEW</th>
                                             <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>OVERDUE</th>
                                             <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'left', letterSpacing: '0.5px' }}>COMPLETION</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {workloads.map((w, idx) => (
-                                            <tr key={w.employeeName} style={{
-                                                borderBottom: '1px solid var(--border)',
-                                                background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
-                                            }}>
-                                                <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{w.employeeName}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700 }}>{w.total}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: '#ffb547', fontWeight: 700 }}>{w.active}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: '#05cd99', fontWeight: 700 }}>{w.completed}</td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: w.pendingReview > 0 ? '#4318ff' : 'var(--text-muted)', fontWeight: 700 }}>
-                                                    {w.pendingReview || '—'}
-                                                </td>
-                                                <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdue > 0 ? '#ee5d50' : 'var(--text-muted)', fontWeight: 700 }}>
-                                                    {w.overdue || '—'}
-                                                </td>
-                                                <td style={{ padding: '10px 16px' }}>
-                                                    {w.total > 0 ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                            <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                                                                <div style={{
-                                                                    width: `${Math.round(w.completed / w.total * 100)}%`, height: '100%',
-                                                                    background: w.completed / w.total >= 0.8 ? '#05cd99' :
-                                                                        w.completed / w.total >= 0.5 ? '#ffb547' : '#ee5d50',
-                                                                    borderRadius: 3,
-                                                                }} />
+                                        {workloads.map((w, idx) => {
+                                            const compPct = w.totalAssigned > 0 ? Math.round(w.completedTasks / w.totalAssigned * 100) : 0;
+                                            return (
+                                                <tr key={w.employeeId} style={{
+                                                    borderBottom: '1px solid var(--border)',
+                                                    background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                                                }}>
+                                                    <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{w.employeeName}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700 }}>{w.totalAssigned}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: '#ffb547', fontWeight: 700 }}>{w.activeTasks}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: '#05cd99', fontWeight: 700 }}>{w.completedTasks}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdueTasks > 0 ? '#ee5d50' : 'var(--text-muted)', fontWeight: 700 }}>
+                                                        {w.overdueTasks || '—'}
+                                                    </td>
+                                                    <td style={{ padding: '10px 16px' }}>
+                                                        {w.totalAssigned > 0 ? (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                                                                    <div style={{
+                                                                        width: `${compPct}%`, height: '100%',
+                                                                        background: compPct >= 80 ? '#05cd99' :
+                                                                            compPct >= 50 ? '#ffb547' : '#ee5d50',
+                                                                        borderRadius: 3,
+                                                                    }} />
+                                                                </div>
+                                                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                                                    {compPct}%
+                                                                </span>
                                                             </div>
-                                                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                                                                {Math.round(w.completed / w.total * 100)}%
-                                                            </span>
-                                                        </div>
-                                                    ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -3970,6 +3977,68 @@ export default function OpsAdminDashboard() {
     const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarningDTO[]>([]);
     const [pendingTaskData, setPendingTaskData] = useState<CreateTaskDTO | null>(null);
 
+    // ── Dashboard Data ──
+    const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
+    const [dashboardLoading, setDashboardLoading] = useState(false);
+    const [dashboardError, setDashboardError] = useState<string | null>(null);
+    const [dashboardEmployees, setDashboardEmployees] = useState<EmployeeFilterOption[]>([]);
+    const [dashboardDepartments, setDashboardDepartments] = useState<DepartmentFilterOption[]>([]);
+    const [dashboardFilters, setDashboardFilters] = useState({ dateStart: '', dateEnd: '', employeeId: '', departmentId: '', taskStatus: '' });
+
+    const fetchDashboardData = useCallback(async () => {
+        setDashboardLoading(true);
+        setDashboardError(null);
+        try {
+            const params = new URLSearchParams();
+            if (dashboardFilters.dateStart) params.append('dateRangeStart', dashboardFilters.dateStart);
+            if (dashboardFilters.dateEnd) params.append('dateRangeEnd', dashboardFilters.dateEnd);
+            if (dashboardFilters.employeeId) params.append('employeeId', dashboardFilters.employeeId);
+            if (dashboardFilters.departmentId) params.append('departmentId', dashboardFilters.departmentId);
+            if (dashboardFilters.taskStatus) params.append('taskStatus', dashboardFilters.taskStatus);
+            const res = await fetch(`/api/dashboard/workload?${params}`, {
+                headers: { Authorization: `Bearer ${token()}` },
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.message || 'Failed to load dashboard data');
+            }
+            const body: ApiResponse<DashboardResponse> = await res.json();
+            if (!body.isSuccess) {
+                setDashboardError(body.message || 'No workload data available.');
+                setDashboardData(null);
+            } else {
+                setDashboardData(body.data);
+                setDashboardError(null);
+            }
+        } catch (err: any) {
+            setDashboardError(err.message || 'No workload data available.');
+            setDashboardData(null);
+        } finally {
+            setDashboardLoading(false);
+        }
+    }, [dashboardFilters]);
+
+    const fetchDashboardFilterOptions = useCallback(async () => {
+        try {
+            const [empRes, deptRes] = await Promise.all([
+                fetch('/api/dashboard/filter-employees', { headers: { Authorization: `Bearer ${token()}` } }),
+                fetch('/api/dashboard/filter-departments', { headers: { Authorization: `Bearer ${token()}` } }),
+            ]);
+            if (empRes.ok) {
+                const empBody: ApiResponse<EmployeeFilterOption[]> = await empRes.json();
+                if (empBody.isSuccess && empBody.data) setDashboardEmployees(empBody.data);
+            }
+            if (deptRes.ok) {
+                const deptBody: ApiResponse<DepartmentFilterOption[]> = await deptRes.json();
+                if (deptBody.isSuccess && deptBody.data) setDashboardDepartments(deptBody.data);
+            }
+        } catch { /* non-fatal */ }
+    }, []);
+
+    const handleDashboardClearFilters = useCallback(() => {
+        setDashboardFilters({ dateStart: '', dateEnd: '', employeeId: '', departmentId: '', taskStatus: '' });
+    }, []);
+
     // ── Update fetchTasks ──
     const fetchTasks = async () => {
         setLoadingTasks(true);
@@ -4167,6 +4236,7 @@ export default function OpsAdminDashboard() {
         fetchTeamMembers();
         fetchLeaveRecords();
         fetchReopenRequests();
+        fetchDashboardFilterOptions();
         const t = localStorage.getItem('authToken');
         if (!t) return;
         fetch('/api/profile/view-profile', {
@@ -4483,6 +4553,31 @@ export default function OpsAdminDashboard() {
         approvals: 'Approvals',
     };
 
+    // ── Fetch dashboard data when filters change ──
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
+
+    // ── SignalR: Auto-refresh dashboard when task data changes ──
+    useEffect(() => {
+        if (USE_MOCK_DATA) return;
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/workflow')
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on('DashboardDataChanged', () => {
+            fetchDashboardData();
+        });
+
+        connection.start().then(() => {
+            const acctId = localStorage.getItem('employeeId');
+            if (acctId) connection.invoke('JoinDashboardGroup', acctId).catch(() => {});
+        }).catch(() => {});
+
+        return () => { connection.stop(); };
+    }, [fetchDashboardData]);
+
     return (
         <div className="dashboard-container">
             <aside className="sidebar">
@@ -4572,12 +4667,15 @@ export default function OpsAdminDashboard() {
 
                 {activeTab === 'dashboard' && (
                     <DashboardTab
-                        tasks={tasks}
-                        teamMembers={teamMembers}
-                        loading={loadingTasks}
-                        onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
+                        dashboardData={dashboardData}
+                        dashboardEmployees={dashboardEmployees}
+                        dashboardDepartments={dashboardDepartments}
+                        dashboardLoading={dashboardLoading}
+                        dashboardError={dashboardError}
+                        filters={dashboardFilters}
+                        onFilterChange={setDashboardFilters}
+                        onClearFilters={handleDashboardClearFilters}
                         onNewTask={() => setShowNew(true)}
-                        onRefresh={fetchTasks}
                     />
                 )}
                 {activeTab === 'tasks' && (

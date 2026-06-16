@@ -15,7 +15,7 @@ using OTMS.Service.Interfaces;
 
 namespace OTMS.Service.Services
 {
-    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService, IFileService fileService) : ITaskService
+    public class TaskService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService, IFileService fileService, IDashboardNotificationService dashboardNotificationService) : ITaskService
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
@@ -190,6 +190,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request)
@@ -299,6 +301,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> RequestReopenTaskAsync(Guid taskId, RequestReopenDTO request)
@@ -415,6 +419,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> ReviewReopenRequestAsync(Guid requestId, ReviewReopenDTO request)
@@ -483,6 +489,8 @@ namespace OTMS.Service.Services
                 $"Reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed. Remarks: {request.AdminRemarks}");
 
             await notificationService.CreateGeneralNotificationAsync(reopenReq.RequestedById, "Task Reopen Decision", $"Your reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed.");
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
@@ -671,6 +679,8 @@ namespace OTMS.Service.Services
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<PaginationResponseDTO<TaskResponseDTO>> GetMyTasksAsync(PaginationDTO request)
@@ -770,6 +780,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             // Return a response indicating successful deletion
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
+
             return new TaskDeleteResponseDTO
             {
                 IsDeleted = true,
@@ -793,6 +805,8 @@ namespace OTMS.Service.Services
 
             task.Deleted = false;
             await context.SaveChangesAsync();
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new ApiResponseDTO<TaskResponseDTO>
             {
@@ -900,6 +914,8 @@ namespace OTMS.Service.Services
                     && !t.PermanentlyDeleted)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(t => t.PermanentlyDeleted, true));
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new ApiResponseDTO<object>
             {
@@ -1198,6 +1214,8 @@ namespace OTMS.Service.Services
                 throw new Exception("Invalid Admin Decision.");
             }
 
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
+
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
@@ -1300,6 +1318,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(loggedInAccountId, "Task Override", $"Operations Admin overrode task '{task.TaskTitle}' from Completed to {task.TaskStatus}. Reason: {request.OverrideReason}");
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
