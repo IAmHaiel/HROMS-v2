@@ -31,6 +31,7 @@ namespace OTMS.Data
         public DbSet<ApprovalRequest> ApprovalRequests { get; set; }
         public DbSet<ApprovalDecision> ApprovalDecisions { get; set; }
         public DbSet<NotificationAuditLog> NotificationAuditLogs { get; set; }
+        public DbSet<ApplicantRecord> ApplicantRecords { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -279,6 +280,13 @@ namespace OTMS.Data
                 .HasOne(n => n.Recipient)
                 .WithMany()
                 .HasForeignKey(n => n.RecipientAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ApplicantRecord -> JobPosition
+            modelBuilder.Entity<ApplicantRecord>()
+                .HasOne(ar => ar.JobPosition)
+                .WithMany()
+                .HasForeignKey(ar => ar.JobPositionId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

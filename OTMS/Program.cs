@@ -122,6 +122,8 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
 builder.Services.AddScoped<IApprovalRoutingEngine, ApprovalRoutingEngine>();
+builder.Services.AddScoped<IPublicApplicationService, PublicApplicationService>();
+builder.Services.AddScoped<IGoogleTokenValidator, GoogleTokenValidator>();
 
 // Register Background Services
 builder.Services.AddHostedService<TaskTemplateSchedulingService>();
