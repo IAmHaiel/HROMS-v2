@@ -114,6 +114,7 @@ builder.Services.AddScoped<ITaskCommentService, TaskCommentService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IEmergencyOverrideService, EmergencyOverrideService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IWorkloadDashboardService, WorkloadDashboardService>();
 builder.Services.AddScoped<ISystemAdminService, SystemAdminService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();

@@ -10,6 +10,8 @@ namespace OTMS.Entities.DTOs.Task
         public string? PriorityLevel { get; set; }
         public string? TaskCategory { get; set; }
         public DateTime? DeadlineDate { get; set; }
+        public DateTime? DeadlineStartDate { get; set; }
+        public DateTime? DeadlineEndDate { get; set; }
         
         public string? SortBy { get; set; }
         public string? SortOrder { get; set; } // "Ascending" or "Descending"

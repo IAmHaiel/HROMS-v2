@@ -679,7 +679,11 @@ namespace OTMS.Service.Services
                         )
                         && !t.Deleted
                         && !t.PermanentlyDeleted)
-                .OrderByDescending(t => t.CreatedAt);
+                .OrderByDescending(t => t.Priority == "Critical" ? 4 :
+                                        t.Priority == "High" ? 3 :
+                                        t.Priority == "Medium" ? 2 :
+                                        t.Priority == "Low" ? 1 : 0)
+                .ThenBy(t => t.DueAt);
 
             var totalRecords = await query.CountAsync();
 
@@ -1002,6 +1006,16 @@ namespace OTMS.Service.Services
                 query = query.Where(t => t.DueAt.HasValue && t.DueAt.Value.Date == request.DeadlineDate.Value.Date);
             }
 
+            if (request.DeadlineStartDate.HasValue)
+            {
+                query = query.Where(t => t.DueAt.HasValue && t.DueAt.Value.Date >= request.DeadlineStartDate.Value.Date);
+            }
+
+            if (request.DeadlineEndDate.HasValue)
+            {
+                query = query.Where(t => t.DueAt.HasValue && t.DueAt.Value.Date <= request.DeadlineEndDate.Value.Date);
+            }
+
             bool isDescending = string.Equals(request.SortOrder, "Descending", StringComparison.OrdinalIgnoreCase);
 
             switch (request.SortBy?.ToLower())
@@ -1013,7 +1027,22 @@ namespace OTMS.Service.Services
                     query = isDescending ? query.OrderByDescending(t => t.DueAt) : query.OrderBy(t => t.DueAt);
                     break;
                 case "priority level":
-                    query = isDescending ? query.OrderByDescending(t => t.Priority) : query.OrderBy(t => t.Priority);
+                    if (isDescending)
+                    {
+                        query = query.OrderBy(t => t.Priority == "Critical" ? 4 :
+                                                   t.Priority == "High" ? 3 :
+                                                   t.Priority == "Medium" ? 2 :
+                                                   t.Priority == "Low" ? 1 : 0)
+                                     .ThenByDescending(t => t.DueAt);
+                    }
+                    else
+                    {
+                        query = query.OrderByDescending(t => t.Priority == "Critical" ? 4 :
+                                                             t.Priority == "High" ? 3 :
+                                                             t.Priority == "Medium" ? 2 :
+                                                             t.Priority == "Low" ? 1 : 0)
+                                     .ThenBy(t => t.DueAt);
+                    }
                     break;
                 case "status":
                     query = isDescending ? query.OrderByDescending(t => t.TaskStatus) : query.OrderBy(t => t.TaskStatus);
@@ -1022,7 +1051,11 @@ namespace OTMS.Service.Services
                     query = isDescending ? query.OrderByDescending(t => t.Assignee.Employee.FirstName) : query.OrderBy(t => t.Assignee.Employee.FirstName);
                     break;
                 default:
-                    query = query.OrderByDescending(t => t.CreatedAt);
+                    query = query.OrderByDescending(t => t.Priority == "Critical" ? 4 :
+                                                         t.Priority == "High" ? 3 :
+                                                         t.Priority == "Medium" ? 2 :
+                                                         t.Priority == "Low" ? 1 : 0)
+                                 .ThenBy(t => t.DueAt);
                     break;
             }
 
