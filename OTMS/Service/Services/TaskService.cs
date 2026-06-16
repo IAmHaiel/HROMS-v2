@@ -536,9 +536,11 @@ namespace OTMS.Service.Services
                 throw new Exception("Task not found.");
             }
 
+            bool isAdmin = permissions.Contains("Permissions.Tasks.Manage");
+
             // SECURITY CHECK
-            // Only assigned employee can update progress
-            if (task.AssignedTo != loggedInAccountId)
+            // Only assigned employee can update progress (admins bypass for approvals)
+            if (!isAdmin && task.AssignedTo != loggedInAccountId)
             {
                 throw new UnauthorizedAccessException(
                     "You can only update tasks assigned to you.");
@@ -551,7 +553,7 @@ namespace OTMS.Service.Services
             }
 
             // Intercept action and explicitly prevent status from changing to "Completed" for non-admins
-            if (request.TaskStatus == "Completed" && !permissions.Contains("Permissions.Tasks.Manage"))
+            if (request.TaskStatus == "Completed" && !isAdmin)
             {
                 request.TaskStatus = "Pending Admin Review";
             }
@@ -577,7 +579,10 @@ namespace OTMS.Service.Services
                 }
                 else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
                 {
-                    // Fallback for previous FSM
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "Done" && request.TaskStatus == "Completed" && isAdmin)
+                {
                     isValidTransition = true;
                 }
                 else
