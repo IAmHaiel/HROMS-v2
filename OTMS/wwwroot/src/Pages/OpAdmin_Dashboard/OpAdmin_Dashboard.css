@@ -1593,6 +1593,38 @@
 }
 
 
+/* ─── Report Sub-tab Navigation ──────────────────────────────────────────── */
+.report-subtabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.report-label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+/* ─── Report Sub-tab Navigation ──────────────────────────────────────────── */
+.report-subtabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.report-label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: var(--text-secondary);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
 /* ─── Report Module ──────────────────────────────────────────────────────── */
 .report-filter-card {
     margin-bottom: 0;
