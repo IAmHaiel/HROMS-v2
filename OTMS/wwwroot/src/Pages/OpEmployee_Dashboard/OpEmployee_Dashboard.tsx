@@ -48,7 +48,7 @@ import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digi
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
-type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
+type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue';
 type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
 
 interface Task {
@@ -126,11 +126,12 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         High: 'high', Medium: 'medium', Low: 'low',
     };
     const statusMap: Record<string, TaskStatus> = {
-        Pending: 'pending', 'In Progress': 'in-progress', Completed: 'completed',
+        Draft: 'pending', Pending: 'pending', Assigned: 'assigned',
+        'In Progress': 'in-progress', Done: 'done', Completed: 'completed',
     };
     const status: TaskStatus = statusMap[dto.taskStatus] ?? 'pending';
     const defaultProgress: Record<TaskStatus, number> = {
-        pending: 0, 'in-progress': 50, completed: 100, overdue: 0,
+        pending: 0, assigned: 0, 'in-progress': 50, done: 90, completed: 100, overdue: 0,
     };
     return {
         id: dto.taskId,
@@ -154,7 +155,7 @@ const fmtDate = (d: string): string => {
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.status !== 'completed' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
+    t.status !== 'completed' && t.status !== 'done' && t.status !== 'assigned' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
 
 const effectiveStatus = (t: Task): TaskStatus =>
     isEffectivelyOverdue(t) ? 'overdue' : t.status;
@@ -173,11 +174,22 @@ const getInitials = (name: string): string => {
 
 // ─── Meta Maps ────────────────────────────────────────────────────────────────
 
-const statusMeta: Record<TaskStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+const statusMeta: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
+    assigned: { label: 'Assigned', cls: 'badge-purple', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
+    done: { label: 'Done', cls: 'badge-blue', icon: <CheckCircle2 size={11} /> },
     completed: { label: 'Completed', cls: 'badge-green', icon: <CheckCircle2 size={11} /> },
     overdue: { label: 'Overdue', cls: 'badge-red', icon: <AlertCircle size={11} /> },
+};
+
+const FSM_EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
+    pending: ['in-progress'],
+    assigned: ['in-progress'],
+    'in-progress': ['done'],
+    done: [],
+    completed: [],
+    overdue: [],
 };
 
 const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
@@ -280,7 +292,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
 
                 <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
                     <button className="btn" onClick={onClose}>Close</button>
-                    {task.status !== 'completed' && (
+                    {task.status !== 'completed' && task.status !== 'done' && (
                         <button className="btn btn-primary" onClick={onUpdate}>
                             <Pencil size={13} /> Update Progress
                         </button>
@@ -300,23 +312,35 @@ interface ProgressModalProps {
 }
 
 const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) => {
-    const [status, setStatus] = useState<TaskStatus>(task.status === 'overdue' ? 'in-progress' : task.status);
+    const baseStatus = task.status === 'overdue' ? 'in-progress' : task.status;
+    const [status, setStatus] = useState<TaskStatus>(baseStatus);
     const [progress, setProgress] = useState(task.progress);
     const [remarks, setRemarks] = useState(task.remarks ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [fsmError, setFsmError] = useState('');
 
     const handleStatusChange = (s: TaskStatus) => {
+        const validNext = FSM_EMPLOYEE_TRANSITIONS[baseStatus] ?? [];
+        if (!validNext.includes(s)) {
+            setFsmError(`Invalid transition: cannot move from "${statusMeta[baseStatus]?.label ?? baseStatus}" to "${statusMeta[s]?.label ?? s}". Status sequence violation detected.`);
+            return;
+        }
+        setFsmError('');
         setStatus(s);
-        if (s === 'completed') setProgress(100);
-        if (s === 'pending') setProgress(0);
+        if (s === 'done') setProgress(100);
+        if (s === 'in-progress' && progress === 0) setProgress(25);
     };
 
     const handleSave = async () => {
+        if (status === baseStatus && (!remarks.trim() || remarks.trim() === (task.remarks ?? '').trim())) {
+            setFsmError('No changes detected. Update the status or remarks to proceed.');
+            return;
+        }
         setError('');
         setSaving(true);
         try {
-            await onSave(task.id, status, progress, remarks);
+            await onSave(task.id, validNext.length > 0 ? status : baseStatus, progress, remarks);
             onClose();
         } catch (err: any) {
             setError(err.message ?? 'Failed to save. Please try again.');
@@ -325,11 +349,11 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
         }
     };
 
-    const statusOptions: { value: TaskStatus; label: string }[] = [
-        { value: 'pending', label: 'Pending' },
-        { value: 'in-progress', label: 'In Progress' },
-        { value: 'completed', label: 'Completed' },
-    ];
+    const validNext = FSM_EMPLOYEE_TRANSITIONS[baseStatus] ?? [];
+    const statusOptions: { value: TaskStatus; label: string }[] = validNext.map(s => ({
+        value: s,
+        label: statusMeta[s]?.label ?? s,
+    }));
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -343,34 +367,45 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                 </div>
 
                 {error && (
-                    <div className="form-api-error" style={{ marginBottom: 14 }}>
+                    <div className="form-api-error" style={{ marginBottom: 10 }}>
                         <AlertCircle size={14} /><span>{error}</span>
                     </div>
                 )}
-
-                <div className="field">
-                    <label>Status</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {statusOptions.map(opt => (
-                            <button
-                                key={opt.value}
-                                className={`filter-pill${status === opt.value ? ' active' : ''}`}
-                                onClick={() => handleStatusChange(opt.value)}
-                            >
-                                {statusMeta[opt.value].icon} {opt.label}
-                            </button>
-                        ))}
+                {fsmError && (
+                    <div className="form-api-error" style={{ marginBottom: 10, background: 'rgba(238,93,80,0.1)', color: 'var(--status-failed)' }}>
+                        <AlertCircle size={14} /><span>{fsmError}</span>
                     </div>
-                </div>
+                )}
 
-                <div className="field">
-                    <label>Progress — {progress}%</label>
-                    <input
-                        type="range" min={0} max={100} step={5} value={progress}
-                        disabled={status === 'completed'}
-                        onChange={e => setProgress(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: 'var(--primary)' }}
-                    />
+                {validNext.length === 0 ? (
+                    <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <AlertCircle size={18} style={{ marginBottom: 6 }} />
+                        <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. The Operations Admin will review it.</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="field">
+                            <label>Status — <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {statusOptions.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        className={`filter-pill${status === opt.value ? ' active' : ''}`}
+                                        onClick={() => handleStatusChange(opt.value)}
+                                    >
+                                        {statusMeta[opt.value].icon} {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="field">
+                            <label>Progress — {progress}%</label>
+                            <input
+                                type="range" min={0} max={100} step={5} value={progress}
+                                onChange={e => setProgress(Number(e.target.value))}
+                                style={{ width: '100%', accentColor: 'var(--primary)' }}
+                            />
                     <div className="tc-bar" style={{ marginTop: 6, height: 8 }}>
                         <div
                             className={`tc-fill ${priorityMeta[task.priority].bar}`}
@@ -378,6 +413,8 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                         />
                     </div>
                 </div>
+                    </>
+                )}
 
                 <div className="field">
                     <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
@@ -1578,8 +1615,9 @@ export default function EmployeeDashboard() {
     }, []);
 
     const toBackendStatus = (status: TaskStatus): string => ({
-        pending: 'Pending', 'in-progress': 'In Progress', completed: 'Completed', overdue: 'In Progress',
-    }[status]);
+        pending: 'Pending', assigned: 'Assigned', 'in-progress': 'In Progress',
+        done: 'Done', completed: 'Completed', overdue: 'In Progress',
+    }[status] ?? 'Assigned');
 
     const handleSaveProgress = async (
         id: string, status: TaskStatus, progress: number, remarks: string
@@ -1600,7 +1638,7 @@ export default function EmployeeDashboard() {
         setTasks(ts => ts.map(t => t.id === id ? {
             ...t,
             status: status === 'overdue' ? 'in-progress' : status,
-            progress: status === 'completed' ? 100 : progress,
+            progress: status === 'done' ? 100 : status === 'completed' ? 100 : progress,
             remarks: remarks.trim() || t.remarks,
         } : t));
     };

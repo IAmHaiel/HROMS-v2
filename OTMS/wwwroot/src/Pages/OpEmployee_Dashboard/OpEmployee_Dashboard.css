@@ -465,6 +465,16 @@ body {
     color: var(--status-failed);
 }
 
+.badge-gray {
+    background: rgba(163, 174, 208, 0.15);
+    color: #6b7280;
+}
+
+.badge-purple {
+    background: rgba(118, 73, 255, 0.12);
+    color: #5e35b1;
+}
+
 /* ─── Priority Pills ─────────────────────────────────────────────────────── */
 .prio-pill {
     font-size: 0.67rem;
