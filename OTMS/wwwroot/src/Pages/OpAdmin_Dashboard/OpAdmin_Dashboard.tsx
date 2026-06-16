@@ -27,6 +27,13 @@ import {
     Trash2,
     CalendarDays,
     Mail,
+    RotateCcw,
+    ThumbsUp,
+    ThumbsDown,
+    Download,
+    FileText,
+    Calendar,
+    Filter,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -68,15 +75,16 @@ const CONFIRM_CLOSED: ConfirmModalState = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Priority = 'High' | 'Medium' | 'Low';  // match backend casing
-type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
+type Priority = 'Critical' | 'High' | 'Medium' | 'Low';  // match backend casing
+type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Done' | 'Completed' | 'Overdue';
 type NavTab =
     | 'dashboard'
     | 'tasks'
     | 'team'
     | 'leave'
     | 'reports'
-    | 'profile';
+    | 'profile'
+    | 'reopen';
 
 interface TeamMember {
     accountId: string;  
@@ -119,6 +127,94 @@ interface UpdateTaskDTO {
     taskRemarks?: string;
 }
 
+// ─── Reopen Request Types ──────────────────────────────────────────────────────
+
+interface ReopenRequest {
+    requestId: string;
+    taskId: string;
+    taskTitle: string;
+    employeeName: string;
+    employeeId: string;
+    reason: string;
+    supportingEvidence?: string;
+    currentStatus: TaskStatus;
+    status: 'Pending' | 'Approved' | 'Rejected';
+    submittedAt: string;
+    reviewedAt?: string;
+    adminRemarks?: string;
+}
+
+// ─── Report Types ──────────────────────────────────────────────────────────────
+
+interface ReportFilter {
+    dateRangeStart: string;
+    dateRangeEnd: string;
+    employeeId: string;
+    taskPriorityLevel: string;
+    taskStatus: string;
+    taskCategory: string;
+}
+
+interface TaskCompletionReport {
+    totalTasksAssigned: number;
+    totalTasksCompleted: number;
+    totalTasksInProgress: number;
+    totalTasksPendingReview: number;
+    totalOverdueTasks: number;
+    taskCompletionRate: number;
+    averageTaskCompletionTimeHours: number;
+    employeePerformanceSummary: EmployeePerformance[];
+}
+
+interface EmployeePerformance {
+    employeeName: string;
+    totalAssigned: number;
+    totalCompleted: number;
+    completionRate: number;
+    averageCompletionTimeHours: number;
+}
+
+const TASK_CATEGORIES = [
+    'Delivery',
+    'Warehouse',
+    'Maintenance',
+    'Administrative',
+    'Logistics',
+];
+
+const TASK_STATUSES_FILTER = [
+    'Pending',
+    'In Progress',
+    'Done',
+    'Completed',
+    'Overdue',
+];
+
+const PRIORITY_LEVELS = ['Critical', 'High', 'Medium', 'Low'];
+
+// ─── Mock Report Data (toggle to test without backend) ────────────────────────
+const USE_MOCK_REPORT = true;
+
+function mockTaskCompletionReport(filter: ReportFilter): TaskCompletionReport {
+    return {
+        totalTasksAssigned: 42,
+        totalTasksCompleted: 28,
+        totalTasksInProgress: 8,
+        totalTasksPendingReview: 3,
+        totalOverdueTasks: 3,
+        taskCompletionRate: 67,
+        averageTaskCompletionTimeHours: 4.5,
+        employeePerformanceSummary: [
+            { employeeName: 'Ana Reyes', totalAssigned: 12, totalCompleted: 9, completionRate: 75, averageCompletionTimeHours: 3.2 },
+            { employeeName: 'Ben Villanueva', totalAssigned: 10, totalCompleted: 7, completionRate: 70, averageCompletionTimeHours: 4.1 },
+            { employeeName: 'Clara Santos', totalAssigned: 8, totalCompleted: 6, completionRate: 75, averageCompletionTimeHours: 2.8 },
+            { employeeName: 'Franco Mendoza', totalAssigned: 7, totalCompleted: 4, completionRate: 57, averageCompletionTimeHours: 5.3 },
+            { employeeName: 'Daniel Cruz', totalAssigned: 3, totalCompleted: 1, completionRate: 33, averageCompletionTimeHours: 6.7 },
+            { employeeName: 'Elena Bautista', totalAssigned: 2, totalCompleted: 1, completionRate: 50, averageCompletionTimeHours: 4.0 },
+        ],
+    };
+}
+
 // ─── Seed Data ────────────────────────────────────────────────────────────────
 
 const WEEKLY_DATA = [
@@ -129,6 +225,155 @@ const WEEKLY_DATA = [
     { day: 'Fri', completed: 28, pending: 4 },
     { day: 'Sat', completed: 10, pending: 3 },
     { day: 'Sun', completed: 8, pending: 2 },
+];
+
+// ─── Mock Data Toggle (set to true to test smart task routing) ────────────────
+const USE_MOCK_DATA = true;
+
+const MOCK_TEAM_MEMBERS: TeamMember[] = [
+    { accountId: 'mock-001', employeeName: 'Ana Reyes',        role: 'Courier',          presenceStatus: 'Online'   },
+    { accountId: 'mock-002', employeeName: 'Ben Villanueva',   role: 'Courier',          presenceStatus: 'Online'   },
+    { accountId: 'mock-003', employeeName: 'Clara Santos',     role: 'Warehouse Staff',  presenceStatus: 'Online'   },
+    { accountId: 'mock-004', employeeName: 'Daniel Cruz',      role: 'Courier',          presenceStatus: 'Offline'  },
+    { accountId: 'mock-005', employeeName: 'Elena Bautista',   role: 'Warehouse Staff',  presenceStatus: 'On Leave' },
+    { accountId: 'mock-006', employeeName: 'Franco Mendoza',   role: 'Courier',          presenceStatus: 'Online'   },
+];
+
+const futureDate = (daysFromNow: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() + daysFromNow);
+    return d.toISOString();
+};
+const pastDate = (daysAgo: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    return d.toISOString();
+};
+
+const MOCK_TASKS: Task[] = [
+    // ── Ana Reyes – 3 active tasks (heaviest workload among online members) ──
+    {
+        taskId: 'task-001', taskTitle: 'Deliver parcels to Makati CBD',
+        taskDescription: 'Batch delivery of 15 parcels to Makati commercial district.',
+        priority: 'High', dueAt: futureDate(1), taskStatus: 'In Progress',
+        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-001', createdAt: pastDate(2),
+    },
+    {
+        taskId: 'task-002', taskTitle: 'Sort incoming shipments – Zone A',
+        taskDescription: 'Sort and tag all incoming parcels for Zone A.',
+        priority: 'Medium', dueAt: futureDate(2), taskStatus: 'Pending',
+        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-001', createdAt: pastDate(1),
+    },
+    {
+        taskId: 'task-003', taskTitle: 'Return failed deliveries to hub',
+        taskDescription: 'Bring back 4 undelivered parcels and log return reasons.',
+        priority: 'Low', dueAt: futureDate(3), taskStatus: 'Pending',
+        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-001', createdAt: pastDate(1),
+    },
+
+    // ── Ben Villanueva – 2 active tasks ──
+    {
+        taskId: 'task-004', taskTitle: 'Route optimization for Quezon City',
+        taskDescription: 'Plan optimal delivery route for 20 stops in QC.',
+        priority: 'Critical', dueAt: futureDate(1), taskStatus: 'In Progress',
+        assignedEmployee: 'Ben Villanueva', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-002', createdAt: pastDate(3),
+    },
+    {
+        taskId: 'task-005', taskTitle: 'Vehicle maintenance check – Van 3',
+        taskDescription: 'Coordinate with garage for scheduled maintenance.',
+        priority: 'Medium', dueAt: futureDate(5), taskStatus: 'Pending',
+        assignedEmployee: 'Ben Villanueva', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-002', createdAt: pastDate(2),
+    },
+
+    // ── Clara Santos – 1 active task (should be recommended by smart routing) ──
+    {
+        taskId: 'task-006', taskTitle: 'Inventory audit – Shelf B12',
+        taskDescription: 'Count and reconcile items on shelf B12 against system records.',
+        priority: 'Low', dueAt: futureDate(4), taskStatus: 'Pending',
+        assignedEmployee: 'Clara Santos', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-003', createdAt: pastDate(1),
+    },
+
+    // ── Franco Mendoza – 2 active tasks ──
+    {
+        taskId: 'task-007', taskTitle: 'Pickup from supplier – Pasig warehouse',
+        taskDescription: 'Collect 8 pallets from supplier and transport to main hub.',
+        priority: 'High', dueAt: futureDate(1), taskStatus: 'In Progress',
+        assignedEmployee: 'Franco Mendoza', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-006', createdAt: pastDate(2),
+    },
+    {
+        taskId: 'task-008', taskTitle: 'Deliver fragile items – Taguig',
+        taskDescription: 'Handle with care: electronics delivery to Taguig residential area.',
+        priority: 'Critical', dueAt: futureDate(2), taskStatus: 'Pending',
+        assignedEmployee: 'Franco Mendoza', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-006', createdAt: pastDate(1),
+    },
+
+    // ── Daniel Cruz (Offline) – tasks should NOT count for routing ──
+    {
+        taskId: 'task-009', taskTitle: 'Deliver to Mandaluyong offices',
+        taskDescription: 'Scheduled office deliveries for the week.',
+        priority: 'Medium', dueAt: futureDate(3), taskStatus: 'Pending',
+        assignedEmployee: 'Daniel Cruz', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-004', createdAt: pastDate(4),
+    },
+
+    // ── Elena Bautista (On Leave) – tasks should NOT count for routing ──
+    {
+        taskId: 'task-010', taskTitle: 'Restock packaging materials',
+        taskDescription: 'Order and restock bubble wrap, tape, and boxes.',
+        priority: 'Low', dueAt: futureDate(7), taskStatus: 'Pending',
+        assignedEmployee: 'Elena Bautista', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-005', createdAt: pastDate(5),
+    },
+
+    // ── Completed tasks (should NOT affect workload count) ──
+    {
+        taskId: 'task-011', taskTitle: 'Weekly report submission',
+        taskDescription: 'Submit weekly delivery performance report.',
+        priority: 'Medium', dueAt: pastDate(1), taskStatus: 'Completed',
+        assignedEmployee: 'Ana Reyes', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-001', createdAt: pastDate(7),
+    },
+    {
+        taskId: 'task-012', taskTitle: 'Calibrate weighing scale',
+        taskDescription: 'Annual calibration of warehouse weighing equipment.',
+        priority: 'High', dueAt: pastDate(2), taskStatus: 'Completed',
+        assignedEmployee: 'Clara Santos', createdByEmployee: 'Op Admin',
+        assignedTo: 'mock-003', createdAt: pastDate(10),
+    },
+];
+
+const MOCK_REOPEN_REQUESTS: ReopenRequest[] = [
+    {
+        requestId: 'reopen-001',
+        taskId: 'task-011',
+        taskTitle: 'Weekly report submission',
+        employeeName: 'Ana Reyes',
+        employeeId: 'mock-001',
+        reason: 'Several entries in the weekly report were incorrect. I need to update the delivery counts and add missing data for Friday.',
+        currentStatus: 'Completed',
+        status: 'Pending',
+        submittedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    },
+    {
+        requestId: 'reopen-002',
+        taskId: 'task-012',
+        taskTitle: 'Calibrate weighing scale',
+        employeeName: 'Clara Santos',
+        employeeId: 'mock-003',
+        reason: 'The calibration was done but the certification document was not attached. Need to reopen to upload the certificate.',
+        supportingEvidence: 'calibration_note.pdf',
+        currentStatus: 'Completed',
+        status: 'Pending',
+        submittedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+    },
 ];
 
 const NAV_GROUPS = [
@@ -147,6 +392,12 @@ const NAV_GROUPS = [
         ],
     },
     {
+        label: 'REQUESTS',
+        items: [
+            { tab: 'reopen' as NavTab, icon: RotateCcw, label: 'Reopen Requests' },
+        ],
+    },
+    {
         label: 'ACCOUNT',
         items: [
             { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
@@ -157,7 +408,7 @@ const NAV_GROUPS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.taskStatus !== 'Completed' && !!t.dueAt && new Date(t.dueAt) < new Date();
+    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
 const getInitials = (name: string): string => {
     if (!name) return 'OA';
@@ -168,14 +419,31 @@ const getInitials = (name: string): string => {
 
 const statusBadgeClass = (s: string): string =>
 ({
+    'Draft': 'badge badge-gray',
+    'Assigned': 'badge badge-purple',
     'Pending': 'badge badge-blue',
     'In Progress': 'badge badge-amber',
+    'Done': 'badge badge-blue',
     'Completed': 'badge badge-green',
     'Overdue': 'badge badge-red'
 }[s] ?? 'badge badge-blue');
 
+// ─── FSM (Finite State Machine) Task Status Transitions ──────────────────────
+const FSM_TRANSITIONS: Record<string, string[]> = {
+    'Draft': ['Assigned'],
+    'Assigned': ['In Progress'],
+    'In Progress': ['Done'],
+    'Done': ['Completed'],
+    'Completed': [],
+    'Pending': ['In Progress'],
+    'Overdue': [],
+};
+
+const isTransitionValid = (from: string, to: string): boolean =>
+    FSM_TRANSITIONS[from]?.includes(to) ?? false;
+
 const priorityDotClass = (p: Priority): string =>
-    ({ High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
+    ({ Critical: 'prio-dot critical', High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
 
 const fmtDate = (d: string): string => {
     if (!d) return '—';
@@ -200,7 +468,7 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
 );
 
 const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`badge ${p === 'High' ? 'badge-red' : p === 'Medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
+    <span className={`badge ${p === 'Critical' ? 'badge-critical' : p === 'High' ? 'badge-red' : p === 'Medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
 );
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
@@ -252,16 +520,33 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
 
 // ─── Modal: New / Edit Task ───────────────────────────────────────────────────
 
+interface WorkloadInfo {
+    employeeName: string;
+    accountId: string;
+    availabilityStatus: string;
+    workload: number;
+}
+
+interface Recommendation {
+    employeeName: string;
+    accountId: string;
+    availabilityStatus: string;
+    workload: number;
+    reason: string;
+}
+
 interface TaskModalProps {
     mode: 'new' | 'edit';
     initial?: Partial<Task>;
     teamMembers: TeamMember[];
+    tasks: Task[];
     onSave: (data: CreateTaskDTO | UpdateTaskDTO) => void;
     onClose: () => void;
     onDelete?: () => void;
+    showSuccess?: (msg: string) => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, onSave, onClose, onDelete }) => {
+const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, tasks, onSave, onClose, onDelete, showSuccess }) => {
     const resolvedAssignedTo =
         initial.assignedTo ||
         teamMembers.find(m => m.employeeName === initial.assignedEmployee)?.accountId ||
@@ -270,7 +555,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const [form, setForm] = useState({
         taskTitle: initial.taskTitle ?? '',
         taskDescription: initial.taskDescription ?? '',
-        dueAt: initial.dueAt ? initial.dueAt.split('T')[0] : '',
+        dueAt: initial.dueAt ? initial.dueAt.substring(0, 16) : '',
         priority: initial.priority ?? '' as Priority,
         assignedTo: resolvedAssignedTo,
         taskRemarks: initial.taskRemarks ?? '',
@@ -278,6 +563,37 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
+    const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+    const [eligibleEmployees, setEligibleEmployees] = useState<WorkloadInfo[]>([]);
+    const [recommendationAccepted, setRecommendationAccepted] = useState(true);
+
+    useEffect(() => {
+        if (mode !== 'new') return;
+        const eligible = teamMembers.filter(m =>
+            m.presenceStatus !== 'Offline' && m.presenceStatus !== 'On Leave'
+        );
+        const withWorkload = eligible.map(m => ({
+            employeeName: m.employeeName,
+            accountId: m.accountId,
+            availabilityStatus: m.presenceStatus || 'Active',
+            workload: tasks.filter(t =>
+                t.assignedEmployee === m.employeeName &&
+                t.taskStatus !== 'Completed'
+            ).length,
+        }));
+        withWorkload.sort((a, b) => a.workload - b.workload);
+        setEligibleEmployees(withWorkload);
+        if (withWorkload.length > 0) {
+            const best = withWorkload[0];
+            setRecommendation({
+                ...best,
+                reason: `Lowest active workload (${best.workload} tasks) among eligible team members. Availability: ${best.availabilityStatus}.`,
+            });
+            if (resolvedAssignedTo === '') {
+                setForm(prev => ({ ...prev, assignedTo: best.accountId }));
+            }
+        }
+    }, []);
 
     // ── Per-field live validator ──────────────────────────────────────────
     const validateField = (key: string, value: string): string => {
@@ -295,11 +611,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 return '';
             }
             case 'dueAt': {
-                if (!value) return 'Due date is required.';
+                if (!value) return 'Due date/time is required.';
                 const selected = new Date(value);
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                if (selected < today) return 'Due date cannot be in the past.';
+                const now = new Date();
+                if (selected < now) return 'Due date/time cannot be in the past.';
                 return '';
             }
             case 'assignedTo': {
@@ -308,7 +623,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
             }
             case 'priority': {
                 if (!value) return 'Priority is required.';
-                if (!['High', 'Medium', 'Low'].includes(value)) return 'Please select a valid priority.';
+                if (!['Critical', 'High', 'Medium', 'Low'].includes(value)) return 'Please select a valid priority.';
                 return '';
             }
             default:
@@ -348,6 +663,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
             assignedTo: form.assignedTo,
             taskRemarks: form.taskRemarks.trim() || undefined,
         });
+        if (mode === 'new' && showSuccess) {
+            if (recommendationAccepted) {
+                showSuccess('Recommendation accepted · Final assignment saved · Audit Log entry created.');
+            } else {
+                showSuccess('Recommendation overridden · Final assignment saved · Audit Log entry created.');
+            }
+        }
         setSubmitting(false);
     };
 
@@ -427,21 +749,20 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 Due Date <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
                             </label>
                             <input
-                                type="date"
+                                type="datetime-local"
                                 value={form.dueAt}
                                 onChange={set('dueAt')}
                                 className={errors.dueAt ? 'input-error' : form.dueAt ? 'input-success' : ''}
-                                min={new Date().toISOString().split('T')[0]}
                             />
                             <FieldErr name="dueAt" />
                             {!errors.dueAt && form.dueAt && (
                                 <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
-                                    ✓ {new Date(form.dueAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    ✓ {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
                             {!form.dueAt && !errors.dueAt && (
                                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>
-                                    Cannot be a past date.
+                                    Cannot be in the past.
                                 </span>
                             )}
                         </div>
@@ -455,6 +776,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 className={errors.priority ? 'input-error' : ''}
                             >
                                 <option value="">Select priority</option>
+                                <option value="Critical">⚫ Critical</option>
                                 <option value="High">🔴 High</option>
                                 <option value="Medium">🟡 Medium</option>
                                 <option value="Low">🟢 Low</option>
@@ -463,8 +785,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             {!errors.priority && form.priority && (
                                 <span style={{
                                     fontSize: 11, marginTop: 3, display: 'block',
-                                    color: form.priority === 'High' ? '#ee5d50' : form.priority === 'Medium' ? '#ffb547' : '#05cd99',
+                                    color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? '#ee5d50' : form.priority === 'Medium' ? '#ffb547' : '#05cd99',
                                 }}>
+                                    {form.priority === 'Critical' && '🚨 Critical — requires immediate attention'}
                                     {form.priority === 'High' && '⚠ High priority — will be flagged for urgent attention'}
                                     {form.priority === 'Medium' && '✓ Medium priority selected'}
                                     {form.priority === 'Low' && '✓ Low priority selected'}
@@ -473,9 +796,80 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                     </div>
 
+                    {/* ── Smart Task Routing Recommendation ── */}
+                    {mode === 'new' && recommendation && (
+                        <div className="sr-section">
+                            <div className="sr-header">
+                                <div className="sr-title-row">
+                                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)' }}>
+                                        Smart Task Routing
+                                    </span>
+                                    <span className="sr-badge">Recommendation Ready</span>
+                                </div>
+                            </div>
+
+                            <div className="sr-recommendation">
+                                <div className="sr-rec-avatar">
+                                    {recommendation.employeeName.charAt(0).toUpperCase()}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <div className="sr-rec-name">{recommendation.employeeName}</div>
+                                    <div className="sr-rec-meta">
+                                        <span>Workload: <strong>{recommendation.workload} active tasks</strong></span>
+                                        <span className={`sr-status-dot ${recommendation.availabilityStatus === 'Active' || recommendation.availabilityStatus === 'Online' ? 'online' : ''}`} />
+                                        <span>Status: <strong>{recommendation.availabilityStatus}</strong></span>
+                                    </div>
+                                    <div className="sr-rec-reason">{recommendation.reason}</div>
+                                </div>
+                            </div>
+
+                            {eligibleEmployees.length > 0 && (
+                                <div className="sr-eligible-list">
+                                    <div className="sr-eligible-title">Employee Availability & Workload</div>
+                                    <div className="sr-eligible-header">
+                                        <span>Employee</span>
+                                        <span>Status</span>
+                                        <span>Workload</span>
+                                        <span />
+                                    </div>
+                                    {eligibleEmployees.map(e => (
+                                        <div key={e.accountId} className={`sr-eligible-row${e.accountId === recommendation.accountId ? ' recommended' : ''}`}>
+                                            <span className="sr-emp-name">{e.employeeName}</span>
+                                            <span className={`sr-status-tag ${e.availabilityStatus === 'Active' || e.availabilityStatus === 'Online' ? 'active' : e.availabilityStatus === 'Offline' ? 'offline' : 'leave'}`}>
+                                                {e.availabilityStatus}
+                                            </span>
+                                            <span className="sr-workload">{e.workload} tasks</span>
+                                            {e.accountId === recommendation.accountId && (
+                                                <span className="sr-rec-tag">Recommended</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {teamMembers.filter(m => m.presenceStatus === 'Offline' || m.presenceStatus === 'On Leave').map(m => (
+                                        <div key={m.accountId} className="sr-eligible-row excluded">
+                                            <span className="sr-emp-name">{m.employeeName}</span>
+                                            <span className={`sr-status-tag ${m.presenceStatus === 'Offline' ? 'offline' : 'leave'}`}>
+                                                {m.presenceStatus}
+                                            </span>
+                                            <span className="sr-workload">—</span>
+                                            <span className="sr-excluded-tag">Excluded</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="sr-note">
+                                The system recommended <strong>{recommendation.employeeName}</strong> based on lowest workload.
+                                You can accept this recommendation or select a different employee below.
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── Assign To ── */}
                     <div className="field">
-                        <label>Assign To <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <label>
+                            {mode === 'new' ? 'Final Assigned Employee' : 'Assign To'}
+                            <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                        </label>
                         <div
                             className={`assignee-select${errors.assignedTo ? ' input-error' : ''}`}
                             tabIndex={0}
@@ -506,6 +900,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     onClick={e => {
                                         setForm(prev => ({ ...prev, assignedTo: '' }));
                                         setErrors(prev => ({ ...prev, assignedTo: 'Please assign the task to someone.' }));
+                                        setRecommendationAccepted(false);
                                         (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                     }}
                                 >
@@ -518,11 +913,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                         onClick={e => {
                                             setForm(prev => ({ ...prev, assignedTo: m.accountId }));
                                             setErrors(prev => ({ ...prev, assignedTo: '' }));
+                                            if (recommendation && m.accountId !== recommendation.accountId) {
+                                                setRecommendationAccepted(false);
+                                            }
                                             (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                         }}
                                     >
                                         <span className="assignee-opt-name">{m.employeeName}</span>
                                         <span className="assignee-opt-role">{m.role}</span>
+                                        {recommendation && m.accountId === recommendation.accountId && (
+                                            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--primary)', background: 'rgba(67,24,255,0.08)', padding: '2px 6px', borderRadius: 4, marginLeft: 8 }}>Recommended</span>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -584,11 +985,21 @@ interface ViewModalProps {
     task: Task;
     onEdit: () => void;
     onReopen: () => void;
+    onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
+    onAdminOverride: (taskId: string) => void;
     onClose: () => void;
     onViewMore?: () => void;
 }
 
-const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onClose, onViewMore }) => {
+const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusChange, onAdminOverride, onClose, onViewMore }) => {
+    const nextStatus = (FSM_TRANSITIONS[task.taskStatus]?.[0] ?? '') as TaskStatus;
+    const canTransition = !!nextStatus;
+    const statusLabel: Record<string, string> = {
+        'Assigned': 'Mark In Progress',
+        'In Progress': 'Mark Done',
+        'Done': 'Approve & Complete',
+    };
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-card view-modal-card" onClick={e => e.stopPropagation()}>
@@ -642,17 +1053,126 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onClose, 
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                    <button className="btn btn-danger" onClick={onReopen}
-                        style={{ visibility: task.taskStatus === 'Completed' ? 'visible' : 'hidden' }}>
-                        Reopen
-                    </button>
+                    {canTransition && (
+                        <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
+                            title={`Transition to ${nextStatus}`}>
+                            {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
+                        </button>
+                    )}
+                    {task.taskStatus === 'Completed' && (
+                        <button className="btn btn-primary" onClick={() => onAdminOverride(task.taskId)}
+                            title="Admin override for completed task">
+                            <RotateCcw size={13} /> Admin Override
+                        </button>
+                    )}
                     <button className="btn btn-primary" onClick={onViewMore}>
                         View More
                     </button>
-                    <button className="btn btn-primary" onClick={onEdit}>
-                        <Pencil size={13} /> Edit Task
-                    </button>
+                    {task.taskStatus !== 'Completed' && (
+                        <button className="btn btn-primary" onClick={onEdit}>
+                            <Pencil size={13} /> Edit Task
+                        </button>
+                    )}
                     <button className="btn" onClick={onClose}>Close</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Admin Override Modal ──────────────────────────────────────────────────────
+interface AdminOverrideModalProps {
+    task: Task;
+    onSubmit: (reason: string, remarks: string) => void;
+    onClose: () => void;
+}
+
+const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit, onClose }) => {
+    const [reason, setReason] = useState('');
+    const [remarks, setRemarks] = useState('');
+    const [confirmed, setConfirmed] = useState(false);
+    const [errors, setErrors] = useState<{ reason?: string; remarks?: string; confirmed?: string }>({});
+
+    const handleSubmit = () => {
+        const e: typeof errors = {};
+        if (!reason.trim()) e.reason = 'Override reason is required.';
+        else if (reason.length > 500) e.reason = 'Override reason must not exceed 500 characters.';
+        if (!remarks.trim()) e.remarks = 'Admin remarks are required.';
+        else if (remarks.length > 500) e.remarks = 'Admin remarks must not exceed 500 characters.';
+        if (!confirmed) e.confirmed = 'You must confirm this override.';
+        setErrors(e);
+        if (Object.keys(e).length === 0) onSubmit(reason.trim(), remarks.trim());
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div>
+                        <h3>Admin Override</h3>
+                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                            Modifying completed task: <strong>{task.taskTitle}</strong>
+                        </p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+                <div className="modal-form">
+                    <div className="view-modal-meta" style={{ marginBottom: 16 }}>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Task ID</span>
+                            <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
+                        </div>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Current Status</span>
+                            <span className={statusBadgeClass(task.taskStatus)}>{task.taskStatus}</span>
+                        </div>
+                        <div className="view-modal-meta-item">
+                            <span className="view-modal-label">Priority</span>
+                            <PrioBadge p={task.priority} />
+                        </div>
+                    </div>
+
+                    <div className="field">
+                        <label>Override Reason *</label>
+                        <textarea className={errors.reason ? 'report-input report-input-error' : 'report-input'}
+                            rows={3} maxLength={500} value={reason}
+                            onChange={e => { setReason(e.target.value); setErrors(p => ({ ...p, reason: '' })); }}
+                            placeholder="Explain why this completed task needs modification..." />
+                        {errors.reason && <span className="report-field-error">{errors.reason}</span>}
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: reason.length > 450 ? (reason.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                            {reason.length}/500
+                        </span>
+                    </div>
+
+                    <div className="field">
+                        <label>Admin Remarks *</label>
+                        <textarea className={errors.remarks ? 'report-input report-input-error' : 'report-input'}
+                            rows={3} maxLength={500} value={remarks}
+                            onChange={e => { setRemarks(e.target.value); setErrors(p => ({ ...p, remarks: '' })); }}
+                            placeholder="Additional notes for the audit log..." />
+                        {errors.remarks && <span className="report-field-error">{errors.remarks}</span>}
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                            {remarks.length}/500
+                        </span>
+                    </div>
+
+                    <div className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <input type="checkbox" id="override-confirm" checked={confirmed}
+                            onChange={e => { setConfirmed(e.target.checked); setErrors(p => ({ ...p, confirmed: '' })); }}
+                            style={{ marginTop: 3 }} />
+                        <label htmlFor="override-confirm" style={{ fontSize: 13, fontWeight: 500, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
+                            I confirm this admin override. I understand this action will be recorded in the Audit Log and the task will be reopened for modification.
+                        </label>
+                    </div>
+                    {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
+
+                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
+                        <button className="btn" onClick={onClose}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleSubmit}
+                            style={{ background: 'var(--status-failed)', borderColor: 'var(--status-failed)' }}>
+                            <Shield size={14} /> Submit Override
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -757,10 +1277,15 @@ const DashboardTab: React.FC<{ tasks: Task[]; loading: boolean; onView: (id: str
 
 // ─── Tasks Tab ────────────────────────────────────────────────────────────────
 
+const TASK_STATUS_FILTERS = ['Pending', 'In Progress', 'Done', 'Completed', 'Overdue'];
+
+const PRIORITY_WEIGHTS: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+
 const TasksTab: React.FC<{
     tasks: Task[];
     allTasks: Task[];
     binTasks: Task[];
+    teamMembers: TeamMember[];
     loading: boolean;
     searchQuery: string;
     setSearchQuery: (query: string) => void;
@@ -769,18 +1294,53 @@ const TasksTab: React.FC<{
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
     onNewTask: () => void;
-}> = ({ tasks, allTasks, binTasks, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
+}> = ({ tasks, allTasks, binTasks, teamMembers, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
+    const [filterEmployee, setFilterEmployee] = useState('');
+    const [filterDeadline, setFilterDeadline] = useState('');
+    const [sortBy, setSortBy] = useState('');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [subTab, setSubTab] = useState<'active' | 'bin'>('active');
+    const [searchError, setSearchError] = useState('');
 
     const deletedTasks = binTasks;
 
-    const filtered = tasks.filter(t =>
-        (!filterStatus || t.taskStatus === filterStatus) &&
-        (!filterPriority || t.priority === filterPriority) &&
-        (!searchQuery || t.taskTitle.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const handleSearchChange = (val: string) => {
+        if (val.length > 150) {
+            setSearchError('Search must not exceed 150 characters.');
+            return;
+        }
+        setSearchError('');
+        setSearchQuery(val);
+    };
+
+    const sorted = [...tasks]
+        .filter(t =>
+            (!filterStatus || t.taskStatus === filterStatus) &&
+            (!filterPriority || t.priority === filterPriority) &&
+            (!filterEmployee || t.assignedTo === filterEmployee) &&
+            (!filterDeadline || (t.dueAt && t.dueAt.startsWith(filterDeadline))) &&
+            (!searchQuery || t.taskTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
+        .sort((a, b) => {
+            if (!sortBy) return 0;
+            const dir = sortOrder === 'asc' ? 1 : -1;
+            switch (sortBy) {
+                case 'taskTitle':
+                    return dir * a.taskTitle.localeCompare(b.taskTitle);
+                case 'deadline':
+                    return dir * ((a.dueAt ?? '') > (b.dueAt ?? '') ? 1 : -1);
+                case 'priority':
+                    return dir * ((PRIORITY_WEIGHTS[a.priority] ?? 0) - (PRIORITY_WEIGHTS[b.priority] ?? 0));
+                case 'status':
+                    return dir * a.taskStatus.localeCompare(b.taskStatus);
+                case 'assignedEmployee':
+                    return dir * a.assignedEmployee.localeCompare(b.assignedEmployee);
+                default:
+                    return 0;
+            }
+        });
 
     return (
         <div className="dashboard-content">
@@ -792,22 +1352,44 @@ const TasksTab: React.FC<{
                 activeTab={subTab}
                 onTabChange={key => setSubTab(key as 'active' | 'bin')}
                 searchQuery={subTab === 'active' ? searchQuery : undefined}
-                setSearchQuery={subTab === 'active' ? setSearchQuery : undefined}
+                setSearchQuery={subTab === 'active' ? handleSearchChange : undefined}
                 searchPlaceholder="Search tasks..."
                 filterElements={subTab === 'active' ? (
                     <>
                         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                             <option value="">All Statuses</option>
-                            <option value="Pending">Pending</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Overdue">Overdue</option>
+                            {TASK_STATUS_FILTERS.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
                         </select>
                         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
                             <option value="">All Priorities</option>
+                            <option value="Critical">Critical</option>
                             <option value="High">High</option>
                             <option value="Medium">Medium</option>
                             <option value="Low">Low</option>
+                        </select>
+                        <select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+                            <option value="">All Employees</option>
+                            {teamMembers.map(m => (
+                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                            ))}
+                        </select>
+                        <input type="date" value={filterDeadline}
+                            onChange={e => setFilterDeadline(e.target.value)}
+                            style={{ height: 38, borderRadius: 8, border: '1.5px solid var(--border, #e8ecf4)', padding: '0 12px', fontSize: '0.82rem', fontFamily: 'inherit', background: 'white', color: 'var(--text-primary)', outline: 'none' }} />
+                        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+                            style={{ borderLeft: '2px solid var(--border, #e8ecf4)', paddingLeft: 12, borderRadius: 0 }}>
+                            <option value="">Sort By</option>
+                            <option value="taskTitle">Task Title</option>
+                            <option value="deadline">Deadline</option>
+                            <option value="priority">Priority Level</option>
+                            <option value="status">Status</option>
+                            <option value="assignedEmployee">Assigned Employee</option>
+                        </select>
+                        <select value={sortOrder} onChange={e => setSortOrder(e.target.value as 'asc' | 'desc')}>
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
                         </select>
                     </>
                 ) : (
@@ -832,11 +1414,16 @@ const TasksTab: React.FC<{
                 headers={subTab === 'bin' ? ['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE', 'ACTIONS'] : undefined}
                 loading={loading}
                 emptyIcon={subTab === 'bin' ? <Trash2 size={24} /> : <Package size={20} />}
-                emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No tasks match filters'}
+                emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No matching task records found.'}
             >
+                {searchError && (
+                    <div style={{ padding: '8px 20px 0' }}>
+                        <span style={{ fontSize: 12, color: 'var(--status-failed)' }}>{searchError}</span>
+                    </div>
+                )}
                 {subTab === 'active' ? (
                     <div style={{ padding: '0 20px 20px' }}>
-                        {filtered.map(t => (
+                        {sorted.map(t => (
                             <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
                         ))}
                     </div>
@@ -955,106 +1542,287 @@ const TeamTab: React.FC<{
 
 // ─── Reports Tab ──────────────────────────────────────────────────────────────
 
-const ReportsTab: React.FC<{ tasks: Task[]; teamMembers: TeamMember[] }> = ({ tasks, teamMembers }) => {
-    const total = tasks.length || 1;
-    const done = tasks.filter(t => t.taskStatus === 'Completed').length;
-    const hiDone = tasks.filter(t => t.taskStatus === 'Completed' && t.priority === 'High').length;
-    const avg = teamMembers.length ? (tasks.length / teamMembers.length).toFixed(1) : '0';
-    const rate = Math.round(done / total * 100);
-    const ontime = tasks.filter(t =>
-        t.taskStatus === 'Completed' && (!t.dueAt || new Date(t.dueAt) >= new Date())
-    ).length;
-    const ontimeRate = Math.round(ontime / total * 100);
+const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
+    const { success, error } = useToast();
+    const [filter, setFilter] = useState<ReportFilter>({
+        dateRangeStart: '',
+        dateRangeEnd: '',
+        employeeId: '',
+        taskPriorityLevel: '',
+        taskStatus: '',
+        taskCategory: '',
+    });
+    const [report, setReport] = useState<TaskCompletionReport | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [fetchError, setFetchError] = useState('');
+    const [noRecords, setNoRecords] = useState(false);
+    const [generatedAt, setGeneratedAt] = useState('');
+    const [errors, setErrors] = useState<{ dateRangeStart?: string; dateRangeEnd?: string }>({});
 
-    const statuses: TaskStatus[] = ['Pending', 'In Progress', 'Completed', 'Overdue'];
-    const maxStat = Math.max(...statuses.map(s => tasks.filter(t => t.taskStatus === s).length), 1);
-    const statusColors: Record<string, string> = {
-        'Pending': 'fill-primary',
-        'In Progress': 'fill-amber',
-        'Completed': 'fill-green',
-        'Overdue': 'fill-red',
+    const validate = (): boolean => {
+        const e: { dateRangeStart?: string; dateRangeEnd?: string } = {};
+        if (!filter.dateRangeStart) e.dateRangeStart = 'Date range start is required.';
+        if (!filter.dateRangeEnd) e.dateRangeEnd = 'Date range end is required.';
+        if (filter.dateRangeStart && filter.dateRangeEnd && filter.dateRangeEnd < filter.dateRangeStart) {
+            e.dateRangeEnd = 'End date must not be earlier than start date.';
+        }
+        setErrors(e);
+        return Object.keys(e).length === 0;
     };
+
+    const handleGenerate = async () => {
+        if (!validate()) return;
+        setLoading(true);
+        setFetchError('');
+        setNoRecords(false);
+        setReport(null);
+        try {
+            if (USE_MOCK_REPORT) {
+                await new Promise(r => setTimeout(r, 600));
+                const mockData = mockTaskCompletionReport(filter);
+                setReport(mockData);
+                setGeneratedAt(new Date().toLocaleString());
+                setLoading(false);
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.set('DateRangeStart', filter.dateRangeStart);
+            params.set('DateRangeEnd', filter.dateRangeEnd);
+            if (filter.employeeId) params.set('EmployeeId', filter.employeeId);
+            if (filter.taskPriorityLevel) params.set('TaskPriorityLevel', filter.taskPriorityLevel);
+            if (filter.taskStatus) params.set('TaskStatus', filter.taskStatus);
+            if (filter.taskCategory) params.set('TaskCategory', filter.taskCategory);
+
+            const res = await fetch(`/api/reporting/task-completion?${params}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+
+            if (res.status === 400) {
+                setFetchError('Invalid date range selected.');
+                setLoading(false);
+                return;
+            }
+            if (!res.ok) {
+                setFetchError('Failed to generate report. Please try again.');
+                setLoading(false);
+                return;
+            }
+
+            const data = await res.json();
+            if (data.isSuccess && data.data) {
+                setReport(data.data);
+                setGeneratedAt(new Date().toLocaleString());
+            } else {
+                setNoRecords(true);
+            }
+        } catch {
+            setFetchError('Failed to generate report. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleReset = () => {
+        setFilter({ dateRangeStart: '', dateRangeEnd: '', employeeId: '', taskPriorityLevel: '', taskStatus: '', taskCategory: '' });
+        setReport(null);
+        setFetchError('');
+        setNoRecords(false);
+        setErrors({});
+        setGeneratedAt('');
+    };
+
+    const exportCSV = () => {
+        if (!report) return;
+        const rows: string[] = [];
+        rows.push('Task Completion Report');
+        rows.push(`Generated,${generatedAt}`);
+        rows.push('');
+        rows.push('Summary');
+        rows.push(`Total Tasks Assigned,${report.totalTasksAssigned}`);
+        rows.push(`Total Tasks Completed,${report.totalTasksCompleted}`);
+        rows.push(`Total Tasks In Progress,${report.totalTasksInProgress}`);
+        rows.push(`Total Tasks Pending Review,${report.totalTasksPendingReview}`);
+        rows.push(`Total Overdue Tasks,${report.totalOverdueTasks}`);
+        rows.push(`Task Completion Rate,${report.taskCompletionRate}%`);
+        rows.push(`Avg Completion Time (Hours),${report.averageTaskCompletionTimeHours.toFixed(1)}`);
+        rows.push('');
+        rows.push('Employee Performance');
+        rows.push('Employee,Assigned,Completed,Completion Rate,Avg Time (Hours)');
+        for (const ep of report.employeePerformanceSummary) {
+            rows.push(`${ep.employeeName},${ep.totalAssigned},${ep.totalCompleted},${ep.completionRate}%,${ep.averageCompletionTimeHours.toFixed(1)}`);
+        }
+        const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `task-completion-report-${filter.dateRangeStart}-to-${filter.dateRangeEnd}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        success('CSV exported successfully.');
+    };
+
+    const selectClass = (field: keyof typeof errors) =>
+        errors[field] ? 'report-select report-select-error' : 'report-select';
+
+    const inputClass = (field: keyof typeof errors) =>
+        errors[field] ? 'report-input report-input-error' : 'report-input';
+
+    const statusChartData = report
+        ? [
+            { name: 'Completed', value: report.totalTasksCompleted, fill: '#05cd99' },
+            { name: 'In Progress', value: report.totalTasksInProgress, fill: '#ffb547' },
+            { name: 'Pending Review', value: report.totalTasksPendingReview, fill: '#4318ff' },
+            { name: 'Overdue', value: report.totalOverdueTasks, fill: '#ee5d50' },
+        ].filter(d => d.value > 0)
+        : [];
 
     return (
         <div className="dashboard-content">
-            <div className="stats-row">
-                {[
-                    { label: 'COMPLETION RATE', value: `${rate}%`, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'Tasks finished on time' },
-                    { label: 'HIGH PRIORITY DONE', value: hiDone, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Critical tasks resolved' },
-                    { label: 'AVG TASKS / MEMBER', value: avg, icon: <Users size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'Workload balance' },
-                    { label: 'ON-TIME RATE', value: `${ontimeRate}%`, icon: <BarChart3 size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Completed before deadline' },
-                ].map(s => (
-                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
-                ))}
-            </div>
-
-            <div className="dashboard-grid">
-                <div className="card">
-                    <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
-                    <div className="perf-bars" style={{ marginTop: 8 }}>
-                        {statuses.map(s => {
-                            const cnt = tasks.filter(t => t.taskStatus === s).length;
-                            return (
-                                <div key={s} className="perf-item">
-                                    <span className="perf-label" style={{ textTransform: 'capitalize' }}>{s}</span>
-                                    <div className="perf-track">
-                                        <div className={`perf-fill ${statusColors[s]}`} style={{ width: `${Math.round(cnt / maxStat * 100)}%` }} />
-                                    </div>
-                                    <span className="perf-pct">{cnt}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
+            <div className="card report-filter-card">
+                <div className="card-header-layout">
+                    <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
                 </div>
-                <div className="card">
-                    <div className="card-header-layout"><h3>Team Performance</h3></div>
-                    <div className="perf-bars" style={{ marginTop: 8 }}>
-                        {teamMembers.map(m => {
-                            const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
-                            const mc = mt.filter(t => t.taskStatus === 'Completed').length;
-                            const r = mt.length ? Math.round(mc / mt.length * 100) : 0;
-                            return (
-                                <div key={m.accountId} className="perf-item">
-                                    <span className="perf-label">{m.employeeName.split(' ')[0]}</span>
-                                    <div className="perf-track">
-                                        <div className="perf-fill fill-primary" style={{ width: `${r}%` }} />
-                                    </div>
-                                    <span className="perf-pct">{r}%</span>
-                                </div>
-                            );
-                        })}
+                <div className="report-filter-grid">
+                    <div className="field">
+                        <label>Date Start *</label>
+                        <input type="date" className={inputClass('dateRangeStart')}
+                            value={filter.dateRangeStart}
+                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
+                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
                     </div>
-                </div>
-            </div>
-
-            <div className="card">
-                <div className="card-header-layout"><h3>Full Task Report</h3></div>
-                <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>TASK</th>
-                                <th>ASSIGNEE</th>
-                                <th>PRIORITY</th>
-                                <th>DEADLINE</th>
-                                <th>STATUS</th>
-                                <th>PROGRESS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tasks.map(t => (
-                                <tr key={t.taskId}>
-                                    <td>{t.taskTitle}</td>
-                                    <td>{t.assignedEmployee || '—'}</td>
-                                    <td><PrioBadge p={t.priority} /></td>
-                                    <td>{t.dueAt ? fmtDate(t.dueAt) : '—'}</td>
-                                    <td><span className={statusBadgeClass(t.taskStatus)}>{t.taskStatus}</span></td>
-                                </tr>
+                    <div className="field">
+                        <label>Date End *</label>
+                        <input type="date" className={inputClass('dateRangeEnd')}
+                            value={filter.dateRangeEnd}
+                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
+                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
+                    </div>
+                    <div className="field">
+                        <label>Employee</label>
+                        <select className="report-select"
+                            value={filter.employeeId}
+                            onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                            <option value="">All Employees</option>
+                            {teamMembers.map(m => (
+                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
                             ))}
-                        </tbody>
-                    </table>
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Priority</label>
+                        <select className="report-select"
+                            value={filter.taskPriorityLevel}
+                            onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
+                            <option value="">All Priorities</option>
+                            {PRIORITY_LEVELS.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Status</label>
+                        <select className="report-select"
+                            value={filter.taskStatus}
+                            onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
+                            <option value="">All Statuses</option>
+                            {TASK_STATUSES_FILTER.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Category</label>
+                        <select className="report-select"
+                            value={filter.taskCategory}
+                            onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
+                            <option value="">All Categories</option>
+                            {TASK_CATEGORIES.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                <div className="report-filter-actions">
+                    <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
+                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+                        {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                        {' '}{loading ? 'Generating...' : 'Generate Report'}
+                    </button>
                 </div>
             </div>
+
+            {fetchError && <div className="report-error-msg">{fetchError}</div>}
+            {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
+
+            {report && (
+                <>
+                    <div className="report-summary-grid">
+                        <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
+                        <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
+                        <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
+                        <StatCard icon={<Eye size={20} strokeWidth={2.3} />} variant="primary" label="PENDING REVIEW" value={String(report.totalTasksPendingReview)} subtext="Awaiting review" />
+                        <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(report.totalOverdueTasks)} subtext="Past deadline" />
+                        <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${report.taskCompletionRate}%`} subtext="Overall rate" />
+                        <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
+                    </div>
+
+                    <div className="card">
+                        <div className="card-header-layout"><h3>Employee Performance Summary</h3></div>
+                        {report.employeePerformanceSummary.length === 0 ? (
+                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No employee data for selected criteria.</p></div>
+                        ) : (
+                            <div style={{ overflowX: 'auto' }}>
+                                <table className="data-table report-perf-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Assigned</th>
+                                            <th>Completed</th>
+                                            <th>Rate</th>
+                                            <th>Avg Time (h)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {report.employeePerformanceSummary.map(ep => (
+                                            <tr key={ep.employeeName}>
+                                                <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                                <td>{ep.totalAssigned}</td>
+                                                <td>{ep.totalCompleted}</td>
+                                                <td>{ep.completionRate}%</td>
+                                                <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="card">
+                        <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
+                        {statusChartData.length === 0 ? (
+                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No status data available.</p></div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={220}>
+                                <BarChart data={statusChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#a3aed0' }} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+
+                    <div className="report-export-row">
+                        <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {generatedAt}</span>
+                        <button className="btn btn-primary" onClick={exportCSV}>
+                            <Download size={14} /> Export CSV
+                        </button>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
@@ -1974,6 +2742,269 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     );
 };
 
+// ─── Modal: Reopen Approval ──────────────────────────────────────────────────
+
+interface ReopenApprovalModalProps {
+    request: ReopenRequest;
+    onApprove: (requestId: string, remarks: string) => void;
+    onReject: (requestId: string, remarks: string) => void;
+    onClose: () => void;
+}
+
+const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onApprove, onReject, onClose }) => {
+    const [decision, setDecision] = useState<'Approve' | 'Reject' | ''>('');
+    const [remarks, setRemarks] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+
+    const validate = (): boolean => {
+        const errs: Record<string, string> = {};
+        if (!decision) errs.decision = 'Please select an approval decision.';
+        if (!remarks.trim()) errs.remarks = 'Admin remarks are required.';
+        else if (remarks.trim().length > 500) errs.remarks = 'Remarks must not exceed 500 characters.';
+        setErrors(errs);
+        return Object.keys(errs).length === 0;
+    };
+
+    const handleSubmit = () => {
+        if (!validate()) return;
+        setSubmitting(true);
+        if (decision === 'Approve') {
+            onApprove(request.requestId, remarks.trim());
+        } else {
+            onReject(request.requestId, remarks.trim());
+        }
+        setSubmitting(false);
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-card reopen-approval-card" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div>
+                        <h3>Reopen Task Approval</h3>
+                        <p className="modal-subtitle">Review and decide on the reopening request.</p>
+                    </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                </div>
+
+                <div className="modal-form">
+                    {/* ── Request Info ── */}
+                    <div className="reopen-info-grid">
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Request ID</span>
+                            <span className="reopen-info-value">{request.requestId}</span>
+                        </div>
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Task ID</span>
+                            <span className="reopen-info-value">{request.taskId}</span>
+                        </div>
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Task Title</span>
+                            <span className="reopen-info-value">{request.taskTitle}</span>
+                        </div>
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Employee</span>
+                            <span className="reopen-info-value">{request.employeeName}</span>
+                        </div>
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Current Status</span>
+                            <span className={`${statusBadgeClass(request.currentStatus)}`} style={{ fontSize: 11 }}>{request.currentStatus}</span>
+                        </div>
+                        <div className="reopen-info-item">
+                            <span className="reopen-info-label">Submitted</span>
+                            <span className="reopen-info-value">{fmtDate(request.submittedAt)}</span>
+                        </div>
+                    </div>
+
+                    {/* ── Reason ── */}
+                    <div className="field">
+                        <label>Reopening Reason</label>
+                        <div className="reopen-reason-box">{request.reason}</div>
+                    </div>
+
+                    {/* ── Supporting Evidence ── */}
+                    {request.supportingEvidence && (
+                        <div className="field">
+                            <label>Supporting Evidence</label>
+                            <div className="reopen-evidence-box">
+                                <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 500 }}>{request.supportingEvidence}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Decision ── */}
+                    <div className="field">
+                        <label>Approval Decision <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <select
+                            value={decision}
+                            onChange={e => { setDecision(e.target.value as 'Approve' | 'Reject'); setErrors(prev => ({ ...prev, decision: '' })); }}
+                            className={errors.decision ? 'input-error' : ''}
+                        >
+                            <option value="">Select decision</option>
+                            <option value="Approve">Approve</option>
+                            <option value="Reject">Reject</option>
+                        </select>
+                        {errors.decision && (
+                            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <AlertCircle size={11} />{errors.decision}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* ── Admin Remarks ── */}
+                    <div className="field">
+                        <label>Admin Remarks <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <textarea
+                            value={remarks}
+                            onChange={e => { setRemarks(e.target.value); setErrors(prev => ({ ...prev, remarks: '' })); }}
+                            placeholder="Provide a reason for your decision..."
+                            rows={3}
+                            className={errors.remarks ? 'input-error' : ''}
+                            maxLength={500}
+                        />
+                        {errors.remarks && (
+                            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <AlertCircle size={11} />{errors.remarks}
+                            </span>
+                        )}
+                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--danger, #ee5d50)' : '#c05c00') : 'var(--text-secondary)' }}>
+                            {remarks.length}/500
+                        </span>
+                    </div>
+                </div>
+
+                <div className="modal-actions">
+                    <div style={{ flex: 1 }} />
+                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
+                        {submitting
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><ThumbsUp size={13} /> Submit Decision</>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ─── Tab: Reopen Requests ─────────────────────────────────────────────────────
+
+const ReopenTab: React.FC<{
+    requests: ReopenRequest[];
+    onReview: (req: ReopenRequest) => void;
+}> = ({ requests, onReview }) => {
+    const pending = requests.filter(r => r.status === 'Pending');
+    const history = requests.filter(r => r.status !== 'Pending');
+
+    return (
+        <div className="dashboard-content">
+            {/* Stat cards */}
+            <div className="stats-row">
+                {[
+                    { label: 'PENDING REQUESTS', value: pending.length, icon: <RotateCcw size={20} strokeWidth={2.3} />, variant: 'warning', subtext: 'Awaiting review' },
+                    { label: 'APPROVED', value: history.filter(r => r.status === 'Approved').length, icon: <ThumbsUp size={20} strokeWidth={2.3} />, variant: 'success', subtext: 'Task reopened' },
+                    { label: 'REJECTED', value: history.filter(r => r.status === 'Rejected').length, icon: <ThumbsDown size={20} strokeWidth={2.3} />, variant: 'danger', subtext: 'Declined requests' },
+                    { label: 'TOTAL', value: requests.length, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'All time' },
+                ].map(s => (
+                    <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
+                ))}
+            </div>
+
+            {/* Pending Requests */}
+            <div className="reopen-section">
+                <div className="reopen-section-header">
+                    <h3>Pending Reopen Requests</h3>
+                    {pending.length > 0 && <span className="badge badge-amber">{pending.length} pending</span>}
+                </div>
+                {pending.length === 0 ? (
+                    <div className="empty-state">
+                        <RotateCcw size={24} />
+                        <p>No pending reopen requests.</p>
+                    </div>
+                ) : (
+                    <div className="reopen-table-wrap">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>REQUEST ID</th>
+                                    <th>TASK</th>
+                                    <th>EMPLOYEE</th>
+                                    <th>REASON</th>
+                                    <th>SUBMITTED</th>
+                                    <th>ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pending.map(r => (
+                                    <tr key={r.requestId}>
+                                        <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.requestId}</td>
+                                        <td>
+                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div>
+                                        </td>
+                                        <td>{r.employeeName}</td>
+                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {r.reason}
+                                        </td>
+                                        <td style={{ fontSize: 12 }}>{fmtDate(r.submittedAt)}</td>
+                                        <td>
+                                            <button className="btn btn-primary" onClick={() => onReview(r)} style={{ fontSize: 11, padding: '4px 12px' }}>
+                                                <Eye size={12} /> Review
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* History */}
+            {history.length > 0 && (
+                <div className="reopen-section">
+                    <div className="reopen-section-header">
+                        <h3>Request History</h3>
+                    </div>
+                    <div className="reopen-table-wrap">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>REQUEST ID</th>
+                                    <th>TASK</th>
+                                    <th>EMPLOYEE</th>
+                                    <th>DECISION</th>
+                                    <th>REMARKS</th>
+                                    <th>REVIEWED</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.map(r => (
+                                    <tr key={r.requestId}>
+                                        <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.requestId}</td>
+                                        <td>
+                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div>
+                                        </td>
+                                        <td>{r.employeeName}</td>
+                                        <td>
+                                            <span className={`badge ${r.status === 'Approved' ? 'badge-green' : 'badge-red'}`}>{r.status}</span>
+                                        </td>
+                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {r.adminRemarks || '—'}
+                                        </td>
+                                        <td style={{ fontSize: 12 }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // ─── Root Component ───────────────────────────────────────────────────────────
 
 export default function OpsAdminDashboard() {
@@ -1999,6 +3030,7 @@ export default function OpsAdminDashboard() {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [viewingTask, setViewingTask] = useState<Task | null>(null);
     const [detailTask, setDetailTask] = useState<TaskViewTask | null>(null);
+    const [overrideTask, setOverrideTask] = useState<Task | null>(null);
 
     const token = () => localStorage.getItem('authToken');
 
@@ -2010,6 +3042,10 @@ export default function OpsAdminDashboard() {
     // Fetch Leave records
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
+
+    // Reopen Requests state
+    const [reopenRequests, setReopenRequests] = useState<ReopenRequest[]>(MOCK_REOPEN_REQUESTS);
+    const [reviewingRequest, setReviewingRequest] = useState<ReopenRequest | null>(null);
 
     // ── Update fetchTasks ──
     const fetchTasks = async () => {
@@ -2161,6 +3197,23 @@ export default function OpsAdminDashboard() {
     };
 
     useEffect(() => {
+        if (USE_MOCK_DATA) {
+            // ── Load mock data for smart task routing testing ──
+            setAllTasks(MOCK_TASKS);
+            setTasks(MOCK_TASKS.filter(t => !t.deleted));
+            setTeamMembers(MOCK_TEAM_MEMBERS);
+            setLoadingTasks(false);
+            console.log('[MOCK] Loaded mock data for smart routing test.');
+            console.log('[MOCK] Expected recommendation: Clara Santos (1 active task, Online)');
+            console.log('[MOCK] Workload summary:');
+            console.log('  Ana Reyes     → 3 active (Online)');
+            console.log('  Ben Villanueva→ 2 active (Online)');
+            console.log('  Clara Santos  → 1 active (Online) ← SHOULD BE RECOMMENDED');
+            console.log('  Franco Mendoza→ 2 active (Online)');
+            console.log('  Daniel Cruz   → excluded (Offline)');
+            console.log('  Elena Bautista→ excluded (On Leave)');
+            return;
+        }
         fetchTasks();
         fetchBinRecords();
         fetchTeamMembers();
@@ -2240,7 +3293,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Reopen Task ──
+    // ── Reopen Task (direct admin override) ──
     const handleReopenTask = async (taskId: string) => {
         try {
             const res = await fetch(`/api/task/${taskId}/reopen`, {
@@ -2257,6 +3310,90 @@ export default function OpsAdminDashboard() {
         } catch (err: any) {
             error(err.message ?? 'Failed to reopen task.');
         }
+    };
+
+    // ── FSM Status Transition ──
+    const handleStatusTransition = async (taskId: string, newStatus: TaskStatus) => {
+        const task = tasks.find(t => t.taskId === taskId);
+        if (!task) { error('Task not found.'); return; }
+        if (!isTransitionValid(task.taskStatus, newStatus)) {
+            error(`Invalid task status transition: ${task.taskStatus} → ${newStatus}. Status sequence violation detected.`);
+            return;
+        }
+        try {
+            const res = await fetch(`/api/task/${taskId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to update task status.');
+            }
+            await fetchTasks();
+            setViewingTask(null);
+            success('Task status updated successfully.');
+        } catch (err: any) {
+            error(err.message ?? 'Invalid task status transition.');
+        }
+    };
+
+    // ── Admin Override (completed task) ──
+    const handleAdminOverride = async (taskId: string, reason: string, remarks: string) => {
+        try {
+            const res = await fetch(`/api/task/${taskId}/reopen`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token()}`,
+                },
+                body: JSON.stringify({ overrideReason: reason, adminRemarks: remarks }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to process admin override.');
+            }
+            await fetchTasks();
+            setOverrideTask(null);
+            success('Administrator override applied · Task reopened · Audit Log entry generated.');
+        } catch (err: any) {
+            error(err.message ?? 'Administrator override failed.');
+        }
+    };
+
+    // ── Approve Reopen Request ──
+    const handleApproveReopen = async (requestId: string, adminRemarks: string) => {
+        setReopenRequests(prev => prev.map(r =>
+            r.requestId === requestId
+                ? { ...r, status: 'Approved', adminRemarks, reviewedAt: new Date().toISOString() }
+                : r
+        ));
+        const req = reopenRequests.find(r => r.requestId === requestId);
+        if (req) {
+            try {
+                await fetch(`/api/task/${req.taskId}/reopen`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `Bearer ${token()}` },
+                });
+                await fetchTasks();
+            } catch { /* non-critical */ }
+        }
+        setReviewingRequest(null);
+        success('Reopening request approved · Task reopened · Task history preserved · Audit Log entry generated.');
+    };
+
+    // ── Reject Reopen Request ──
+    const handleRejectReopen = async (requestId: string, adminRemarks: string) => {
+        setReopenRequests(prev => prev.map(r =>
+            r.requestId === requestId
+                ? { ...r, status: 'Rejected', adminRemarks, reviewedAt: new Date().toISOString() }
+                : r
+        ));
+        setReviewingRequest(null);
+        success('Reopening request rejected · Original task preserved · Audit Log entry generated.');
     };
 
     const handleDeleteTask = (taskId: string) => {
@@ -2325,6 +3462,7 @@ export default function OpsAdminDashboard() {
         reports: 'Performance Reports',
         profile: 'My Profile',
         leave: 'Leave Requests',
+        reopen: 'Reopen Requests',
     };
 
     return (
@@ -2396,7 +3534,7 @@ export default function OpsAdminDashboard() {
                     onSettingsClick={() => setActiveTab('profile')}
                     onLogout={handleLogout}
                 >
-                    {activeTab !== 'profile' && activeTab !== 'leave' && activeTab !== 'tasks' && (
+                    {activeTab !== 'profile' && activeTab !== 'leave' && activeTab !== 'tasks' && activeTab !== 'reopen' && (
                         <>
                             <div className="header-search">
                                 <Search size={15} />
@@ -2427,6 +3565,7 @@ export default function OpsAdminDashboard() {
                         tasks={tasks}
                         allTasks={allTasks}
                         binTasks={binTasks}
+                        teamMembers={teamMembers}
                         loading={loadingTasks}
                         searchQuery={searchQuery}
                         setSearchQuery={setSearchQuery}
@@ -2444,13 +3583,19 @@ export default function OpsAdminDashboard() {
                         onView={id => setViewingTask(tasks.find(t => t.taskId === id) ?? null)}
                     />
                 )}
-                {activeTab === 'reports' && <ReportsTab tasks={tasks} teamMembers={teamMembers} />}
+                {activeTab === 'reports' && <ReportsTab teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
                 {activeTab === 'leave' && (
                     <LeaveTab
                         records={leaveRecords}
                         loading={leaveLoading}
                         onNewRecord={record => setLeaveRecords(prev => [record, ...prev])}
+                    />
+                )}
+                {activeTab === 'reopen' && (
+                    <ReopenTab
+                        requests={reopenRequests}
+                        onReview={req => setReviewingRequest(req)}
                     />
                 )}
             </main>
@@ -2460,8 +3605,10 @@ export default function OpsAdminDashboard() {
                 <TaskModal
                     mode="new"
                     teamMembers={teamMembers}
+                    tasks={tasks}
                     onSave={data => handleNewTask(data as CreateTaskDTO)}
                     onClose={() => setShowNew(false)}
+                    showSuccess={success}
                 />
             )}
             {editingTask && (
@@ -2469,6 +3616,7 @@ export default function OpsAdminDashboard() {
                     mode="edit"
                     initial={editingTask}
                     teamMembers={teamMembers}
+                    tasks={tasks}
                     onSave={data => handleEditTask(editingTask.taskId, data as UpdateTaskDTO)}
                     onClose={() => setEditingTask(null)}
                     onDelete={() => handleDeleteTask(editingTask.taskId)}
@@ -2479,6 +3627,8 @@ export default function OpsAdminDashboard() {
                     task={viewingTask}
                     onEdit={() => { setEditingTask(viewingTask); setViewingTask(null); }}
                     onReopen={() => handleReopenTask(viewingTask.taskId)}
+                    onStatusChange={(id, status) => handleStatusTransition(id, status)}
+                    onAdminOverride={(id) => setOverrideTask(tasks.find(t => t.taskId === id) ?? null)}
                     onClose={() => setViewingTask(null)}
                     onViewMore={() => { setDetailTask(viewingTask); setViewingTask(null); }}
                 />
@@ -2489,6 +3639,21 @@ export default function OpsAdminDashboard() {
                     onEdit={() => { setEditingTask(detailTask); setDetailTask(null); }}
                     onReopen={() => handleReopenTask(detailTask.taskId)}
                     onClose={() => setDetailTask(null)}
+                />
+            )}
+            {overrideTask && (
+                <AdminOverrideModal
+                    task={overrideTask}
+                    onSubmit={(reason, remarks) => handleAdminOverride(overrideTask.taskId, reason, remarks)}
+                    onClose={() => setOverrideTask(null)}
+                />
+            )}
+            {reviewingRequest && (
+                <ReopenApprovalModal
+                    request={reviewingRequest}
+                    onApprove={handleApproveReopen}
+                    onReject={handleRejectReopen}
+                    onClose={() => setReviewingRequest(null)}
                 />
             )}
 

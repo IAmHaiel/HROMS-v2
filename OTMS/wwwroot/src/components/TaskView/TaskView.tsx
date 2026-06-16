@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Pencil, X, Package, Send, CheckCircle2,
     XCircle, Clock, AlertTriangle, ThumbsUp, RotateCcw,
@@ -7,8 +7,8 @@ import './TaskView.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Priority = 'High' | 'Medium' | 'Low';
-type TaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Overdue';
+type Priority = 'Critical' | 'High' | 'Medium' | 'Low';
+type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Done' | 'Completed' | 'Overdue';
 type ReviewState = 'none' | 'pending_review' | 'approved' | 'rejected';
 
 export interface TaskViewTask {
@@ -80,10 +80,10 @@ const statusBadgeClass = (s: string): string =>
 }[s] ?? 'tv-badge tv-badge-blue');
 
 const priorityDotClass = (p: Priority): string =>
-    ({ High: 'tv-prio-dot high', Medium: 'tv-prio-dot medium', Low: 'tv-prio-dot low' }[p]);
+    ({ Critical: 'tv-prio-dot high', High: 'tv-prio-dot high', Medium: 'tv-prio-dot medium', Low: 'tv-prio-dot low' }[p]);
 
 const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`tv-badge ${p === 'High' ? 'tv-badge-red' : p === 'Medium' ? 'tv-badge-amber' : 'tv-badge-green'}`}>
+    <span className={`tv-badge ${p === 'Critical' || p === 'High' ? 'tv-badge-red' : p === 'Medium' ? 'tv-badge-amber' : 'tv-badge-green'}`}>
         {p}
     </span>
 );
