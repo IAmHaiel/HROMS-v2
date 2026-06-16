@@ -144,6 +144,8 @@ const CATEGORY_LABELS: Record<string, string> = {
     SystemAdmin: 'System Administration', Users: 'User Management',
     Roles: 'Role Management', Departments: 'Department Management',
     JobPositions: 'Job Position Management', Tasks: 'Task Management',
+    Approvals: 'Approval Management', Recruitment: 'Recruitment Management',
+    Dashboard: 'Dashboard', Reporting: 'Reporting',
 };
 function formatCategory(cat: string) { return CATEGORY_LABELS[cat] || cat.replace(/([A-Z])/g, ' $1').trim(); }
 function groupPermissions(perms: PermissionResponseDTO[]): Record<string, PermissionResponseDTO[]> {
@@ -232,43 +234,65 @@ interface PermSelectorProps {
     setSelected: (s: Set<string>) => void;
     disabled?: boolean;
 }
-const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, setSelected, disabled }) => (
-    <div className="rm2-perm-selector">
-        <div className="rm2-perm-selector__header">
-            <span className="rm2-form-label">Assign Permissions</span>
-            <span className="rm2-perm-count">{selected.size} selected</span>
-        </div>
-        <div className="rm2-perm-groups">
-            {Object.entries(grouped).map(([cat, perms]) => {
-                const allSel = perms.every(p => selected.has(p.name));
-                const someSel = perms.some(p => selected.has(p.name)) && !allSel;
-                return (
-                    <div key={cat} className="rm2-perm-group">
-                        <label className="rm2-perm-category">
-                            <input type="checkbox" checked={allSel} disabled={disabled}
-                                ref={el => { if (el) el.indeterminate = someSel; }}
-                                onChange={e => setSelected(toggleCat(selected, perms, e.target.checked))} />
-                            <span>{formatCategory(cat)}</span>
-                        </label>
-                        <div className="rm2-perm-items">
-                            {perms.map(perm => (
-                                <label key={perm.permissionId} className="rm2-perm-item" title={perm.description}>
-                                    <input type="checkbox" checked={selected.has(perm.name)} disabled={disabled}
-                                        onChange={() => setSelected(togglePerm(selected, perm.name))} />
-                                    <div className="rm2-perm-item__info">
-                                        <span className="rm2-perm-item__name">{getFriendlyName(perm.name)}</span>
-                                        {perm.description && <span className="rm2-perm-item__desc">{perm.description}</span>}
-                                    </div>
-                                </label>
-                            ))}
+const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, setSelected, disabled }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filtered = Object.entries(grouped).reduce((acc, [cat, perms]) => {
+        const filteredPerms = searchQuery
+            ? perms.filter(p =>
+                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                getFriendlyName(p.name).toLowerCase().includes(searchQuery.toLowerCase())
+              )
+            : perms;
+        if (filteredPerms.length > 0) acc[cat] = filteredPerms;
+        return acc;
+    }, {} as Record<string, PermissionResponseDTO[]>);
+
+    return (
+        <div className="rm2-perm-selector">
+            <div className="rm2-perm-selector__header">
+                <span className="rm2-form-label">Assign Permissions</span>
+                <span className="rm2-perm-count">{selected.size} selected</span>
+            </div>
+            <div style={{ padding: '0 16px 8px' }}>
+                <input type="text" className="report-input" placeholder="Search permissions..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ width: '100%', fontSize: 13 }} />
+            </div>
+            <div className="rm2-perm-groups">
+                {Object.entries(filtered).map(([cat, perms]) => {
+                    const allSel = perms.every(p => selected.has(p.name));
+                    const someSel = perms.some(p => selected.has(p.name)) && !allSel;
+                    return (
+                        <div key={cat} className="rm2-perm-group">
+                            <label className="rm2-perm-category">
+                                <input type="checkbox" checked={allSel} disabled={disabled}
+                                    ref={el => { if (el) el.indeterminate = someSel; }}
+                                    onChange={e => setSelected(toggleCat(selected, perms, e.target.checked))} />
+                                <span>{formatCategory(cat)} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({perms.length})</span></span>
+                            </label>
+                            <div className="rm2-perm-items">
+                                {perms.map(perm => (
+                                    <label key={perm.permissionId} className="rm2-perm-item" title={perm.description}>
+                                        <input type="checkbox" checked={selected.has(perm.name)} disabled={disabled}
+                                            onChange={() => setSelected(togglePerm(selected, perm.name))} />
+                                        <div className="rm2-perm-item__info">
+                                            <span className="rm2-perm-item__name">{getFriendlyName(perm.name)}</span>
+                                            {perm.description && <span className="rm2-perm-item__desc">{perm.description}</span>}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                );
-            })}
-            {Object.keys(grouped).length === 0 && <p className="rm2-perm-empty">No permissions available.</p>}
+                    );
+                })}
+                {Object.keys(filtered).length === 0 && <p className="rm2-perm-empty">No permissions match your search.</p>}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
