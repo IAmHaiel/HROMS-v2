@@ -250,6 +250,72 @@ namespace OTMS.Data
                 context.ApprovalRoutingMatrices.Add(resignMatrix);
             }
 
+            // e-NTE (Notice to Explain) Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "e-NTE"))
+            {
+                var nteMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "e-NTE",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Tiers = new List<ApprovalTier>
+                    {
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 1,
+                            ApproverRole = "Supervisor",
+                            FallbackApproverRole = "OperationAdmin",
+                            IsFinalTier = false,
+                            CreatedAt = DateTime.UtcNow
+                        },
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 2,
+                            ApproverRole = "OperationAdmin",
+                            IsFinalTier = true,
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    }
+                };
+                context.ApprovalRoutingMatrices.Add(nteMatrix);
+            }
+
+            // Offboarding Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "Offboarding"))
+            {
+                var offboardMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "Offboarding",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Tiers = new List<ApprovalTier>
+                    {
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 1,
+                            ApproverRole = "Supervisor",
+                            FallbackApproverRole = "OperationAdmin",
+                            IsFinalTier = false,
+                            CreatedAt = DateTime.UtcNow
+                        },
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 2,
+                            ApproverRole = "OperationAdmin",
+                            IsFinalTier = true,
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    }
+                };
+                context.ApprovalRoutingMatrices.Add(offboardMatrix);
+            }
+
             await context.SaveChangesAsync();
         }
     }

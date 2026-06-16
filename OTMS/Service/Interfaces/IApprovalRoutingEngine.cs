@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Approval;
 using OTMS.Entities.DTOs.Approval.Responses;
@@ -20,5 +23,19 @@ namespace OTMS.Service.Interfaces
         Task<ApiResponseDTO<WorkflowTrackerDTO>> GetTrackerAsync(Guid approvalRequestId);
 
         Task<ApiResponseDTO<List<WorkflowTrackerDTO>>> GetMyTrackersAsync(Guid requesterAccountId);
+
+        Task<ApiResponseDTO<ApprovalRequestResponseDTO>> CancelRequestAsync(Guid approvalRequestId, CancelApprovalRequestDTO dto);
+
+        Task<ApiResponseDTO<List<RoutingMatrixResponseDTO>>> GetAllMatricesAsync();
+
+        Task<ApiResponseDTO<RoutingMatrixResponseDTO>> GetMatrixByIdAsync(Guid matrixId);
+
+        Task<ApiResponseDTO<RoutingMatrixResponseDTO>> CreateMatrixAsync(CreateRoutingMatrixDTO dto);
+
+        Task<ApiResponseDTO<RoutingMatrixResponseDTO>> UpdateMatrixAsync(Guid matrixId, CreateRoutingMatrixDTO dto);
+
+        Task<ApiResponseDTO<object>> ToggleMatrixActiveAsync(Guid matrixId);
+
+        Task<ApiResponseDTO<object>> DeleteMatrixAsync(Guid matrixId);
     }
 }

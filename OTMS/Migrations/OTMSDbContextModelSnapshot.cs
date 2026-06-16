@@ -403,6 +403,43 @@ namespace OTMS.Migrations
                     b.ToTable("ApprovalTiers");
                 });
 
+            modelBuilder.Entity("OTMS.Entities.Models.AssetAllocation", b =>
+                {
+                    b.Property<Guid>("AssetAllocationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AllocatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedByRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AssetDescription")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AssetType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReturnedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("AssetAllocationId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("AssetAllocations");
+                });
+
             modelBuilder.Entity("OTMS.Entities.Models.Department", b =>
                 {
                     b.Property<Guid>("DepartmentId")
@@ -578,6 +615,18 @@ namespace OTMS.Migrations
 
                     b.Property<string>("MiddleName")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("NTEDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("OffboardingDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("OffboardingRemarks")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ResignationDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Suffix")
                         .HasColumnType("nvarchar(max)");
@@ -1442,6 +1491,17 @@ namespace OTMS.Migrations
                         .IsRequired();
 
                     b.Navigation("RoutingMatrix");
+                });
+
+            modelBuilder.Entity("OTMS.Entities.Models.AssetAllocation", b =>
+                {
+                    b.HasOne("OTMS.Entities.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Department", b =>
