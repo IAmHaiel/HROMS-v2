@@ -26,6 +26,7 @@ namespace OTMS.Common.Constraints
         public const string ApprovalTierRejected = "Approval Tier Rejected";
         public const string ApprovalRequestFullyApproved = "Approval Request Fully Approved";
         public const string ApprovalRequestRouted = "Approval Request Routed";
+        public const string TaskSorted = "Task Sorted";
         public const string RecruitmentStatusUpdated = "Recruitment Status Updated";
         public const string OnboardingLinkSent = "Onboarding Link Sent";
         public const string OnboardingLinkResent = "Onboarding Link Resent";
@@ -35,5 +36,6 @@ namespace OTMS.Common.Constraints
         public const string StatutoryRecordsUpdated = "Statutory Records Updated";
         public const string DashboardViewed = "Dashboard Viewed";
         public const string DashboardFiltered = "Dashboard Filtered";
+        public const string ReportGeneration = "Report Generation";
     }
 }

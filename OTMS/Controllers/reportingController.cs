@@ -43,7 +43,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Returns operational summary report data as JSON for preview.
         /// </summary>
-        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [Authorize(Policy = "Permissions.Reporting.View")]
         [ProducesResponseType(typeof(ApiResponseDTO<OperationalSummaryReportDTO>), 200)]
         [HttpGet("operational-summary")]
         public async Task<IActionResult> GetOperationalSummaryPreview([FromQuery] OperationalSummaryReportFilterDTO filter)
@@ -67,7 +67,7 @@ namespace OTMS.Controllers
         /// <summary>
         /// Generates and downloads the operational summary report in PDF or Excel format.
         /// </summary>
-        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        [Authorize(Policy = "Permissions.Reporting.View")]
         [HttpGet("operational-summary/download")]
         public async Task<IActionResult> DownloadOperationalSummary([FromQuery] OperationalSummaryReportFilterDTO filter)
         {

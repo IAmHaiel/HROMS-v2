@@ -35,6 +35,7 @@ namespace OTMS.Data
                 "Permissions.Recruitment.View",
                 "Permissions.Recruitment.Manage",
                 "Permissions.Dashboard.View",
+                "Permissions.Reporting.View",
             };
 
             foreach (var perm in permissions)
@@ -103,7 +104,8 @@ namespace OTMS.Data
                     p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
                     p.Name.StartsWith("Permissions.JobPositions.View") ||
-                    p.Name.StartsWith("Permissions.Dashboard."));
+                    p.Name.StartsWith("Permissions.Dashboard.") ||
+                    p.Name.StartsWith("Permissions.Reporting."));
 
                 foreach (var perm in opPermissions)
                 {
