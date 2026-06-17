@@ -4040,7 +4040,7 @@ export default function OpsAdminDashboard() {
                                     <div
                                         key={tab}
                                         className={`nav-item${isActive ? ' nav-item-active' : ''}`}
-                                        onClick={() => setActiveTab(tab)}
+                                        onClick={() => tab === 'profile' ? navigate('/profile') : setActiveTab(tab)}
                                     >
                                         <Icon size={18} />
                                         <span className="nav-item-label">{label}</span>
@@ -4082,7 +4082,7 @@ export default function OpsAdminDashboard() {
                     title={pageTitles[activeTab]}
                     notificationApi="/api/notification/my-notifications"
                     userInitials={getInitials(employeeName || 'Operation Admin')}
-                    onSettingsClick={() => setActiveTab('profile')}
+                    onSettingsClick={() => navigate('/profile')}
                     onLogout={handleLogout}
                 >
                 </DashboardHeader>

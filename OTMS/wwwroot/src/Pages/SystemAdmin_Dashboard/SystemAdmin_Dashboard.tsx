@@ -3091,7 +3091,7 @@ export default function Dashboard() {
                         <div key={group.label} className="nav-section">
                             <div className="nav-section-title">{group.label}</div>
                             {group.items.map(({ tab, icon: Icon, label }) => (
-                                <div key={tab} className={`nav-item${activeTab === tab ? ' nav-item-active' : ''}`} onClick={() => { setActiveTab(tab); setSelectedPanelEmployee(null); }}>
+                                <div key={tab} className={`nav-item${activeTab === tab ? ' nav-item-active' : ''}`} onClick={() => { if (tab === 'profile') navigate('/profile'); else { setActiveTab(tab); setSelectedPanelEmployee(null); } }}>
                                     <Icon size={18} /><span className="nav-item-label">{label}</span>
                                 </div>
                             ))}
@@ -3112,7 +3112,7 @@ export default function Dashboard() {
                     <DashboardHeader
                         title={pageTitles[activeTab]}
                         userInitials={getInitials(employeeName)}
-                        onSettingsClick={() => setActiveTab('settings')}
+                        onSettingsClick={() => navigate('/profile')}
                         onLogout={handleLogout}
                     />
                 )}
