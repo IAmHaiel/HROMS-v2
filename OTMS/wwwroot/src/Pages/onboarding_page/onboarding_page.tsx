@@ -165,14 +165,17 @@ export default function OnboardingPage() {
                     : prev.medical,
             }));
             // Pre-fill 201 file fields from application form data
+            const applicantBankName = info.bankName || '';
+            const matchedBank = BANK_OPTIONS.find(opt => opt.toLowerCase() === applicantBankName.toLowerCase()) ||
+                BANK_OPTIONS.find(opt => applicantBankName.toLowerCase().includes(opt.toLowerCase().split('(')[0].trim().toLowerCase()) || opt.toLowerCase().includes(applicantBankName.toLowerCase()));
             setForm201(prev => ({
                 ...prev,
                 sss: info.sssNumber || prev.sss,
                 philhealth: info.philHealthNumber || prev.philhealth,
                 pagibig: info.pagIBIGNumber || prev.pagibig,
                 tin: info.tin || prev.tin,
-                bankName: info.bankName || prev.bankName,
-                bankAccount: info.bankAccountNumber || prev.bankAccount,
+                bankName: matchedBank || '',
+                bankAccount: matchedBank ? (info.bankAccountNumber || '') : '',
                 emergencyName: info.emergencyContactName || prev.emergencyName,
                 emergencyNumber: info.emergencyContactMobileNumber || prev.emergencyNumber,
             }));
