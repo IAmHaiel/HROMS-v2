@@ -202,10 +202,23 @@ namespace OTMS.Service.Services
             {
                 var jwt = authService.CreateToken(existingEmployee);
 
+                // If password hasn't been changed yet, the temp password is still in effect
+                // but we no longer have the plain text. Generate a fresh one so the
+                // frontend can auto-fill the current password field.
+                var existingTempPassword = "";
+                if (!existingEmployee.Account.IsPasswordChanged)
+                {
+                    existingTempPassword = PasswordGenerator.Generate();
+                    existingEmployee.Account.PasswordHash = new PasswordHasher<Account>().HashPassword(existingEmployee.Account, existingTempPassword);
+                    await context.SaveChangesAsync();
+                }
+
                 return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
                     IsSuccess = true,
-                    Message = "Token is valid. Existing session resumed.",
+                    Message = existingEmployee.Account.IsPasswordChanged
+                        ? "Token is valid. Existing session resumed."
+                        : "Token is valid. A new temporary password has been generated.",
                     Data = new OnboardingValidationResponseDTO
                     {
                         AccessToken = jwt,
@@ -213,7 +226,8 @@ namespace OTMS.Service.Services
                         EmployeeId = existingEmployee.EmployeeId,
                         FullName = onboardingToken.ApplicantRecord.FullName,
                         EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
-                        JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? ""
+                        JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? "",
+                        TempPassword = existingTempPassword
                     }
                 };
             }
@@ -303,7 +317,8 @@ namespace OTMS.Service.Services
                     EmployeeId = employee.EmployeeId,
                     FullName = applicant.FullName,
                     EmailAddress = applicant.EmailAddress,
-                    JobPositionName = applicant.JobPosition?.Title ?? ""
+                    JobPositionName = applicant.JobPosition?.Title ?? "",
+                    TempPassword = tempPassword
                 }
             };
         }
@@ -397,10 +412,10 @@ namespace OTMS.Service.Services
                 var body = $@"
                     <h2>Welcome to the Team!</h2>
                     <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                    <p>Your employee account has been created. You can now log in with the temporary password that was set during the onboarding process.</p>
+                    <p>Your employee account has been created and is now active. You can log in using the password you set during the onboarding process.</p>
                     <p><strong>Employee Number:</strong> {provisionedEmployee.EmployeeNumber}</p>
                     <p><strong>Login URL:</strong> <a href='{frontendBaseUrl}'>{frontendBaseUrl}</a></p>
-                    <p>Please change your password after your first login.</p>
+                    <p>If you have not completed your onboarding, please use the link from your onboarding email.</p>
                     <hr>
                     <p><small>This is an automated message from the Operational Task Management System.</small></p>";
 

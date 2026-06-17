@@ -3,8 +3,10 @@ using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MimeKit;
+using NETCore.MailKit.Infrastructure.Internal;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs.Notification.Responses;
@@ -18,7 +20,8 @@ namespace OTMS.Service.Services
     public class NotificationService(
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        IConfiguration configuration
+        IOptions<MailKitOptions> mailKitOptions,
+        ILogger<NotificationService> logger
         ) : INotificationService
     {
         private async Task<string> GetEmployeeEmailAsync(Guid accountId)
@@ -35,13 +38,14 @@ namespace OTMS.Service.Services
 
             try
             {
-                var smtpServer = configuration["MailKitOptions:Server"] ?? "smtp.gmail.com";
-                var smtpPort = int.TryParse(configuration["MailKitOptions:Port"], out var port) ? port : 587;
-                var senderName = configuration["MailKitOptions:SenderName"] ?? "Operational Management System";
-                var senderEmail = configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
-                var account = configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
-                var password = configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
-                var useSsl = bool.TryParse(configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
+                var opts = mailKitOptions.Value;
+                var smtpServer = opts.Server ?? "smtp.gmail.com";
+                var smtpPort = opts.Port > 0 ? opts.Port : 587;
+                var senderName = opts.SenderName ?? "Operational Management System";
+                var senderEmail = opts.SenderEmail ?? "operationalmanagementsystemoms@gmail.com";
+                var account = opts.Account ?? "operationalmanagementsystemoms@gmail.com";
+                var password = opts.Password ?? "fmda mprv nlga haxq";
+                var useSsl = opts.Security;
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
@@ -60,8 +64,9 @@ namespace OTMS.Service.Services
                 await client.DisconnectAsync(true);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogError(ex, "Failed to send email to {Email} with subject '{Subject}': {Message}", toEmail, subject, ex.Message);
                 return false;
             }
         }

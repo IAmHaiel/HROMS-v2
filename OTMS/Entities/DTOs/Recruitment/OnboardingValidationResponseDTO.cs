@@ -8,5 +8,6 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string FullName { get; set; } = string.Empty;
         public string EmailAddress { get; set; } = string.Empty;
         public string JobPositionName { get; set; } = string.Empty;
+        public string TempPassword { get; set; } = string.Empty;
     }
 }

@@ -147,6 +147,7 @@ namespace OTMS.Data
                         EmployeeNumber = "0000",
                         FirstName = "System",
                         LastName = "Admin",
+                        IsEmailVerified = true,
                         Email = adminEmail,
                         ContactNumber = "N/A",
                         EmploymentStatus = "Active",
@@ -160,6 +161,7 @@ namespace OTMS.Data
                         RoleId = adminRole.RoleId,
                         PasswordHash = new PasswordHasher<Account>().HashPassword(null!, "SystemAdmin1001!"),
                         AccountStatus = "Active",
+                        IsPasswordChanged = true,
                         CreatedAt = DateTime.UtcNow
                     };
 

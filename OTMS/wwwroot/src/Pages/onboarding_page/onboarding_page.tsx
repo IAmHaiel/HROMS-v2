@@ -90,6 +90,10 @@ export default function OnboardingPage() {
                         email: data.data.emailAddress,
                         position: data.data.jobPositionName,
                     });
+                    // Store temporary password and auto-fill current password field
+                    if (data.data.tempPassword) {
+                        setPw(prev => ({ ...prev, current: data.data.tempPassword }));
+                    }
                     setTokenValidating(false);
                 } else {
                     setTokenError(data?.message || 'Invalid or expired link.');
@@ -116,7 +120,6 @@ export default function OnboardingPage() {
     const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
     const [pwSaving, setPwSaving] = useState(false);
     const [pwApiError, setPwApiError] = useState('');
-    const [showCurrent, setShowCurrent] = useState(false);
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -283,7 +286,7 @@ export default function OnboardingPage() {
 
     const validatePwField = (key: string, value: string): string => {
         switch (key) {
-            case 'current': return !value ? 'Current password is required.' : '';
+            case 'current': return '';
             case 'next':
                 if (!value) return 'New password is required.';
                 if (value.length < 15) return 'Must be at least 15 characters.';
@@ -323,7 +326,7 @@ export default function OnboardingPage() {
 
     const handlePasswordSave = async () => {
         const errs: Record<string, string> = {};
-        ['current', 'next', 'confirm'].forEach(k => { const err = validatePwField(k, pw[k as keyof typeof pw]); if (err) errs[k] = err; });
+        ['next', 'confirm'].forEach(k => { const err = validatePwField(k, pw[k as keyof typeof pw]); if (err) errs[k] = err; });
         if (Object.keys(errs).length > 0) { setPwErrors(errs); return; }
         setPwSaving(true); setPwApiError('');
         try {
@@ -550,7 +553,7 @@ export default function OnboardingPage() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
                                     {[
                                         { icon: User, label: 'Set up your profile', desc: 'Add your name and contact details' },
-                                        { icon: Lock, label: 'Create a secure password', desc: 'Replace the temporary password sent to you' },
+                                        { icon: Lock, label: 'Create a secure password', desc: 'Replace the temporary password with your own' },
                                         { icon: Upload, label: 'Upload onboarding documents', desc: 'Biodata, medical certificate, government ID' },
                                         { icon: CreditCard, label: 'Submit your 201 File', desc: 'Government IDs, bank details, emergency contacts' },
                                     ].map(({ icon: Icon, label, desc }, i) => (
@@ -641,14 +644,13 @@ export default function OnboardingPage() {
                                     </div>
                                 )}
                                 {[
-                                    { key: 'current', label: 'Current Password', show: showCurrent, setShow: setShowCurrent, placeholder: 'Enter your current password' },
                                     { key: 'next', label: 'New Password', show: showNext, setShow: setShowNext, placeholder: 'At least 15 characters' },
                                     { key: 'confirm', label: 'Confirm Password', show: showConfirm, setShow: setShowConfirm, placeholder: 'Re-enter your password' },
                                 ].map(({ key, label, show, setShow, placeholder }) => (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                         <FieldLabel label={label} required />
                                         <div style={{ position: 'relative' }}>
-                                            <input type={show ? 'text' : 'password'} placeholder={placeholder} value={pw[key as keyof typeof pw]} onChange={e => { const val = e.target.value; setPw(p => ({ ...p, [key]: val })); setPwErrors(p => ({ ...p, [key]: validatePwField(key, val), ...(key === 'next' && pw.confirm ? { confirm: pw.confirm !== val ? 'Passwords do not match.' : '' } : {}) })); }} maxLength={key === 'current' ? undefined : 64} style={pwInputStyle(pwErrors[key])} />
+                                            <input type={show ? 'text' : 'password'} placeholder={placeholder} value={pw[key as keyof typeof pw]} onChange={e => { const val = e.target.value; setPw(p => ({ ...p, [key]: val })); setPwErrors(p => ({ ...p, [key]: validatePwField(key, val), ...(key === 'next' && pw.confirm ? { confirm: pw.confirm !== val ? 'Passwords do not match.' : '' } : {}) })); }} maxLength={64} style={pwInputStyle(pwErrors[key])} />
                                             <button type="button" onClick={() => setShow((p: boolean) => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8a95b0' }}>
                                                 {show ? <EyeOff size={15} /> : <Eye size={15} />}
                                             </button>

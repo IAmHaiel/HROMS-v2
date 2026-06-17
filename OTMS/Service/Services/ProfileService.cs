@@ -49,20 +49,35 @@ namespace OTMS.Service.Services
                 };
             }
 
-            // Change Password
             var passwordHasher = new PasswordHasher<Account>();
 
-            var verificationResult = passwordHasher.VerifyHashedPassword(
-                profile.Account, 
-                profile.Account.PasswordHash, 
-                request.CurrentPassword
-                );
-
-            // Check if the current password is correct
-            if (verificationResult == PasswordVerificationResult.Success)
+            // For users who haven't changed their initial password yet (onboarding flow),
+            // skip the current password check since they are already authenticated via the
+            // onboarding token JWT. Once they set their password, IsPasswordChanged becomes
+            // true and all subsequent changes will require the current password.
+            if (profile.Account.IsPasswordChanged)
             {
-                // Check if the new password is the same as the current password
-                if (request.CurrentPassword == request.NewPassword)
+                var verificationResult = passwordHasher.VerifyHashedPassword(
+                    profile.Account,
+                    profile.Account.PasswordHash,
+                    request.CurrentPassword
+                    );
+
+                // Check if the current password is correct
+                if (verificationResult == PasswordVerificationResult.Success)
+                {
+                    // Check if the new password is the same as the current password
+                    if (request.CurrentPassword == request.NewPassword)
+                    {
+                        return new ChangePasswordResponseDTO
+                        {
+                            EmployeeNumber = profile.EmployeeNumber,
+                            Success = false
+                        };
+                    }
+                }
+
+                if (verificationResult == PasswordVerificationResult.Failed)
                 {
                     return new ChangePasswordResponseDTO
                     {
@@ -70,15 +85,6 @@ namespace OTMS.Service.Services
                         Success = false
                     };
                 }
-            }
-
-            if(verificationResult == PasswordVerificationResult.Failed)
-            {
-                return new ChangePasswordResponseDTO
-                {
-                    EmployeeNumber = profile.EmployeeNumber,
-                    Success = false
-                };
             }
 
             profile.Account.PasswordHash = passwordHasher.HashPassword(
