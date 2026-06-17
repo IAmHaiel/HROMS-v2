@@ -1620,112 +1620,7 @@ function ManageEmployeesTab({
         marginBottom: -1, // overlap the container border
     });
 
-    // ── Shared toolbar ────────────────────────────────────────────────────────
-    const EmployeesToolbar = (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <SearchBar value={search} onChange={setSearch} placeholder="Search by name or ID…" />
-            <Select value={filterRole} onChange={setFilterRole} placeholder="All Roles"
-                options={rolesList.map(r => ({ value: r, label: r }))} />
-            <Select value={filterStatus} onChange={setFilterStatus} placeholder="All Statuses"
-                options={[{ value: 'Active', label: 'Active' }, { value: 'Deactivated', label: 'Deactivated' }]} />
-            <button className="btn btn-primary" onClick={onAddEmployee}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 9, fontSize: 13, whiteSpace: 'nowrap' }}>
-                <Plus size={14} /> Add Employee
-            </button>
-        </div>
-    );
-
-    const LeaveToolbar = (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <SearchBar value={leaveSearch} onChange={setLeaveSearch} placeholder="Search leave requests…" />
-            <Select value={leaveFilterStatus} onChange={v => setLeaveFilterStatus(v as any)}
-                options={[
-                    { value: 'pending', label: 'Pending' },
-                    { value: 'all', label: 'All Statuses' },
-                    { value: 'approved', label: 'Approved' },
-                    { value: 'declined', label: 'Declined' },
-                ]} />
-            <Select value={leaveFilterRole} onChange={setLeaveFilterRole} placeholder="All Roles"
-                options={rolesList.map(r => ({ value: r, label: r }))} />
-        </div>
-    );
-
     // ── Shared table card wrapper ──────────────────────────────────────────────
-    const TableWrapper = ({ children, headers, loading: isLoading, emptyMsg, page, totalPages, onPage, resultCount }: {
-        children: React.ReactNode;
-        headers: string[];
-        loading: boolean;
-        emptyMsg: string;
-        page: number;
-        totalPages: number;
-        onPage: (p: number) => void;
-        resultCount: number;
-    }) => (
-        <div className="unified-table-wrap" style={{ background: 'var(--bg-primary,#fff)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
-            <style>{`
-                .unified-table-wrap td {
-                    padding: 13px 14px;
-                    border-bottom: 1px solid var(--border);
-                    color: var(--text-primary);
-                    font-weight: 500;
-                }
-                .unified-table-wrap tbody tr:last-child td {
-                    border-bottom: none;
-                }
-            `}</style>
-            <div style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 12, color: 'var(--text-secondary)' }}>
-                {resultCount} result{resultCount !== 1 ? 's' : ''} on this page
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr>
-                            {headers.map(h => (
-                                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', padding: '10px 14px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
-                                    {h}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {isLoading ? (
-                            <tr><td colSpan={headers.length}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8, color: 'var(--text-secondary)' }}>
-                                    <Loader2 size={24} className="spin" /><span style={{ fontSize: 13 }}>Loading…</span>
-                                </div>
-                            </td></tr>
-                        ) : resultCount === 0 ? (
-                            <tr><td colSpan={headers.length}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 0', gap: 8, color: 'var(--text-secondary)' }}>
-                                    <Package size={24} style={{ opacity: 0.4 }} /><span style={{ fontSize: 13 }}>{emptyMsg}</span>
-                                </div>
-                            </td></tr>
-                        ) : children}
-                    </tbody>
-                </table>
-            </div>
-            {totalPages > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '12px 16px', borderTop: '1px solid #f1f5f9', gap: 4 }}>
-                    <button onClick={() => onPage(page - 1)} disabled={page === 1}
-                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ChevronLeft size={15} />
-                    </button>
-                    {getPageNumbers(totalPages, page).map((p, i) =>
-                        p === '...' ? <span key={`e${i}`} style={{ width: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>…</span> :
-                            <button key={p} onClick={() => onPage(p as number)}
-                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: page === p ? 'var(--primary)' : 'transparent', color: page === p ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                                {p}
-                            </button>
-                    )}
-                    <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
-                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ChevronRight size={15} />
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-
     return (
         <div className="dashboard-content">
             {/* ── Unified tab bar ── */}
@@ -1749,104 +1644,121 @@ function ManageEmployeesTab({
 
             {/* ── All Employees ── */}
             {subTab === 'employees' && (
-                <>
-                    {EmployeesToolbar}
-                    <TableWrapper
-                        headers={['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']}
-                        loading={loading}
-                        emptyMsg="No employees match your filters"
-                        page={empPage}
-                        totalPages={empTotalPages}
-                        onPage={p => onEmpPageChange(p, { search, role: filterRole, status: filterStatus })}
-                        resultCount={employees.length}
-                    >
-                        {employees.map(emp => {
-                            const name = getEmployeeDisplayName(emp) || 'Unknown';
-                            return (
-                                <tr key={emp.employeeNumber} className="clickable-row" onClick={() => onSelectEmployee(emp)}>
-                                    <td>
-                                        <div className="emp-name-cell">
-                                            <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
-                                                <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
-                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? 'var(--status-active)' : '#a3aed0', border: '2px solid var(--bg-primary,#fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
-                                            </div>
-                                            {name}
+                <DataTable
+                    searchQuery={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder="Search by name or ID…"
+                    filterElements={
+                        <>
+                            <Select value={filterRole} onChange={setFilterRole} placeholder="All Roles"
+                                options={rolesList.map(r => ({ value: r, label: r }))} />
+                            <Select value={filterStatus} onChange={setFilterStatus} placeholder="All Statuses"
+                                options={[{ value: 'Active', label: 'Active' }, { value: 'Deactivated', label: 'Deactivated' }]} />
+                        </>
+                    }
+                    actionButton={{ label: 'Add Employee', icon: <Plus size={14} />, onClick: onAddEmployee }}
+                    headers={['NAME', 'EMPLOYEE NO', 'ROLE', 'CONTACT', 'STATUS', 'ACTION']}
+                    loading={loading}
+                    emptyMessage="No employees match your filters"
+                    currentPage={empPage}
+                    totalPages={empTotalPages}
+                    onPageChange={p => onEmpPageChange(p, { search, role: filterRole, status: filterStatus })}
+                    totalRecords={employees.length}
+                >
+                    {employees.map(emp => {
+                        const name = getEmployeeDisplayName(emp) || 'Unknown';
+                        return (
+                            <tr key={emp.employeeNumber} onClick={() => onSelectEmployee(emp)} style={{ cursor: 'pointer' }}>
+                                <td>
+                                    <div className="emp-name-cell">
+                                        <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
+                                            <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
+                                            <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? 'var(--status-active)' : 'var(--text-secondary)', border: '2px solid var(--bg-card)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
                                         </div>
-                                    </td>
-                                    <td style={{ fontSize: 13 }}>{emp.employeeNumber}</td>
-                                    <td style={{ fontSize: 13 }}>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                    <td style={{ fontSize: 13 }}>{emp.contactNumber}</td>
-                                                    <td><StatusBadge status={emp.accountStatus || 'Active'} /></td>
-                                    <td onClick={e => e.stopPropagation()}>
-                                        <ActionsDropdown actions={[
-                                            { label: 'View Details', icon: <Eye size={12} />, onClick: () => onViewEmployee(emp) },
-                                            { label: 'Digital 201 File', icon: <FileText size={12} />, onClick: () => onOpenDigital201(emp) },
-                                            { label: 'Edit', icon: <Pencil size={12} />, onClick: () => onEditEmployee(emp) },
-                                            { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDeleteEmployee(emp), variant: 'danger' },
-                                        ]} />
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </TableWrapper>
-                </>
+                                        <span style={{ fontWeight: 600 }}>{name}</span>
+                                    </div>
+                                </td>
+                                <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{emp.employeeNumber}</td>
+                                <td style={{ fontSize: 13 }}>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
+                                <td style={{ fontSize: 13 }}>{emp.contactNumber}</td>
+                                <td><StatusBadge status={emp.accountStatus || 'Active'} /></td>
+                                <td onClick={e => e.stopPropagation()}>
+                                    <ActionsDropdown actions={[
+                                        { label: 'View Details', icon: <Eye size={12} />, onClick: () => onViewEmployee(emp) },
+                                        { label: 'Digital 201 File', icon: <FileText size={12} />, onClick: () => onOpenDigital201(emp) },
+                                        { label: 'Edit', icon: <Pencil size={12} />, onClick: () => onEditEmployee(emp) },
+                                        { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDeleteEmployee(emp), variant: 'danger' },
+                                    ]} />
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </DataTable>
             )}
 
             {/* ── Leave Requests ── */}
             {subTab === 'leave' && (
-                <>
-                    {LeaveToolbar}
-                    <TableWrapper
-                        headers={['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']}
-                        loading={leaveLoading}
-                        emptyMsg="No leave requests match your filters"
-                        page={leavePage}
-                        totalPages={leaveTotalPages}
-                        onPage={p => onLeavePageChange(p, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })}
-                        resultCount={leaveRequests.length}
-                    >
-                        {leaveRequests.map(r => {
-                            const days = calcDays(r.startDate, r.endDate);
-                            const meta = LEAVE_STATUS_META[r.status];
-                            return (
-                                <tr key={r.id} className="clickable-row" onClick={() => setDetailModal(r)}>
-                                    <td>
-                                        <div className="emp-name-cell">
-                                            <div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div>
-                                            <div>
-                                                <div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div>
-                                                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div>
-                                            </div>
+                <DataTable
+                    searchQuery={leaveSearch}
+                    onSearchChange={setLeaveSearch}
+                    searchPlaceholder="Search leave requests…"
+                    filterElements={
+                        <>
+                            <Select value={leaveFilterStatus} onChange={v => setLeaveFilterStatus(v as any)}
+                                options={[
+                                    { value: 'pending', label: 'Pending' },
+                                    { value: 'all', label: 'All Statuses' },
+                                    { value: 'approved', label: 'Approved' },
+                                    { value: 'declined', label: 'Declined' },
+                                ]} />
+                            <Select value={leaveFilterRole} onChange={setLeaveFilterRole} placeholder="All Roles"
+                                options={rolesList.map(r => ({ value: r, label: r }))} />
+                        </>
+                    }
+                    headers={['EMPLOYEE', 'LEAVE TYPE', 'DATES', 'DURATION', 'SUBMITTED', 'STATUS', 'ACTIONS']}
+                    loading={leaveLoading}
+                    emptyMessage="No leave requests match your filters"
+                    currentPage={leavePage}
+                    totalPages={leaveTotalPages}
+                    onPageChange={p => onLeavePageChange(p, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch })}
+                    totalRecords={leaveRequests.length}
+                >
+                    {leaveRequests.map(r => {
+                        const days = calcDays(r.startDate, r.endDate);
+                        const meta = LEAVE_STATUS_META[r.status];
+                        return (
+                            <tr key={r.id} onClick={() => setDetailModal(r)} style={{ cursor: 'pointer' }}>
+                                <td>
+                                    <div className="emp-name-cell">
+                                        <div className="emp-avatar">{r.employeeName.charAt(0).toUpperCase()}</div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.employeeName}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.employeeNumber}</div>
                                         </div>
-                                    </td>
-                                    <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
-                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
-                                    <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
-                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
-                                    <td>
-                                        <span className={`status-badge ${r.status === 'approved' ? 'active' : r.status === 'declined' ? 'deactivated' : 'pending-badge'}`}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                            {meta.icon}{meta.label}
+                                    </div>
+                                </td>
+                                <td style={{ fontSize: 13 }}>{LEAVE_TYPE_LABELS[r.leaveType]}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.startDate)}<br />{fmtDate(r.endDate)}</td>
+                                <td style={{ fontSize: 13, fontWeight: 600 }}>{days} {days === 1 ? 'day' : 'days'}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
+                                <td><StatusBadge status={r.status === 'approved' ? 'Approved' : r.status === 'declined' ? 'Rejected' : 'Pending'} /></td>
+                                <td onClick={e => e.stopPropagation()}>
+                                    {r.status === 'pending' ? (
+                                        <ActionsDropdown actions={[
+                                            { label: 'Approve', icon: <CheckCircle2 size={12} />, onClick: () => setActionModal({ request: r, action: 'approve' }), variant: 'success' },
+                                            { label: 'Decline', icon: <X size={12} />, onClick: () => setActionModal({ request: r, action: 'decline' }), variant: 'danger' },
+                                            { label: 'View Details', icon: <Eye size={12} />, onClick: () => setDetailModal(r) },
+                                        ]} />
+                                    ) : (
+                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                                            {r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}
                                         </span>
-                                    </td>
-                                    <td onClick={e => e.stopPropagation()}>
-                                        {r.status === 'pending' ? (
-                                            <ActionsDropdown actions={[
-                                                { label: 'Approve', icon: <CheckCircle2 size={12} />, onClick: () => setActionModal({ request: r, action: 'approve' }), variant: 'success' },
-                                                { label: 'Decline', icon: <X size={12} />, onClick: () => setActionModal({ request: r, action: 'decline' }), variant: 'danger' },
-                                                { label: 'View Details', icon: <Eye size={12} />, onClick: () => setDetailModal(r) },
-                                            ]} />
-                                        ) : (
-                                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                                                {r.status === 'approved' ? `By ${r.reviewedBy ?? 'Admin'}` : 'Declined'}
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </TableWrapper>
-                </>
+                                    )}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </DataTable>
             )}
 
             {/* ── Employee Documents ── */}

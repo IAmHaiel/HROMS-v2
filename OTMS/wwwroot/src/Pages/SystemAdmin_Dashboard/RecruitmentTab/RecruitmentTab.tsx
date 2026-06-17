@@ -1,6 +1,8 @@
 ﻿import { useState, useEffect, useCallback, ReactNode } from 'react';
 import axios from 'axios';
 import StatCard from '../../../components/StatCard/StatCard';
+import DataTable from '../../../components/ui/DataTable';
+import StatusBadge from '../../../components/ui/StatusBadge';
 import {
     Search, Users, Clock, CheckCircle2, XCircle,
     CalendarCheck, Briefcase, ChevronLeft, ChevronRight,
@@ -1489,122 +1491,70 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     <StatCard icon={<XCircle size={20} />} variant="danger" label="Rejected" value={counts.rejected} subtext="Not accepted" />
                 </div>
 
-                {/* ── Table Card ── */}
-                <div className="rec-table-card">
-                    <div className="rec-toolbar">
-                        <div className="rec-search-wrap">
-                            <Search size={13} className="rec-search-icon" />
-                            <input type="text" className="rec-search-input" placeholder="Search applicant or ID…"
-                                value={search} onChange={(e) => setSearch(e.target.value)} />
-                        </div>
-                        <div className="rec-filter-wrap">
-                            <Filter size={12} className="rec-filter-icon" />
-                            <select className="rec-select rec-select--with-icon" value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value as RecruitmentStatus | '')}>
+                {/* ── DataTable ── */}
+                <DataTable
+                    searchQuery={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder="Search applicant or ID…"
+                    filterElements={
+                        <>
+                            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as RecruitmentStatus | '')}
+                                style={{ height: 38, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 32px 0 14px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 500, outline: 'none' }}>
                                 <option value="">All Statuses</option>
                                 {ALL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                             </select>
-                        </div>
-                        <select className="rec-select" value={filterPosition}
-                            onChange={(e) => setFilterPosition(e.target.value)}>
-                            <option value="">All Positions</option>
-                            {positionNames.map((p) => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                        <span className="rec-result-count">{totalCount} result{totalCount !== 1 ? 's' : ''}</span>
-                    </div>
-
-                    <div className="rec-table-scroll">
-                        <table className="rec-table">
-                            <thead>
-                                <tr>
-                                    {['REF ID', 'APPLICANT', 'POSITION APPLIED', 'SUBMITTED', 'CURRENT STATUS', 'ACTIONS'].map((h) => (
-                                        <th key={h}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr><td colSpan={6}><div className="rec-empty-state"><Loader2 size={24} className="rec-spinner" /><span>Loading applicants…</span></div></td></tr>
-                                ) : applicants.length === 0 ? (
-                                    <tr><td colSpan={6}><div className="rec-empty-state"><Package size={28} /><span>No applicants match your filters</span></div></td></tr>
-                                ) : applicants.map((a) => (
-                                    <tr key={a.applicantId} className="rec-row" onClick={() => setDetailApplicant(a)}>
-                                        <td><code className="rec-ref-chip">{a.applicantId}</code></td>
-                                        <td>
-                                            <div className="rec-applicant-cell">
-                                                <div className="rec-avatar">{a.fullName.charAt(0).toUpperCase()}</div>
-                                                <div>
-                                                    <div className="rec-applicant-name">{a.fullName}</div>
-                                                    <div className="rec-applicant-email">{a.email}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>{a.position}</td>
-                                        <td style={{ color: '#64748b', fontSize: 12 }}>{fmtDate(a.submittedAt)}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                                                <StatusBadge status={a.currentStatus} />
-                                                {a.currentStatus === 'Interview Scheduled' && a.interviewDetails && (
-                                                    <span style={{ fontSize: 10, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: 3 }}>
-                                                        <CalendarDays size={10} /> {fmtDate(a.interviewDetails.date)}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td onClick={(e) => e.stopPropagation()}>
-                                            <div className="rec-actions-cell">
-                                                <button className="rec-action-btn" onClick={() => setDetailApplicant(a)}>
-                                                    <Eye size={12} /> View
-                                                </button>
-                                                {STATUS_TRANSITIONS[a.currentStatus].length > 0 && a.currentStatus !== 'Job Offered' && (
-                                                    <button className="rec-action-btn rec-action-btn--primary"
-                                                        onClick={() => setUpdateApplicant(a)}>
-                                                        <RefreshCw size={12} /> Update
-                                                    </button>
-                                                )}
-                                                {a.currentStatus === 'Job Offered' && (
-                                                    <button className="rec-action-btn rec-action-btn--primary"
-                                                        onClick={async () => {
-                                                            try {
-                                                                const res = await axios.post(`/api/recruitment/${a.applicantId}/resend-onboarding`);
-                                                                const apiResult = res.data as any;
-                                                                if (apiResult?.isSuccess) {
-                                                                    showToast('Onboarding link resent successfully.');
-                                                                } else {
-                                                                    showToast(apiResult?.message || 'Failed to resend onboarding link.', 'error');
-                                                                }
-                                                            } catch {
-                                                                showToast('Failed to resend onboarding link.', 'error');
-                                                            }
-                                                        }}>
-                                                        <Mail size={12} /> Resend Onboarding
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {totalPages > 1 && (
-                        <div className="rec-pagination">
-                            <button className="rec-page-btn" onClick={() => fetchApplicants(page - 1)} disabled={page === 1}>
-                                <ChevronLeft size={15} />
-                            </button>
-                            {getPageNumbers(totalPages, page).map((p, i) =>
-                                p === '...'
-                                    ? <span key={`e${i}`} className="rec-page-ellipsis">…</span>
-                                    : <button key={p} className={`rec-page-btn${page === p ? ' rec-page-btn--active' : ''}`}
-                                        onClick={() => fetchApplicants(p as number)}>{p}</button>
-                            )}
-                            <button className="rec-page-btn" onClick={() => fetchApplicants(page + 1)} disabled={page === totalPages}>
-                                <ChevronRight size={15} />
-                            </button>
-                        </div>
-                    )}
-                </div>
+                            <select value={filterPosition} onChange={(e) => setFilterPosition(e.target.value)}
+                                style={{ height: 38, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 32px 0 14px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 500, outline: 'none' }}>
+                                <option value="">All Positions</option>
+                                {positionNames.map((p) => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                        </>
+                    }
+                    headers={['REF ID', 'APPLICANT', 'POSITION APPLIED', 'SUBMITTED', 'CURRENT STATUS', 'ACTIONS']}
+                    loading={loading}
+                    emptyMessage="No applicants match your filters"
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={(p) => fetchApplicants(p)}
+                    totalRecords={totalCount}
+                >
+                    {applicants.map((a) => (
+                        <tr key={a.applicantId} onClick={() => setDetailApplicant(a)} style={{ cursor: 'pointer' }}>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>{a.applicantId}</td>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                                        {a.fullName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{a.fullName}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{a.email}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style={{ fontSize: 13 }}>{a.position}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(a.submittedAt)}</td>
+                            <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                                    <StatusBadge status={a.currentStatus} />
+                                    {a.currentStatus === 'Interview Scheduled' && a.interviewDetails && (
+                                        <span style={{ fontSize: 10, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                                            <CalendarDays size={10} /> {fmtDate(a.interviewDetails.date)}
+                                        </span>
+                                    )}
+                                </div>
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                    <button className="action-icon-btn" onClick={() => setDetailApplicant(a)} title="View"><Eye size={13} /></button>
+                                    {STATUS_TRANSITIONS[a.currentStatus].length > 0 && a.currentStatus !== 'Job Offered' && (
+                                        <button className="action-icon-btn" onClick={() => setUpdateApplicant(a)} title="Update" style={{ background: 'var(--bg-input)', color: 'var(--primary)' }}><RefreshCw size={13} /></button>
+                                    )}
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </DataTable>
             </div>
 
             {/* ── Modals ── */}

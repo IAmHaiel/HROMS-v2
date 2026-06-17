@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Loader2, ChevronLeft, ChevronRight, Package, MoreVertical } from 'lucide-react';
 import ReactDOM from 'react-dom';
+import './DataTable.css';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
