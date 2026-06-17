@@ -1546,66 +1546,38 @@ const DashboardTab: React.FC<{
                         </div>
                     </div>
 
-                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                        <div className="card-header-layout" style={{ padding: '14px 20px', margin: 0 }}>
-                            <h3>Workload Summary per Employee</h3>
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{total} tasks · {workloads.length} employees</span>
-                        </div>
-                        {workloads.length === 0 ? (
-                            <div className="empty-state" style={{ padding: '24px 0' }}><p>No workload data available.</p></div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                                    <thead>
-                                        <tr style={{ background: 'var(--bg-main)' }}>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'left', letterSpacing: '0.5px' }}>EMPLOYEE</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>TOTAL</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>ACTIVE</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>COMPLETED</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'center', letterSpacing: '0.5px' }}>OVERDUE</th>
-                                            <th style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text-secondary)', fontSize: 11, textAlign: 'left', letterSpacing: '0.5px' }}>COMPLETION</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {workloads.map((w, idx) => {
-                                            const compPct = w.totalAssigned > 0 ? Math.round(w.completedTasks / w.totalAssigned * 100) : 0;
-                                            return (
-                                                <tr key={w.employeeId} style={{
-                                                    borderBottom: '1px solid var(--border)',
-                                                    background: idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
-                                                }}>
-                                                    <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{w.employeeName}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700 }}>{w.totalAssigned}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--status-pending)', fontWeight: 700 }}>{w.activeTasks}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--status-active)', fontWeight: 700 }}>{w.completedTasks}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdueTasks > 0 ? 'var(--status-failed)' : 'var(--text-muted)', fontWeight: 700 }}>
-                                                        {w.overdueTasks || '—'}
-                                                    </td>
-                                                    <td style={{ padding: '10px 16px' }}>
-                                                        {w.totalAssigned > 0 ? (
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                                                                    <div style={{
-                                                                        width: `${compPct}%`, height: '100%',
-                                                                        background: compPct >= 80 ? 'var(--status-active)' :
-                                                                            compPct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)',
-                                                                        borderRadius: 3,
-                                                                    }} />
-                                                                </div>
-                                                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                                                                    {compPct}%
-                                                                </span>
-                                                            </div>
-                                                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
+                    <DataTable
+                        title="Workload Summary per Employee"
+                        headers={['EMPLOYEE', 'TOTAL', 'ACTIVE', 'COMPLETED', 'OVERDUE', 'COMPLETION']}
+                        loading={false}
+                        emptyMessage="No workload data available."
+                        totalRecords={workloads.length}
+                    >
+                        {workloads.map((w, idx) => {
+                            const compPct = w.totalAssigned > 0 ? Math.round(w.completedTasks / w.totalAssigned * 100) : 0;
+                            return (
+                                <tr key={w.employeeId}>
+                                    <td style={{ fontWeight: 600 }}>{w.employeeName}</td>
+                                    <td style={{ textAlign: 'center', fontWeight: 700 }}>{w.totalAssigned}</td>
+                                    <td style={{ textAlign: 'center', color: 'var(--status-pending)', fontWeight: 700 }}>{w.activeTasks}</td>
+                                    <td style={{ textAlign: 'center', color: 'var(--status-active)', fontWeight: 700 }}>{w.completedTasks}</td>
+                                    <td style={{ textAlign: 'center', color: w.overdueTasks > 0 ? 'var(--status-failed)' : 'var(--text-muted)', fontWeight: 700 }}>
+                                        {w.overdueTasks || '—'}
+                                    </td>
+                                    <td>
+                                        {w.totalAssigned > 0 ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${compPct}%`, height: '100%', background: compPct >= 80 ? 'var(--status-active)' : compPct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)', borderRadius: 3 }} />
+                                                </div>
+                                                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{compPct}%</span>
+                                            </div>
+                                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </DataTable>
                 </>
             )}
         </div>
@@ -2377,35 +2349,23 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                     </div>
 
                     <div className="card">
-                        <div className="card-header-layout"><h3>Employee Performance Summary</h3></div>
-                        {report.employeePerformanceSummary.length === 0 ? (
-                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No employee data for selected criteria.</p></div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <table className="data-table report-perf-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Employee</th>
-                                            <th>Assigned</th>
-                                            <th>Completed</th>
-                                            <th>Rate</th>
-                                            <th>Avg Time (h)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {report.employeePerformanceSummary.map(ep => (
-                                            <tr key={ep.employeeName}>
-                                                <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
-                                                <td>{ep.totalAssigned}</td>
-                                                <td>{ep.totalCompleted}</td>
-                                                <td>{ep.completionRate}%</td>
-                                                <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                        <DataTable
+                            title="Employee Performance Summary"
+                            headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
+                            loading={false}
+                            emptyMessage="No employee data for selected criteria."
+                            totalRecords={report.employeePerformanceSummary.length}
+                        >
+                            {report.employeePerformanceSummary.map(ep => (
+                                <tr key={ep.employeeName}>
+                                    <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                    <td>{ep.totalAssigned}</td>
+                                    <td>{ep.totalCompleted}</td>
+                                    <td>{ep.completionRate}%</td>
+                                    <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                                </tr>
+                            ))}
+                        </DataTable>
                     </div>
 
                     <div className="card">
@@ -3527,87 +3487,50 @@ const ReopenTab: React.FC<{
                     <h3>Pending Reopen Requests</h3>
                     {pending.length > 0 && <span className="badge badge-amber">{pending.length} pending</span>}
                 </div>
-                {pending.length === 0 ? (
-                    <div className="empty-state">
-                        <RotateCcw size={24} />
-                        <p>No pending reopen requests.</p>
-                    </div>
-                ) : (
-                    <div className="reopen-table-wrap">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>REQUEST ID</th>
-                                    <th>TASK</th>
-                                    <th>EMPLOYEE</th>
-                                    <th>REASON</th>
-                                    <th>SUBMITTED</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pending.map(r => (
-                                    <tr key={r.requestId}>
-                                        <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.requestId}</td>
-                                        <td>
-                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div>
-                                        </td>
-                                        <td>{r.employeeName}</td>
-                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {r.reason}
-                                        </td>
-                                        <td style={{ fontSize: 12 }}>{fmtDate(r.submittedAt)}</td>
-                                        <td>
-                                            <button className="btn btn-primary" onClick={() => onReview(r)} style={{ fontSize: 11, padding: '4px 12px' }}>
-                                                <Eye size={12} /> Review
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <DataTable
+                    headers={['REQUEST ID', 'TASK', 'EMPLOYEE', 'REASON', 'SUBMITTED', 'ACTIONS']}
+                    loading={false}
+                    emptyMessage="No pending reopen requests."
+                    emptyIcon={<RotateCcw size={24} />}
+                    totalRecords={pending.length}
+                >
+                    {pending.map(r => (
+                        <tr key={r.requestId}>
+                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                            <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
+                            <td style={{ fontSize: 13 }}>{r.employeeName}</td>
+                            <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.reason}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDate(r.submittedAt)}</td>
+                            <td>
+                                <button className="btn btn-primary" onClick={() => onReview(r)} style={{ fontSize: 11, padding: '4px 12px' }}>
+                                    <Eye size={12} /> Review
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </DataTable>
             </div>
 
             {/* History */}
             {history.length > 0 && (
-                <div className="reopen-section">
-                    <div className="reopen-section-header">
-                        <h3>Request History</h3>
-                    </div>
-                    <div className="reopen-table-wrap">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>REQUEST ID</th>
-                                    <th>TASK</th>
-                                    <th>EMPLOYEE</th>
-                                    <th>DECISION</th>
-                                    <th>REMARKS</th>
-                                    <th>REVIEWED</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {history.map(r => (
-                                    <tr key={r.requestId}>
-                                        <td style={{ fontFamily: 'monospace', fontSize: 11 }}>{r.requestId}</td>
-                                        <td>
-                                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div>
-                                        </td>
-                                        <td>{r.employeeName}</td>
-                                        <td>
-                                            <span className={`badge ${r.status === 'Approved' ? 'badge-green' : 'badge-red'}`}>{r.status}</span>
-                                        </td>
-                                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {r.adminRemarks || '—'}
-                                        </td>
-                                        <td style={{ fontSize: 12 }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div style={{ marginTop: 24 }}>
+                    <h3 style={{ marginBottom: 12, fontSize: 15 }}>Request History</h3>
+                    <DataTable
+                        headers={['REQUEST ID', 'TASK', 'EMPLOYEE', 'DECISION', 'REMARKS', 'REVIEWED']}
+                        loading={false}
+                        totalRecords={history.length}
+                    >
+                        {history.map(r => (
+                            <tr key={r.requestId}>
+                                <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                                <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
+                                <td style={{ fontSize: 13 }}>{r.employeeName}</td>
+                                <td><span className={`badge ${r.status === 'Approved' ? 'badge-green' : 'badge-red'}`}>{r.status}</span></td>
+                                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.adminRemarks || '—'}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '—'}</td>
+                            </tr>
+                        ))}
+                    </DataTable>
                 </div>
             )}
         </div>
