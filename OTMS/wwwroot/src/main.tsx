@@ -17,7 +17,6 @@ import { ToastProvider } from './components/Toast/Toast'
 import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
 import OnboardingPage from './Pages/onboarding_page/onboarding_page'
 import PublicApplicationPortal from './Pages/public_application_portal/public_application_portal'
-import ProfilePage from './Pages/profile_page/profile_page'
 
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
@@ -47,7 +46,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route element={<ProtectedRoute allowedRoles={['System Admin', 'SystemAdmin']} />}>
                         <Route element={<PasswordChangedGuard />}>
                             <Route path="/SystemAdmin_Dashboard" element={<SystemAdmin_Dashboard />} />
-                            <Route path="/profile" element={<ProfilePage />} />
                         </Route>
                     </Route>
 
@@ -55,7 +53,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route element={<ProtectedRoute allowedRoles={['Operation Admin', 'OperationAdmin']} />}>
                         <Route element={<PasswordChangedGuard />}>
                             <Route path="/OpAdmin_Dashboard" element={<OpAdmin_Dashboard />} />
-                            <Route path="/profile" element={<ProfilePage />} />
                         </Route>
                     </Route>
 
@@ -63,7 +60,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route element={<ProtectedRoute allowedRoles={['Coordinator', 'Encoder']} />}>
                         <Route element={<PasswordChangedGuard />}>
                             <Route path="/OpEmployee_Dashboard" element={<OpEmployee_Dashboard />} />
-                            <Route path="/profile" element={<ProfilePage />} />
                         </Route>
                     </Route>
 

@@ -2394,7 +2394,7 @@ export default function EmployeeDashboard() {
                                 <div
                                     key={tab}
                                     className={`nav-item${activeTab === tab ? ' nav-item-active' : ''}`}
-                                    onClick={() => tab === 'profile' ? navigate('/profile') : setActiveTab(tab)}
+                                    onClick={() => setActiveTab(tab)}
                                 >
                                     <Icon size={18} />
                                     <span className="nav-item-label">{label}</span>
@@ -2438,9 +2438,10 @@ export default function EmployeeDashboard() {
                     title={pageTitles[activeTab]}
                     notificationApi="/api/notification/my-notifications"
                     userInitials={initials}
-                    onSettingsClick={() => navigate('/profile')}
+                    onSettingsClick={() => setActiveTab('profile')}
                     onLogout={handleLogout}
                 />
+
                 {activeTab === 'dashboard' && (
                     <DashboardTab
                         tasks={tasks} user={user}
