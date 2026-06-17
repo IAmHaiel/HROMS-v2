@@ -1035,7 +1035,7 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             </div>
             {sorted.length === 0 ? (
                 <div className="card">
-                    <div className="empty-state"><ClipboardList size={22} /><p>No tasks in this category</p></div>
+                    <div className="empty-state"><ClipboardList size={22} /><p>No tasks available</p></div>
                 </div>
             ) : (
                 <div className="task-grid">
@@ -2256,8 +2256,10 @@ export default function EmployeeDashboard() {
             setTaskTotalPages(paginatedData?.totalPages ?? 1);
             setTaskTotalRecords(paginatedData?.totalRecords ?? 0);
             setTaskPage(p);
-        } catch (err: any) {
-            setTasksError(err.message ?? 'Unable to load tasks. Check your connection and try again.');
+        } catch {
+            setTasks([]);
+            setTaskTotalPages(1);
+            setTaskTotalRecords(0);
         } finally {
             setTasksLoading(false);
         }

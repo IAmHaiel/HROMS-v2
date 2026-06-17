@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
@@ -77,7 +77,7 @@ const CONFIRM_CLOSED: ConfirmModalState = {
     variant: 'neutral',
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
 };
 
 // ─── Dashboard API Types ──────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ type NavTab =
     | 'approvals';
 
 interface TeamMember {
-    accountId: string;  
+    accountId: string;
     employeeName: string;
     role: string;
     presenceStatus?: string;
@@ -152,8 +152,8 @@ interface Task {
     createdByEmployee: string;
     assignedTo: string;
     createdAt: string;
-    deleted?: boolean;  
-    Deleted?: boolean;   
+    deleted?: boolean;
+    Deleted?: boolean;
 }
 
 // DTOs matching backend
@@ -1313,81 +1313,27 @@ const DashboardTab: React.FC<{
 
     return (
         <div className="dashboard-content">
-            {/* Filters */}
-            <div className="card" style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 140 }}>
-                        <label className="form-label" style={{ whiteSpace: 'nowrap' }}>Date Start</label>
-                        <input type="date" className="form-input" value={filters.dateStart}
-                            onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })} />
-                    </div>
-                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 140 }}>
-                        <label className="form-label" style={{ whiteSpace: 'nowrap' }}>Date End</label>
-                        <input type="date" className="form-input" value={filters.dateEnd}
-                            onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })} />
-                    </div>
-                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 160 }}>
-                        <label className="form-label">Employee</label>
-                        <select className="form-input" value={filters.employeeId}
-                            onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}>
-                            <option value="">All Employees</option>
-                            {dashboardEmployees.map(m => (
-                                <option key={m.employeeId} value={m.employeeId}>{m.employeeName}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 150 }}>
-                        <label className="form-label">Department</label>
-                        <select className="form-input" value={filters.departmentId}
-                            onChange={e => onFilterChange({ ...filters, departmentId: e.target.value })}>
-                            <option value="">All Departments</option>
-                            {dashboardDepartments.map(d => (
-                                <option key={d.departmentId} value={d.departmentId}>{d.departmentName}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 150 }}>
-                        <label className="form-label">Task Status</label>
-                        <select className="form-input" value={filters.taskStatus}
-                            onChange={e => onFilterChange({ ...filters, taskStatus: e.target.value })}>
-                            <option value="">All Statuses</option>
-                            <option value="Assigned">Assigned</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Pending Admin Review">Pending Admin Review</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Overdue">Overdue</option>
-                        </select>
-                    </div>
-                    {hasAnyFilter && (
-                        <button className="btn btn-sm" onClick={onClearFilters} style={{ marginBottom: 1, alignSelf: 'flex-end' }}>
-                            <X size={12} /> Clear
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {dashboardLoading ? (
                 <div className="empty-state" style={{ padding: '40px 0' }}>
                     <Loader2 size={24} className="spin" />
                     <p style={{ fontWeight: 600 }}>Loading workload data...</p>
                 </div>
-            ) : dashboardError ? (
-                <div className="empty-state" style={{ padding: '40px 0' }}>
-                    <ClipboardList size={28} color="var(--text-secondary)" />
-                    <p style={{ fontWeight: 600 }}>{dashboardError}</p>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Create a new task or adjust filters.</span>
-                </div>
-            ) : total === 0 ? (
-                <div className="empty-state" style={{ padding: '40px 0' }}>
-                    <ClipboardList size={28} color="var(--text-secondary)" />
-                    <p style={{ fontWeight: 600 }}>No workload data available.</p>
-                    <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Create a new task or adjust filters.</span>
-                </div>
             ) : (
                 <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                        <div style={{ position: 'relative', width: 300, margin: 0 }}>
+                            <Search size={14} style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                            <input type="text" placeholder="Search employee…"
+                                style={{ width: '100%', height: 46, borderRadius: 999, border: '1px solid #dbe3f0', background: '#f8fafc', padding: '0 20px 0 42px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                                onFocus={e => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#14b8a6'; e.target.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.08)'; }}
+                                onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#dbe3f0'; e.target.style.boxShadow = 'none'; }} />
+                        </div>
+                        <button className="btn btn-primary" onClick={onNewTask} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 9, fontSize: 13, whiteSpace: 'nowrap' }}>
+                            <Plus size={14} /> New Task
+                        </button>
+                    </div>
                     <div className="stats-row">
                         {[
-                            { label: 'TOTAL TASKS', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: `Avg ${avgPerEmployee} per employee` },
                             { label: 'ACTIVE', value: active, icon: <Loader2 size={20} strokeWidth={2.3} />, variant: 'warning' as const, subtext: 'In Progress / Assigned' },
                             { label: 'COMPLETED', value: completed, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success' as const, subtext: `${pct}% completion rate` },
                             { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
@@ -1397,7 +1343,7 @@ const DashboardTab: React.FC<{
                         ))}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
                                 <svg viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
@@ -1427,40 +1373,11 @@ const DashboardTab: React.FC<{
 
                         <div className="card">
                             <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
-                                <h3 style={{ fontSize: 13 }}>Task Assignment Distribution</h3>
-                            </div>
-                            {Object.keys(taskDist).length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)', fontSize: 12 }}>No data</div>
-                            ) : (
-                                <>
-                                    <ResponsiveContainer width="100%" height={Object.keys(taskDist).length * 28 + 20}>
-                                        <BarChart data={Object.entries(taskDist).map(([k, v]) => ({ name: k, value: v }))} layout="vertical" barSize={14}>
-                                            <CartesianGrid horizontal={false} stroke="transparent" />
-                                            <XAxis hide type="number" />
-                                            <YAxis hide type="category" dataKey="name" />
-                                            <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
-                                            <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--primary)" />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
-                                        {Object.entries(taskDist).map(([k, v]) => (
-                                            <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
-                                                <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
-                                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{v}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        <div className="card">
-                            <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
                                 <h3 style={{ fontSize: 13 }}>Quick Summary</h3>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12 }}>
                                 {[
+                                    { label: 'Total Tasks', value: total },
                                     { label: 'Employees', value: workloads.length },
                                     { label: 'Avg/Employee', value: avgPerEmployee },
                                     { label: 'Active %', value: total > 0 ? `${Math.round(active / total * 100)}%` : '0%' },
@@ -1468,7 +1385,7 @@ const DashboardTab: React.FC<{
                                     { label: 'Review %', value: total > 0 ? `${Math.round(pendingReview / total * 100)}%` : '0%' },
                                 ].map(s => (
                                     <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                                        <span style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{s.label}</span>
                                         <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{s.value}</span>
                                     </div>
                                 ))}
@@ -1482,22 +1399,6 @@ const DashboardTab: React.FC<{
                                 <h3>Employee Workload Distribution</h3>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workloads.length} employees</span>
                             </div>
-                            {workloads.length === 0 ? (
-                                <div className="empty-state" style={{ padding: '20px 0' }}><p>No workload data available.</p></div>
-                            ) : (
-                                <ResponsiveContainer width="100%" height={Math.max(120, workloads.length * 48)}>
-                                    <BarChart data={workloadChartData} layout="vertical" barSize={18} barGap={4} margin={{ top: 4, right: 16, left: -8, bottom: 0 }}>
-                                        <CartesianGrid horizontal={false} stroke="transparent" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
-                                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: 'var(--text-primary)' }} width={70} />
-                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
-                                        <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                        <Bar dataKey="Total" fill="var(--primary)" radius={[0, 4, 4, 0]} stackId="a" />
-                                        <Bar dataKey="Completed" fill="var(--status-active)" radius={[0, 4, 4, 0]} stackId="a" />
-                                        <Bar dataKey="Overdue" fill="var(--status-failed)" radius={[0, 4, 4, 0]} stackId="a" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            )}
                         </div>
 
                         <div className="card">
@@ -1543,6 +1444,38 @@ const DashboardTab: React.FC<{
 
                     <DataTable
                         title="Workload Summary per Employee"
+                        filterElements={
+                            <>
+                                <input type="date" value={filters.dateStart}
+                                    onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })}
+                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                                <input type="date" value={filters.dateEnd}
+                                    onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })}
+                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                                <select value={filters.employeeId}
+                                    onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}>
+                                    <option value="">All Employees</option>
+                                    {dashboardEmployees.map(m => (<option key={m.employeeId} value={m.employeeId}>{m.employeeName}</option>))}
+                                </select>
+                                <select value={filters.departmentId}
+                                    onChange={e => onFilterChange({ ...filters, departmentId: e.target.value })}>
+                                    <option value="">All Departments</option>
+                                    {dashboardDepartments.map(d => (<option key={d.departmentId} value={d.departmentId}>{d.departmentName}</option>))}
+                                </select>
+                                <select value={filters.taskStatus}
+                                    onChange={e => onFilterChange({ ...filters, taskStatus: e.target.value })}>
+                                    <option value="">All Statuses</option>
+                                    <option value="Assigned">Assigned</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Pending Admin Review">Pending Admin Review</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="Overdue">Overdue</option>
+                                </select>
+                                {hasAnyFilter && (
+                                    <button className="btn btn-sm" onClick={onClearFilters} style={{ height: 38, whiteSpace: 'nowrap' }}><X size={12} /> Clear</button>
+                                )}
+                            </>
+                        }
                         headers={['EMPLOYEE', 'TOTAL', 'ACTIVE', 'COMPLETED', 'OVERDUE', 'COMPLETION']}
                         loading={false}
                         emptyMessage="No workload data available."
@@ -2255,12 +2188,85 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
 
     return (
         <div className="dashboard-content">
-            {fetchError && <div className="report-error-msg" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--status-failed-bg)', borderRadius: 'var(--radius-sm)', marginBottom: 16, color: 'var(--status-failed)', fontSize: 13 }}>{fetchError}</div>}
-            {noRecords && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}><FileText size={32} /><p style={{ marginTop: 8 }}>No records found for selected criteria.</p></div>}
+            <div className="card report-filter-card">
+                <div className="card-header-layout">
+                    <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
+                </div>
+                <div className="report-filter-grid">
+                    <div className="field">
+                        <label>Date Start *</label>
+                        <input type="date" className={inputClass('dateRangeStart')}
+                            value={filter.dateRangeStart}
+                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
+                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
+                    </div>
+                    <div className="field">
+                        <label>Date End *</label>
+                        <input type="date" className={inputClass('dateRangeEnd')}
+                            value={filter.dateRangeEnd}
+                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
+                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
+                    </div>
+                    <div className="field">
+                        <label>Employee</label>
+                        <select className="report-select"
+                            value={filter.employeeId}
+                            onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                            <option value="">All Employees</option>
+                            {teamMembers.map(m => (
+                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Priority</label>
+                        <select className="report-select"
+                            value={filter.taskPriorityLevel}
+                            onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
+                            <option value="">All Priorities</option>
+                            {PRIORITY_LEVELS.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Status</label>
+                        <select className="report-select"
+                            value={filter.taskStatus}
+                            onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
+                            <option value="">All Statuses</option>
+                            {TASK_STATUSES_FILTER.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Category</label>
+                        <select className="report-select"
+                            value={filter.taskCategory}
+                            onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
+                            <option value="">All Categories</option>
+                            {TASK_CATEGORIES.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                <div className="report-filter-actions">
+                    <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
+                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
+                        {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                        {' '}{loading ? 'Generating...' : 'Generate Report'}
+                    </button>
+                </div>
+            </div>
+
+            {fetchError && <div className="report-error-msg">{fetchError}</div>}
+            {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
 
             {report && (
                 <>
-                    <div className="report-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 'var(--gap)', marginBottom: 'var(--gap)' }}>
+                    <div className="report-summary-grid">
                         <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
                         <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
                         <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
@@ -2270,63 +2276,25 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                         <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
                     </div>
 
-                    <DataTable
-                        title="Task Completion Reports"
-                        filterElements={
-                            <>
-                                <input type="date" className="form-input" value={filter.dateRangeStart}
-                                    onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))}
-                                    style={{ height: 38, width: 150, fontSize: '0.82rem', padding: '0 10px' }} />
-                                <input type="date" className="form-input" value={filter.dateRangeEnd}
-                                    onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))}
-                                    style={{ height: 38, width: 150, fontSize: '0.82rem', padding: '0 10px' }} />
-                                <select className="form-input" value={filter.employeeId}
-                                    onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}
-                                    style={{ height: 38, fontSize: '0.82rem' }}>
-                                    <option value="">All Employees</option>
-                                    {teamMembers.map(m => (<option key={m.accountId} value={m.accountId}>{m.employeeName}</option>))}
-                                </select>
-                                <select className="form-input" value={filter.taskPriorityLevel}
-                                    onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}
-                                    style={{ height: 38, fontSize: '0.82rem' }}>
-                                    <option value="">All Priorities</option>
-                                    {PRIORITY_LEVELS.map(p => (<option key={p} value={p}>{p}</option>))}
-                                </select>
-                                <select className="form-input" value={filter.taskStatus}
-                                    onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}
-                                    style={{ height: 38, fontSize: '0.82rem' }}>
-                                    <option value="">All Statuses</option>
-                                    {TASK_STATUSES_FILTER.map(s => (<option key={s} value={s}>{s}</option>))}
-                                </select>
-                                <select className="form-input" value={filter.taskCategory}
-                                    onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}
-                                    style={{ height: 38, fontSize: '0.82rem' }}>
-                                    <option value="">All Categories</option>
-                                    {TASK_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}
-                                </select>
-                                <button className="btn btn-outline btn-sm" onClick={handleReset} style={{ height: 38 }}><RotateCcw size={13} /> Reset</button>
-                            </>
-                        }
-                        actionButton={{
-                            label: loading ? 'Generating...' : 'Generate Report',
-                            icon: loading ? <Loader2 size={13} className="spin" /> : <Filter size={13} />,
-                            onClick: handleGenerate,
-                        }}
-                        headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
-                        loading={false}
-                        emptyMessage="No employee data for selected criteria."
-                        totalRecords={report.employeePerformanceSummary.length}
-                    >
-                        {report.employeePerformanceSummary.map(ep => (
-                            <tr key={ep.employeeName}>
-                                <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
-                                <td>{ep.totalAssigned}</td>
-                                <td>{ep.totalCompleted}</td>
-                                <td>{ep.completionRate}%</td>
-                                <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
-                            </tr>
-                        ))}
-                    </DataTable>
+                    <div className="card">
+                        <DataTable
+                            title="Employee Performance Summary"
+                            headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
+                            loading={false}
+                            emptyMessage="No employee data for selected criteria."
+                            totalRecords={report.employeePerformanceSummary.length}
+                        >
+                            {report.employeePerformanceSummary.map(ep => (
+                                <tr key={ep.employeeName}>
+                                    <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                    <td>{ep.totalAssigned}</td>
+                                    <td>{ep.totalCompleted}</td>
+                                    <td>{ep.completionRate}%</td>
+                                    <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                                </tr>
+                            ))}
+                        </DataTable>
+                    </div>
 
                     <div className="card">
                         <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
@@ -2479,7 +2447,7 @@ function ProfileTab() {
                 method: 'POST',
                 headers: authHeader(),
                 body: JSON.stringify({
-                    employeeID: employeeId,   
+                    employeeID: employeeId,
                     password: gatePassword,
                 }),
             });
@@ -2710,9 +2678,9 @@ function ProfileTab() {
                             <button
                                 className="btn btn-primary"
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
-                                onClick={() => { 
-                                    setEditingProfile(true); 
-                                    setProfileSuccess(false); 
+                                onClick={() => {
+                                    setEditingProfile(true);
+                                    setProfileSuccess(false);
                                     ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
                                 }}
                             >
@@ -2864,24 +2832,24 @@ function ProfileTab() {
                                 </span>
                                 <span className="detail-value">{employeeId || '—'}</span>
                             </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">
-                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name
-                                    </span>
-                                    <span className="detail-value">{profileForm.firstName || '—'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">
-                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name
-                                    </span>
-                                    <span className="detail-value">{profileForm.middleName || '—'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">
-                                        <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name
-                                    </span>
-                                    <span className="detail-value">{profileForm.lastName || '—'}</span>
-                                </div>
+                            <div className="detail-item">
+                                <span className="detail-label">
+                                    <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name
+                                </span>
+                                <span className="detail-value">{profileForm.firstName || '—'}</span>
+                            </div>
+                            <div className="detail-item">
+                                <span className="detail-label">
+                                    <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name
+                                </span>
+                                <span className="detail-value">{profileForm.middleName || '—'}</span>
+                            </div>
+                            <div className="detail-item">
+                                <span className="detail-label">
+                                    <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name
+                                </span>
+                                <span className="detail-value">{profileForm.lastName || '—'}</span>
+                            </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <Mail size={11} style={{ display: 'inline', marginRight: 4 }} />Email Address
@@ -3222,7 +3190,7 @@ const LeaveTab: React.FC<{
             )}
         </div>
     );
-    };
+};
 
 
 const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
@@ -3549,7 +3517,7 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicate
                                     padding: '10px 8px', fontWeight: 700,
                                     color: d.similarityPercentage >= 90 ? 'var(--status-failed)' :
                                         d.similarityPercentage >= 80 ? '#c05c00' :
-                                        d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)',
+                                            d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)',
                                 }}>
                                     {d.similarityPercentage}%
                                 </td>
@@ -3603,7 +3571,7 @@ export default function OpsAdminDashboard() {
 
     // ── Fetch Tasks ──
     const [allTasks, setAllTasks] = useState<Task[]>([]);
-    const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set()); 
+    const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
     const [binTasks, setBinTasks] = useState<Task[]>([]);
 
     // Fetch Leave records
@@ -4198,8 +4166,8 @@ export default function OpsAdminDashboard() {
 
         connection.start().then(() => {
             const acctId = localStorage.getItem('employeeId');
-            if (acctId) connection.invoke('JoinDashboardGroup', acctId).catch(() => {});
-        }).catch(() => {});
+            if (acctId) connection.invoke('JoinDashboardGroup', acctId).catch(() => { });
+        }).catch(() => { });
 
         return () => { connection.stop(); };
     }, [fetchDashboardData]);
@@ -4273,22 +4241,6 @@ export default function OpsAdminDashboard() {
                     onSettingsClick={() => setActiveTab('profile')}
                     onLogout={handleLogout}
                 >
-                    {activeTab !== 'profile' && activeTab !== 'leave' && activeTab !== 'tasks' && activeTab !== 'reopen' && (
-                        <>
-                            <div className="header-search">
-                                <Search size={15} />
-                                <input
-                                    type="text"
-                                    placeholder="Search tasks..."
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                            <ActionButton icon={<Plus size={18} />} onClick={() => setShowNew(true)}>
-                                New Task
-                            </ActionButton>
-                        </>
-                    )}
                 </DashboardHeader>
 
                 {activeTab === 'dashboard' && (

@@ -1251,55 +1251,6 @@ body {
 }
 
 /* ─── BUTTONS ─────────────────────────────────────────────────────────────── */
-.btn {
-    padding: 8px 18px;
-    border-radius: var(--radius-sm);
-    border: 1.5px solid var(--border);
-    background: white;
-    font-size: 0.83rem;
-    font-weight: 600;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-family: inherit;
-}
-
-.btn:hover {
-    background: var(--bg-main);
-}
-
-.btn:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.btn-primary {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: white;
-    box-shadow: 0 3px 12px rgba(67, 24, 255, 0.2);
-}
-
-.btn-primary:hover:not(:disabled) {
-    background: #3610d9;
-    border-color: #3610d9;
-    box-shadow: 0 5px 16px rgba(67, 24, 255, 0.3);
-}
-
-.btn-danger {
-    background: var(--status-failed-bg);
-    border-color: rgba(238, 93, 80, 0.25);
-    color: var(--status-failed);
-}
-
-.btn-danger:hover:not(:disabled) {
-    background: rgba(238, 93, 80, 0.14);
-    border-color: var(--status-failed);
-}
-
 .btn-xs {
     display: inline-flex;
     align-items: center;
@@ -1317,8 +1268,8 @@ body {
 }
 
 .btn-xs:hover {
-    background: #eef2ff;
-    border-color: rgba(67, 24, 255, 0.3);
+    background: rgba(0, 169, 157, 0.08);
+    border-color: var(--primary);
 }
 
 /* ─── EMPLOYEE DETAIL MODAL ───────────────────────────────────────────────── */

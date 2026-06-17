@@ -2826,6 +2826,8 @@ export default function Dashboard() {
 
     // ── Activity Logs ──
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+    const [activityLogPage, setActivityLogPage] = useState(1);
+    const ACTIVITY_LOG_PAGE_SIZE = 15;
 
     // ── Employment Contracts / Documents ──
     const [contracts, setContracts] = useState<EmploymentContract[]>([]);
@@ -3025,10 +3027,10 @@ export default function Dashboard() {
                 try { return JSON.parse(text); } catch (e) { console.error('Failed to parse JSON. Response was:', text); throw e; }
             })
             .then(data => {
-                if (Array.isArray(data)) setActivityLogs(data);
-                else if (data && Array.isArray(data.data)) setActivityLogs(data.data);
-                else if (data && Array.isArray(data.$values)) setActivityLogs(data.$values);
-                else setActivityLogs([]);
+                if (Array.isArray(data)) { setActivityLogs(data); setActivityLogPage(1); }
+                else if (data && Array.isArray(data.data)) { setActivityLogs(data.data); setActivityLogPage(1); }
+                else if (data && Array.isArray(data.$values)) { setActivityLogs(data.$values); setActivityLogPage(1); }
+                else { setActivityLogs([]); setActivityLogPage(1); }
             })
             .catch((err) => { console.error('Activity logs fetch error:', err); setActivityLogs([]); });
     }, []);
@@ -3209,36 +3211,43 @@ export default function Dashboard() {
 
                 {activeTab === 'activity_logs' && (
                     <div className="dashboard-content">
-                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div className="card-header-layout" style={{ padding: '24px 36px', borderBottom: '1px solid rgba(241, 245, 249, 1)', background: 'linear-gradient(to right, #ffffff, #f8fafc)' }}>
-                                <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}><Activity size={20} color="#4f46e5" /> System Activity Logs</h3>
-                            </div>
-                            {activityLogs.length === 0 ? (
-                                <EmptyState icon={<Activity size={32} />} message="No activity logs found in the system." />
-                            ) : (
-                                <div className="global-timeline" style={{ padding: '24px 36px' }}>
-                                    {activityLogs.map((log, index) => {
-                                        let dotColor = '#4318FF';
-                                        let ringColor = 'var(--status-new-bg)';
-                                        if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
-                                        else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
-                                        else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
-                                        return (
-                                            <div key={log.activityLogId} className="global-timeline-item" style={{ display: 'flex', gap: 24, marginBottom: 32, position: 'relative' }}>
-                                                {index < activityLogs.length - 1 && <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: 'var(--border)', zIndex: 0 }} />}
-                                                <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, boxShadow: `0 0 0 6px ${ringColor}`, zIndex: 1, flexShrink: 0, marginTop: 4 }} />
-                                                <div className="global-timeline-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                                    <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{log.description}</div>
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 500, alignSelf: 'flex-start', border: '1px solid var(--border)' }}>
-                                                        <Clock size={13} />{new Date(log.createdAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
+                        <DataTable
+                            title="System Activity Logs"
+                            headers={['Date & Time', 'Activity Type', 'Employee', 'Description']}
+                            loading={false}
+                            emptyMessage="No activity logs found in the system."
+                            emptyIcon={<Activity size={24} />}
+                            totalRecords={activityLogs.length}
+                            currentPage={activityLogPage}
+                            totalPages={Math.max(1, Math.ceil(activityLogs.length / ACTIVITY_LOG_PAGE_SIZE))}
+                            onPageChange={setActivityLogPage}
+                        >
+                            {activityLogs.slice((activityLogPage - 1) * ACTIVITY_LOG_PAGE_SIZE, activityLogPage * ACTIVITY_LOG_PAGE_SIZE).map(log => {
+                                const empName = [log.firstName, log.middleName, log.lastName, log.suffix].filter(Boolean).join(' ');
+                                return (
+                                    <tr key={log.activityLogId}>
+                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                            {new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </td>
+                                        <td>
+                                            <span style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
+                                                background: log.activityType === 'Login' ? 'var(--status-active-bg)' :
+                                                    log.activityType === 'Logout' ? 'var(--status-pending-bg)' :
+                                                    'var(--status-new-bg)',
+                                                color: log.activityType === 'Login' ? 'var(--status-active)' :
+                                                    log.activityType === 'Logout' ? 'var(--status-pending)' :
+                                                    'var(--status-new)',
+                                            }}>
+                                                {log.activityType}
+                                            </span>
+                                        </td>
+                                        <td style={{ fontSize: 13 }}>{empName || 'System'}</td>
+                                        <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{log.description}</td>
+                                    </tr>
+                                );
+                            })}
+                        </DataTable>
                     </div>
                 )}
             </main>
@@ -3251,10 +3260,10 @@ export default function Dashboard() {
                     fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
                         .then(res => { if (!res.ok) return []; return res.json(); })
                         .then(data => {
-                            if (Array.isArray(data)) setActivityLogs(data);
-                            else if (data && Array.isArray(data.data)) setActivityLogs(data.data);
-                            else if (data && Array.isArray(data.$values)) setActivityLogs(data.$values);
-                            else setActivityLogs([]);
+                            if (Array.isArray(data)) { setActivityLogs(data); setActivityLogPage(1); }
+                            else if (data && Array.isArray(data.data)) { setActivityLogs(data.data); setActivityLogPage(1); }
+                            else if (data && Array.isArray(data.$values)) { setActivityLogs(data.$values); setActivityLogPage(1); }
+                            else { setActivityLogs([]); setActivityLogPage(1); }
                         })
                         .catch((err) => { console.error('Activity logs fetch error:', err); });
                 }} />

@@ -1487,7 +1487,6 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     <StatCard icon={<Users size={20} />} variant="primary" label="Total Applicants" value={counts.total} subtext="All time" />
                     <StatCard icon={<Clock size={20} />} variant="warning" label="Pending Review" value={counts.pending} subtext="Awaiting review" />
                     <StatCard icon={<CalendarCheck size={20} />} variant="primary" label="Interview Scheduled" value={counts.interview} subtext="Scheduled" />
-                    <StatCard icon={<Briefcase size={20} />} variant="success" label="Job Offered" value={counts.offered} subtext="Offers extended" />
                     <StatCard icon={<XCircle size={20} />} variant="danger" label="Rejected" value={counts.rejected} subtext="Not accepted" />
                 </div>
 
