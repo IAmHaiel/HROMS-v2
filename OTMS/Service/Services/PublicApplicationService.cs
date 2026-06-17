@@ -42,12 +42,12 @@ namespace OTMS.Service.Services
             {
                 emailAddress = await googleTokenValidator.ValidateTokenAndGetEmailAsync(request.GoogleToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return new ApiResponseDTO<string>
                 {
                     IsSuccess = false,
-                    Message = "Invalid Google token provided.",
+                    Message = $"Invalid Google token: {ex.Message}",
                     Data = null
                 };
             }

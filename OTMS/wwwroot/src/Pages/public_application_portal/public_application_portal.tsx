@@ -12,16 +12,25 @@ declare global {
                         callback: (response: { credential: string }) => void;
                         auto_select?: boolean;
                         cancel_on_tap_outside?: boolean;
+                        use_fedcm_for_prompt?: boolean;
                     }) => void;
                     renderButton: (
                         element: HTMLElement,
                         options: { theme?: string; size?: string; text?: string; width?: string }
                     ) => void;
-                    prompt: () => void;
+                    prompt: (momentListener?: (moment: PromptMomentNotification) => void) => void;
                 };
             };
         };
     }
+}
+
+interface PromptMomentNotification {
+    getMomentType(): string;
+    getNotDisplayedReason(): string;
+    getSkippedReason(): string;
+    getDismissedReason(): string;
+    getReason(): string;
 }
 
 type Stage = 'landing' | 'auth' | 'form' | 'success';
@@ -124,6 +133,7 @@ export default function PublicApplicationPortal() {
     const [googleToken, setGoogleToken] = useState('');
     const [submitError, setSubmitError] = useState('');
     const gsiInitialized = useRef(false);
+    const credentialReceived = useRef(false);
 
     useEffect(() => {
         const init = async () => {
@@ -167,15 +177,35 @@ export default function PublicApplicationPortal() {
                     callback: handleGoogleCredentialResponse,
                     auto_select: false,
                     cancel_on_tap_outside: false,
+                    use_fedcm_for_prompt: true,
                 });
             }
+        };
+        script.onerror = () => {
+            setConfigLoading(false);
+            setSubmitError('Failed to load Google Sign-In. Please check your network connection.');
         };
         document.head.appendChild(script);
     };
 
     const handleGoogleCredentialResponse = (response: { credential: string }) => {
+        console.log('Google credential received, length:', response.credential?.length);
+        credentialReceived.current = true;
         setGoogleToken(response.credential);
+        try {
+            const parts = response.credential.split('.');
+            if (parts.length === 3) {
+                const payload = JSON.parse(atob(parts[1]));
+                console.log('Decoded Google payload:', payload);
+                if (payload.email) {
+                    setForm(p => ({ ...p, email: payload.email }));
+                }
+            }
+        } catch {
+            console.error('Failed to decode Google credential JWT');
+        }
         setAuthLoading(false);
+        setSubmitError('');
         setStage('form');
     };
 
@@ -186,7 +216,30 @@ export default function PublicApplicationPortal() {
         }
         setAuthLoading(true);
         setSubmitError('');
-        window.google.accounts.id.prompt();
+        window.google.accounts.id.prompt((moment) => {
+            if (credentialReceived.current) return;
+            const type = moment.getMomentType();
+            if (type !== 'display') {
+                setAuthLoading(false);
+                const reason = (typeof moment.getReason === 'function' ? moment.getReason() : '') || '';
+                if (reason === 'credential_not_found') {
+                    setSubmitError('No Google account found. Please sign in to Google first.');
+                } else if (reason === 'opt_out_or_no_session') {
+                    setSubmitError('Google Sign-In is not available. Please sign in to Google and try again.');
+                } else if (reason === 'secure_http_required') {
+                    setSubmitError('Google Sign-In requires a secure connection (HTTPS).');
+                } else if (reason === 'suppressed_by_user' || type === 'dismissed') {
+                    setSubmitError('Google Sign-In was cancelled.');
+                } else if (reason === 'unregistered_origin') {
+                    setSubmitError(
+                        'This domain is not registered for Google Sign-In. ' +
+                        'Please contact the administrator.'
+                    );
+                } else if (reason) {
+                    setSubmitError(`Google Sign-In unavailable: ${reason}.`);
+                }
+            }
+        });
     };
 
     const validateField = (key: FormKey, value: string | File | null): string => {
@@ -259,6 +312,11 @@ export default function PublicApplicationPortal() {
         });
         if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
+        if (!googleToken) {
+            setSubmitError('Google authentication is missing. Please sign in with Google again.');
+            return;
+        }
+
         setSubmitLoading(true);
         setSubmitError('');
 
@@ -281,8 +339,17 @@ export default function PublicApplicationPortal() {
         } catch (err: unknown) {
             setSubmitLoading(false);
             if (axios.isAxiosError(err) && err.response?.data) {
-                const data = err.response.data as { message?: string };
-                setSubmitError(data.message ?? 'An error occurred. Please try again.');
+                const data = err.response.data as Record<string, unknown>;
+                console.error('Submit error response:', JSON.stringify(data));
+                const message = (data as { message?: string }).message
+                    || (data as { title?: string }).title
+                    || '';
+                if (data.errors && typeof data.errors === 'object') {
+                    const allErrors = Object.values(data.errors as Record<string, string[]>).flat();
+                    setSubmitError(allErrors.join(' ') || message || 'Validation failed. Please check your inputs.');
+                } else {
+                    setSubmitError(message || 'An error occurred. Please try again.');
+                }
             } else {
                 setSubmitError('An error occurred. Please try again.');
             }
@@ -397,6 +464,14 @@ export default function PublicApplicationPortal() {
                                 <GoogleIcon />
                                 <span>{configLoading ? 'Loading...' : 'Continue with Google'}</span>
                             </button>
+
+                            {submitError && (
+                                <div style={s.errorBanner}>
+                                    <AlertIcon />
+                                    <span>{submitError}</span>
+                                </div>
+                            )}
+
                             <p style={s.privacyNote}>
                                 <ShieldIcon />
                                 Only your Gmail address is accessed. No other Google data is read or stored.

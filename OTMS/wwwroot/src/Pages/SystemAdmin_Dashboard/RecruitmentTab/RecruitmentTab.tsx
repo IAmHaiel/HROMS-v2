@@ -7,6 +7,8 @@ import {
     AlertCircle, Mail, MapPin, User, Send, CalendarDays,
 } from 'lucide-react';
 
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` });
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RecruitmentStatus =
@@ -790,7 +792,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 locationOrLink: location.trim(),
                 interviewerName: interviewer,
             };
-            const res = await axios.post('/api/recruitment/schedule-interview', payload);
+            const res = await axios.post('/api/recruitment/schedule-interview', payload, { headers: authHeaders() });
             const apiResult = res.data as any;
 
             if (apiResult?.isSuccess) {
@@ -1199,7 +1201,7 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
 
     useEffect(() => {
         if (applicant.currentStatus === 'Job Offered') {
-            axios.get(`/api/recruitment/${applicant.applicantId}/onboarding-link`)
+            axios.get(`/api/recruitment/${applicant.applicantId}/onboarding-link`, { headers: authHeaders() })
                 .then((res) => {
                     const data = res.data as any;
                     if (data?.isSuccess && data.data) {
@@ -1372,7 +1374,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
             }
             if (search) params.search = search;
 
-            const res = await axios.get('/api/recruitment/dashboard', { params });
+            const res = await axios.get('/api/recruitment/dashboard', { params, headers: authHeaders() });
             const apiResult = res.data as any;
             if (apiResult?.isSuccess && apiResult.data) {
                 const paginated = apiResult.data;
@@ -1426,7 +1428,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
             applicantRecordId: applicantId,
             newStatus,
             remarks: remarks || null,
-        });
+        }, { headers: authHeaders() });
         const apiResult = res.data as any;
         if (!apiResult?.isSuccess) {
             throw new Error(apiResult?.message || 'Failed to update status.');
@@ -1577,7 +1579,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                                                     <button className="rec-action-btn rec-action-btn--primary"
                                                         onClick={async () => {
                                                             try {
-                                                                const res = await axios.post(`/api/recruitment/${a.applicantId}/resend-onboarding`);
+                                                                const res = await axios.post(`/api/recruitment/${a.applicantId}/resend-onboarding`, null, { headers: authHeaders() });
                                                                 const apiResult = res.data as any;
                                                                 if (apiResult?.isSuccess) {
                                                                     showToast('Onboarding link resent successfully.');

@@ -63,6 +63,9 @@ export default function Login() {
     const [mounted, setMounted] = useState(false);
     const [employeeIdError, setEmployeeIdError] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [showEmailVerification, setShowEmailVerification] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [resendMessage, setResendMessage] = useState('');
 
     useEffect(() => { setMounted(true); }, []);
 
@@ -94,6 +97,28 @@ export default function Login() {
         return '';
     };
 
+    const handleResendVerification = async () => {
+        setResending(true);
+        setResendMessage('');
+        try {
+            const res = await fetch('/api/authentication/resend-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(employeeId.trim()),
+            });
+            if (res.ok) {
+                setResendMessage('Verification email sent! Check your inbox.');
+            } else {
+                const text = await res.text().catch(() => '');
+                setResendMessage(text || 'Failed to resend. Try again later.');
+            }
+        } catch {
+            setResendMessage('Unable to connect to the server.');
+        } finally {
+            setResending(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -103,6 +128,8 @@ export default function Login() {
         setPasswordError(pwErr);
         if (idErr || pwErr) return;
 
+        setShowEmailVerification(false);
+        setResendMessage('');
         setIsLoading(true);
         updateStatus('Authenticating...', 'info');
 
@@ -147,6 +174,12 @@ export default function Login() {
                             reason: data?.message ?? data?.Message ?? '',
                         }
                     });
+                    return;
+                }
+
+                if (message.includes('verify your email')) {
+                    updateStatus(data?.message || 'Please verify your email before logging in.', 'error');
+                    setShowEmailVerification(true);
                     return;
                 }
 
@@ -280,6 +313,32 @@ export default function Login() {
                         <div className={`status-bar ${statusType}`} role="alert">
                             <StatusIcon type={statusType} />
                             {statusMessage}
+                        </div>
+                    )}
+
+                    {/* Email verification banner */}
+                    {showEmailVerification && (
+                        <div className="email-verify-banner">
+                            <div className="evb-icon">
+                                <MailWarningIcon />
+                            </div>
+                            <div className="evb-content">
+                                <p className="evb-text">
+                                    Your email has not been verified yet. Please check your inbox for the verification email.
+                                </p>
+                                <button
+                                    className="evb-resend-btn"
+                                    onClick={handleResendVerification}
+                                    disabled={resending}
+                                >
+                                    {resending ? 'Sending...' : 'Resend verification email'}
+                                </button>
+                                {resendMessage && (
+                                    <p className={`evb-resend-msg ${resendMessage.includes('sent') ? 'success' : 'error'}`}>
+                                        {resendMessage}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -495,6 +554,17 @@ function EyeOffIcon() {
             <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
             <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
             <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+    );
+}
+
+function MailWarningIcon() {
+    return (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+            <polyline points="22,6 12,13 2,6" />
+            <line x1="12" y1="13" x2="12" y2="18" />
+            <circle cx="12" cy="20" r="0.5" fill="currentColor" />
         </svg>
     );
 }

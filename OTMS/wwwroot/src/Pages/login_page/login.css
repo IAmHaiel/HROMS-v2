@@ -688,7 +688,78 @@ APPLICANT SECTION DIVIDER
 }
 
 /* ─────────────────────────────────────────
-   RESPONSIVE
+   EMAIL VERIFICATION BANNER
+───────────────────────────────────────── */
+.email-verify-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: #fff8eb;
+    border: 1px solid #ffe4a0;
+}
+
+.evb-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #b45309;
+}
+
+.evb-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.evb-text {
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #7a5e22;
+    margin: 0;
+}
+
+.evb-resend-btn {
+    align-self: flex-start;
+    padding: 7px 16px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: #b45309;
+    color: white;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.evb-resend-btn:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.evb-resend-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.evb-resend-msg {
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+.evb-resend-msg.success {
+    color: #0a7a45;
+}
+
+.evb-resend-msg.error {
+    color: #e31a1a;
+}
+
+/* ─────────────────────────────────────────
+    RESPONSIVE
 ───────────────────────────────────────── */
 @media (max-width: 960px) {
     .login-page {

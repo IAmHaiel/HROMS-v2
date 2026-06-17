@@ -43,6 +43,9 @@ namespace OTMS.Controllers
                 return Unauthorized(new { message = "Invalid Employee ID or password." });
 
             // Automatically update and restore employee availability statuses (leave expiration/overrides)
+            if (!employee.IsEmailVerified)
+                return Unauthorized(new { message = "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support." });
+
             try
             {
                 await lrService.UpdateEmployeeAvailabilityStatusesAsync(employee.Account.AccountId);
@@ -113,6 +116,10 @@ namespace OTMS.Controllers
                     leaveId = ex.LeaveId,
                     overrideToken = ex.OverrideToken
                 });
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
 
         }
