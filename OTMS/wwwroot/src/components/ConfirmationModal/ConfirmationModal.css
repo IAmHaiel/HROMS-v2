@@ -17,9 +17,9 @@
 
 /* ── Card ────────────────────────────────────────────────── */
 .cm-card {
-    background: #ffffff;
+    background: var(--bg-card);
     border-radius: var(--radius-md);
-    border: 1px solid #e8edf5;
+    border: 1px solid var(--border);
     box-shadow:
         0 4px 6px -1px rgba(0, 0, 0, 0.05),
         0 20px 60px -10px rgba(15, 23, 42, 0.20);
@@ -31,11 +31,11 @@
 }
 
 /* ── Colored top accent bar per variant ─────────────────── */
-.cm-variant-danger  { border-top: 4px solid #ef4444; }
-.cm-variant-warning { border-top: 4px solid #f59e0b; }
-.cm-variant-info    { border-top: 4px solid #3b82f6; }
-.cm-variant-success { border-top: 4px solid #22c55e; }
-.cm-variant-neutral { border-top: 4px solid #94a3b8; }
+.cm-variant-danger  { border-top: 4px solid var(--status-failed); }
+.cm-variant-warning { border-top: 4px solid var(--status-pending); }
+.cm-variant-info    { border-top: 4px solid var(--primary); }
+.cm-variant-success { border-top: 4px solid var(--status-active); }
+.cm-variant-neutral { border-top: 4px solid var(--text-tertiary); }
 
 /* ── Header ──────────────────────────────────────────────── */
 .cm-header {
@@ -65,7 +65,7 @@
 .cm-title {
     font-size: 16px;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--text-primary);
     margin: 0 0 6px;
     line-height: 1.35;
     letter-spacing: -0.01em;
@@ -73,7 +73,7 @@
 
 .cm-desc {
     font-size: 13.5px;
-    color: #64748b;
+    color: var(--text-secondary);
     margin: 0;
     line-height: 1.65;
 }
@@ -104,8 +104,8 @@
     gap: 10px;
     justify-content: flex-end;
     padding: 16px 24px 20px;
-    border-top: 1px solid #f1f5f9;
-    background: #fafbfd;
+    border-top: 1px solid var(--bg-main);
+    background: var(--bg-main);
 }
 
 /* ── Buttons ─────────────────────────────────────────────── */
@@ -136,15 +136,15 @@
 
 /* Cancel — always the same neutral ghost style */
 .cm-btn-cancel {
-    background: #ffffff;
-    color: #475569;
-    border: 1.5px solid #e2e8f0;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1.5px solid var(--border);
 }
 
 .cm-btn-cancel:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-    color: #1e293b;
+    background: var(--bg-input);
+    border-color: var(--border-hover);
+    color: var(--text-primary);
 }
 
 /* Confirm base */
@@ -154,116 +154,116 @@
 
 /* ── Confirm button variants — solid filled, high-contrast ── */
 .cm-btn-danger {
-    background: #ef4444;
-    color: #ffffff;
+    background: var(--status-failed);
+    color: var(--bg-card);
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.30);
 }
 .cm-btn-danger:hover:not(:disabled) {
-    background: #dc2626;
+    background: var(--status-failed);
     box-shadow: 0 4px 14px rgba(239, 68, 68, 0.40);
 }
 
 .cm-btn-warning {
-    background: #f59e0b;
-    color: #ffffff;
+    background: var(--status-pending);
+    color: var(--bg-card);
     box-shadow: 0 2px 8px rgba(245, 158, 11, 0.30);
 }
 .cm-btn-warning:hover:not(:disabled) {
-    background: #d97706;
+    background: var(--status-pending);
     box-shadow: 0 4px 14px rgba(245, 158, 11, 0.40);
 }
 
 .cm-btn-info {
-    background: #3b82f6;
-    color: #ffffff;
+    background: var(--primary);
+    color: var(--bg-card);
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.30);
 }
 .cm-btn-info:hover:not(:disabled) {
-    background: #2563eb;
+    background: var(--primary);
     box-shadow: 0 4px 14px rgba(59, 130, 246, 0.40);
 }
 
 .cm-btn-success {
-    background: #22c55e;
-    color: #ffffff;
+    background: var(--status-active);
+    color: var(--bg-card);
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.30);
 }
 .cm-btn-success:hover:not(:disabled) {
-    background: #16a34a;
+    background: var(--status-active);
     box-shadow: 0 4px 14px rgba(34, 197, 94, 0.40);
 }
 
 .cm-btn-neutral {
-    background: #4318ff;
-    color: #ffffff;
+    background: var(--primary);
+    color: var(--bg-card);
     box-shadow: 0 2px 8px rgba(67, 24, 255, 0.25);
 }
 .cm-btn-neutral:hover:not(:disabled) {
-    background: #3310d6;
+    background: var(--primary-dark-hover);
     box-shadow: 0 4px 14px rgba(67, 24, 255, 0.35);
 }
 
 /* ── Icon circles ────────────────────────────────────────── */
 .cm-icon-danger {
-    background: #fef2f2;
-    color: #ef4444;
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
 }
 
 .cm-icon-warning {
-    background: #fffbeb;
-    color: #f59e0b;
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
 }
 
 .cm-icon-info {
-    background: #eff6ff;
-    color: #3b82f6;
+    background: rgba(79,70,229,0.08);
+    color: var(--primary);
 }
 
 .cm-icon-success {
-    background: #f0fdf4;
-    color: #22c55e;
+    background: var(--status-active-bg);
+    color: var(--status-active);
 }
 
 .cm-icon-neutral {
-    background: #f0eeff;
-    color: #4318ff;
+    background: rgba(79,70,229,0.08);
+    color: var(--primary);
 }
 
 /* ── Notice callouts ─────────────────────────────────────── */
 .cm-notice-danger {
-    background: #fef2f2;
-    border-color: #fecaca;
-    color: #991b1b;
+    background: var(--status-failed-bg);
+    border-color: rgba(220,38,38,0.2);
+    color: var(--status-failed);
 }
-.cm-notice-danger .cm-notice-icon { color: #ef4444; }
+.cm-notice-danger .cm-notice-icon { color: var(--status-failed); }
 
 .cm-notice-warning {
-    background: #fffbeb;
+    background: var(--status-pending-bg);
     border-color: #fde68a;
-    color: #92400e;
+    color: var(--status-pending);
 }
-.cm-notice-warning .cm-notice-icon { color: #f59e0b; }
+.cm-notice-warning .cm-notice-icon { color: var(--status-pending); }
 
 .cm-notice-info {
-    background: #eff6ff;
+    background: rgba(79,70,229,0.08);
     border-color: #bfdbfe;
     color: #1e40af;
 }
-.cm-notice-info .cm-notice-icon { color: #3b82f6; }
+.cm-notice-info .cm-notice-icon { color: var(--primary); }
 
 .cm-notice-success {
-    background: #f0fdf4;
+    background: var(--status-active-bg);
     border-color: #bbf7d0;
-    color: #166534;
+    color: var(--status-active);
 }
-.cm-notice-success .cm-notice-icon { color: #22c55e; }
+.cm-notice-success .cm-notice-icon { color: var(--status-active); }
 
 .cm-notice-neutral {
-    background: #f8f7ff;
+    background: rgba(79,70,229,0.05);
     border-color: #ddd6fe;
     color: #3730a3;
 }
-.cm-notice-neutral .cm-notice-icon { color: #4318ff; }
+.cm-notice-neutral .cm-notice-icon { color: var(--primary); }
 
 /* ── Spinner ─────────────────────────────────────────────── */
 @keyframes cm-spin {

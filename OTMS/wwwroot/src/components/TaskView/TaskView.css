@@ -1,13 +1,13 @@
-﻿/* ─────────────────────────────────────────────
+/* ---------------------------------------------
    TaskView.css
-───────────────────────────────────────────── */
+--------------------------------------------- */
 
-/* ── Backdrop ── */
+/* -- Backdrop -- */
 .tv-backdrop {
     display: none;
 }
 
-/* ── Panel ── */
+/* -- Panel -- */
 .tv-panel {
     position: fixed;
     top: 0;
@@ -20,7 +20,7 @@
     display: flex;
     flex-direction: column;
     box-shadow: none;
-    border-left: 1px solid #eef0f8;
+    border-left: 1px solid var(--border);
     animation: tv-slide-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     overflow: hidden;
 }
@@ -37,14 +37,14 @@
     }
 }
 
-/* ── Header ── */
+/* -- Header -- */
 .tv-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px;
     padding: 20px 28px 16px;
-    border-bottom: 1px solid #eef0f8;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     background: #fff;
 }
@@ -63,7 +63,7 @@
 .tv-title {
     font-size: 17px;
     font-weight: 700;
-    color: #1b2559;
+    color: var(--text-primary);
     margin: 0 0 4px;
     line-height: 1.3;
     overflow: hidden;
@@ -74,12 +74,12 @@
 
 .tv-subtitle {
     font-size: 12px;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     margin: 0;
 }
 
     .tv-subtitle strong {
-        color: #1b2559;
+        color: var(--text-primary);
         font-weight: 600;
     }
 
@@ -90,7 +90,7 @@
     flex-shrink: 0;
 }
 
-/* ── Review Banner ── */
+/* -- Review Banner -- */
 .tv-review-banner {
     display: flex;
     align-items: center;
@@ -132,67 +132,67 @@
 }
 
 .tv-review-none {
-    background: #f8f9fe;
-    border-color: #eef0f8;
-    color: #a3aed0;
+    background: var(--bg-input);
+    border-color: var(--border);
+    color: var(--sidebar-text);
 }
 
     .tv-review-none .tv-review-banner-title {
-        color: #1b2559;
+        color: var(--text-primary);
     }
 
 .tv-review-pending {
-    background: #fffbf0;
-    border-color: #fde8a0;
+    background: var(--status-pending-bg);
+    border-color: rgba(217,119,6,0.2);
 }
 
     .tv-review-pending .tv-review-banner-title {
-        color: #7a5c00;
+        color: var(--status-pending);
     }
 
     .tv-review-pending .tv-review-banner-sub {
-        color: #b07d00;
+        color: var(--status-pending);
     }
 
     .tv-review-pending > .tv-review-banner-left > svg {
-        color: #ffb547;
+        color: var(--status-pending);
     }
 
 .tv-review-approved {
-    background: #f0fdf8;
+    background: var(--status-active-bg);
     border-color: #9fe1cb;
 }
 
     .tv-review-approved .tv-review-banner-title {
-        color: #085041;
+        color: var(--status-active);
     }
 
     .tv-review-approved .tv-review-banner-sub {
-        color: #0f6e56;
+        color: var(--status-active);
     }
 
     .tv-review-approved > .tv-review-banner-left > svg {
-        color: #01b574;
+        color: var(--status-active);
     }
 
 .tv-review-rejected {
-    background: #fff5f5;
+    background: var(--status-failed-bg);
     border-color: #fdd;
 }
 
     .tv-review-rejected .tv-review-banner-title {
-        color: #7f1d1d;
+        color: var(--status-failed);
     }
 
     .tv-review-rejected .tv-review-banner-sub {
-        color: #ee5d50;
+        color: var(--status-failed);
     }
 
     .tv-review-rejected > .tv-review-banner-left > svg {
-        color: #ee5d50;
+        color: var(--status-failed);
     }
 
-/* ── Buttons ── */
+/* -- Buttons -- */
 .tv-btn {
     display: inline-flex;
     align-items: center;
@@ -212,7 +212,7 @@
     }
 
 .tv-btn-primary {
-    background: #4318ff;
+    background: var(--primary);
     color: #fff;
 }
 
@@ -221,7 +221,7 @@
     }
 
 .tv-btn-success {
-    background: #01b574;
+    background: var(--status-active);
     color: #fff;
 }
 
@@ -230,7 +230,7 @@
     }
 
 .tv-btn-danger-solid {
-    background: #ee5d50;
+    background: var(--status-failed);
     color: #fff;
 }
 
@@ -239,8 +239,8 @@
     }
 
 .tv-btn-danger {
-    background: #fff1f0;
-    color: #ee5d50;
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
     border: 1px solid #fcc;
 }
 
@@ -255,31 +255,31 @@
 
 .tv-btn-outline {
     background: transparent;
-    color: #1b2559;
-    border: 1px solid #d0d5e8;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
 }
 
     .tv-btn-outline:hover {
-        background: #f4f7ff;
+        background: var(--bg-input);
     }
 
 .tv-btn-ghost-sm {
     background: transparent;
-    color: #a3aed0;
-    border: 1px solid #d0d5e8;
+    color: var(--sidebar-text);
+    border: 1px solid var(--border);
     padding: 5px 12px;
     font-size: 11.5px;
     border-radius: 7px;
 }
 
     .tv-btn-ghost-sm:hover {
-        background: #f4f7ff;
-        color: #1b2559;
+        background: var(--bg-input);
+        color: var(--text-primary);
     }
 
 .tv-btn-outline-sm {
     background: transparent;
-    color: #ee5d50;
+    color: var(--status-failed);
     border: 1px solid #fcc;
     padding: 5px 12px;
     font-size: 11.5px;
@@ -287,16 +287,16 @@
 }
 
     .tv-btn-outline-sm:hover {
-        background: #fff5f5;
+        background: var(--status-failed-bg);
     }
 
 .tv-icon-btn {
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    border: 1px solid #eef0f8;
+    border: 1px solid var(--border);
     background: transparent;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -305,15 +305,15 @@
 }
 
     .tv-icon-btn:hover {
-        background: #f4f7ff;
-        color: #1b2559;
+        background: var(--bg-input);
+        color: var(--text-primary);
     }
 
-/* ── Mobile tabs ── */
+/* -- Mobile tabs -- */
 .tv-tabs {
     display: none;
     padding: 0 28px;
-    border-bottom: 1px solid #eef0f8;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -321,7 +321,7 @@
     padding: 10px 18px;
     font-size: 13px;
     font-weight: 600;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
@@ -334,13 +334,13 @@
 }
 
     .tv-tab.active {
-        color: #4318ff;
-        border-bottom-color: #4318ff;
+        color: var(--primary);
+        border-bottom-color: var(--primary);
     }
 
 .tv-tab-count {
-    background: #eef0f8;
-    color: #a3aed0;
+    background: var(--border);
+    color: var(--sidebar-text);
     font-size: 10px;
     font-weight: 700;
     border-radius: 999px;
@@ -348,11 +348,11 @@
 }
 
 .tv-tab.active .tv-tab-count {
-    background: #ede9ff;
-    color: #4318ff;
+    background: rgba(79,70,229,0.10);
+    color: var(--primary);
 }
 
-/* ── Body ── */
+/* -- Body -- */
 .tv-body {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -361,11 +361,11 @@
     min-height: 0;
 }
 
-/* ── Left: Details ── */
+/* -- Left: Details -- */
 .tv-details {
     padding: 20px 26px;
     overflow-y: auto;
-    border-right: 1px solid #eef0f8;
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -381,8 +381,8 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    background: #f8f9fe;
-    border: 1px solid #eef0f8;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 16px;
     min-width: 90px;
@@ -391,7 +391,7 @@
 .tv-meta-label {
     font-size: 10px;
     font-weight: 700;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
@@ -399,11 +399,11 @@
 .tv-meta-value {
     font-size: 13px;
     font-weight: 600;
-    color: #1b2559;
+    color: var(--text-primary);
 }
 
     .tv-meta-value.tv-overdue {
-        color: #ee5d50;
+        color: var(--status-failed);
     }
 
 .tv-section {
@@ -415,7 +415,7 @@
 .tv-section-label {
     font-size: 10px;
     font-weight: 700;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
@@ -429,16 +429,16 @@
 .tv-assignee-name {
     font-size: 14px;
     font-weight: 600;
-    color: #1b2559;
+    color: var(--text-primary);
 }
 
 .tv-text-box {
-    background: #f8f9fe;
-    border: 1px solid #eef0f8;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 13px 16px;
     font-size: 13.5px;
-    color: #1b2559;
+    color: var(--text-primary);
     line-height: 1.65;
     min-height: 52px;
     white-space: pre-wrap;
@@ -446,22 +446,22 @@
 }
 
 .tv-text-box-remarks {
-    background: #fffbf0;
-    border-color: #fde8a0;
-    color: #7a5c00;
+    background: var(--status-pending-bg);
+    border-color: rgba(217,119,6,0.2);
+    color: var(--status-pending);
 }
 
 .tv-empty-text {
-    color: #a3aed0;
+    color: var(--sidebar-text);
     font-style: italic;
 }
 
-/* ── Review history ── */
+/* -- Review history -- */
 .tv-review-history {
     display: flex;
     flex-direction: column;
     gap: 0;
-    border: 1px solid #eef0f8;
+    border: 1px solid var(--border);
     border-radius: 10px;
     overflow: hidden;
 }
@@ -471,7 +471,7 @@
     align-items: flex-start;
     gap: 12px;
     padding: 11px 14px;
-    border-bottom: 1px solid #eef0f8;
+    border-bottom: 1px solid var(--border);
 }
 
     .tv-rh-item:last-child {
@@ -487,19 +487,19 @@
 }
 
 .tv-rh-dot-submitted {
-    background: #4318ff;
+    background: var(--primary);
 }
 
 .tv-rh-dot-approved {
-    background: #01b574;
+    background: var(--status-active);
 }
 
 .tv-rh-dot-rejected {
-    background: #ee5d50;
+    background: var(--status-failed);
 }
 
 .tv-rh-dot-reopened {
-    background: #a3aed0;
+    background: var(--sidebar-text);
 }
 
 .tv-rh-content {
@@ -511,22 +511,22 @@
 .tv-rh-label {
     font-size: 12.5px;
     font-weight: 600;
-    color: #1b2559;
+    color: var(--text-primary);
 }
 
 .tv-rh-meta {
     font-size: 11px;
-    color: #a3aed0;
+    color: var(--sidebar-text);
 }
 
 .tv-rh-note {
     font-size: 11.5px;
-    color: #ee5d50;
+    color: var(--status-failed);
     font-style: italic;
     margin-top: 2px;
 }
 
-/* ── Timeline ── */
+/* -- Timeline -- */
 .tv-timeline {
     display: flex;
     flex-direction: column;
@@ -544,24 +544,24 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: #a3aed0;
+    background: var(--sidebar-text);
     flex-shrink: 0;
 }
 
     .tv-timeline-dot.tv-dot-blue {
-        background: #4318ff;
+        background: var(--primary);
     }
 
     .tv-timeline-dot.tv-dot-red {
-        background: #ee5d50;
+        background: var(--status-failed);
     }
 
 .tv-timeline-text {
     font-size: 11.5px;
-    color: #a3aed0;
+    color: var(--sidebar-text);
 }
 
-/* ── Avatars ── */
+/* -- Avatars -- */
 .tv-avatar {
     width: 30px;
     height: 30px;
@@ -575,11 +575,11 @@
 }
 
 .tv-avatar-blue {
-    background: #ede9ff;
-    color: #4318ff;
+    background: rgba(79,70,229,0.10);
+    color: var(--primary);
 }
 
-/* ── Badges ── */
+/* -- Badges -- */
 .tv-badge {
     display: inline-flex;
     align-items: center;
@@ -591,31 +591,31 @@
 }
 
 .tv-badge-blue {
-    background: #e9f0ff;
-    color: #4318ff;
+    background: rgba(79,70,229,0.08);
+    color: var(--primary);
 }
 
 .tv-badge-amber {
-    background: #fff8e6;
-    color: #b07d00;
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
 }
 
 .tv-badge-green {
-    background: #e6faf4;
-    color: #01b574;
+    background: var(--status-active-bg);
+    color: var(--status-active);
 }
 
 .tv-badge-red {
-    background: #fff1f0;
-    color: #ee5d50;
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
 }
 
 .tv-badge-purple {
     background: #f0ebff;
-    color: #6a3de8;
+    color: var(--primary);
 }
 
-/* ── Priority dots ── */
+/* -- Priority dots -- */
 .tv-prio-dot {
     display: inline-block;
     width: 9px;
@@ -626,21 +626,21 @@
 }
 
     .tv-prio-dot.high {
-        background: #ee5d50;
+        background: var(--status-failed);
         box-shadow: 0 0 0 3px rgba(238,93,80,0.18);
     }
 
     .tv-prio-dot.medium {
-        background: #ffb547;
+        background: var(--status-pending);
         box-shadow: 0 0 0 3px rgba(255,181,71,0.18);
     }
 
     .tv-prio-dot.low {
-        background: #05cd99;
+        background: var(--status-active);
         box-shadow: 0 0 0 3px rgba(5,205,153,0.18);
     }
 
-/* ── Right: Comments ── */
+/* -- Right: Comments -- */
 .tv-comments {
     display: flex;
     flex-direction: column;
@@ -653,19 +653,19 @@
     align-items: center;
     gap: 8px;
     padding: 16px 20px 12px;
-    border-bottom: 1px solid #eef0f8;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
 .tv-comments-title {
     font-size: 13px;
     font-weight: 700;
-    color: #1b2559;
+    color: var(--text-primary);
 }
 
 .tv-comments-count {
-    background: #eef0f8;
-    color: #a3aed0;
+    background: var(--border);
+    color: var(--sidebar-text);
     font-size: 10.5px;
     font-weight: 700;
     border-radius: 999px;
@@ -690,7 +690,7 @@
     gap: 6px;
     flex: 1;
     padding: 48px 0;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     text-align: center;
 }
 
@@ -698,7 +698,7 @@
         margin: 0;
         font-size: 14px;
         font-weight: 600;
-        color: #1b2559;
+        color: var(--text-primary);
     }
 
     .tv-thread-empty span {
@@ -711,10 +711,10 @@
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    background: #f8f9fe;
+    background: var(--bg-input);
     border-radius: 8px;
     font-size: 11.5px;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     flex-wrap: wrap;
 }
 
@@ -722,14 +722,14 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #c4c9e0;
+    background: var(--border-hover);
     flex-shrink: 0;
 }
 
 .tv-system-time {
     margin-left: auto;
     font-size: 10px;
-    color: #c4c9e0;
+    color: var(--border-hover);
     white-space: nowrap;
 }
 
@@ -752,8 +752,8 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #eef0f8;
-    color: #4318ff;
+    background: var(--border);
+    color: var(--primary);
     font-size: 11px;
     font-weight: 700;
     display: flex;
@@ -763,7 +763,7 @@
 }
 
 .tv-avatar-self {
-    background: #4318ff;
+    background: var(--primary);
     color: #fff;
 }
 
@@ -785,7 +785,7 @@
 .tv-msg-author {
     font-size: 11px;
     font-weight: 600;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     padding: 0 2px;
 }
 
@@ -799,27 +799,27 @@
 }
 
 .tv-bubble-theirs {
-    background: #f4f7ff;
-    color: #1b2559;
+    background: var(--bg-input);
+    color: var(--text-primary);
     border-bottom-left-radius: 4px;
 }
 
 .tv-bubble-mine {
-    background: #4318ff;
+    background: var(--primary);
     color: #fff;
     border-bottom-right-radius: 4px;
 }
 
 .tv-msg-time {
     font-size: 10px;
-    color: #c4c9e0;
+    color: var(--border-hover);
     padding: 0 2px;
 }
 
-/* ── Input area ── */
+/* -- Input area -- */
 .tv-input-area {
     padding: 10px 18px 14px;
-    border-top: 1px solid #eef0f8;
+    border-top: 1px solid var(--border);
     flex-shrink: 0;
     background: #fff;
 }
@@ -834,7 +834,7 @@
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    background: #4318ff;
+    background: var(--primary);
     color: #fff;
     font-size: 12px;
     font-weight: 700;
@@ -849,15 +849,15 @@
     display: flex;
     align-items: flex-end;
     gap: 8px;
-    background: #f8f9fe;
-    border: 1.5px solid #eef0f8;
+    background: var(--bg-input);
+    border: 1.5px solid var(--border);
     border-radius: 14px;
     padding: 8px 8px 8px 14px;
     transition: border-color 0.15s, background 0.15s;
 }
 
     .tv-input-box:focus-within {
-        border-color: #4318ff;
+        border-color: var(--primary);
         background: #fff;
     }
 
@@ -866,7 +866,7 @@
     border: none;
     background: transparent;
     font-size: 13px;
-    color: #1b2559;
+    color: var(--text-primary);
     resize: none;
     outline: none;
     font-family: inherit;
@@ -877,14 +877,14 @@
 }
 
     .tv-textarea::placeholder {
-        color: #c4c9e0;
+        color: var(--border-hover);
     }
 
 .tv-send-btn {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: #4318ff;
+    background: var(--primary);
     color: #fff;
     border: none;
     cursor: pointer;
@@ -911,11 +911,11 @@
 
 .tv-input-hint {
     font-size: 10.5px;
-    color: #c4c9e0;
+    color: var(--border-hover);
     margin: 5px 0 0 42px;
 }
 
-/* ── Reject modal ── */
+/* -- Reject modal -- */
 .tv-modal-overlay {
     position: fixed;
     inset: 0;
@@ -979,46 +979,46 @@
 }
 
 .tv-modal-icon-danger {
-    background: #fff1f0;
-    color: #ee5d50;
+    background: var(--status-failed-bg);
+    color: var(--status-failed);
 }
 
 .tv-modal-title {
     font-size: 15px;
     font-weight: 700;
-    color: #1b2559;
+    color: var(--text-primary);
     margin: 0 0 3px;
 }
 
 .tv-modal-sub {
     font-size: 12px;
-    color: #a3aed0;
+    color: var(--sidebar-text);
     margin: 0;
 }
 
 .tv-modal-textarea {
     width: 100%;
-    border: 1.5px solid #eef0f8;
+    border: 1.5px solid var(--border);
     border-radius: 10px;
     padding: 11px 14px;
     font-size: 13px;
-    color: #1b2559;
+    color: var(--text-primary);
     font-family: inherit;
     resize: none;
     outline: none;
-    background: #f8f9fe;
+    background: var(--bg-input);
     transition: border-color 0.15s;
     box-sizing: border-box;
     line-height: 1.5;
 }
 
     .tv-modal-textarea:focus {
-        border-color: #ee5d50;
+        border-color: var(--status-failed);
         background: #fff;
     }
 
     .tv-modal-textarea::placeholder {
-        color: #c4c9e0;
+        color: var(--border-hover);
     }
 
 .tv-modal-actions {
@@ -1027,7 +1027,7 @@
     gap: 8px;
 }
 
-/* ── Scrollbar ── */
+/* -- Scrollbar -- */
 .tv-details::-webkit-scrollbar,
 .tv-thread::-webkit-scrollbar {
     width: 4px;
@@ -1040,11 +1040,11 @@
 
 .tv-details::-webkit-scrollbar-thumb,
 .tv-thread::-webkit-scrollbar-thumb {
-    background: #e0e5f2;
+    background: var(--border);
     border-radius: 2px;
 }
 
-/* ── Mobile ── */
+/* -- Mobile -- */
 @media (max-width: 700px) {
     .tv-panel {
         width: 100vw;

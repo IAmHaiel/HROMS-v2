@@ -3,9 +3,9 @@
 .table-card {
     display: flex;
     flex-direction: column;
-    background: var(--bg-card, #ffffff);
+    background: var(--bg-card, var(--bg-card));
     border-radius: var(--radius, 16px);
-    border: 1px solid var(--border, #e8ecf4);
+    border: 1px solid var(--border, var(--border));
     box-shadow: var(--shadow-sm, 0 2px 12px rgba(15, 21, 53, 0.06));
     transition: var(--transition, all 0.22s cubic-bezier(0.4, 0, 0.2, 1));
     /* Do NOT use overflow:hidden here — it clips the actions dropdown */
@@ -21,7 +21,7 @@
     display: flex;
     gap: 24px;
     padding: 0 24px;
-    border-bottom: 1px solid var(--border, #e8ecf4);
+    border-bottom: 1px solid var(--border, var(--border));
     background: transparent;
     /* Keep tab area clipped to card radius without clipping dropdown */
     border-radius: var(--radius, 16px) var(--radius, 16px) 0 0;
@@ -38,7 +38,7 @@
     font-family: inherit;
     font-size: 0.88rem;
     font-weight: 600;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     position: relative;
     transition: color 0.2s ease;
 }
@@ -48,7 +48,7 @@
 }
 
 .table-card-tab-btn.active {
-    color: var(--primary, #4318ff);
+    color: var(--primary, var(--primary));
 }
 
 .table-card-tab-btn::after {
@@ -58,7 +58,7 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: var(--primary, #4318ff);
+    background: var(--primary, var(--primary));
     border-radius: 99px 99px 0 0;
     transform: scaleX(0);
     transition: transform 0.2s ease;
@@ -76,20 +76,20 @@
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 999px;
-    background: #f4f7fe;
-    color: var(--text-secondary, #8a95b0);
+    background: var(--bg-main);
+    color: var(--text-secondary, var(--text-secondary));
     transition: all 0.2s ease;
 }
 
 .table-card-tab-badge.active {
     background: var(--primary-light, rgba(67, 24, 255, 0.08));
-    color: var(--primary, #4318ff);
+    color: var(--primary, var(--primary));
 }
 
 /* ── Filter / Search Bar ── */
 .table-card-results-info {
     font-size: 0.78rem;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     font-weight: 500;
 }
 
@@ -113,7 +113,7 @@
     left: 12px;
     top: 50%;
     transform: translateY(-50%);
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     pointer-events: none;
 }
 
@@ -122,7 +122,7 @@
     height: 38px;
     padding: 0 12px 0 36px;
     border-radius: var(--radius-sm, 8px);
-    border: 1.5px solid var(--border, #e8ecf4);
+    border: 1.5px solid var(--border, var(--border));
     background: white;
     font-size: 0.82rem;
     font-weight: 500;
@@ -134,7 +134,7 @@
 }
 
 .table-card-search-input:focus {
-    border-color: var(--primary, #4318ff);
+    border-color: var(--primary, var(--primary));
     box-shadow: 0 0 0 3px var(--primary-light, rgba(67, 24, 255, 0.08));
 }
 
@@ -143,7 +143,7 @@
     height: 38px;
     padding: 0 32px 0 14px;
     border-radius: var(--radius-sm, 8px);
-    border: 1.5px solid var(--border, #e8ecf4);
+    border: 1.5px solid var(--border, var(--border));
     background-color: white;
     color: var(--text-primary, #1a2332);
     font-size: 0.82rem;
@@ -165,12 +165,12 @@
 }
 
 .table-card-filter-bar select:hover {
-    border-color: #cbd5e1;
-    background-color: #fcfdfe;
+    border-color: var(--border-hover);
+    background-color: var(--bg-main);
 }
 
 .table-card-filter-bar select:focus {
-    border-color: var(--primary, #4318ff);
+    border-color: var(--primary, var(--primary));
     box-shadow: 0 0 0 3px var(--primary-light, rgba(67, 24, 255, 0.08));
 }
 
@@ -182,9 +182,9 @@
     padding: 6px 14px;
     height: 32px;
     border-radius: var(--radius-full, 99px);
-    border: 1.5px solid var(--border, #e8ecf4);
+    border: 1.5px solid var(--border, var(--border));
     background: white;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
@@ -193,14 +193,14 @@
 }
 
 .table-card-filter-bar .filter-pill:hover {
-    border-color: var(--primary, #4318ff);
-    color: var(--primary, #4318ff);
+    border-color: var(--primary, var(--primary));
+    color: var(--primary, var(--primary));
     background: var(--primary-light, rgba(67, 24, 255, 0.03));
 }
 
 .table-card-filter-bar .filter-pill.active {
-    border-color: var(--primary, #4318ff);
-    color: var(--primary, #4318ff);
+    border-color: var(--primary, var(--primary));
+    color: var(--primary, var(--primary));
     background: var(--primary-light, rgba(67, 24, 255, 0.08));
     box-shadow: 0 2px 8px rgba(67, 24, 255, 0.12);
 }
@@ -222,7 +222,7 @@
 }
 
 .table-card-data-table thead tr {
-    background: #0d1b2e;
+    background: var(--sidebar-bg);
 }
 
 .table-card-data-table th {
@@ -245,7 +245,7 @@
 
 .table-card-data-table td {
     padding: 8px 12px;
-    border-bottom: 1px solid var(--border, #e8ecf4);
+    border-bottom: 1px solid var(--border, var(--border));
     font-size: 0.78rem;
     color: var(--text-primary, #1a2332);
     font-weight: 500;
@@ -256,7 +256,7 @@
 }
 
 .table-card-data-table tbody tr:hover {
-    background: #f7f9fd;
+    background: var(--bg-main);
 }
 
 .table-card-data-table tbody tr:last-child td {
@@ -276,7 +276,7 @@
     align-items: center;
     justify-content: center;
     padding: 48px 24px;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     font-size: 0.88rem;
     font-weight: 500;
     gap: 8px;
@@ -293,7 +293,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 16px;
-    border-top: 1px solid var(--border, #e8ecf4);
+    border-top: 1px solid var(--border, var(--border));
     margin-top: auto;
     flex-wrap: wrap;
     gap: 8px;
@@ -301,7 +301,7 @@
 
 .table-card-pagination-info {
     font-size: 0.78rem;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     font-weight: 500;
 }
 
@@ -316,7 +316,7 @@
     height: 32px;
     padding: 0 8px;
     border-radius: var(--radius-sm, 8px);
-    border: 1.5px solid var(--border, #e8ecf4);
+    border: 1.5px solid var(--border, var(--border));
     background: white;
     font-size: 0.78rem;
     font-weight: 600;
@@ -330,14 +330,14 @@
 }
 
 .table-card-page-btn:hover:not(:disabled) {
-    background: #eef2ff;
-    border-color: var(--primary, #4318ff);
-    color: var(--primary, #4318ff);
+    background: rgba(79,70,229,0.08);
+    border-color: var(--primary, var(--primary));
+    color: var(--primary, var(--primary));
 }
 
 .table-card-page-btn.active {
-    background: var(--primary, #4318ff);
-    border-color: var(--primary, #4318ff);
+    background: var(--primary, var(--primary));
+    border-color: var(--primary, var(--primary));
     color: white;
     box-shadow: 0 2px 7px rgba(67, 24, 255, 0.26);
 }
@@ -348,12 +348,12 @@
 }
 
 .table-card-page-btn-nav {
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
 }
 
 .table-card-page-ellipsis {
     font-size: 0.78rem;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     padding: 0 4px;
     display: inline-flex;
     align-items: center;
@@ -369,7 +369,7 @@
 .actions-dropdown-trigger {
     background: none;
     border: none;
-    color: var(--text-secondary, #8a95b0);
+    color: var(--text-secondary, var(--text-secondary));
     padding: 6px;
     border-radius: 8px;
     cursor: pointer;
@@ -386,13 +386,13 @@
 
 .actions-dropdown-trigger.active {
     background: rgba(15, 21, 53, 0.08);
-    color: var(--primary, #4318ff);
+    color: var(--primary, var(--primary));
 }
 
 .actions-dropdown-menu {
     position: fixed;
-    background: var(--bg-card, #ffffff);
-    border: 1px solid var(--border, #e8ecf4);
+    background: var(--bg-card, var(--bg-card));
+    border: 1px solid var(--border, var(--border));
     border-radius: 12px;
     box-shadow: 0 10px 40px rgba(26, 35, 50, 0.18);
     padding: 6px;
@@ -439,7 +439,7 @@
 }
 
 .actions-dropdown-item.danger {
-    color: #ee5d50;
+    color: var(--status-failed);
 }
 
 .actions-dropdown-item.danger:hover {
@@ -447,7 +447,7 @@
 }
 
 .actions-dropdown-item.success {
-    color: #05cd99;
+    color: var(--status-active);
 }
 
 .actions-dropdown-item.success:hover {

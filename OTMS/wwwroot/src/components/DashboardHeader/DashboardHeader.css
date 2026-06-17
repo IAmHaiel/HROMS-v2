@@ -18,7 +18,7 @@
 .dashboard-header-company {
     font-size: 0.8rem;
     font-weight: 700;
-    color: var(--text-primary, #1b254b);
+    color: var(--text-primary, var(--primary-dark));
     line-height: 1.2;
     letter-spacing: -0.01em;
 }
@@ -26,7 +26,7 @@
 .dashboard-header-date {
     font-size: 0.72rem;
     font-weight: 500;
-    color: var(--text-secondary, #a3aed0);
+    color: var(--text-secondary, var(--sidebar-text));
     line-height: 1.2;
 }
 
@@ -35,7 +35,7 @@
     height: 38px;
     border-radius: 50%;
     background: #000000;
-    color: #ffffff;
+    color: var(--bg-card);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,8 +93,8 @@
     position: absolute;
     right: 0;
     top: calc(100% + 8px);
-    background: var(--bg-card, #ffffff);
-    border: 1px solid var(--border, #e9edf7);
+    background: var(--bg-card, var(--bg-card));
+    border: 1px solid var(--border, var(--border));
     border-radius: 12px;
     box-shadow: 0px 10px 25px rgba(112, 144, 176, 0.15);
     z-index: 100;
@@ -123,7 +123,7 @@
     padding: 10px 12px;
     font-size: 0.84rem;
     font-weight: 600;
-    color: var(--text-primary, #1b254b);
+    color: var(--text-primary, var(--primary-dark));
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -134,7 +134,7 @@
 }
 
 .dropdown-item:hover {
-    background: var(--bg-main, #f4f7fe);
+    background: var(--bg-main, var(--bg-main));
     color: var(--primary, #00a99d);
 }
 

@@ -36,7 +36,7 @@
 
 .at-badge.at-approved {
     background: rgba(5, 205, 153, 0.1);
-    color: #047d5b;
+    color: var(--status-active);
 }
 
 .at-badge.at-rejected {
@@ -88,12 +88,12 @@
 
 .at-tier-circle.at-approved {
     background: rgba(5, 205, 153, 0.15);
-    color: #05cd99;
+    color: var(--status-active);
 }
 
 .at-tier-circle.at-rejected {
     background: rgba(238, 93, 80, 0.15);
-    color: #ee5d50;
+    color: var(--status-failed);
 }
 
 .at-tier-circle.at-current {
@@ -113,11 +113,11 @@
 }
 
 .at-tier-line.at-approved {
-    background: #05cd99;
+    background: var(--status-active);
 }
 
 .at-tier-line.at-rejected {
-    background: #ee5d50;
+    background: var(--status-failed);
 }
 
 .at-tier-line.at-pending, .at-tier-line.at-current {
@@ -142,8 +142,8 @@
     font-weight: 600;
 }
 
-.at-tier-status.at-approved { color: #05cd99; }
-.at-tier-status.at-rejected { color: #ee5d50; }
+.at-tier-status.at-approved { color: var(--status-active); }
+.at-tier-status.at-rejected { color: var(--status-failed); }
 .at-tier-status.at-current { color: var(--primary); }
 .at-tier-status.at-pending { color: var(--text-muted); }
 

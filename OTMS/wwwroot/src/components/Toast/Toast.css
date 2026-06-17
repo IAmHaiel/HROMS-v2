@@ -18,7 +18,7 @@
 .toast {
     position: relative;
     pointer-events: all;
-    background: #ffffff;
+    background: var(--bg-card);
     border-radius: 14px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 10px 24px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
     overflow: hidden;
@@ -111,7 +111,7 @@
     font-size: 13.5px;
     font-weight: 500;
     line-height: 1.45;
-    color: #1a202c;
+    color: var(--text-primary);
     word-break: break-word;
 }
 
@@ -126,15 +126,15 @@
     background: none;
     cursor: pointer;
     border-radius: 6px;
-    color: #9ca3af;
+    color: var(--text-tertiary);
     margin-top: -1px;
     margin-right: -2px;
     transition: background 0.15s, color 0.15s;
 }
 
     .toast-close:hover {
-        background: #f3f4f6;
-        color: #4b5563;
+        background: var(--bg-main);
+        color: var(--text-secondary);
     }
 
 /* ─── Confirm Actions ─────────────────────────────────────────────────────── */
@@ -161,123 +161,123 @@
     }
 
 .toast-btn-cancel {
-    background: #f3f4f6;
-    color: #374151;
+    background: var(--bg-main);
+    color: var(--text-secondary);
 }
 
     .toast-btn-cancel:hover {
-        background: #e5e7eb;
+        background: var(--border);
     }
 
 /* ─── Variant: Success ────────────────────────────────────────────────────── */
 
 .toast-success {
-    border-left: 4px solid #10b981;
+    border-left: 4px solid var(--status-active);
 }
 
     .toast-success .toast-icon {
-        color: #10b981;
+        color: var(--status-active);
     }
 
     .toast-success .toast-progress {
-        background: #10b981;
+        background: var(--status-active);
     }
 
     .toast-success .toast-btn-confirm {
-        background: #10b981;
+        background: var(--status-active);
         color: #fff;
     }
 
         .toast-success .toast-btn-confirm:hover {
-            background: #059669;
+            background: var(--status-active);
         }
 
 /* ─── Variant: Error ──────────────────────────────────────────────────────── */
 
 .toast-error {
-    border-left: 4px solid #ef4444;
+    border-left: 4px solid var(--status-failed);
 }
 
     .toast-error .toast-icon {
-        color: #ef4444;
+        color: var(--status-failed);
     }
 
     .toast-error .toast-progress {
-        background: #ef4444;
+        background: var(--status-failed);
     }
 
     .toast-error .toast-btn-confirm {
-        background: #ef4444;
+        background: var(--status-failed);
         color: #fff;
     }
 
         .toast-error .toast-btn-confirm:hover {
-            background: #dc2626;
+            background: var(--status-failed);
         }
 
 /* ─── Variant: Warning ────────────────────────────────────────────────────── */
 
 .toast-warning {
-    border-left: 4px solid #f59e0b;
+    border-left: 4px solid var(--status-pending);
 }
 
     .toast-warning .toast-icon {
-        color: #f59e0b;
+        color: var(--status-pending);
     }
 
     .toast-warning .toast-progress {
-        background: #f59e0b;
+        background: var(--status-pending);
     }
 
     .toast-warning .toast-btn-confirm {
-        background: #f59e0b;
+        background: var(--status-pending);
         color: #fff;
     }
 
         .toast-warning .toast-btn-confirm:hover {
-            background: #d97706;
+            background: var(--status-pending);
         }
 
 /* ─── Variant: Info ───────────────────────────────────────────────────────── */
 
 .toast-info {
-    border-left: 4px solid #4318ff;
+    border-left: 4px solid var(--primary);
 }
 
     .toast-info .toast-icon {
-        color: #4318ff;
+        color: var(--primary);
     }
 
     .toast-info .toast-progress {
-        background: #4318ff;
+        background: var(--primary);
     }
 
     .toast-info .toast-btn-confirm {
-        background: #4318ff;
+        background: var(--primary);
         color: #fff;
     }
 
         .toast-info .toast-btn-confirm:hover {
-            background: #3311cc;
+            background: var(--primary-dark-hover);
         }
 
 /* ─── Variant: Confirm ────────────────────────────────────────────────────── */
 
 .toast-confirm {
-    border-left: 4px solid #6366f1;
+    border-left: 4px solid var(--primary);
 }
 
     .toast-confirm .toast-icon {
-        color: #6366f1;
+        color: var(--primary);
     }
 
     .toast-confirm .toast-btn-confirm {
-        background: #6366f1;
+        background: var(--primary);
         color: #fff;
     }
 
         .toast-confirm .toast-btn-confirm:hover {
-            background: #4f46e5;
+            background: var(--primary);
         }
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
