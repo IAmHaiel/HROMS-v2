@@ -132,7 +132,6 @@ namespace OTMS.Service.Services
                 var senderEmail = _configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
                 var account = _configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
                 var password = _configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
-                var useSsl = bool.TryParse(_configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
@@ -141,7 +140,7 @@ namespace OTMS.Service.Services
                 message.Body = new TextPart("html") { Text = body };
 
                 using var client = new SmtpClient();
-                await client.ConnectAsync(smtpServer, smtpPort, useSsl);
+                await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(account, password);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);

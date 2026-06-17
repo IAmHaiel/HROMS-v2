@@ -227,6 +227,7 @@ namespace OTMS.Service.Services
             }
 
             var applicant = await context.ApplicantRecords
+                .Include(ar => ar.JobPosition)
                 .FirstOrDefaultAsync(ar => ar.ApplicantRecordId == request.ApplicantRecordId);
 
             if (applicant == null)
