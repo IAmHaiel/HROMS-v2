@@ -617,7 +617,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     // ── Shared field error renderer ───────────────────────────────────────
     const FieldErr = ({ name }: { name: string }) =>
         errors[name] ? (
-            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 11, color: 'var(--status-failed, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <AlertCircle size={11} />{errors[name]}
             </span>
         ) : null;
@@ -626,7 +626,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const CharCount = ({ value, max }: { value: string; max: number }) => (
         <span style={{
             fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right',
-            color: value.length > max * 0.9 ? (value.length >= max ? 'var(--danger, #ee5d50)' : '#c05c00') : 'var(--text-secondary)',
+            color: value.length > max * 0.9 ? (value.length >= max ? 'var(--status-failed, #ee5d50)' : '#c05c00') : 'var(--text-secondary)',
         }}>
             {value.length}/{max}
         </span>
@@ -649,7 +649,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
 
                     {/* ── Task Title ── */}
                     <div className="field">
-                        <label>Task Title <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
+                        <label>Task Title <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span></label>
                         <input
                             value={form.taskTitle}
                             onChange={set('taskTitle')}
@@ -687,7 +687,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     <div className="field-row">
                         <div className="field">
                             <label>
-                                Due Date <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                                Due Date <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span>
                             </label>
                             <input
                                 type="datetime-local"
@@ -709,7 +709,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                         <div className="field">
                             <label>
-                                Priority <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                                Priority <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span>
                             </label>
                             <select
                                 value={form.priority}
@@ -809,7 +809,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     <div className="field">
                         <label>
                             {mode === 'new' ? 'Final Assigned Employee' : 'Assign To'}
-                            <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span>
+                            <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span>
                         </label>
                         <div
                             className={`assignee-select${errors.assignedTo ? ' input-error' : ''}`}
@@ -1859,91 +1859,80 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, teamMembers, on
     const FieldErr = ({ name }: { name: string }) => errors[name] ? <span className="report-field-error">{errors[name]}</span> : null;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div>
-                        <h3>{isEdit ? 'Edit Task Template' : 'Create Task Template'}</h3>
-                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                            {isEdit ? 'Update the template details below.' : 'Fill in the details to create a recurring task template.'}
-                        </p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        <Modal isOpen onClose={onClose}
+            title={isEdit ? 'Edit Task Template' : 'Create Task Template'}
+            subtitle={isEdit ? 'Update the template details below.' : 'Fill in the details to create a recurring task template.'}
+            size="md"
+            footer={
+                <>
+                    <button className="btn" onClick={onClose}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                        {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> {isEdit ? 'Update Template' : 'Create Template'}</>}
+                    </button>
+                </>
+            }
+        >
+            {apiError && <div className="report-error-msg" style={{ marginBottom: 14 }}>{apiError}</div>}
+
+            <div className="field">
+                <label>Template Name *</label>
+                <input type="text" className={errors.templateName ? 'report-input report-input-error' : 'report-input'}
+                    value={form.templateName} onChange={set('templateName')} maxLength={150} placeholder="e.g. Weekly Warehouse Inventory" />
+                <FieldErr name="templateName" />
+            </div>
+
+            <div className="field">
+                <label>Template Description *</label>
+                <textarea className={errors.templateDescription ? 'report-input report-input-error' : 'report-input'}
+                    rows={3} value={form.templateDescription} onChange={set('templateDescription')} maxLength={2000} placeholder="Describe the recurring task..." />
+                <FieldErr name="templateDescription" />
+                <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: 'var(--text-secondary)' }}>{form.templateDescription.length}/2000</span>
+            </div>
+
+            <div className="field-row">
+                <div className="field">
+                    <label>Priority Level</label>
+                    <select className="report-select" value={form.priorityLevel} onChange={set('priorityLevel')}>
+                        {PRIORITY_LEVELS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
                 </div>
-
-                <div className="modal-form">
-                    {apiError && (
-                        <div className="report-error-msg" style={{ marginBottom: 14 }}>{apiError}</div>
-                    )}
-
-                    <div className="field">
-                        <label>Template Name *</label>
-                        <input type="text" className={errors.templateName ? 'report-input report-input-error' : 'report-input'}
-                            value={form.templateName} onChange={set('templateName')} maxLength={150} placeholder="e.g. Weekly Warehouse Inventory" />
-                        <FieldErr name="templateName" />
-                    </div>
-
-                    <div className="field">
-                        <label>Template Description *</label>
-                        <textarea className={errors.templateDescription ? 'report-input report-input-error' : 'report-input'}
-                            rows={3} value={form.templateDescription} onChange={set('templateDescription')} maxLength={2000} placeholder="Describe the recurring task..." />
-                        <FieldErr name="templateDescription" />
-                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: 'var(--text-secondary)' }}>{form.templateDescription.length}/2000</span>
-                    </div>
-
-                    <div className="field-row">
-                        <div className="field">
-                            <label>Priority Level</label>
-                            <select className="report-select" value={form.priorityLevel} onChange={set('priorityLevel')}>
-                                {PRIORITY_LEVELS.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div className="field">
-                            <label>Recurrence Type</label>
-                            <select className="report-select" value={form.recurrenceType} onChange={set('recurrenceType')}>
-                                {RECURRENCE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="field-row">
-                        <div className="field">
-                            <label>Recurrence Start Date *</label>
-                            <input type="date" className={errors.recurrenceStartDate ? 'report-input report-input-error' : 'report-input'}
-                                value={form.recurrenceStartDate} onChange={set('recurrenceStartDate')} />
-                            <FieldErr name="recurrenceStartDate" />
-                        </div>
-                        <div className="field">
-                            <label>Assigned Employee</label>
-                            <select className="report-select" value={form.assignedEmployee} onChange={set('assignedEmployee')}>
-                                <option value="">Auto-assign (unassigned)</option>
-                                {teamMembers.map(m => <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="field">
-                        <label>Template Status</label>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            {TEMPLATE_STATUSES.map(s => (
-                                <button key={s} type="button"
-                                    className={`filter-pill${form.templateStatus === s ? ' active' : ''}`}
-                                    onClick={() => { setForm(p => ({ ...p, templateStatus: s })); }}>
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-                        <button className="btn" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-                            {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> {isEdit ? 'Update Template' : 'Create Template'}</>}
-                        </button>
-                    </div>
+                <div className="field">
+                    <label>Recurrence Type</label>
+                    <select className="report-select" value={form.recurrenceType} onChange={set('recurrenceType')}>
+                        {RECURRENCE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
                 </div>
             </div>
-        </div>
+
+            <div className="field-row">
+                <div className="field">
+                    <label>Recurrence Start Date *</label>
+                    <input type="date" className={errors.recurrenceStartDate ? 'report-input report-input-error' : 'report-input'}
+                        value={form.recurrenceStartDate} onChange={set('recurrenceStartDate')} />
+                    <FieldErr name="recurrenceStartDate" />
+                </div>
+                <div className="field">
+                    <label>Assigned Employee</label>
+                    <select className="report-select" value={form.assignedEmployee} onChange={set('assignedEmployee')}>
+                        <option value="">Auto-assign (unassigned)</option>
+                        {teamMembers.map(m => <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <div className="field">
+                <label>Template Status</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    {TEMPLATE_STATUSES.map(s => (
+                        <button key={s} type="button"
+                            className={`filter-pill${form.templateStatus === s ? ' active' : ''}`}
+                            onClick={() => { setForm(p => ({ ...p, templateStatus: s })); }}>
+                            {s}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </Modal>
     );
 };
 
@@ -2687,16 +2676,16 @@ function ProfileTab() {
                                 </div>
                             )}
                             <div className="field">
-                                <label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <label>First Name <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                                 <input
                                     type="text"
                                     value={profileForm.firstName}
                                     onChange={handleProfileChange('firstName')}
                                     placeholder="Enter first name"
                                     maxLength={50}
-                                    style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}}
+                                    style={validationErrors['firstName'] ? { borderColor: 'var(--status-failed)' } : {}}
                                 />
-                                {validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
+                                {validationErrors['firstName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
                             </div>
                             <div className="field">
                                 <label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
@@ -2706,32 +2695,32 @@ function ProfileTab() {
                                     onChange={handleProfileChange('middleName')}
                                     placeholder="Enter middle name"
                                     maxLength={50}
-                                    style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}}
+                                    style={validationErrors['middleName'] ? { borderColor: 'var(--status-failed)' } : {}}
                                 />
-                                {validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
+                                {validationErrors['middleName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
                             </div>
                             <div className="field">
-                                <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <label>Last Name <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                                 <input
                                     type="text"
                                     value={profileForm.lastName}
                                     onChange={handleProfileChange('lastName')}
                                     placeholder="Enter last name"
                                     maxLength={50}
-                                    style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}}
+                                    style={validationErrors['lastName'] ? { borderColor: 'var(--status-failed)' } : {}}
                                 />
-                                {validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
+                                {validationErrors['lastName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
                             </div>
                             <div className="field">
-                                <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <label>Email Address <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                                 <input
                                     type="email"
                                     value={profileForm.email}
                                     onChange={handleProfileChange('email')}
                                     placeholder="e.g. name@company.com"
-                                    style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}}
+                                    style={validationErrors['email'] ? { borderColor: 'var(--status-failed)' } : {}}
                                 />
-                                {validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
+                                {validationErrors['email'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
                             </div>
                             <div className="field">
                                 <label>Contact Number</label>
@@ -2740,9 +2729,9 @@ function ProfileTab() {
                                     value={profileForm.contactNumber}
                                     onChange={handleProfileChange('contactNumber')}
                                     placeholder="e.g. 09170000000"
-                                    style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}}
+                                    style={validationErrors['contactNumber'] ? { borderColor: 'var(--status-failed)' } : {}}
                                 />
-                                {validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
+                                {validationErrors['contactNumber'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
                             </div>
                             <div className="detail-grid" style={{ marginTop: 4 }}>
                                 <div className="detail-item">
@@ -2967,7 +2956,7 @@ function ProfileTab() {
                                     </button>
                                 </div>
                                 {pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && (
-                                    <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>
+                                    <span style={{ fontSize: 11, color: 'var(--status-failed)', marginTop: 3, display: 'block' }}>
                                         Passwords do not match
                                     </span>
                                 )}
@@ -3235,114 +3224,90 @@ const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onAp
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card reopen-approval-card" onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div>
-                        <h3>Reopen Task Approval</h3>
-                        <p className="modal-subtitle">Review and decide on the reopening request.</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-
-                <div className="modal-form">
-                    {/* ── Request Info ── */}
-                    <div className="reopen-info-grid">
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Request ID</span>
-                            <span className="reopen-info-value">{request.requestId}</span>
-                        </div>
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Task ID</span>
-                            <span className="reopen-info-value">{request.taskId}</span>
-                        </div>
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Task Title</span>
-                            <span className="reopen-info-value">{request.taskTitle}</span>
-                        </div>
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Employee</span>
-                            <span className="reopen-info-value">{request.employeeName}</span>
-                        </div>
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Current Status</span>
-                            <span className={`${statusBadgeClass(request.currentStatus)}`} style={{ fontSize: 11 }}>{request.currentStatus}</span>
-                        </div>
-                        <div className="reopen-info-item">
-                            <span className="reopen-info-label">Submitted</span>
-                            <span className="reopen-info-value">{fmtDate(request.submittedAt)}</span>
-                        </div>
-                    </div>
-
-                    {/* ── Reason ── */}
-                    <div className="field">
-                        <label>Reopening Reason</label>
-                        <div className="reopen-reason-box">{request.reason}</div>
-                    </div>
-
-                    {/* ── Supporting Evidence ── */}
-                    {request.supportingEvidence && (
-                        <div className="field">
-                            <label>Supporting Evidence</label>
-                            <div className="reopen-evidence-box">
-                                <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 500 }}>{request.supportingEvidence}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── Decision ── */}
-                    <div className="field">
-                        <label>Approval Decision <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
-                        <select
-                            value={decision}
-                            onChange={e => { setDecision(e.target.value as 'Approve' | 'Reject'); setErrors(prev => ({ ...prev, decision: '' })); }}
-                            className={errors.decision ? 'input-error' : ''}
-                        >
-                            <option value="">Select decision</option>
-                            <option value="Approve">Approve</option>
-                            <option value="Reject">Reject</option>
-                        </select>
-                        {errors.decision && (
-                            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <AlertCircle size={11} />{errors.decision}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* ── Admin Remarks ── */}
-                    <div className="field">
-                        <label>Admin Remarks <span style={{ color: 'var(--danger, #ee5d50)' }}>*</span></label>
-                        <textarea
-                            value={remarks}
-                            onChange={e => { setRemarks(e.target.value); setErrors(prev => ({ ...prev, remarks: '' })); }}
-                            placeholder="Provide a reason for your decision..."
-                            rows={3}
-                            className={errors.remarks ? 'input-error' : ''}
-                            maxLength={500}
-                        />
-                        {errors.remarks && (
-                            <span style={{ fontSize: 11, color: 'var(--danger, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <AlertCircle size={11} />{errors.remarks}
-                            </span>
-                        )}
-                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--danger, #ee5d50)' : '#c05c00') : 'var(--text-secondary)' }}>
-                            {remarks.length}/500
-                        </span>
-                    </div>
-                </div>
-
-                <div className="modal-actions">
+        <Modal isOpen onClose={onClose} title="Reopen Task Approval" subtitle="Review and decide on the reopening request." size="md"
+            footer={
+                <>
                     <div style={{ flex: 1 }} />
                     <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
-                        {submitting
-                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
-                            : <><ThumbsUp size={13} /> Submit Decision</>
-                        }
+                        {submitting ? <><Loader2 size={13} className="spin" /> Submitting…</> : <><ThumbsUp size={13} /> Submit Decision</>}
                     </button>
+                </>
+            }
+        >
+            <div className="reopen-info-grid">
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Request ID</span>
+                    <span className="reopen-info-value">{request.requestId}</span>
+                </div>
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Task ID</span>
+                    <span className="reopen-info-value">{request.taskId}</span>
+                </div>
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Task Title</span>
+                    <span className="reopen-info-value">{request.taskTitle}</span>
+                </div>
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Employee</span>
+                    <span className="reopen-info-value">{request.employeeName}</span>
+                </div>
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Current Status</span>
+                    <span className={statusBadgeClass(request.currentStatus)} style={{ fontSize: 11 }}>{request.currentStatus}</span>
+                </div>
+                <div className="reopen-info-item">
+                    <span className="reopen-info-label">Submitted</span>
+                    <span className="reopen-info-value">{fmtDate(request.submittedAt)}</span>
                 </div>
             </div>
-        </div>
+
+            <div className="field">
+                <label>Reopening Reason</label>
+                <div className="reopen-reason-box">{request.reason}</div>
+            </div>
+
+            {request.supportingEvidence && (
+                <div className="field">
+                    <label>Supporting Evidence</label>
+                    <div className="reopen-evidence-box">
+                        <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 500 }}>{request.supportingEvidence}</span>
+                    </div>
+                </div>
+            )}
+
+            <div className="field">
+                <label>Approval Decision <span style={{ color: 'var(--status-failed)' }}>*</span></label>
+                <select value={decision}
+                    onChange={e => { setDecision(e.target.value as 'Approve' | 'Reject'); setErrors(prev => ({ ...prev, decision: '' })); }}
+                    className={errors.decision ? 'input-error' : ''}>
+                    <option value="">Select decision</option>
+                    <option value="Approve">Approve</option>
+                    <option value="Reject">Reject</option>
+                </select>
+                {errors.decision && (
+                    <span style={{ fontSize: 11, color: 'var(--status-failed)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={11} />{errors.decision}
+                    </span>
+                )}
+            </div>
+
+            <div className="field">
+                <label>Admin Remarks <span style={{ color: 'var(--status-failed)' }}>*</span></label>
+                <textarea value={remarks}
+                    onChange={e => { setRemarks(e.target.value); setErrors(prev => ({ ...prev, remarks: '' })); }}
+                    placeholder="Provide a reason for your decision..." rows={3}
+                    className={errors.remarks ? 'input-error' : ''} maxLength={500} />
+                {errors.remarks && (
+                    <span style={{ fontSize: 11, color: 'var(--status-failed)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={11} />{errors.remarks}
+                    </span>
+                )}
+                <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                    {remarks.length}/500
+                </span>
+            </div>
+        </Modal>
     );
 };
 
