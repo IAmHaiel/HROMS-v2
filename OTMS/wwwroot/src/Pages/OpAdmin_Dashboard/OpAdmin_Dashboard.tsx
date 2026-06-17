@@ -1314,47 +1314,42 @@ const DashboardTab: React.FC<{
     return (
         <div className="dashboard-content">
             {/* Filters */}
-            <div className="card" style={{ marginBottom: 16, padding: '14px 20px' }}>
+            <div className="card" style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
-                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
-                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE START</label>
-                        <input type="date" value={filters.dateStart}
-                            onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })}
-                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 140 }}>
+                        <label className="form-label" style={{ whiteSpace: 'nowrap' }}>Date Start</label>
+                        <input type="date" className="form-input" value={filters.dateStart}
+                            onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })} />
                     </div>
-                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 140 }}>
-                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DATE END</label>
-                        <input type="date" value={filters.dateEnd}
-                            onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })}
-                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, outline: 'none' }} />
+                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 140 }}>
+                        <label className="form-label" style={{ whiteSpace: 'nowrap' }}>Date End</label>
+                        <input type="date" className="form-input" value={filters.dateEnd}
+                            onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })} />
                     </div>
-                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 160 }}>
-                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>EMPLOYEE</label>
-                        <select value={filters.employeeId}
-                            onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}
-                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 160 }}>
+                        <label className="form-label">Employee</label>
+                        <select className="form-input" value={filters.employeeId}
+                            onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}>
                             <option value="">All Employees</option>
                             {dashboardEmployees.map(m => (
                                 <option key={m.employeeId} value={m.employeeId}>{m.employeeName}</option>
                             ))}
                         </select>
                     </div>
-                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 150 }}>
-                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>DEPARTMENT</label>
-                        <select value={filters.departmentId}
-                            onChange={e => onFilterChange({ ...filters, departmentId: e.target.value })}
-                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 150 }}>
+                        <label className="form-label">Department</label>
+                        <select className="form-input" value={filters.departmentId}
+                            onChange={e => onFilterChange({ ...filters, departmentId: e.target.value })}>
                             <option value="">All Departments</option>
                             {dashboardDepartments.map(d => (
                                 <option key={d.departmentId} value={d.departmentId}>{d.departmentName}</option>
                             ))}
                         </select>
                     </div>
-                    <div className="field" style={{ margin: 0, flex: '0 0 auto', minWidth: 150 }}>
-                        <label style={{ fontSize: 11, marginBottom: 3, color: 'var(--text-secondary)', fontWeight: 700, letterSpacing: '0.5px' }}>TASK STATUS</label>
-                        <select value={filters.taskStatus}
-                            onChange={e => onFilterChange({ ...filters, taskStatus: e.target.value })}
-                            style={{ width: '100%', padding: '7px 10px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13, background: '#fff', outline: 'none' }}>
+                    <div className="form-group" style={{ flex: '0 0 auto', minWidth: 150 }}>
+                        <label className="form-label">Task Status</label>
+                        <select className="form-input" value={filters.taskStatus}
+                            onChange={e => onFilterChange({ ...filters, taskStatus: e.target.value })}>
                             <option value="">All Statuses</option>
                             <option value="Assigned">Assigned</option>
                             <option value="In Progress">In Progress</option>
@@ -1403,7 +1398,7 @@ const DashboardTab: React.FC<{
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
-                        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
+                        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
                                 <svg viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
                                     <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" strokeWidth="6" />
@@ -1430,8 +1425,8 @@ const DashboardTab: React.FC<{
                             </div>
                         </div>
 
-                        <div className="card" style={{ padding: '16px 20px' }}>
-                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                        <div className="card">
+                            <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
                                 <h3 style={{ fontSize: 13 }}>Task Assignment Distribution</h3>
                             </div>
                             {Object.keys(taskDist).length === 0 ? (
@@ -1444,7 +1439,7 @@ const DashboardTab: React.FC<{
                                             <XAxis hide type="number" />
                                             <YAxis hide type="category" dataKey="name" />
                                             <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
-                                            <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#4318ff" />
+                                            <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="var(--primary)" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
@@ -1460,8 +1455,8 @@ const DashboardTab: React.FC<{
                             )}
                         </div>
 
-                        <div className="card" style={{ padding: '16px 20px' }}>
-                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                        <div className="card">
+                            <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
                                 <h3 style={{ fontSize: 13 }}>Quick Summary</h3>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 12 }}>
@@ -1482,8 +1477,8 @@ const DashboardTab: React.FC<{
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }}>
-                        <div className="card" style={{ padding: '16px 20px' }}>
-                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                        <div className="card">
+                            <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
                                 <h3>Employee Workload Distribution</h3>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workloads.length} employees</span>
                             </div>
@@ -1497,16 +1492,16 @@ const DashboardTab: React.FC<{
                                         <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: 'var(--text-primary)' }} width={70} />
                                         <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
                                         <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                                        <Bar dataKey="Total" fill="#4318ff" radius={[0, 4, 4, 0]} stackId="a" />
-                                        <Bar dataKey="Completed" fill="#05cd99" radius={[0, 4, 4, 0]} stackId="a" />
-                                        <Bar dataKey="Overdue" fill="#ee5d50" radius={[0, 4, 4, 0]} stackId="a" />
+                                        <Bar dataKey="Total" fill="var(--primary)" radius={[0, 4, 4, 0]} stackId="a" />
+                                        <Bar dataKey="Completed" fill="var(--status-active)" radius={[0, 4, 4, 0]} stackId="a" />
+                                        <Bar dataKey="Overdue" fill="var(--status-failed)" radius={[0, 4, 4, 0]} stackId="a" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             )}
                         </div>
 
-                        <div className="card" style={{ padding: '16px 20px' }}>
-                            <div className="card-header-layout" style={{ marginBottom: 8 }}>
+                        <div className="card">
+                            <div className="card-header-layout" style={{ margin: 0, marginBottom: 12 }}>
                                 <h3>Task Status Distribution</h3>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{total} total</span>
                             </div>
@@ -2260,85 +2255,12 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
 
     return (
         <div className="dashboard-content">
-            <div className="card report-filter-card">
-                <div className="card-header-layout">
-                    <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
-                </div>
-                <div className="report-filter-grid">
-                    <div className="field">
-                        <label>Date Start *</label>
-                        <input type="date" className={inputClass('dateRangeStart')}
-                            value={filter.dateRangeStart}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
-                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Date End *</label>
-                        <input type="date" className={inputClass('dateRangeEnd')}
-                            value={filter.dateRangeEnd}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
-                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Employee</label>
-                        <select className="report-select"
-                            value={filter.employeeId}
-                            onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
-                            <option value="">All Employees</option>
-                            {teamMembers.map(m => (
-                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Priority</label>
-                        <select className="report-select"
-                            value={filter.taskPriorityLevel}
-                            onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
-                            <option value="">All Priorities</option>
-                            {PRIORITY_LEVELS.map(p => (
-                                <option key={p} value={p}>{p}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Status</label>
-                        <select className="report-select"
-                            value={filter.taskStatus}
-                            onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
-                            <option value="">All Statuses</option>
-                            {TASK_STATUSES_FILTER.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Category</label>
-                        <select className="report-select"
-                            value={filter.taskCategory}
-                            onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
-                            <option value="">All Categories</option>
-                            {TASK_CATEGORIES.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div className="report-filter-actions">
-                    <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
-                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
-                        {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
-                        {' '}{loading ? 'Generating...' : 'Generate Report'}
-                    </button>
-                </div>
-            </div>
-
-            {fetchError && <div className="report-error-msg">{fetchError}</div>}
-            {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
+            {fetchError && <div className="report-error-msg" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--status-failed-bg)', borderRadius: 'var(--radius-sm)', marginBottom: 16, color: 'var(--status-failed)', fontSize: 13 }}>{fetchError}</div>}
+            {noRecords && <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}><FileText size={32} /><p style={{ marginTop: 8 }}>No records found for selected criteria.</p></div>}
 
             {report && (
                 <>
-                    <div className="report-summary-grid">
+                    <div className="report-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 'var(--gap)', marginBottom: 'var(--gap)' }}>
                         <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
                         <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
                         <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
@@ -2348,25 +2270,63 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                         <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
                     </div>
 
-                    <div className="card">
-                        <DataTable
-                            title="Employee Performance Summary"
-                            headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
-                            loading={false}
-                            emptyMessage="No employee data for selected criteria."
-                            totalRecords={report.employeePerformanceSummary.length}
-                        >
-                            {report.employeePerformanceSummary.map(ep => (
-                                <tr key={ep.employeeName}>
-                                    <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
-                                    <td>{ep.totalAssigned}</td>
-                                    <td>{ep.totalCompleted}</td>
-                                    <td>{ep.completionRate}%</td>
-                                    <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
-                                </tr>
-                            ))}
-                        </DataTable>
-                    </div>
+                    <DataTable
+                        title="Task Completion Reports"
+                        filterElements={
+                            <>
+                                <input type="date" className="form-input" value={filter.dateRangeStart}
+                                    onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))}
+                                    style={{ height: 38, width: 150, fontSize: '0.82rem', padding: '0 10px' }} />
+                                <input type="date" className="form-input" value={filter.dateRangeEnd}
+                                    onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))}
+                                    style={{ height: 38, width: 150, fontSize: '0.82rem', padding: '0 10px' }} />
+                                <select className="form-input" value={filter.employeeId}
+                                    onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}
+                                    style={{ height: 38, fontSize: '0.82rem' }}>
+                                    <option value="">All Employees</option>
+                                    {teamMembers.map(m => (<option key={m.accountId} value={m.accountId}>{m.employeeName}</option>))}
+                                </select>
+                                <select className="form-input" value={filter.taskPriorityLevel}
+                                    onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}
+                                    style={{ height: 38, fontSize: '0.82rem' }}>
+                                    <option value="">All Priorities</option>
+                                    {PRIORITY_LEVELS.map(p => (<option key={p} value={p}>{p}</option>))}
+                                </select>
+                                <select className="form-input" value={filter.taskStatus}
+                                    onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}
+                                    style={{ height: 38, fontSize: '0.82rem' }}>
+                                    <option value="">All Statuses</option>
+                                    {TASK_STATUSES_FILTER.map(s => (<option key={s} value={s}>{s}</option>))}
+                                </select>
+                                <select className="form-input" value={filter.taskCategory}
+                                    onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}
+                                    style={{ height: 38, fontSize: '0.82rem' }}>
+                                    <option value="">All Categories</option>
+                                    {TASK_CATEGORIES.map(c => (<option key={c} value={c}>{c}</option>))}
+                                </select>
+                                <button className="btn btn-outline btn-sm" onClick={handleReset} style={{ height: 38 }}><RotateCcw size={13} /> Reset</button>
+                            </>
+                        }
+                        actionButton={{
+                            label: loading ? 'Generating...' : 'Generate Report',
+                            icon: loading ? <Loader2 size={13} className="spin" /> : <Filter size={13} />,
+                            onClick: handleGenerate,
+                        }}
+                        headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
+                        loading={false}
+                        emptyMessage="No employee data for selected criteria."
+                        totalRecords={report.employeePerformanceSummary.length}
+                    >
+                        {report.employeePerformanceSummary.map(ep => (
+                            <tr key={ep.employeeName}>
+                                <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                <td>{ep.totalAssigned}</td>
+                                <td>{ep.totalCompleted}</td>
+                                <td>{ep.completionRate}%</td>
+                                <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                            </tr>
+                        ))}
+                    </DataTable>
 
                     <div className="card">
                         <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
