@@ -489,3 +489,60 @@
     font-size: 13px;
     flex-shrink: 0;
 }
+
+/* ── Sub Tab Navigation ── */
+.rm2-subtab-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    box-shadow: var(--shadow-sm);
+    width: fit-content;
+    margin-bottom: 20px;
+}
+
+.rm2-subtab-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+
+.rm2-subtab-btn:not(.rm2-subtab-btn--active):hover {
+    color: var(--text-primary);
+    background: var(--bg-main);
+}
+
+.rm2-subtab-btn--active,
+.rm2-subtab-btn--active:hover {
+    background: var(--primary) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(0, 169, 157, 0.25);
+}
+
+.rm2-subtab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--status-failed);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1;
+}

@@ -27,6 +27,7 @@ import {
 import { useToast } from '../../../components/Toast/Toast';
 import StatCard from '../../../components/StatCard/StatCard';
 import DataTable, { ActionsDropdown } from '../../../components/ui/DataTable';
+import SubTabNav from '../../../components/ui/SubTabNav';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 import './RoleManagementTab.css';
@@ -1338,20 +1339,16 @@ export default function RoleManagementTab() {
         <div className="rm2-root">
 
             {/* ── Sub-tab Navigation ── */}
-            <div className="rm2-subtab-nav">
-                <button className={`rm2-subtab-btn${subTab === 'roles' ? ' rm2-subtab-btn--active' : ''}`} onClick={() => setSubTab('roles')}>
-                    <Shield size={15} /> Roles & Permissions
-                </button>
-                <button className={`rm2-subtab-btn${subTab === 'departments' ? ' rm2-subtab-btn--active' : ''}`} onClick={() => setSubTab('departments')}>
-                    <Building2 size={15} /> Departments
-                </button>
-                <button className={`rm2-subtab-btn${subTab === 'positions' ? ' rm2-subtab-btn--active' : ''}`} onClick={() => setSubTab('positions')}>
-                    <Briefcase size={15} /> Job Positions
-                </button>
-                <button className={`rm2-subtab-btn${subTab === 'overview' ? ' rm2-subtab-btn--active' : ''}`} onClick={() => setSubTab('overview')}>
-                    <BarChart2 size={15} /> Overview & Logs
-                </button>
-            </div>
+            <SubTabNav
+                tabs={[
+                    { key: 'roles', label: 'Roles & Permissions', icon: <Shield size={15} /> },
+                    { key: 'departments', label: 'Departments', icon: <Building2 size={15} /> },
+                    { key: 'positions', label: 'Job Positions', icon: <Briefcase size={15} /> },
+                    { key: 'overview', label: 'Overview & Logs', icon: <BarChart2 size={15} /> },
+                ]}
+                activeTab={subTab}
+                onTabChange={setSubTab}
+            />
 
             {/* ─────────────────────────────── ROLES TAB ────────────────────── */}
             {subTab === 'roles' && (

@@ -59,6 +59,7 @@ import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
+import SubTabNav from '../../components/ui/SubTabNav';
 import EmployeeDocumentsTab from './EmployeeDocumentsTab/EmployeeDocumentsTab';
 import RecruitmentTab from './RecruitmentTab/RecruitmentTab';
 
@@ -1598,49 +1599,19 @@ function ManageEmployeesTab({
         onLeavePageChange(1, { status: leaveFilterStatus, role: leaveFilterRole, search: leaveSearch });
     }, [leaveFilterStatus, leaveFilterRole, leaveSearch]);
 
-    // ── Shared tab bar styles ─────────────────────────────────────────────────
-    const tabBarStyle: React.CSSProperties = {
-        display: 'flex',
-        gap: 0,
-        borderBottom: '1px solid var(--border)',
-        marginBottom: 20,
-    };
-
-    const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '11px 20px',
-        border: 'none',
-        borderBottom: `2px solid ${active ? 'var(--primary)' : 'transparent'}`,
-        background: 'none',
-        cursor: 'pointer',
-        fontWeight: active ? 700 : 500,
-        color: active ? 'var(--primary)' : 'var(--text-secondary)',
-        fontSize: 13,
-        transition: 'all 0.15s',
-        marginBottom: -1, // overlap the container border
-    });
-
     // ── Shared table card wrapper ──────────────────────────────────────────────
     return (
         <div className="dashboard-content">
-            {/* ── Unified tab bar ── */}
-            <div style={tabBarStyle}>
-                {([
+            {/* ── Unified sub-tab nav ── */}
+            <SubTabNav
+                tabs={[
                     { key: 'employees', label: 'All Employees', icon: <Users size={14} /> },
                     { key: 'leave', label: 'Leave Requests', icon: <CalendarDays size={14} />, badge: leavePendingCount },
                     { key: 'documents', label: 'Employee Documents', icon: <FileText size={14} /> },
-                ] as const).map(t => (
-                    <button key={t.key} onClick={() => setSubTab(t.key)} style={tabBtnStyle(subTab === t.key)}>
-                        {t.icon}
-                        {t.label}
-                        {'badge' in t && t.badge ? (
-                            <span style={{ background: 'var(--status-failed)', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999 }}>
-                                {t.badge}
-                            </span>
-                        ) : null}
-                    </button>
-                ))}
-            </div>
+                ]}
+                activeTab={subTab}
+                onTabChange={(key) => setSubTab(key as EmployeeSubTab)}
+            />
 
             {/* ── All Employees ── */}
             {subTab === 'employees' && (
