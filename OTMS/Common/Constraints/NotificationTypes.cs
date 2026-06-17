@@ -18,5 +18,6 @@ namespace OTMS.Common.Constraints
         public const string ApplicantStatusUpdated = "Applicant Status Updated";
         public const string OnboardingLinkSent = "Onboarding Link Sent";
         public const string AccountCreated = "Account Created";
+        public const string ApplicationEmailVerified = "Application Email Verified";
     }
 }

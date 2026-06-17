@@ -1,8 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
@@ -19,7 +23,6 @@ namespace OTMS.Service.Services
         INotificationService notificationService,
         IActivityLogService activityLogService,
         IHttpContextAccessor httpContextAccessor,
-        IAuthService authService,
         IEmployeeNumberGenerator employeeNumberGenerator
         ) : IOnboardingService
     {
@@ -200,7 +203,7 @@ namespace OTMS.Service.Services
 
             if (existingEmployee != null)
             {
-                var jwt = authService.CreateToken(existingEmployee);
+                var jwt = CreateToken(existingEmployee);
 
                 return new ApiResponseDTO<OnboardingValidationResponseDTO>
                 {
@@ -235,20 +238,16 @@ namespace OTMS.Service.Services
                 };
             }
 
-            var nameParts = applicant.FullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var firstName = nameParts.Length > 0 ? nameParts[0] : string.Empty;
-            var lastName = nameParts.Length > 1 ? string.Join(" ", nameParts.Skip(1)) : string.Empty;
-
             var tempPassword = PasswordGenerator.Generate();
 
             var employee = new Employee
             {
                 EmployeeId = Guid.NewGuid(),
                 EmployeeNumber = employeeNumber,
-                FirstName = firstName,
-                MiddleName = null,
-                LastName = lastName,
-                Suffix = null,
+                FirstName = applicant.FirstName,
+                MiddleName = applicant.MiddleName,
+                LastName = applicant.LastName,
+                Suffix = applicant.Suffix,
                 ContactNumber = applicant.ContactNumber,
                 EmploymentStatus = "Active",
                 CreatedAt = DateTime.UtcNow,
@@ -284,7 +283,7 @@ namespace OTMS.Service.Services
                             .ThenInclude(rp => rp.Permission)
                 .FirstAsync(e => e.EmployeeId == employee.EmployeeId);
 
-            var accessToken = authService.CreateToken(provisionedEmployee);
+            var accessToken = CreateToken(provisionedEmployee);
 
             await activityLogService.LogActivityAsync(
                 onboardingToken.CreatedByAccountId,
@@ -511,6 +510,65 @@ namespace OTMS.Service.Services
             if (string.IsNullOrEmpty(accountIdClaim) || !Guid.TryParse(accountIdClaim, out var accountId))
                 return null;
             return accountId;
+        }
+
+        private string CreateToken(Employee employee)
+        {
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
+            var claims = new List<Claim>
+            {
+                new Claim(
+                    ClaimTypes.Name,
+                    employee.EmployeeNumber
+                ),
+                new Claim(
+                    ClaimTypes.NameIdentifier,
+                    employee.Account.AccountId.ToString()
+                ),
+                new Claim(
+                    ClaimTypes.Role,
+                    (employee.Account.Role?.Name ?? string.Empty).Replace(" ", "")
+                )
+            };
+
+            if (employee.Account.Role != null && employee.Account.Role.RolePermissions != null)
+            {
+                foreach (var rp in employee.Account.Role.RolePermissions)
+                {
+                    if (rp.Permission != null)
+                    {
+                        claims.Add(new Claim("Permission", rp.Permission.Name));
+                    }
+                }
+            }
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    configuration.GetValue<string>("AppSettings:Token")!
+                )
+            );
+
+            var creds = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha512
+            );
+
+            var tokenDescriptor = new JwtSecurityToken(
+                issuer: configuration.GetValue<string>("AppSettings:Issuer"),
+                audience: configuration.GetValue<string>("AppSettings:Audience"),
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(1),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler()
+                .WriteToken(tokenDescriptor);
         }
     }
 }
