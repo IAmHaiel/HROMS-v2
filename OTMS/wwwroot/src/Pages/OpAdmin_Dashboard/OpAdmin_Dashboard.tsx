@@ -58,6 +58,7 @@ import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
+import Modal from '../../components/ui/Modal';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
@@ -1056,91 +1057,75 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div>
-                        <h3>Admin Override</h3>
-                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                            Modifying completed task: <strong>{task.taskTitle}</strong>
-                        </p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        <Modal isOpen onClose={onClose} title="Admin Override" subtitle={`Modifying completed task: ${task.taskTitle}`} size="sm"
+            footer={
+                <>
+                    <button className="btn" onClick={onClose}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit}
+                        style={{ background: 'var(--status-failed)', borderColor: 'var(--status-failed)' }}>
+                        <Shield size={14} /> Submit Override
+                    </button>
+                </>
+            }
+        >
+            <div className="view-modal-meta" style={{ marginBottom: 16 }}>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Task ID</span>
+                    <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
                 </div>
-                <div className="modal-form">
-                    <div className="view-modal-meta" style={{ marginBottom: 16 }}>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Task ID</span>
-                            <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
-                        </div>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Current Status</span>
-                            <span className={statusBadgeClass(task.taskStatus)}>{task.taskStatus}</span>
-                        </div>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Priority</span>
-                            <PrioBadge p={task.priority} />
-                        </div>
-                    </div>
-
-                    <div className="field">
-                        <label>Requested Status *</label>
-                        <select
-                            value={requestedStatus}
-                            onChange={e => setRequestedStatus(e.target.value)}
-                            className={errors.requestedStatus ? 'report-input report-input-error' : 'report-input'}
-                        >
-                            {OVERRIDE_TARGETS.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                        {errors.requestedStatus && <span className="report-field-error">{errors.requestedStatus}</span>}
-                    </div>
-
-                    <div className="field">
-                        <label>Override Reason *</label>
-                        <textarea className={errors.reason ? 'report-input report-input-error' : 'report-input'}
-                            rows={3} maxLength={500} value={reason}
-                            onChange={e => { setReason(e.target.value); setErrors(p => ({ ...p, reason: '' })); }}
-                            placeholder="Explain why this completed task needs modification..." />
-                        {errors.reason && <span className="report-field-error">{errors.reason}</span>}
-                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: reason.length > 450 ? (reason.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
-                            {reason.length}/500
-                        </span>
-                    </div>
-
-                    <div className="field">
-                        <label>Admin Remarks *</label>
-                        <textarea className={errors.remarks ? 'report-input report-input-error' : 'report-input'}
-                            rows={3} maxLength={500} value={remarks}
-                            onChange={e => { setRemarks(e.target.value); setErrors(p => ({ ...p, remarks: '' })); }}
-                            placeholder="Additional notes for the audit log..." />
-                        {errors.remarks && <span className="report-field-error">{errors.remarks}</span>}
-                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
-                            {remarks.length}/500
-                        </span>
-                    </div>
-
-                    <div className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <input type="checkbox" id="override-confirm" checked={confirmed}
-                            onChange={e => { setConfirmed(e.target.checked); setErrors(p => ({ ...p, confirmed: '' })); }}
-                            style={{ marginTop: 3 }} />
-                        <label htmlFor="override-confirm" style={{ fontSize: 13, fontWeight: 500, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
-                            I confirm this admin override. I understand this action will be recorded in the Audit Log and the task will be reopened for modification.
-                        </label>
-                    </div>
-                    {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
-
-                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-                        <button className="btn" onClick={onClose}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSubmit}
-                            style={{ background: 'var(--status-failed)', borderColor: 'var(--status-failed)' }}>
-                            <Shield size={14} /> Submit Override
-                        </button>
-                    </div>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Current Status</span>
+                    <span className={statusBadgeClass(task.taskStatus)}>{task.taskStatus}</span>
+                </div>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Priority</span>
+                    <PrioBadge p={task.priority} />
                 </div>
             </div>
-        </div>
+
+            <div className="field">
+                <label>Requested Status *</label>
+                <select value={requestedStatus} onChange={e => setRequestedStatus(e.target.value)}
+                    className={errors.requestedStatus ? 'report-input report-input-error' : 'report-input'}>
+                    {OVERRIDE_TARGETS.map(s => (<option key={s} value={s}>{s}</option>))}
+                </select>
+                {errors.requestedStatus && <span className="report-field-error">{errors.requestedStatus}</span>}
+            </div>
+
+            <div className="field">
+                <label>Override Reason *</label>
+                <textarea className={errors.reason ? 'report-input report-input-error' : 'report-input'}
+                    rows={3} maxLength={500} value={reason}
+                    onChange={e => { setReason(e.target.value); setErrors(p => ({ ...p, reason: '' })); }}
+                    placeholder="Explain why this completed task needs modification..." />
+                {errors.reason && <span className="report-field-error">{errors.reason}</span>}
+                <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: reason.length > 450 ? (reason.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                    {reason.length}/500
+                </span>
+            </div>
+
+            <div className="field">
+                <label>Admin Remarks *</label>
+                <textarea className={errors.remarks ? 'report-input report-input-error' : 'report-input'}
+                    rows={3} maxLength={500} value={remarks}
+                    onChange={e => { setRemarks(e.target.value); setErrors(p => ({ ...p, remarks: '' })); }}
+                    placeholder="Additional notes for the audit log..." />
+                {errors.remarks && <span className="report-field-error">{errors.remarks}</span>}
+                <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                    {remarks.length}/500
+                </span>
+            </div>
+
+            <div className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <input type="checkbox" id="override-confirm" checked={confirmed}
+                    onChange={e => { setConfirmed(e.target.checked); setErrors(p => ({ ...p, confirmed: '' })); }}
+                    style={{ marginTop: 3 }} />
+                <label htmlFor="override-confirm" style={{ fontSize: 13, fontWeight: 500, margin: 0, textTransform: 'none', letterSpacing: 0, color: 'var(--text-primary)' }}>
+                    I confirm this admin override. I understand this action will be recorded in the Audit Log and the task will be reopened for modification.
+                </label>
+            </div>
+            {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
+        </Modal>
     );
 };
 
@@ -1176,95 +1161,70 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ width: 520 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div>
-                        <h3>Review Task Submission</h3>
-                        <p className="modal-subtitle" style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                            Reviewing: <strong>{task.taskTitle}</strong>
-                        </p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        <Modal isOpen onClose={onClose} title="Review Task Submission" subtitle={`Reviewing: ${task.taskTitle}`} size="md"
+            footer={
+                <>
+                    <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
+                        {submitting
+                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            : <><Shield size={13} /> Submit Review Decision</>
+                        }
+                    </button>
+                </>
+            }
+        >
+            <div className="view-modal-meta" style={{ marginBottom: 16 }}>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Task ID</span>
+                    <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
                 </div>
-                <div className="modal-form">
-                    <div className="view-modal-meta" style={{ marginBottom: 16 }}>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Task ID</span>
-                            <span className="view-modal-meta-value" style={{ fontSize: 12 }}>{task.taskId}</span>
-                        </div>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Assigned To</span>
-                            <span className="view-modal-meta-value">{task.assignedEmployee}</span>
-                        </div>
-                        <div className="view-modal-meta-item">
-                            <span className="view-modal-label">Priority</span>
-                            <PrioBadge p={task.priority} />
-                        </div>
-                    </div>
-
-                    {task.taskRemarks && (
-                        <div className="field">
-                            <label>Employee Notes</label>
-                            <div style={{
-                                padding: '10px 12px', background: 'var(--bg-main)',
-                                borderRadius: 8, fontSize: 13, lineHeight: 1.5,
-                                color: 'var(--text-primary)',
-                            }}>
-                                {task.taskRemarks}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="field">
-                        <label>Admin Decision <span style={{ color: 'var(--danger)' }}>*</span></label>
-                        <select
-                            className="report-select"
-                            value={decision}
-                            onChange={e => { setDecision(e.target.value as 'Approve & Close' | 'Return for Rework'); setError(''); }}
-                        >
-                            <option value="">Select decision</option>
-                            <option value="Approve & Close">Approve & Close</option>
-                            <option value="Return for Rework">Return for Rework</option>
-                        </select>
-                    </div>
-
-                    <div className="field">
-                        <label>
-                            Reviewer Remarks
-                            {decision === 'Return for Rework' && <span style={{ color: 'var(--danger)' }}> * (Required for rework)</span>}
-                        </label>
-                        <textarea
-                            className={remarks.length > 500 ? 'report-input report-input-error' : 'report-input'}
-                            rows={4} maxLength={500}
-                            value={remarks}
-                            onChange={e => { setRemarks(e.target.value); setError(''); }}
-                            placeholder={
-                                decision === 'Return for Rework'
-                                    ? 'Provide specific instructions on what needs to be improved...'
-                                    : 'Optional closing remarks...'
-                            }
-                            disabled={!decision}
-                        />
-                        <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
-                            {remarks.length}/500
-                        </span>
-                    </div>
-
-                    {error && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{error}</span></div>}
-
-                    <div className="modal-actions" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-                        <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
-                        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
-                            {submitting
-                                ? <><Loader2 size={13} className="spin" /> Submitting…</>
-                                : <><Shield size={13} /> Submit Review Decision</>
-                            }
-                        </button>
-                    </div>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Assigned To</span>
+                    <span className="view-modal-meta-value">{task.assignedEmployee}</span>
+                </div>
+                <div className="view-modal-meta-item">
+                    <span className="view-modal-label">Priority</span>
+                    <PrioBadge p={task.priority} />
                 </div>
             </div>
-        </div>
+
+            {task.taskRemarks && (
+                <div className="field">
+                    <label>Employee Notes</label>
+                    <div style={{ padding: '10px 12px', background: 'var(--bg-main)', borderRadius: 8, fontSize: 13, lineHeight: 1.5, color: 'var(--text-primary)' }}>
+                        {task.taskRemarks}
+                    </div>
+                </div>
+            )}
+
+            <div className="field">
+                <label>Admin Decision <span style={{ color: 'var(--status-failed)' }}>*</span></label>
+                <select className="report-select" value={decision}
+                    onChange={e => { setDecision(e.target.value as 'Approve & Close' | 'Return for Rework'); setError(''); }}>
+                    <option value="">Select decision</option>
+                    <option value="Approve & Close">Approve & Close</option>
+                    <option value="Return for Rework">Return for Rework</option>
+                </select>
+            </div>
+
+            <div className="field">
+                <label>
+                    Reviewer Remarks
+                    {decision === 'Return for Rework' && <span style={{ color: 'var(--status-failed)' }}> * (Required for rework)</span>}
+                </label>
+                <textarea className={remarks.length > 500 ? 'report-input report-input-error' : 'report-input'}
+                    rows={4} maxLength={500} value={remarks}
+                    onChange={e => { setRemarks(e.target.value); setError(''); }}
+                    placeholder={decision === 'Return for Rework' ? 'Provide specific instructions on what needs to be improved...' : 'Optional closing remarks...'}
+                    disabled={!decision} />
+                <span style={{ fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right', color: remarks.length > 450 ? (remarks.length >= 500 ? 'var(--status-failed)' : '#c05c00') : 'var(--text-secondary)' }}>
+                    {remarks.length}/500
+                </span>
+            </div>
+
+            {error && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{error}</span></div>}
+        </Modal>
     );
 };
 
