@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace OTMS.Migrations
 {
     /// <inheritdoc />
-    public partial class ExpandApplicantRecordFields : Migration
+    public partial class AddAllApplicantRecordFields : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -93,6 +93,12 @@ namespace OTMS.Migrations
 
             migrationBuilder.AddColumn<string>(
                 name: "HighestEducationalAttainment",
+                table: "ApplicantRecords",
+                type: "nvarchar(max)",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Institution",
                 table: "ApplicantRecords",
                 type: "nvarchar(max)",
                 nullable: true);
@@ -191,6 +197,12 @@ namespace OTMS.Migrations
                 table: "ApplicantRecords",
                 type: "nvarchar(max)",
                 nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "YearGraduated",
+                table: "ApplicantRecords",
+                type: "nvarchar(max)",
+                nullable: true);
         }
 
         /// <inheritdoc />
@@ -253,6 +265,10 @@ namespace OTMS.Migrations
                 table: "ApplicantRecords");
 
             migrationBuilder.DropColumn(
+                name: "Institution",
+                table: "ApplicantRecords");
+
+            migrationBuilder.DropColumn(
                 name: "InstitutionAndYearGraduated",
                 table: "ApplicantRecords");
 
@@ -310,6 +326,10 @@ namespace OTMS.Migrations
 
             migrationBuilder.DropColumn(
                 name: "TIN",
+                table: "ApplicantRecords");
+
+            migrationBuilder.DropColumn(
+                name: "YearGraduated",
                 table: "ApplicantRecords");
         }
     }

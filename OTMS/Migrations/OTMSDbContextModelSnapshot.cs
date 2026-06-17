@@ -241,6 +241,9 @@ namespace OTMS.Migrations
                     b.Property<string>("HighestEducationalAttainment")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Institution")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("InstitutionAndYearGraduated")
                         .HasColumnType("nvarchar(max)");
 
@@ -299,6 +302,9 @@ namespace OTMS.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("TIN")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("YearGraduated")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ApplicantRecordId");

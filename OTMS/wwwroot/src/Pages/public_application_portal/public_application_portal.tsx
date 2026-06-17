@@ -164,6 +164,7 @@ export default function PublicApplicationPortal() {
     const [configLoading, setConfigLoading] = useState(true);
     const [googleToken, setGoogleToken] = useState('');
     const [submitError, setSubmitError] = useState('');
+    const [genderCustom, setGenderCustom] = useState('');
     const gsiInitialized = useRef(false);
 
     useEffect(() => {
@@ -361,7 +362,7 @@ export default function PublicApplicationPortal() {
             if (form.middleName.trim()) formData.append('MiddleName', form.middleName.trim());
             formData.append('LastName', form.lastName.trim());
             if (form.suffix.trim()) formData.append('Suffix', form.suffix.trim());
-            formData.append('Gender', form.gender);
+            formData.append('Gender', form.gender === 'Other' && genderCustom.trim() ? `Other - ${genderCustom.trim()}` : form.gender);
             formData.append('CivilStatus', form.civilStatus);
             formData.append('ContactNumber', form.contactNumber.trim());
             formData.append('CurrentResidentialAddress', form.currentResidentialAddress.trim());
@@ -636,7 +637,7 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Gender <span style={s.req}>*</span></label>
                                     <select value={form.gender}
-                                        onChange={handleSelectChange('gender')}
+                                        onChange={e => { handleSelectChange('gender')(e); if (e.target.value !== 'Other') setGenderCustom(''); }}
                                         style={{ ...s.input, ...s.select, ...(errors.gender ? s.inputErr : {}) }}>
                                         <option value="">Select…</option>
                                         <option value="Male">Male</option>
@@ -644,6 +645,11 @@ export default function PublicApplicationPortal() {
                                         <option value="Other">Other</option>
                                         <option value="Prefer not to say">Prefer not to say</option>
                                     </select>
+                                    {form.gender === 'Other' && (
+                                        <input type="text" placeholder="Please specify" value={genderCustom}
+                                            onChange={e => { setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }}
+                                            style={{ ...s.input, marginTop: 6 }} />
+                                    )}
                                     {errors.gender && <span style={s.errMsg}><AlertIcon />{errors.gender}</span>}
                                 </div>
                                 <div style={s.field}>
@@ -854,75 +860,44 @@ export default function PublicApplicationPortal() {
                             <div style={s.field}>
                                 <label style={s.label}>Declared Dependents</label>
                                 <span style={s.hint}>Optional. Add dependents for HMO/benefits enrollment.</span>
-                                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                                    <input type="text" placeholder="Full name" id="dep-name" style={s.input}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                const input = e.currentTarget;
-                                                const name = input.value.trim();
-                                                if (!name) return;
-                                                const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
-                                                current.push({ name });
-                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
-                                                input.value = '';
-                                            }
-                                        }} />
-                                    <input type="date" id="dep-dob" style={{ ...s.input, width: 160 }}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                const nameInput = document.getElementById('dep-name') as HTMLInputElement;
-                                                const dobInput = e.currentTarget;
-                                                const name = nameInput.value.trim();
-                                                if (!name) return;
-                                                const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
-                                                current.push({ name, dob: dobInput.value || undefined });
-                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
-                                                nameInput.value = '';
-                                                dobInput.value = '';
-                                            }
-                                        }} />
-                                    <button type="button" style={{
-                                        background: '#4318ff', color: 'white', border: 'none', borderRadius: 10,
-                                        padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-                                    }} onClick={() => {
-                                        const nameInput = document.getElementById('dep-name') as HTMLInputElement;
-                                        const dobInput = document.getElementById('dep-dob') as HTMLInputElement;
-                                        const name = nameInput.value.trim();
-                                        if (!name) return;
-                                        const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
-                                        current.push({ name, dob: dobInput.value || undefined });
-                                        setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
-                                        nameInput.value = '';
-                                        dobInput.value = '';
-                                    }}>+ Add</button>
-                                </div>
-                                {form.declaredDependents && (() => {
-                                    const deps = JSON.parse(form.declaredDependents) as { name: string; dob?: string }[];
-                                    return deps.length > 0 ? (
-                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {(() => {
+                                    const deps: { name: string; dob?: string }[] = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
+                                    return (
+                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                             {deps.map((dep, i) => (
-                                                <div key={i} style={{
-                                                    display: 'flex', alignItems: 'center', gap: 8,
-                                                    background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
-                                                    padding: '8px 12px', fontSize: 13
-                                                }}>
-                                                    <span style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>{dep.name}</span>
-                                                    {dep.dob && <span style={{ color: '#64748b', fontSize: 12 }}>{dep.dob}</span>}
-                                                    <button type="button" style={{
-                                                        background: 'none', border: 'none', cursor: 'pointer',
-                                                        color: '#ef4444', padding: 2, display: 'flex'
-                                                    }} onClick={() => {
+                                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <input type="text" value={dep.name}
+                                                        onChange={e => {
+                                                            const updated = [...deps];
+                                                            updated[i] = { ...updated[i], name: e.target.value };
+                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                                        }}
+                                                        placeholder="Full name"
+                                                        style={{ ...s.input, flex: 1 }} />
+                                                    <input type="date" value={dep.dob || ''}
+                                                        onChange={e => {
+                                                            const updated = [...deps];
+                                                            updated[i] = { ...updated[i], dob: e.target.value };
+                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                                        }}
+                                                        style={{ ...s.input, width: 160 }} />
+                                                    <button type="button" onClick={() => {
                                                         const updated = deps.filter((_, j) => j !== i);
                                                         setForm(p => ({ ...p, declaredDependents: updated.length > 0 ? JSON.stringify(updated) : '' }));
-                                                    }}>
-                                                        <XIcon />
-                                                    </button>
+                                                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
                                                 </div>
                                             ))}
+                                            <button type="button" onClick={() => {
+                                                const updated = [...deps, { name: '', dob: '' }];
+                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                            }} style={{
+                                                display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                                                background: '#f1f5f9', border: '1px dashed #cbd5e1', borderRadius: 8,
+                                                padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#4318ff',
+                                                fontWeight: 600, fontFamily: 'inherit'
+                                            }}>+ Add Dependent</button>
                                         </div>
-                                    ) : null;
+                                    );
                                 })()}
                             </div>
 
@@ -963,7 +938,7 @@ export default function PublicApplicationPortal() {
                             <div style={s.field}>
                                 <label style={s.label}>Select Position <span style={s.req}>*</span></label>
                                 <select value={form.positionId}
-                                    onChange={handleSelectChange('position')}
+                                    onChange={e => { const val = e.target.value; setForm(p => ({ ...p, positionId: val })); const err = validateField('position', val); setErrors(p => ({ ...p, position: err || undefined })); }}
                                     style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}>
                                     <option value="">Choose a position…</option>
                                     {positions.length === 0 && <option value="" disabled>No positions available</option>}
