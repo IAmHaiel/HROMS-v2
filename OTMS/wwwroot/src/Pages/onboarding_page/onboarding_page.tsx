@@ -66,7 +66,14 @@ export default function OnboardingPage() {
 
     const [tokenValidating, setTokenValidating] = useState(true);
     const [tokenError, setTokenError] = useState('');
-    const [applicantInfo, setApplicantInfo] = useState<{ fullName: string; firstName: string; middleName: string; lastName: string; suffix: string; contactNumber: string; email: string; position: string } | null>(null);
+    const [applicantInfo, setApplicantInfo] = useState<{
+        fullName: string; firstName: string; middleName: string; lastName: string; suffix: string;
+        contactNumber: string; email: string; position: string;
+        resumeFilePath: string; medicalClearanceFilePath: string;
+        sssNumber: string; philHealthNumber: string; pagIBIGNumber: string; tin: string;
+        bankName: string; bankAccountName: string; bankAccountNumber: string;
+        emergencyContactName: string; emergencyContactRelationship: string; emergencyContactMobileNumber: string;
+    } | null>(null);
 
     useEffect(() => {
         if (!onboardingToken) {
@@ -105,6 +112,18 @@ export default function OnboardingPage() {
                         contactNumber: data.data.contactNumber || '',
                         email: data.data.emailAddress,
                         position: data.data.jobPositionName,
+                        resumeFilePath: data.data.resumeFilePath || '',
+                        medicalClearanceFilePath: data.data.medicalClearanceFilePath || '',
+                        sssNumber: data.data.sssNumber || '',
+                        philHealthNumber: data.data.philHealthNumber || '',
+                        pagIBIGNumber: data.data.pagIBIGNumber || '',
+                        tin: data.data.tin || '',
+                        bankName: data.data.bankName || '',
+                        bankAccountName: data.data.bankAccountName || '',
+                        bankAccountNumber: data.data.bankAccountNumber || '',
+                        emergencyContactName: data.data.emergencyContactName || '',
+                        emergencyContactRelationship: data.data.emergencyContactRelationship || '',
+                        emergencyContactMobileNumber: data.data.emergencyContactMobileNumber || '',
                     });
                     setTokenValidating(false);
                 } else {
@@ -134,6 +153,29 @@ export default function OnboardingPage() {
                 suffix: applicantInfo.suffix || '',
                 contactNumber: applicantInfo.contactNumber || '',
             });
+            // Pre-fill uploaded docs with existing files from application form
+            const info = applicantInfo as any;
+            setUploadedDocs(prev => ({
+                ...prev,
+                biodata: info.resumeFilePath
+                    ? { name: 'Resume/CV (from application)', size: 'Uploaded', status: 'done' as const }
+                    : prev.biodata,
+                medical: info.medicalClearanceFilePath
+                    ? { name: 'Medical Clearance (from application)', size: 'Uploaded', status: 'done' as const }
+                    : prev.medical,
+            }));
+            // Pre-fill 201 file fields from application form data
+            setForm201(prev => ({
+                ...prev,
+                sss: info.sssNumber || prev.sss,
+                philhealth: info.philHealthNumber || prev.philhealth,
+                pagibig: info.pagIBIGNumber || prev.pagibig,
+                tin: info.tin || prev.tin,
+                bankName: info.bankName || prev.bankName,
+                bankAccount: info.bankAccountNumber || prev.bankAccount,
+                emergencyName: info.emergencyContactName || prev.emergencyName,
+                emergencyNumber: info.emergencyContactMobileNumber || prev.emergencyNumber,
+            }));
         }
     }, [applicantInfo]);
     const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
