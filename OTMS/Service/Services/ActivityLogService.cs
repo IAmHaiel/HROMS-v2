@@ -120,7 +120,7 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
-                    createdAt = al.CreatedAt
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
         }
@@ -139,7 +139,7 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
-                    createdAt = al.CreatedAt
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
         }
