@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Entities.Models;
@@ -133,7 +134,42 @@ namespace OTMS.Data
 
             await context.SaveChangesAsync();
 
-            // 4. Seed Default Approval Routing Matrices
+            // 4. Seed Default SystemAdmin Employee & Account
+            var adminEmail = "admin@hroms.com";
+            if (!await context.Accounts.AnyAsync(a => a.Employee.Email == adminEmail))
+            {
+                var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SystemAdmin");
+                if (adminRole != null)
+                {
+                    var adminEmployee = new Employee
+                    {
+                        EmployeeId = Guid.NewGuid(),
+                        EmployeeNumber = "0000",
+                        FirstName = "System",
+                        LastName = "Admin",
+                        Email = adminEmail,
+                        ContactNumber = "N/A",
+                        EmploymentStatus = "Active",
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    var adminAccount = new Account
+                    {
+                        AccountId = Guid.NewGuid(),
+                        EmployeeId = adminEmployee.EmployeeId,
+                        RoleId = adminRole.RoleId,
+                        PasswordHash = new PasswordHasher<Account>().HashPassword(null!, "SystemAdmin1001!"),
+                        AccountStatus = "Active",
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    context.Employees.Add(adminEmployee);
+                    context.Accounts.Add(adminAccount);
+                    await context.SaveChangesAsync();
+                }
+            }
+
+            // 5. Seed Default Approval Routing Matrices
             await SeedApprovalRoutingMatricesAsync(context);
         }
 
