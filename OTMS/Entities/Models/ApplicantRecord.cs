@@ -60,6 +60,9 @@ namespace OTMS.Entities.Models
         public Guid JobPositionId { get; set; }
         public JobPosition JobPosition { get; set; } = null!;
 
+        // Reference Number (public-facing unique identifier, not the PK)
+        public string ReferenceNumber { get; set; } = string.Empty;
+
         // Status
         public string Status { get; set; } = "Pending Review";
 

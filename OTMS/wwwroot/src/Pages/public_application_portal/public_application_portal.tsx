@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties, DragEvent, ChangeEvent } from 'react';
 import axios from 'axios';
 
@@ -271,6 +271,9 @@ export default function PublicApplicationPortal() {
         if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
         if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
         if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
+        if (key === 'bankName' && !(value as string)?.trim()) return 'Bank name is required.';
+        if (key === 'bankAccountName' && !(value as string)?.trim()) return 'Bank account name is required.';
+        if (key === 'bankAccountNumber' && !(value as string)?.trim()) return 'Bank account number is required.';
         if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
         if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
         if (key === 'emergencyContactMobileNumber') {
@@ -283,6 +286,10 @@ export default function PublicApplicationPortal() {
         if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
+        if ((key === 'nbiClearance' || key === 'medicalClearance' || key === 'psaBirthCertificate' || key === 'signedEmploymentContract') && !value) {
+            const labels: Record<string, string> = { nbiClearance: 'NBI Clearance', medicalClearance: 'Medical Clearance', psaBirthCertificate: 'PSA Birth Certificate', signedEmploymentContract: 'Employment Contract' };
+            return `Please upload your ${labels[key] || key}.`;
+        }
         return '';
     };
 
@@ -333,6 +340,7 @@ export default function PublicApplicationPortal() {
             'firstName', 'lastName', 'gender', 'civilStatus', 'contactNumber',
             'currentResidentialAddress', 'permanentAddress',
             'sssNumber', 'philHealthNumber', 'pagIBIGNumber', 'tin',
+            'bankName', 'bankAccountName', 'bankAccountNumber',
             'emergencyContactName', 'emergencyContactRelationship', 'emergencyContactMobileNumber',
             'highestEducationalAttainment', 'institution', 'yearGraduated',
             'position'
@@ -343,8 +351,11 @@ export default function PublicApplicationPortal() {
             const e = validateField(k, val);
             if (e) errs[k] = e;
         });
-        const resumeErr = validateField('resume', form.resume);
-        if (resumeErr) errs.resume = resumeErr;
+        const docKeys: FormKey[] = ['resume', 'nbiClearance', 'medicalClearance', 'psaBirthCertificate', 'signedEmploymentContract'];
+        docKeys.forEach(k => {
+            const e = validateField(k, (form as any)[k] as File | null);
+            if (e) errs[k] = e;
+        });
         return errs;
     };
 
@@ -439,7 +450,7 @@ export default function PublicApplicationPortal() {
                         </div>
                         <div>
                             <span style={s.logoName}>Speedex Courier</span>
-                            <span style={s.logoDivider}>·</span>
+                            <span style={s.logoDivider}>�</span>
                             <span style={s.logoSub}>Careers</span>
                         </div>
                     </div>
@@ -452,7 +463,7 @@ export default function PublicApplicationPortal() {
 
             <main style={s.main}>
 
-                {/* ══ LANDING ══════════════════════════════════════════════════════ */}
+                {/* -- LANDING ------------------------------------------------------ */}
                 {stage === 'landing' && (
                     <div style={s.landingWrap}>
                         <div style={s.landingLeft}>
@@ -522,7 +533,7 @@ export default function PublicApplicationPortal() {
                     </div>
                 )}
 
-                {/* ══ AUTH ═════════════════════════════════════════════════════════ */}
+                {/* -- AUTH --------------------------------------------------------- */}
                 {stage === 'auth' && (
                     <div style={s.centeredStage}>
                         <div style={s.authCard}>
@@ -552,17 +563,17 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,24,255,0.15)'; }}
                             >
                                 {authLoading ? (
-                                    <><div style={s.spinner} /><span>Verifying…</span></>
+                                    <><div style={s.spinner} /><span>Verifying�</span></>
                                 ) : (
                                     <><GoogleIcon /><span>Continue with Google</span></>
                                 )}
                             </button>
-                            <button style={s.ghostBtn} onClick={() => setStage('landing')}>← Back</button>
+                            <button style={s.ghostBtn} onClick={() => setStage('landing')}>? Back</button>
                         </div>
                     </div>
                 )}
 
-                {/* ══ FORM ═════════════════════════════════════════════════════════ */}
+                {/* -- FORM --------------------------------------------------------- */}
                 {stage === 'form' && (
                     <div style={s.formWrap}>
                         <div style={s.formSide}>
@@ -603,7 +614,7 @@ export default function PublicApplicationPortal() {
                                 <span style={s.formCardSub}>All fields marked * are required</span>
                             </div>
 
-                            {/* ── Personal Information ─────────────────── */}
+                            {/* -- Personal Information ------------------- */}
                             <div style={s.sectionLabel}>Personal Information</div>
                             <div style={s.fieldRow3}>
                                 <div style={s.field}>
@@ -639,7 +650,7 @@ export default function PublicApplicationPortal() {
                                     <select value={form.gender}
                                         onChange={e => { handleSelectChange('gender')(e); if (e.target.value !== 'Other') setGenderCustom(''); }}
                                         style={{ ...s.input, ...s.select, ...(errors.gender ? s.inputErr : {}) }}>
-                                        <option value="">Select…</option>
+                                        <option value="">Select</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
                                         <option value="Other">Other</option>
@@ -657,7 +668,7 @@ export default function PublicApplicationPortal() {
                                     <select value={form.civilStatus}
                                         onChange={handleSelectChange('civilStatus')}
                                         style={{ ...s.input, ...s.select, ...(errors.civilStatus ? s.inputErr : {}) }}>
-                                        <option value="">Select…</option>
+                                        <option value="">Select</option>
                                         <option value="Single">Single</option>
                                         <option value="Married">Married</option>
                                         <option value="Divorced">Divorced</option>
@@ -691,7 +702,7 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
-                            {/* ── Address ─────────────────────────────── */}
+                            {/* -- Address ------------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Address</div>
                             <div style={s.fieldRow2}>
                                 <div style={s.field}>
@@ -710,7 +721,7 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
-                            {/* ── Statutory & Gov ID ──────────────────── */}
+                            {/* -- Statutory & Gov ID -------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Statutory &amp; Government Identifiers</div>
                             <div style={s.fieldRow4}>
                                 <div style={s.field}>
@@ -743,30 +754,33 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
-                            {/* ── Financial ───────────────────────────── */}
+                            {/* -- Financial ----------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Financial &amp; Payroll Data</div>
                             <div style={s.fieldRow3}>
                                 <div style={s.field}>
-                                    <label style={s.label}>Bank Name</label>
+                                    <label style={s.label}>Bank Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. BPI, BDO" value={form.bankName}
                                         onChange={handleTextChange('bankName')}
-                                        style={s.input} />
+                                        style={{ ...s.input, ...(errors.bankName ? s.inputErr : {}) }} />
+                                    {errors.bankName && <span style={s.errMsg}><AlertIcon />{errors.bankName}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Bank Account Name</label>
+                                    <label style={s.label}>Bank Account Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account holder name" value={form.bankAccountName}
                                         onChange={handleTextChange('bankAccountName')}
-                                        style={s.input} />
+                                        style={{ ...s.input, ...(errors.bankAccountName ? s.inputErr : {}) }} />
+                                    {errors.bankAccountName && <span style={s.errMsg}><AlertIcon />{errors.bankAccountName}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Bank Account No.</label>
+                                    <label style={s.label}>Bank Account No. <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account number" value={form.bankAccountNumber}
                                         onChange={handleTextChange('bankAccountNumber')}
-                                        style={s.input} />
+                                        style={{ ...s.input, ...(errors.bankAccountNumber ? s.inputErr : {}) }} />
+                                    {errors.bankAccountNumber && <span style={s.errMsg}><AlertIcon />{errors.bankAccountNumber}</span>}
                                 </div>
                             </div>
 
-                            {/* ── Documents ───────────────────────────── */}
+                            {/* -- Documents ----------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Pre-Employment Documents</div>
 
                             <label style={s.label}>Resume / CV <span style={s.req}>*</span></label>
@@ -778,7 +792,7 @@ export default function PublicApplicationPortal() {
                                             onChange={e => handleFileUpload('resume')(e.target.files?.[0])} />
                                         <UploadIcon />
                                         <span>Click to upload Resume</span>
-                                        <span style={s.fileBtnHint}>PDF or DOCX · Max 5MB</span>
+                                        <span style={s.fileBtnHint}>PDF or DOCX � Max 5MB</span>
                                     </div>
                                 ) : (
                                     <div style={s.filePreview}>
@@ -793,38 +807,44 @@ export default function PublicApplicationPortal() {
                                 {errors.resume && <span style={s.errMsg}><AlertIcon />{errors.resume}</span>}
                             </div>
 
-                            <div style={s.fileDocGrid}>
-                                {([
-                                    { k: 'nbiClearance' as const, label: 'NBI Clearance' },
-                                    { k: 'medicalClearance' as const, label: 'Medical Clearance' },
-                                    { k: 'psaBirthCertificate' as const, label: 'PSA Birth Certificate' },
-                                    { k: 'signedEmploymentContract' as const, label: 'Employment Contract' },
-                                ]).map(({ k, label }) => {
-                                    const file = (form as any)[k] as File | null;
-                                    const err = (errors as any)[k] as string | undefined;
-                                    return (
-                                        <div key={k} style={s.fileDocCell}>
+                            {([
+                                { k: 'nbiClearance' as const, label: 'NBI Clearance', required: true },
+                                { k: 'medicalClearance' as const, label: 'Medical Clearance', required: true },
+                                { k: 'psaBirthCertificate' as const, label: 'PSA Birth Certificate', required: true },
+                                { k: 'signedEmploymentContract' as const, label: 'Employment Contract', required: true },
+                            ]).map(({ k, label, required }) => {
+                                const file = (form as any)[k] as File | null;
+                                const err = (errors as any)[k] as string | undefined;
+                                return (
+                                    <div key={k} style={{ marginBottom: 10 }}>
+                                        <label style={s.label}>{label} {required && <span style={s.req}>*</span>}</label>
+                                        <div style={{ marginTop: 6 }}>
                                             {!file ? (
-                                                <div style={{ ...s.fileBtnSmall, ...(err ? s.fileBtnErr : {}) }}
-                                                    onClick={() => document.getElementById(`fin-${k}`)?.click()}>
-                                                    <input id={`fin-${k}`} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                                                        onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(k)(f); }} />
-                                                    <FileIcon />
-                                                    <span style={{ fontSize: 11 }}>{label}</span>
+                                                <div style={{ ...s.fileBtn, ...(err ? s.fileBtnErr : {}) }}
+                                                    onClick={() => document.getElementById(`doc-${k}`)?.click()}>
+                                                    <input id={`doc-${k}`} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                                                        onChange={e => handleFileUpload(k)(e.target.files?.[0])} />
+                                                    <UploadIcon />
+                                                    <span>Click to upload {label}</span>
+                                                    <span style={s.fileBtnHint}>PDF or DOCX · Max 5MB</span>
                                                 </div>
                                             ) : (
-                                                <div style={s.filePreviewSmall}>
-                                                    <span style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{file.name}</span>
+                                                <div style={s.filePreview}>
+                                                    <div style={s.fileIcon}><FileIcon /></div>
+                                                    <div style={s.fileMeta}>
+                                                        <div style={s.fileName}>{file.name}</div>
+                                                        <div style={s.fileSize}>{formatBytes(file.size)}</div>
+                                                    </div>
                                                     <button style={s.fileRemove} onClick={() => setForm(p => ({ ...p, [k]: null }))}><XIcon /></button>
                                                 </div>
                                             )}
                                             {err && <span style={s.errMsg}><AlertIcon />{err}</span>}
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    </div>
+                                );
+                            })}
 
-                            {/* ── Emergency ────────────────────────────── */}
+                            {/* -- Emergency ------------------------------ */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Emergency Contact &amp; Dependents</div>
                             <div style={s.fieldRow3}>
                                 <div style={s.field}>
@@ -839,7 +859,7 @@ export default function PublicApplicationPortal() {
                                     <select value={form.emergencyContactRelationship}
                                         onChange={handleSelectChange('emergencyContactRelationship')}
                                         style={{ ...s.input, ...s.select, ...(errors.emergencyContactRelationship ? s.inputErr : {}) }}>
-                                        <option value="">Select…</option>
+                                        <option value="">Select</option>
                                         <option value="Mother">Mother</option>
                                         <option value="Father">Father</option>
                                         <option value="Spouse">Spouse</option>
@@ -901,7 +921,7 @@ export default function PublicApplicationPortal() {
                                 })()}
                             </div>
 
-                            {/* ── Education ──────────────────────────── */}
+                            {/* -- Education ---------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Educational &amp; Professional Background</div>
                             <div style={s.fieldRow2}>
                                 <div style={s.field}>
@@ -933,14 +953,14 @@ export default function PublicApplicationPortal() {
                                     style={s.textarea} rows={2} />
                             </div>
 
-                            {/* ── Position ──────────────────────────── */}
+                            {/* -- Position ---------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Position Applied For</div>
                             <div style={s.field}>
                                 <label style={s.label}>Select Position <span style={s.req}>*</span></label>
                                 <select value={form.positionId}
                                     onChange={e => { const val = e.target.value; setForm(p => ({ ...p, positionId: val })); const err = validateField('position', val); setErrors(p => ({ ...p, position: err || undefined })); }}
                                     style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}>
-                                    <option value="">Choose a position…</option>
+                                    <option value="">Choose a position�</option>
                                     {positions.length === 0 && <option value="" disabled>No positions available</option>}
                                     {positions.map(p => <option key={p.jobPositionId} value={p.jobPositionId}>{p.title}</option>)}
                                 </select>
@@ -962,9 +982,9 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.background = '#4318ff'; }}
                             >
                                 {submitLoading ? (
-                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application…</>
+                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application�</>
                                 ) : (
-                                    'Submit Application →'
+                                    'Submit Application ?'
                                 )}
                             </button>
 
@@ -976,7 +996,7 @@ export default function PublicApplicationPortal() {
                     </div>
                 )}
 
-                {/* ══ SUCCESS ══════════════════════════════════════════════════════ */}
+                {/* -- SUCCESS ------------------------------------------------------ */}
                 {stage === 'success' && (
                     <div style={s.centeredStage}>
                         <div style={s.successCard}>
@@ -1002,7 +1022,7 @@ export default function PublicApplicationPortal() {
                                 <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.6 }}>
                                     A verification email has been sent to your Google account. Please check your inbox and click the
                                     verification link to activate your application. Our recruitment team will then review it and
-                                    reach out within 3\u20135 business days. Check your spam folder if you don\u2019t see the email.
+                                    reach out within 3�5 business days. Check your spam folder if you don't see the email.
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 28 }}>
@@ -1029,8 +1049,8 @@ export default function PublicApplicationPortal() {
             </main>
 
             <footer style={s.footer}>
-                <span>© 2026 Speedex Courier Inc. · All rights reserved.</span>
-                <span style={s.footerRight}>Powered by OTMS · Recruitment Module</span>
+                <span>� 2026 Speedex Courier Inc. � All rights reserved.</span>
+                <span style={s.footerRight}>Powered by OTMS � Recruitment Module</span>
             </footer>
         </div>
     );

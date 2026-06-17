@@ -124,7 +124,15 @@ namespace OTMS.Service.Services
             var verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
             var fullName = BuildFullName(request.FirstName, request.MiddleName, request.LastName, request.Suffix);
 
-            // 6. Create ApplicantRecord
+            // 6. Collect uploaded file paths for cleanup on failure
+            var uploadedFiles = new[] { resumeFilePath, nbiPath, medicalPath, psaPath, contractPath }.Where(f => f != null).Cast<string>().ToList();
+
+            try
+            {
+            // 7. Generate unique reference number
+            var referenceNumber = await GenerateReferenceNumberAsync();
+
+            // 8. Create ApplicantRecord
             var applicantRecord = new ApplicantRecord
             {
                 ApplicantRecordId = Guid.NewGuid(),
@@ -161,6 +169,7 @@ namespace OTMS.Service.Services
                 InstitutionAndYearGraduated = $"{request.Institution.Trim()}, {request.YearGraduated.Trim()}",
                 ProfessionalLicensesCertifications = request.ProfessionalLicensesCertifications?.Trim(),
                 JobPositionId = request.JobPositionId,
+                ReferenceNumber = referenceNumber,
                 Status = "Pending Review",
                 IsEmailVerified = false,
                 EmailVerificationToken = verificationToken,
@@ -171,10 +180,10 @@ namespace OTMS.Service.Services
             context.ApplicantRecords.Add(applicantRecord);
             await context.SaveChangesAsync();
 
-            // 7. Send verification email
+            // 8. Send verification email
             await SendVerificationEmailAsync(applicantRecord);
 
-            // 8. Dispatch notification to SystemAdmin / HRAdmin
+            // 9. Dispatch notification to SystemAdmin / HRAdmin
             await DispatchApplicationNotificationAsync(applicantRecord);
 
             return new ApiResponseDTO<string>
@@ -183,6 +192,16 @@ namespace OTMS.Service.Services
                 Message = "Application submitted successfully. Thank you for applying.",
                 Data = applicantRecord.ApplicantRecordId.ToString()
             };
+            }
+            catch
+            {
+                // Clean up uploaded files if DB save or subsequent operation fails
+                foreach (var path in uploadedFiles)
+                {
+                    try { fileService.DeleteFile(path); } catch { }
+                }
+                throw;
+            }
         }
 
         public async Task<ApiResponseDTO<string>> VerifyEmailAsync(string token)
@@ -374,6 +393,19 @@ namespace OTMS.Service.Services
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .ToArray();
             return string.Join(" ", parts);
+        }
+
+        private async Task<string> GenerateReferenceNumberAsync()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            string refNo;
+            do
+            {
+                refNo = new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+            }
+            while (await context.ApplicantRecords.AnyAsync(ar => ar.ReferenceNumber == refNo));
+            return refNo;
         }
     }
 }

@@ -264,13 +264,14 @@ namespace OTMS.Service.Services
             context.InterviewSchedules.Add(interviewSchedule);
             await context.SaveChangesAsync();
 
+            var formattedTime = DateTime.TryParse(request.InterviewTime, out var parsedTime) ? parsedTime.ToString("hh:mm tt") : request.InterviewTime;
             var subject = $"Interview Scheduled: {applicant.JobPosition.Title} Position";
             var body = $@"
                 <h2>Interview Invitation</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
                 <p>You have been invited for an interview for the <strong>{applicant.JobPosition.Title}</strong> position.</p>
                 <p><strong>Date:</strong> {request.InterviewDate:MMMM dd, yyyy}</p>
-                <p><strong>Time:</strong> {request.InterviewTime}</p>
+                <p><strong>Time:</strong> {formattedTime}</p>
                 <p><strong>Location/Link:</strong> {request.LocationOrLink}</p>
                 <p><strong>Interviewer:</strong> {request.InterviewerName}</p>
                 <p>Please confirm your availability by replying to this email.</p>

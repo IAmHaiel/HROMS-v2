@@ -66,7 +66,7 @@ export default function OnboardingPage() {
 
     const [tokenValidating, setTokenValidating] = useState(true);
     const [tokenError, setTokenError] = useState('');
-    const [applicantInfo, setApplicantInfo] = useState<{ fullName: string; email: string; position: string } | null>(null);
+    const [applicantInfo, setApplicantInfo] = useState<{ fullName: string; firstName: string; middleName: string; lastName: string; suffix: string; contactNumber: string; email: string; position: string } | null>(null);
 
     useEffect(() => {
         if (!onboardingToken) {
@@ -81,12 +81,28 @@ export default function OnboardingPage() {
                     // Store JWT and employee info for subsequent API calls
                     if (data.data.accessToken) {
                         localStorage.setItem('authToken', data.data.accessToken);
+                        // Extract role from JWT for dashboard navigation later
+                        try {
+                            const payload = data.data.accessToken.split('.')[1];
+                            const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+                            const roleClaim = json['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || json.role || '';
+                            const roleMap: Record<string, string> = {
+                                'SystemAdmin': 'System Admin', 'OperationAdmin': 'Operation Admin',
+                                'Coordinator': 'Coordinator', 'Encoder': 'Encoder'
+                            };
+                            localStorage.setItem('userRole', roleMap[roleClaim] || roleClaim);
+                        } catch { /* ignore JWT parse errors */ }
                     }
                     if (data.data.employeeNumber) {
                         localStorage.setItem('employeeId', data.data.employeeNumber);
                     }
                     setApplicantInfo({
                         fullName: data.data.fullName,
+                        firstName: data.data.firstName || '',
+                        middleName: data.data.middleName || '',
+                        lastName: data.data.lastName || '',
+                        suffix: data.data.suffix || '',
+                        contactNumber: data.data.contactNumber || '',
                         email: data.data.emailAddress,
                         position: data.data.jobPositionName,
                     });
@@ -107,16 +123,28 @@ export default function OnboardingPage() {
 
     // ── Profile state ──
     const [profile, setProfile] = useState({ firstName: '', middleName: '', lastName: '', suffix: '', contactNumber: '' });
+
+    // Pre-fill profile from applicant info when available
+    useEffect(() => {
+        if (applicantInfo) {
+            setProfile({
+                firstName: applicantInfo.firstName || '',
+                middleName: applicantInfo.middleName || '',
+                lastName: applicantInfo.lastName || '',
+                suffix: applicantInfo.suffix || '',
+                contactNumber: applicantInfo.contactNumber || '',
+            });
+        }
+    }, [applicantInfo]);
     const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
     const [profileSaving, setProfileSaving] = useState(false);
     const [profileApiError, setProfileApiError] = useState('');
 
     // ── Password state ──
-    const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+    const [pw, setPw] = useState({ next: '', confirm: '' });
     const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
     const [pwSaving, setPwSaving] = useState(false);
     const [pwApiError, setPwApiError] = useState('');
-    const [showCurrent, setShowCurrent] = useState(false);
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -283,9 +311,8 @@ export default function OnboardingPage() {
 
     const validatePwField = (key: string, value: string): string => {
         switch (key) {
-            case 'current': return !value ? 'Current password is required.' : '';
             case 'next':
-                if (!value) return 'New password is required.';
+                if (!value) return 'Password is required.';
                 if (value.length < 15) return 'Must be at least 15 characters.';
                 if (value.length > 64) return 'Must not exceed 64 characters.';
                 return '';
@@ -323,11 +350,11 @@ export default function OnboardingPage() {
 
     const handlePasswordSave = async () => {
         const errs: Record<string, string> = {};
-        ['current', 'next', 'confirm'].forEach(k => { const err = validatePwField(k, pw[k as keyof typeof pw]); if (err) errs[k] = err; });
+        ['next', 'confirm'].forEach(k => { const err = validatePwField(k, pw[k as keyof typeof pw]); if (err) errs[k] = err; });
         if (Object.keys(errs).length > 0) { setPwErrors(errs); return; }
         setPwSaving(true); setPwApiError('');
         try {
-            const res = await fetch('/api/profile/change-password', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }) });
+            const res = await fetch('/api/profile/set-initial-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ newPassword: pw.next, confirmPassword: pw.confirm }) });
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Password update failed.'); }
             localStorage.setItem('isPasswordChanged', 'true');
             setStep('documents');
@@ -641,14 +668,13 @@ export default function OnboardingPage() {
                                     </div>
                                 )}
                                 {[
-                                    { key: 'current', label: 'Current Password', show: showCurrent, setShow: setShowCurrent, placeholder: 'Enter your current password' },
-                                    { key: 'next', label: 'New Password', show: showNext, setShow: setShowNext, placeholder: 'At least 15 characters' },
+                                    { key: 'next', label: 'Create your Password', show: showNext, setShow: setShowNext, placeholder: 'At least 15 characters' },
                                     { key: 'confirm', label: 'Confirm Password', show: showConfirm, setShow: setShowConfirm, placeholder: 'Re-enter your password' },
                                 ].map(({ key, label, show, setShow, placeholder }) => (
                                     <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                                         <FieldLabel label={label} required />
                                         <div style={{ position: 'relative' }}>
-                                            <input type={show ? 'text' : 'password'} placeholder={placeholder} value={pw[key as keyof typeof pw]} onChange={e => { const val = e.target.value; setPw(p => ({ ...p, [key]: val })); setPwErrors(p => ({ ...p, [key]: validatePwField(key, val), ...(key === 'next' && pw.confirm ? { confirm: pw.confirm !== val ? 'Passwords do not match.' : '' } : {}) })); }} maxLength={key === 'current' ? undefined : 64} style={pwInputStyle(pwErrors[key])} />
+                                            <input type={show ? 'text' : 'password'} placeholder={placeholder} value={pw[key as keyof typeof pw]} onChange={e => { const val = e.target.value; setPw(p => ({ ...p, [key]: val })); setPwErrors(p => ({ ...p, [key]: validatePwField(key, val), ...(key === 'next' && pw.confirm ? { confirm: pw.confirm !== val ? 'Passwords do not match.' : '' } : {}) })); }} maxLength={64} style={pwInputStyle(pwErrors[key])} />
                                             <button type="button" onClick={() => setShow((p: boolean) => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8a95b0' }}>
                                                 {show ? <EyeOff size={15} /> : <Eye size={15} />}
                                             </button>

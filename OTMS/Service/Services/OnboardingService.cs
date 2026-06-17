@@ -215,6 +215,11 @@ namespace OTMS.Service.Services
                         EmployeeNumber = existingEmployee.EmployeeNumber,
                         EmployeeId = existingEmployee.EmployeeId,
                         FullName = onboardingToken.ApplicantRecord.FullName,
+                        FirstName = onboardingToken.ApplicantRecord.FirstName,
+                        MiddleName = onboardingToken.ApplicantRecord.MiddleName,
+                        LastName = onboardingToken.ApplicantRecord.LastName,
+                        Suffix = onboardingToken.ApplicantRecord.Suffix,
+                        ContactNumber = onboardingToken.ApplicantRecord.ContactNumber,
                         EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
                         JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? ""
                     }
@@ -273,7 +278,37 @@ namespace OTMS.Service.Services
 
             context.Employees.Add(employee);
             context.Accounts.Add(account);
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+            {
+                // Employee with this email already exists (concurrent request)
+                var existing = await context.Employees
+                    .Include(e => e.Account).ThenInclude(a => a.Role).ThenInclude(r => r.RolePermissions).ThenInclude(rp => rp.Permission)
+                    .FirstAsync(e => e.Email == applicant.EmailAddress && e.Account != null);
+                var jwt = CreateToken(existing);
+                return new ApiResponseDTO<OnboardingValidationResponseDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Onboarding access granted. Existing session resumed.",
+                    Data = new OnboardingValidationResponseDTO
+                    {
+                        AccessToken = jwt,
+                        EmployeeNumber = existing.EmployeeNumber,
+                        EmployeeId = existing.EmployeeId,
+                        FullName = applicant.FullName,
+                        FirstName = applicant.FirstName,
+                        MiddleName = applicant.MiddleName,
+                        LastName = applicant.LastName,
+                        Suffix = applicant.Suffix,
+                        ContactNumber = applicant.ContactNumber,
+                        EmailAddress = applicant.EmailAddress,
+                        JobPositionName = applicant.JobPosition?.Title ?? ""
+                    }
+                };
+            }
 
             // Reload with role + permissions for JWT
             var provisionedEmployee = await context.Employees
@@ -301,6 +336,11 @@ namespace OTMS.Service.Services
                     EmployeeNumber = employeeNumber,
                     EmployeeId = employee.EmployeeId,
                     FullName = applicant.FullName,
+                    FirstName = applicant.FirstName,
+                    MiddleName = applicant.MiddleName,
+                    LastName = applicant.LastName,
+                    Suffix = applicant.Suffix,
+                    ContactNumber = applicant.ContactNumber,
                     EmailAddress = applicant.EmailAddress,
                     JobPositionName = applicant.JobPosition?.Title ?? ""
                 }

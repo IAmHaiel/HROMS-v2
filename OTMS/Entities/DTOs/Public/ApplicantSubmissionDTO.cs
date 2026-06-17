@@ -49,9 +49,12 @@ namespace OTMS.Entities.DTOs.Public
         public string TIN { get; set; } = string.Empty;
 
         // ─── Financial and Payroll Data ────────────────────────────────────
-        public string? BankName { get; set; }
-        public string? BankAccountName { get; set; }
-        public string? BankAccountNumber { get; set; }
+        [Required]
+        public string BankName { get; set; } = string.Empty;
+        [Required]
+        public string BankAccountName { get; set; } = string.Empty;
+        [Required]
+        public string BankAccountNumber { get; set; } = string.Empty;
 
         // ─── Pre-Employment Documents ──────────────────────────────────────
         public IFormFile? NBIClearance { get; set; }
