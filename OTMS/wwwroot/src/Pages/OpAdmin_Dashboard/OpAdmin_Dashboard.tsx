@@ -2521,100 +2521,42 @@ function ProfileTab() {
 
             {/* ── Password Gate Modal ──────────────────────────────────────── */}
             {passwordGate && (
-                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
-                    <div
-                        className="modal-card"
-                        onClick={e => e.stopPropagation()}
-                        style={{ maxWidth: 400 }}
-                    >
-                        <div className="modal-head">
-                            <div>
-                                <h3>Confirm Your Identity</h3>
-                                <p className="modal-sub">Enter your password to save your profile changes.</p>
-                            </div>
-                            <button
-                                className="icon-btn"
-                                onClick={() => setPasswordGate(false)}
-                                aria-label="Close"
-                            >
-                                <X size={16} />
+                <Modal isOpen={passwordGate} onClose={() => setPasswordGate(false)}
+                    title="Confirm Your Identity" subtitle="Enter your password to save your profile changes." size="sm"
+                    footer={
+                        <>
+                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
+                                {gateLoading ? <><Loader2 size={13} className="spin" /> Verifying…</> : <><Shield size={13} /> Confirm & Save</>}
                             </button>
+                        </>
+                    }
+                >
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
+                        <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(0,169,157,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Lock size={22} color="var(--primary)" />
                         </div>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
+                            For your security, please verify your identity before saving changes.
+                        </p>
+                    </div>
 
-                        <div style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                            padding: '8px 0 16px', gap: 8,
-                        }}>
-                            <div style={{
-                                width: 52, height: 52, borderRadius: '50%',
-                                background: 'rgba(67,24,255,0.1)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Lock size={22} color="var(--primary)" />
-                            </div>
-                            <p style={{
-                                fontSize: 13, color: 'var(--text-secondary)',
-                                textAlign: 'center', margin: 0,
-                            }}>
-                                For your security, please verify your identity before saving changes.
-                            </p>
-                        </div>
+                    {gateError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{gateError}</span></div>}
 
-                        {gateError && (
-                            <div className="form-api-error" style={{ marginBottom: 12 }}>
-                                <AlertCircle size={14} /><span>{gateError}</span>
-                            </div>
-                        )}
-
-                        <div className="field" style={{ marginBottom: 20 }}>
-                            <label>Password</label>
-                            <div style={{ position: 'relative' }}>
-                                <input
-                                    type={showGatePassword ? 'text' : 'password'}
-                                    value={gatePassword}
-                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
-                                    onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
-                                    placeholder="Enter your current password"
-                                    style={{ paddingRight: 40, width: '100%' }}
-                                    autoFocus
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowGatePassword(p => !p)}
-                                    style={{
-                                        position: 'absolute', right: 12, top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'none', border: 'none', cursor: 'pointer',
-                                        color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
-                                    }}
-                                    tabIndex={-1}
-                                >
-                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="modal-actions">
-                            <button
-                                className="btn"
-                                onClick={() => setPasswordGate(false)}
-                                disabled={gateLoading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                onClick={handleGateConfirm}
-                                disabled={gateLoading || !gatePassword}
-                            >
-                                {gateLoading
-                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
-                                    : <><Shield size={13} /> Confirm & Save</>
-                                }
+                    <div className="field" style={{ marginBottom: 20 }}>
+                        <label>Password</label>
+                        <div style={{ position: 'relative' }}>
+                            <input type={showGatePassword ? 'text' : 'password'} value={gatePassword}
+                                onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
+                                placeholder="Enter your current password" style={{ paddingRight: 40, width: '100%' }} autoFocus />
+                            <button type="button" onClick={() => setShowGatePassword(p => !p)}
+                                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>
+                                {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
                             </button>
                         </div>
                     </div>
-                </div>
+                </Modal>
             )}
 
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
@@ -3399,69 +3341,46 @@ interface DuplicateWarningModalProps {
 }
 
 const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicates, onContinue, onCancel }) => (
-    <div className="modal-overlay" onClick={onCancel}>
-        <div className="modal-card" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <AlertCircle size={22} color="#ffb547" />
-                    <div>
-                        <h3>Potential duplicate task detected.</h3>
-                        <p className="modal-sub">
-                            The system found {duplicates.length} similar task{duplicates.length !== 1 ? 's' : ''} in existing records. Review the matches below.
-                        </p>
-                    </div>
-                </div>
-                <button className="icon-btn" onClick={onCancel}><X size={16} /></button>
+    <Modal isOpen onClose={onCancel}
+        title="Potential duplicate task detected."
+        subtitle={`The system found ${duplicates.length} similar task${duplicates.length !== 1 ? 's' : ''} in existing records. Review the matches below.`}
+        size="lg"
+        footer={
+            <div className="modal-actions" style={{ width: '100%', justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={onCancel}><X size={13} /> Cancel</button>
+                <button className="btn btn-primary" onClick={onContinue}><CheckCircle2 size={13} /> Continue Anyway</button>
             </div>
-
-            <div style={{ overflowX: 'auto', margin: '8px 0 4px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                        <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Existing Task Title</th>
-                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Task ID</th>
-                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Status</th>
-                            <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Similarity</th>
+        }
+    >
+        <div style={{ overflowX: 'auto', margin: '8px 0 4px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
+                        <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Existing Task Title</th>
+                        <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Task ID</th>
+                        <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Status</th>
+                        <th style={{ padding: '8px 8px', fontWeight: 700, color: 'var(--text-secondary)' }}>Similarity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {duplicates.map((d, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>{d.existingTaskTitle}</td>
+                            <td style={{ padding: '10px 8px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                {d.existingTaskId.length > 8 ? d.existingTaskId.slice(0, 8) + '...' : d.existingTaskId}
+                            </td>
+                            <td style={{ padding: '10px 8px' }}>
+                                <span className={statusBadgeClass(d.existingTaskStatus)} style={{ fontSize: 11 }}>{d.existingTaskStatus}</span>
+                            </td>
+                            <td style={{ padding: '10px 8px', fontWeight: 700, color: d.similarityPercentage >= 90 ? 'var(--status-failed)' : d.similarityPercentage >= 80 ? '#c05c00' : d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)' }}>
+                                {d.similarityPercentage}%
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {duplicates.map((d, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                                    {d.existingTaskTitle}
-                                </td>
-                                <td style={{ padding: '10px 8px', fontSize: 11, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                                    {d.existingTaskId.length > 8 ? d.existingTaskId.slice(0, 8) + '...' : d.existingTaskId}
-                                </td>
-                                <td style={{ padding: '10px 8px' }}>
-                                    <span className={statusBadgeClass(d.existingTaskStatus)} style={{ fontSize: 11 }}>
-                                        {d.existingTaskStatus}
-                                    </span>
-                                </td>
-                                <td style={{
-                                    padding: '10px 8px', fontWeight: 700,
-                                    color: d.similarityPercentage >= 90 ? 'var(--status-failed)' :
-                                        d.similarityPercentage >= 80 ? '#c05c00' :
-                                            d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)',
-                                }}>
-                                    {d.similarityPercentage}%
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 12 }}>
-                <button className="btn" onClick={onCancel}>
-                    <X size={13} /> Cancel
-                </button>
-                <button className="btn btn-primary" onClick={onContinue}>
-                    <CheckCircle2 size={13} /> Continue Anyway
-                </button>
-            </div>
+                    ))}
+                </tbody>
+            </table>
         </div>
-    </div>
+    </Modal>
 );
 
 // ─── Root Component ───────────────────────────────────────────────────────────

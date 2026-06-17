@@ -50,6 +50,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import RoleBadge from '../../components/ui/RoleBadge';
 import Select from '../../components/ui/Select';
 import Pagination from '../../components/ui/Pagination';
+import Modal from '../../components/ui/Modal';
 import EmployeeDetailPanel from './EmployeeDetailPanel/EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
@@ -1740,18 +1741,11 @@ function ManageEmployeesTab({
                 />
             )}
             {/* ── Leave detail modal ── */}
-            {detailModal && (
-                <div className="modal-overlay" onClick={() => setDetailModal(null)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 480, minWidth: 'auto', padding: '28px 30px', borderRadius: 16 }}>
-                        <div className="modal-header" style={{ marginBottom: 20 }}>
-                            <div>
-                                <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Leave Request Detail</h3>
-                                <p className="modal-subtitle" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>Full details for this request</p>
-                            </div>
-                            <button className="icon-btn" onClick={() => setDetailModal(null)} style={{ borderRadius: '50%', width: 32, height: 32 }}><X size={15} /></button>
-                        </div>
+            <Modal isOpen={!!detailModal} onClose={() => setDetailModal(null)} title="Leave Request Detail" subtitle="Full details for this request" size="sm">
+                {detailModal && (
+                    <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                            <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #4318ff, #868cff)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)' }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
+                            <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44 }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
                             <div>
                                 <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{detailModal.employeeName}</h4>
                                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{toDisplayRole(detailModal.role)}</span></div>
@@ -1760,41 +1754,41 @@ function ManageEmployeesTab({
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                             {[
                                 { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'var(--status-new-bg)', color: 'var(--primary)' },
-                                { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547' },
-                                { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)' },
-                                { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)' },
+                                { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'var(--status-pending-bg)', color: 'var(--status-pending)' },
+                                { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'var(--status-active-bg)', color: 'var(--status-active)' },
+                                { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'var(--status-active-bg)', color: 'var(--status-active)' },
                                 { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'var(--status-new-bg)', color: 'var(--primary)' },
-                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'var(--status-active-bg)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? 'var(--status-active)' : detailModal.status === 'declined' ? 'var(--status-failed)' : '#ffb547' },
+                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'var(--status-active-bg)' : detailModal.status === 'declined' ? 'var(--status-failed-bg)' : 'var(--status-pending-bg)', color: detailModal.status === 'approved' ? 'var(--status-active)' : detailModal.status === 'declined' ? 'var(--status-failed)' : 'var(--status-pending)' },
                             ].map(({ label, value, icon, bg, color }) => (
-                                <div key={label} style={{ background: 'var(--bg-input)', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div key={label} style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <div style={{ background: bg, color, padding: 6, borderRadius: 8, display: 'flex' }}>{icon}</div>
                                     <div><span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span><strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong></div>
                                 </div>
                             ))}
                         </div>
-                        <div style={{ background: 'rgba(255, 181, 71, 0.04)', borderLeft: '3px solid #ffb547', borderRadius: '0 8px 8px 0', padding: '12px 14px', marginBottom: 16 }}>
+                        <div style={{ background: 'var(--status-pending-bg)', borderLeft: '3px solid var(--status-pending)', borderRadius: '0 8px 8px 0', padding: '12px 14px', marginBottom: 16 }}>
                             <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REASON FOR REQUEST</span>
                             <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{detailModal.reason}</p>
                         </div>
                         {detailModal.reviewNote && (
-                            <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', borderLeft: `3px solid ${detailModal.status === 'approved' ? 'var(--status-active)' : 'var(--status-failed)'}`, borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 16 }}>
+                            <div style={{ background: detailModal.status === 'approved' ? 'var(--status-active-bg)' : 'var(--status-failed-bg)', borderLeft: `3px solid ${detailModal.status === 'approved' ? 'var(--status-active)' : 'var(--status-failed)'}`, borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 16 }}>
                                 <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REVIEW NOTE</span>
                                 <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>{detailModal.reviewNote}</p>
                             </div>
                         )}
-                        <div className="modal-actions" style={{ marginTop: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                             {detailModal.status === 'pending' ? (
                                 <>
-                                    <button className="btn btn-danger" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }} style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}><X size={13} /> Decline</button>
-                                    <button className="btn btn-primary" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }} style={{ fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}><CheckCircle2 size={13} /> Approve</button>
+                                    <button className="btn btn-danger" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'decline' }); }}><X size={13} /> Decline</button>
+                                    <button className="btn btn-primary" onClick={() => { setDetailModal(null); setActionModal({ request: detailModal, action: 'approve' }); }}><CheckCircle2 size={13} /> Approve</button>
                                 </>
                             ) : (
-                                <button className="btn" onClick={() => setDetailModal(null)} style={{ background: '#f4f7fe', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, padding: '10px 24px', borderRadius: 10 }}>Close</button>
+                                <button className="btn btn-outline" onClick={() => setDetailModal(null)}>Close</button>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                    </>
+                )}
+            </Modal>
             {actionModal && (
                 <LeaveActionModal
                     request={actionModal.request}
