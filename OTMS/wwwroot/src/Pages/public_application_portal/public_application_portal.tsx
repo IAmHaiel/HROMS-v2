@@ -921,14 +921,24 @@ export default function PublicApplicationPortal() {
                                     reach out within 3\u20135 business days. Check your spam folder if you don\u2019t see the email.
                                 </p>
                             </div>
-                            <button
-                                style={{ ...s.submitBtn, background: '#0f172a' }}
-                                onClick={resetPortal}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
-                                onMouseLeave={e => (e.currentTarget.style.background = '#0f172a')}
-                            >
-                                Submit Another Application
-                            </button>
+                            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 28 }}>
+                                <button
+                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1 }}
+                                    onClick={resetPortal}
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#3510d9')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '#4318ff')}
+                                >
+                                    Submit Another Application
+                                </button>
+                                <button
+                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1, background: '#0f172a', boxShadow: '0 4px 16px rgba(15,23,42,0.2)' }}
+                                    onClick={() => window.location.href = '/'}
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '#0f172a')}
+                                >
+                                    Back to Login
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
