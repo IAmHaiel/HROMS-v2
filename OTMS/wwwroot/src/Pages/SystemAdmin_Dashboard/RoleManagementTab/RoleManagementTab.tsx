@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../../components/Toast/Toast';
 import StatCard from '../../../components/StatCard/StatCard';
-import { TableCard, ActionsDropdown } from '../../../components/TableCard/TableCard';
+import DataTable, { ActionsDropdown } from '../../../components/ui/DataTable';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 import './RoleManagementTab.css';
@@ -1363,7 +1363,7 @@ export default function RoleManagementTab() {
                         <StatCard icon={<Key size={18} />} label="Total Permissions" value={permissions.length} subtext="Available across all roles" variant="primary" />
                     </div>
 
-                    <TableCard
+                    <DataTable
                         title="Roles" totalResults={filteredRoles.length}
                         searchQuery={roleSearch} setSearchQuery={v => { setRoleSearch(v); setRolePage(1); }}
                         searchPlaceholder="Search roles…"
@@ -1393,7 +1393,7 @@ export default function RoleManagementTab() {
                                 </td>
                             </tr>
                         ))}
-                    </TableCard>
+                    </DataTable>
                 </>
             )}
 
@@ -1407,7 +1407,7 @@ export default function RoleManagementTab() {
                         <StatCard icon={<Users size={18} />} label="Total Positions" value={positions.length || '—'} subtext="Across all departments" variant="primary" />
                     </div>
 
-                    <TableCard
+                    <DataTable
                         title="Departments" totalResults={filteredDepts.length}
                         searchQuery={deptSearch} setSearchQuery={v => { setDeptSearch(v); setDeptPage(1); }}
                         searchPlaceholder="Search by name or code…"
@@ -1451,7 +1451,7 @@ export default function RoleManagementTab() {
                                 </td>
                             </tr>
                         ))}
-                    </TableCard>
+                    </DataTable>
                 </>
             )}
 
@@ -1465,7 +1465,7 @@ export default function RoleManagementTab() {
                         <StatCard icon={<Building2 size={18} />} label="Departments" value={departments.length} subtext="Available departments" variant="primary" />
                     </div>
 
-                    <TableCard
+                    <DataTable
                         title="Job Positions" totalResults={filteredPos.length}
                         searchQuery={posSearch} setSearchQuery={v => { setPosSearch(v); setPosPage(1); }}
                         searchPlaceholder="Search by name, code, or department…"
@@ -1511,7 +1511,7 @@ export default function RoleManagementTab() {
                                 </td>
                             </tr>
                         ))}
-                    </TableCard>
+                    </DataTable>
                 </>
             )}
 

@@ -57,7 +57,7 @@ import PendingApprovalsTab from './PendingApprovalsTab';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
-import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
+import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
@@ -1681,7 +1681,7 @@ const TasksTab: React.FC<{
 
     return (
         <div className="dashboard-content">
-            <TableCard
+            <DataTable
                 tabs={[
                     { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.length },
                     { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, badge: deletedTasks.length },
@@ -1799,7 +1799,7 @@ const TasksTab: React.FC<{
                         </tr>
                     ))
                 )}
-            </TableCard>
+            </DataTable>
         </div>
     );
 };
@@ -1880,7 +1880,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
 
     return (
         <div className="dashboard-content">
-            <TableCard
+            <DataTable
                 title="Task Templates"
                 totalResults={templates.length}
                 actionButton={{ label: 'Create Template', icon: <Plus size={14} />, onClick: () => { setEditingTemplate(null); setShowModal(true); } }}
@@ -1921,7 +1921,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                         </td>
                     </tr>
                 ))}
-            </TableCard>
+            </DataTable>
 
             {showModal && (
                 <TemplateModal
@@ -3258,7 +3258,7 @@ const LeaveTab: React.FC<{
                 ))}
             </div>
 
-            <TableCard
+            <DataTable
                 title="My Leave History"
                 filterElements={
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -3292,7 +3292,7 @@ const LeaveTab: React.FC<{
                 <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
                     {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
                 </div>
-            </TableCard>
+            </DataTable>
 
             {showModal && (
                 <LeaveRequestModal

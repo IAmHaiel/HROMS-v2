@@ -47,6 +47,7 @@ import SearchBar from '../../components/ui/SearchBar';
 import EmptyState from '../../components/ui/EmptyState';
 import ErrorBanner from '../../components/ui/ErrorBanner';
 import StatusBadge from '../../components/ui/StatusBadge';
+import RoleBadge from '../../components/ui/RoleBadge';
 import Select from '../../components/ui/Select';
 import Pagination from '../../components/ui/Pagination';
 import EmployeeDetailPanel from './EmployeeDetailPanel/EmployeeDetailPanel';
@@ -57,7 +58,7 @@ import RoleManagementTab, { DepartmentResponseDTO, JobPositionResponseDTO } from
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import ActionButton from '../../components/ActionButton/ActionButton';
-import TableCard, { ActionsDropdown } from '../../components/TableCard/TableCard';
+import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
 import EmployeeDocumentsTab from './EmployeeDocumentsTab/EmployeeDocumentsTab';
 import RecruitmentTab from './RecruitmentTab/RecruitmentTab';
 
@@ -1462,10 +1463,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
             {/* Main Content Grid */}
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header">
-                        <h3>Recent Employees</h3>
-                        <button className="view-all-link" onClick={onViewAll}>View all →</button>
-                    </div>
+                    <div className="card-header-layout"><span className="text-link">Recent Employees</span><button className="view-all-link" onClick={onViewAll}>View more →</button></div>
                     <table className="data-table">
                         <thead>
                             <tr>
@@ -1504,10 +1502,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     </table>
                 </div>
                 <div className="card activity-card">
-                    <div className="card-header">
-                        <h3>Recent Activity</h3>
-                        <a href="/activity-logs" className="view-all-link">View all →</a>
-                    </div>
+                    <div className="card-header-layout"><span className="text-link">Recent Activity</span><a href="/activity-logs" className="view-all-link">View all →</a></div>
                     <div className="activity-feed-list">
                         {loading
                             ? <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." />
@@ -2489,7 +2484,7 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                     <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
             </div>
-            <TableCard
+            <DataTable
                 title="Emergency Override Requests"
                 searchQuery={search}
                 setSearchQuery={setSearch}
@@ -2545,7 +2540,7 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
                         </tr>
                     );
                 })}
-            </TableCard>
+            </DataTable>
 
             {/* ── Override Confirmation Modal ── */}
             <ConfirmationModal
