@@ -39,9 +39,39 @@ export interface AuditLogEntry {
 
 export interface ApplicantRecord {
     applicantId: string;
+    referenceNumber: string;
     fullName: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    suffix: string;
+    gender: string;
+    civilStatus: string;
     email: string;
     contactNumber: string;
+    currentResidentialAddress: string;
+    permanentAddress: string;
+    sssNumber: string;
+    philHealthNumber: string;
+    pagIBIGNumber: string;
+    tin: string;
+    bankName: string;
+    bankAccountName: string;
+    bankAccountNumber: string;
+    nbiClearanceFilePath: string;
+    medicalClearanceFilePath: string;
+    psaBirthCertificateFilePath: string;
+    resumeFilePath: string;
+    signedEmploymentContractFilePath: string;
+    emergencyContactName: string;
+    emergencyContactRelationship: string;
+    emergencyContactMobileNumber: string;
+    declaredDependents: string;
+    highestEducationalAttainment: string;
+    institution: string;
+    yearGraduated: string;
+    professionalLicensesCertifications: string;
+    isEmailVerified: boolean;
     position: string;
     currentStatus: RecruitmentStatus;
     submittedAt: string;
@@ -76,7 +106,7 @@ interface StatusMeta {
 
 // ─── Dummy Data ───────────────────────────────────────────────────────────────
 
-const DUMMY_APPLICANTS: ApplicantRecord[] = [
+const DUMMY_APPLICANTS = [
     {
         applicantId: 'APP-0001',
         fullName: 'Maria Santos',
@@ -304,7 +334,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
             { status: 'Pending Review', changedAt: '2025-06-10T11:00:00Z', changedBy: 'System', remarks: 'Application received.' },
         ],
     },
-];
+] as ApplicantRecord[];
 
 // ─── In-memory audit log ──────────────────────────────────────────────────────
 
@@ -839,7 +869,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                     <div>
                         <h3 className="rec-modal-title">Schedule Interview</h3>
                         <p className="rec-modal-subtitle">
-                            Ref: <code className="rec-modal-ref">{applicant.applicantId}</code>
+Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code>
                         </p>
                     </div>
                     {step !== 'sending' && (
@@ -1108,7 +1138,7 @@ function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: U
                 <div className="rec-modal-header">
                     <div>
                         <h3 className="rec-modal-title">Update Application Status</h3>
-                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.applicantId}</code></p>
+                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code></p>
                     </div>
                     <button className="rec-close-btn" onClick={onClose}><X size={14} /></button>
                 </div>
@@ -1197,6 +1227,32 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
     const hasTransitions = STATUS_TRANSITIONS[applicant.currentStatus].length > 0;
     const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
 
+    function CollapsibleSection({ title, children, defaultOpen }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+        const [open, setOpen] = useState(defaultOpen ?? false);
+        return (
+            <div style={{ marginTop: 16, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+                <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#1e293b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    <span style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', fontSize: 10 }}>▶</span>
+                    {title}
+                </div>
+                {open && <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>}
+            </div>
+        );
+    }
+
+    function DetailRow({ label, value, link }: { label: string; value: string; link?: string }) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#64748b', fontWeight: 500 }}>{label}</span>
+                {link ? (
+                    <a href={link} target="_blank" rel="noopener noreferrer" style={{ color: '#4318ff', fontWeight: 600, textDecoration: 'none' }}>{value}</a>
+                ) : (
+                    <span style={{ color: '#0f172a', fontWeight: 600, textAlign: 'right' }}>{value || '—'}</span>
+                )}
+            </div>
+        );
+    }
+
     useEffect(() => {
         if (applicant.currentStatus === 'Job Offered') {
             axios.get(`/api/recruitment/${applicant.applicantId}/onboarding-link`)
@@ -1218,7 +1274,7 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                 <div className="rec-modal-header rec-modal-header--sticky">
                     <div>
                         <h3 className="rec-modal-title">Application Details</h3>
-                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.applicantId}</code></p>
+                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code></p>
                     </div>
                     <button className="rec-close-btn" onClick={onClose}><X size={14} /></button>
                 </div>
@@ -1245,6 +1301,80 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                             </div>
                         ))}
                     </div>
+
+                    {/* ── Collapsible personal info ── */}
+                    <CollapsibleSection title="Personal Information">
+                        <DetailRow label="First Name" value={applicant.firstName} />
+                        <DetailRow label="Middle Name" value={applicant.middleName} />
+                        <DetailRow label="Last Name" value={applicant.lastName} />
+                        <DetailRow label="Suffix" value={applicant.suffix} />
+                        <DetailRow label="Gender" value={applicant.gender} />
+                        <DetailRow label="Civil Status" value={applicant.civilStatus} />
+                        <DetailRow label="Email" value={applicant.email} />
+                        <DetailRow label="Contact Number" value={applicant.contactNumber} />
+                        <DetailRow label="Email Verified" value={applicant.isEmailVerified ? 'Yes' : 'No'} />
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible address ── */}
+                    <CollapsibleSection title="Address">
+                        <DetailRow label="Current Address" value={applicant.currentResidentialAddress} />
+                        <DetailRow label="Permanent Address" value={applicant.permanentAddress} />
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible government IDs ── */}
+                    <CollapsibleSection title="Government Identifiers">
+                        <DetailRow label="SSS Number" value={applicant.sssNumber} />
+                        <DetailRow label="PhilHealth Number" value={applicant.philHealthNumber} />
+                        <DetailRow label="Pag-IBIG Number" value={applicant.pagIBIGNumber} />
+                        <DetailRow label="TIN" value={applicant.tin} />
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible financial ── */}
+                    <CollapsibleSection title="Financial &amp; Payroll Data">
+                        <DetailRow label="Bank Name" value={applicant.bankName} />
+                        <DetailRow label="Account Name" value={applicant.bankAccountName} />
+                        <DetailRow label="Account Number" value={applicant.bankAccountNumber} />
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible documents ── */}
+                    <CollapsibleSection title="Pre-Employment Documents">
+                        <DetailRow label="Resume/CV" value={applicant.resumeFilePath ? 'Uploaded' : '—'} link={applicant.resumeFilePath} />
+                        <DetailRow label="NBI Clearance" value={applicant.nbiClearanceFilePath ? 'Uploaded' : '—'} link={applicant.nbiClearanceFilePath} />
+                        <DetailRow label="Medical Clearance" value={applicant.medicalClearanceFilePath ? 'Uploaded' : '—'} link={applicant.medicalClearanceFilePath} />
+                        <DetailRow label="PSA Birth Certificate" value={applicant.psaBirthCertificateFilePath ? 'Uploaded' : '—'} link={applicant.psaBirthCertificateFilePath} />
+                        <DetailRow label="Employment Contract" value={applicant.signedEmploymentContractFilePath ? 'Uploaded' : '—'} link={applicant.signedEmploymentContractFilePath} />
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible emergency ── */}
+                    <CollapsibleSection title="Emergency Contact &amp; Dependents">
+                        <DetailRow label="Contact Name" value={applicant.emergencyContactName} />
+                        <DetailRow label="Relationship" value={applicant.emergencyContactRelationship} />
+                        <DetailRow label="Mobile Number" value={applicant.emergencyContactMobileNumber} />
+                        <DetailRow label="Dependents" value={applicant.declaredDependents ? '(see details)' : 'None declared'} />
+                        {applicant.declaredDependents && (() => {
+                            try {
+                                const deps = JSON.parse(applicant.declaredDependents) as { name: string; dob?: string }[];
+                                return deps.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                                        {deps.map((d, i) => (
+                                            <div key={i} style={{ fontSize: 12, color: '#334155', display: 'flex', gap: 8 }}>
+                                                <span style={{ fontWeight: 600 }}>{d.name}</span>
+                                                {d.dob && <span style={{ color: '#64748b' }}>({d.dob})</span>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null;
+                            } catch { return null; }
+                        })()}
+                    </CollapsibleSection>
+
+                    {/* ── Collapsible education ── */}
+                    <CollapsibleSection title="Educational &amp; Professional Background">
+                        <DetailRow label="Highest Attainment" value={applicant.highestEducationalAttainment} />
+                        <DetailRow label="Institution" value={applicant.institution} />
+                        <DetailRow label="Year Graduated" value={applicant.yearGraduated} />
+                        <DetailRow label="Licenses/Certifications" value={applicant.professionalLicensesCertifications} />
+                    </CollapsibleSection>
 
                     {applicant.adminRemarks && (
                         <div className="rec-remarks-strip">
@@ -1378,6 +1508,36 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                 const paginated = apiResult.data;
                 const mapped: ApplicantRecord[] = (paginated.data || []).map((item: any) => ({
                     applicantId: item.applicantRecordId,
+                    referenceNumber: item.referenceNumber || '',
+                    firstName: item.firstName || '',
+                    middleName: item.middleName || '',
+                    lastName: item.lastName || '',
+                    suffix: item.suffix || '',
+                    gender: item.gender || '',
+                    civilStatus: item.civilStatus || '',
+                    currentResidentialAddress: item.currentResidentialAddress || '',
+                    permanentAddress: item.permanentAddress || '',
+                    sssNumber: item.sssNumber || '',
+                    philHealthNumber: item.philHealthNumber || '',
+                    pagIBIGNumber: item.pagIBIGNumber || '',
+                    tin: item.tin || '',
+                    bankName: item.bankName || '',
+                    bankAccountName: item.bankAccountName || '',
+                    bankAccountNumber: item.bankAccountNumber || '',
+                    nbiClearanceFilePath: item.nbiClearanceFilePath || '',
+                    medicalClearanceFilePath: item.medicalClearanceFilePath || '',
+                    psaBirthCertificateFilePath: item.psaBirthCertificateFilePath || '',
+                    resumeFilePath: item.resumeFilePath || '',
+                    signedEmploymentContractFilePath: item.signedEmploymentContractFilePath || '',
+                    emergencyContactName: item.emergencyContactName || '',
+                    emergencyContactRelationship: item.emergencyContactRelationship || '',
+                    emergencyContactMobileNumber: item.emergencyContactMobileNumber || '',
+                    declaredDependents: item.declaredDependents || '',
+                    highestEducationalAttainment: item.highestEducationalAttainment || '',
+                    institution: item.institution || '',
+                    yearGraduated: item.yearGraduated || '',
+                    professionalLicensesCertifications: item.professionalLicensesCertifications || '',
+                    isEmailVerified: !!item.isEmailVerified,
                     fullName: item.fullName,
                     email: item.emailAddress,
                     contactNumber: item.contactNumber,
@@ -1540,7 +1700,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                                     <tr><td colSpan={6}><div className="rec-empty-state"><Package size={28} /><span>No applicants match your filters</span></div></td></tr>
                                 ) : applicants.map((a) => (
                                     <tr key={a.applicantId} className="rec-row" onClick={() => setDetailApplicant(a)}>
-                                        <td><code className="rec-ref-chip">{a.applicantId}</code></td>
+                                        <td><code className="rec-ref-chip">{a.referenceNumber || a.applicantId}</code></td>
                                         <td>
                                             <div className="rec-applicant-cell">
                                                 <div className="rec-avatar">{a.fullName.charAt(0).toUpperCase()}</div>

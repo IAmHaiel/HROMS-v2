@@ -13,5 +13,17 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string ContactNumber { get; set; } = string.Empty;
         public string EmailAddress { get; set; } = string.Empty;
         public string JobPositionName { get; set; } = string.Empty;
+        public string? ResumeFilePath { get; set; }
+        public string? MedicalClearanceFilePath { get; set; }
+        public string? SSSNumber { get; set; }
+        public string? PhilHealthNumber { get; set; }
+        public string? PagIBIGNumber { get; set; }
+        public string? TIN { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccountName { get; set; }
+        public string? BankAccountNumber { get; set; }
+        public string? EmergencyContactName { get; set; }
+        public string? EmergencyContactRelationship { get; set; }
+        public string? EmergencyContactMobileNumber { get; set; }
     }
 }
