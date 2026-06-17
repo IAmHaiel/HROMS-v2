@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, ReactNode } from 'react';
 import axios from 'axios';
+import StatCard from '../../../components/StatCard/StatCard';
 import {
     Search, Users, Clock, CheckCircle2, XCircle,
     CalendarCheck, Briefcase, ChevronLeft, ChevronRight,
@@ -1467,14 +1468,6 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         rejected: applicants.filter((a) => a.currentStatus === 'Rejected').length,
     };
 
-    const statCards: { iconEl: ReactNode; cls: string; label: string; value: number }[] = [
-        { iconEl: <Users size={19} />, cls: 'rec-stat-icon--purple', label: 'Total Applicants', value: counts.total },
-        { iconEl: <Clock size={19} />, cls: 'rec-stat-icon--amber', label: 'Pending Review', value: counts.pending },
-        { iconEl: <CalendarCheck size={19} />, cls: 'rec-stat-icon--blue', label: 'Interview Scheduled', value: counts.interview },
-        { iconEl: <Briefcase size={19} />, cls: 'rec-stat-icon--green', label: 'Job Offered', value: counts.offered },
-        { iconEl: <XCircle size={19} />, cls: 'rec-stat-icon--red', label: 'Rejected', value: counts.rejected },
-    ];
-
     return (
         <>
             <style>{css}</style>
@@ -1488,16 +1481,12 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
 
             <div className="rec-content">
                 {/* ── Stat Cards ── */}
-                <div className="rec-stats-row">
-                    {statCards.map(({ iconEl, cls, label, value }) => (
-                        <div key={label} className="rec-stat-card">
-                            <div className={`rec-stat-icon ${cls}`}>{iconEl}</div>
-                            <div>
-                                <div className="rec-stat-value">{value}</div>
-                                <div className="rec-stat-label">{label}</div>
-                            </div>
-                        </div>
-                    ))}
+                <div className="stats-row">
+                    <StatCard icon={<Users size={20} />} variant="primary" label="Total Applicants" value={counts.total} subtext="All time" />
+                    <StatCard icon={<Clock size={20} />} variant="warning" label="Pending Review" value={counts.pending} subtext="Awaiting review" />
+                    <StatCard icon={<CalendarCheck size={20} />} variant="primary" label="Interview Scheduled" value={counts.interview} subtext="Scheduled" />
+                    <StatCard icon={<Briefcase size={20} />} variant="success" label="Job Offered" value={counts.offered} subtext="Offers extended" />
+                    <StatCard icon={<XCircle size={20} />} variant="danger" label="Rejected" value={counts.rejected} subtext="Not accepted" />
                 </div>
 
                 {/* ── Table Card ── */}

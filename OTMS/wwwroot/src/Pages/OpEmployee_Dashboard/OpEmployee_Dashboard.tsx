@@ -505,7 +505,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, on
                 ) : (
                     <>
                         <div className="field">
-                            <label>Task Status <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
+                            <label>Task Status <span style={{ color: 'var(--status-failed)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
                             <select
                                 className="report-select"
                                 value={status}
@@ -725,7 +725,7 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
                 </div>
 
                 <div className="field">
-                    <label>Completion Notes <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                    <label>Completion Notes <span style={{ color: 'var(--status-failed)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
                     <textarea
                         className="leave-reason-textarea"
                         rows={4}
@@ -994,7 +994,7 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             <div className="tab-content">
                 <div className="card">
                     <div className="empty-state">
-                        <AlertCircle size={22} style={{ color: 'var(--danger)' }} />
+                        <AlertCircle size={22} style={{ color: 'var(--status-failed)' }} />
                         <p>{error}</p>
                         <button className="btn btn-primary" onClick={onRetry} style={{ marginTop: 8 }}>
                             <RefreshCw size={13} /> Retry
@@ -1068,9 +1068,9 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     const days = calcDays(record.startDate, record.endDate);
 
     const borderColor =
-        record.status === 'Approved' ? '#05cd99' :
-            record.status === 'Declined' ? '#ee5d50' :
-                '#ffb547';
+        record.status === 'Approved' ? 'var(--status-active)' :
+            record.status === 'Declined' ? 'var(--status-failed)' :
+                'var(--status-pending)';
 
     return (
         <div style={{
@@ -1215,7 +1215,7 @@ const LeaveTab: React.FC<{
                     display: 'flex', alignItems: 'center', gap: 8,
                     background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
                     borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-                    fontSize: 13, color: '#05cd99', fontWeight: 600,
+                    fontSize: 13, color: 'var(--status-active)', fontWeight: 600,
                 }}>
                     <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
                 </div>
@@ -1435,7 +1435,7 @@ const ApprovalsTab: React.FC = () => {
                                 </select>
                             </div>
                             <div className="field">
-                                <label>Source Entity ID <span style={{ color: 'var(--danger)' }}>*</span></label>
+                                <label>Source Entity ID <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                                 <input type="text" className="report-input" value={sourceId} onChange={e => setSourceId(e.target.value)}
                                     placeholder="e.g. leave-request-guid" />
                             </div>
@@ -1775,7 +1775,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         >
                             <span style={{
                                 display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                                background: user.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
+                                background: user.presenceStatus === 'Online' ? 'var(--status-active)' : 'var(--text-secondary)',
                             }} />
                             {user.presenceStatus ?? 'Offline'}
                         </span>
@@ -1823,28 +1823,28 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         {editMode ? (
                             <>
                                 <div className="info-field">
-                                    <label>Given Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                    <div className="if-input-wrap" style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}}>
+                                    <label>Given Name <span style={{ color: 'var(--status-failed)' }}>*</span></label>
+                                    <div className="if-input-wrap" style={validationErrors['firstName'] ? { borderColor: 'var(--status-failed)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.firstName} onChange={setF('firstName')} placeholder="Given Name" maxLength={50} />
                                     </div>
-                                    {validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
+                                    {validationErrors['firstName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}
                                 </div>
                                 <div className="info-field">
                                     <label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label>
-                                    <div className="if-input-wrap" style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}}>
+                                    <div className="if-input-wrap" style={validationErrors['middleName'] ? { borderColor: 'var(--status-failed)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.middleName} onChange={setF('middleName')} placeholder="Middle Name" maxLength={50} />
                                     </div>
-                                    {validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
+                                    {validationErrors['middleName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}
                                 </div>
                                 <div className="info-field">
-                                    <label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label>
-                                    <div className="if-input-wrap" style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}}>
+                                    <label>Last Name <span style={{ color: 'var(--status-failed)' }}>*</span></label>
+                                    <div className="if-input-wrap" style={validationErrors['lastName'] ? { borderColor: 'var(--status-failed)' } : {}}>
                                         <span className="if-icon"><User size={15} /></span>
                                         <input type="text" value={form.lastName} onChange={setF('lastName')} placeholder="Last Name" maxLength={50} />
                                     </div>
-                                    {validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
+                                    {validationErrors['lastName'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}
                                 </div>
                             </>
                         ) : (
@@ -1857,14 +1857,14 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             </div>
                         )}
                         <div className="info-field">
-                            <label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label>
+                            <label>Email Address <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                             {editMode ? (
                                 <>
-                                    <div className="if-input-wrap" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}}>
+                                    <div className="if-input-wrap" style={validationErrors['email'] ? { borderColor: 'var(--status-failed)' } : {}}>
                                         <span className="if-icon"><Mail size={15} /></span>
                                         <input type="email" value={form.email} onChange={setF('email')} placeholder="e.g. name@company.com" />
                                     </div>
-                                    {validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
+                                    {validationErrors['email'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}
                                 </>
                             ) : (
                                 <div className="if-value">
@@ -1877,11 +1877,11 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             <label>Contact Number</label>
                             {editMode ? (
                                 <>
-                                    <div className="if-input-wrap" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}}>
+                                    <div className="if-input-wrap" style={validationErrors['contactNumber'] ? { borderColor: 'var(--status-failed)' } : {}}>
                                         <span className="if-icon"><Phone size={15} /></span>
                                         <input type="tel" value={form.contactNumber} onChange={setF('contactNumber')} placeholder="e.g. 09170000000" />
                                     </div>
-                                    {validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
+                                    {validationErrors['contactNumber'] && <span style={{ color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}
                                 </>
                             ) : (
                                 <div className="if-value">
@@ -1957,8 +1957,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                                         <div key={lv} style={{
                                                             flex: 1, height: 4, borderRadius: 2,
                                                             background: pwd.next.length >= lv * 4
-                                                                ? lv === 1 ? '#ee5d50' : lv === 2 ? '#ffb547' : '#05cd99'
-                                                                : '#e9edf7',
+                                                                ? lv === 1 ? 'var(--status-failed)' : lv === 2 ? 'var(--status-pending)' : 'var(--status-active)'
+                                                                : 'var(--border)',
                                                             transition: 'background 0.2s',
                                                         }} />
                                                     ))}
@@ -1971,7 +1971,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                                         {k === 'confirm' && pwd.confirm.length > 0 && (
                                             <span style={{
                                                 fontSize: 11,
-                                                color: pwd.next === pwd.confirm ? '#05cd99' : 'var(--danger)',
+                                                color: pwd.next === pwd.confirm ? 'var(--status-active)' : 'var(--status-failed)',
                                                 marginTop: 3, display: 'block',
                                             }}>
                                                 {pwd.next === pwd.confirm ? '✓ Passwords match' : 'Passwords do not match'}
@@ -2109,7 +2109,7 @@ const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onClose, 
                     </div>
 
                     <div className="field">
-                        <label>Reason for Reopening <span style={{ color: 'var(--danger)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
+                        <label>Reason for Reopening <span style={{ color: 'var(--status-failed)' }}>*</span> <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Required, Max 500 characters)</span></label>
                         <textarea
                             className="leave-reason-textarea"
                             rows={4}
@@ -2451,7 +2451,7 @@ export default function EmployeeDashboard() {
                             <span style={{
                                 position: 'absolute', bottom: 1, right: 1,
                                 width: 9, height: 9, borderRadius: '50%',
-                                background: user.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
+                                background: user.presenceStatus === 'Online' ? 'var(--status-active)' : 'var(--text-secondary)',
                                 border: '2px solid var(--sidebar-bg, #1b2559)',
                                 display: 'block',
                             }} />

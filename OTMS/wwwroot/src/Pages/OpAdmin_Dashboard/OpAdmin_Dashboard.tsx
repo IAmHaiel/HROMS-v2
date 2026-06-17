@@ -383,7 +383,7 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
         <span style={{
             position: 'absolute', bottom: 1, right: 1,
             width: 9, height: 9, borderRadius: '50%',
-            background: member.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
+            background: member.presenceStatus === 'Online' ? 'var(--status-active)' : 'var(--text-secondary)',
             border: '2px solid var(--bg-primary, #fff)',
             display: 'block'
         }} title={member.presenceStatus ?? 'Offline'} />
@@ -659,7 +659,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <FieldErr name="taskTitle" />
                             {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
-                                <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3 }}>✓ Looks good</span>
+                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>✓ Looks good</span>
                             )}
                             <CharCount value={form.taskTitle} max={100} />
                         </div>
@@ -696,7 +696,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             />
                             <FieldErr name="dueAt" />
                             {!errors.dueAt && form.dueAt && (
-                                <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
                                     ✓ {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
@@ -725,7 +725,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             {!errors.priority && form.priority && (
                                 <span style={{
                                     fontSize: 11, marginTop: 3, display: 'block',
-                                    color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? '#ee5d50' : form.priority === 'Medium' ? '#ffb547' : '#05cd99',
+                                    color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? 'var(--status-failed)' : form.priority === 'Medium' ? 'var(--status-pending)' : 'var(--status-active)',
                                 }}>
                                     {form.priority === 'Critical' && '🚨 Critical — requires immediate attention'}
                                     {form.priority === 'High' && '⚠ High priority — will be flagged for urgent attention'}
@@ -870,7 +870,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                         <FieldErr name="assignedTo" />
                         {!errors.assignedTo && form.assignedTo && (
-                            <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                            <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
                                 ✓ {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
                             </span>
                         )}
@@ -1290,16 +1290,16 @@ const DashboardTab: React.FC<{
     const overdue = td?.totalOverdueTasks ?? 0;
     const avgPerEmployee = td?.averageTasksPerEmployee?.toFixed(1) ?? '0';
     const pct = total > 0 ? Math.round(completed / total * 100) : 0;
-    const completionColor = pct >= 80 ? '#05cd99' : pct >= 50 ? '#ffb547' : '#ee5d50';
+    const completionColor = pct >= 80 ? 'var(--status-active)' : pct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)';
     const workloads = td?.employeeWorkloadDistribution ?? [];
     const taskDist = td?.taskAssignmentDistribution ?? {};
     const pendingReview = taskDist['Pending Admin Review'] ?? 0;
 
     const statusChartData = [
-        { name: 'Active', value: active, color: '#ffb547' },
-        { name: 'Pending Review', value: pendingReview, color: '#4318ff' },
-        { name: 'Completed', value: completed, color: '#05cd99' },
-        { name: 'Overdue', value: overdue, color: '#ee5d50' },
+        { name: 'Active', value: active, color: 'var(--status-pending)' },
+        { name: 'Pending Review', value: pendingReview, color: 'var(--primary)' },
+        { name: 'Completed', value: completed, color: 'var(--status-active)' },
+        { name: 'Overdue', value: overdue, color: 'var(--status-failed)' },
     ].filter(d => d.value > 0);
 
     const workloadChartData = workloads.map(w => ({
@@ -1450,7 +1450,7 @@ const DashboardTab: React.FC<{
                                     <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 6 }}>
                                         {Object.entries(taskDist).map(([k, v]) => (
                                             <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4318ff', display: 'inline-block' }} />
+                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block' }} />
                                                 <span style={{ color: 'var(--text-secondary)' }}>{k}</span>
                                                 <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{v}</span>
                                             </div>
@@ -1493,8 +1493,8 @@ const DashboardTab: React.FC<{
                                 <ResponsiveContainer width="100%" height={Math.max(120, workloads.length * 48)}>
                                     <BarChart data={workloadChartData} layout="vertical" barSize={18} barGap={4} margin={{ top: 4, right: 16, left: -8, bottom: 0 }}>
                                         <CartesianGrid horizontal={false} stroke="transparent" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#a3aed0' }} />
-                                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#2b3674' }} width={70} />
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                        <YAxis type="category" dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: 'var(--text-primary)' }} width={70} />
                                         <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
                                         <Legend verticalAlign="bottom" iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                                         <Bar dataKey="Total" fill="#4318ff" radius={[0, 4, 4, 0]} stackId="a" />
@@ -1576,9 +1576,9 @@ const DashboardTab: React.FC<{
                                                 }}>
                                                     <td style={{ padding: '10px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{w.employeeName}</td>
                                                     <td style={{ padding: '10px 16px', textAlign: 'center', fontWeight: 700 }}>{w.totalAssigned}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: '#ffb547', fontWeight: 700 }}>{w.activeTasks}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: '#05cd99', fontWeight: 700 }}>{w.completedTasks}</td>
-                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdueTasks > 0 ? '#ee5d50' : 'var(--text-muted)', fontWeight: 700 }}>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--status-pending)', fontWeight: 700 }}>{w.activeTasks}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: 'var(--status-active)', fontWeight: 700 }}>{w.completedTasks}</td>
+                                                    <td style={{ padding: '10px 16px', textAlign: 'center', color: w.overdueTasks > 0 ? 'var(--status-failed)' : 'var(--text-muted)', fontWeight: 700 }}>
                                                         {w.overdueTasks || '—'}
                                                     </td>
                                                     <td style={{ padding: '10px 16px' }}>
@@ -1587,8 +1587,8 @@ const DashboardTab: React.FC<{
                                                                 <div style={{ flex: 1, maxWidth: 100, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
                                                                     <div style={{
                                                                         width: `${compPct}%`, height: '100%',
-                                                                        background: compPct >= 80 ? '#05cd99' :
-                                                                            compPct >= 50 ? '#ffb547' : '#ee5d50',
+                                                                        background: compPct >= 80 ? 'var(--status-active)' :
+                                                                            compPct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)',
                                                                         borderRadius: 3,
                                                                     }} />
                                                                 </div>
@@ -2279,10 +2279,10 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
 
     const statusChartData = report
         ? [
-            { name: 'Completed', value: report.totalTasksCompleted, fill: '#05cd99' },
-            { name: 'In Progress', value: report.totalTasksInProgress, fill: '#ffb547' },
-            { name: 'Pending Review', value: report.totalTasksPendingReview, fill: '#4318ff' },
-            { name: 'Overdue', value: report.totalOverdueTasks, fill: '#ee5d50' },
+            { name: 'Completed', value: report.totalTasksCompleted, fill: 'var(--status-active)' },
+            { name: 'In Progress', value: report.totalTasksInProgress, fill: 'var(--status-pending)' },
+            { name: 'Pending Review', value: report.totalTasksPendingReview, fill: 'var(--primary)' },
+            { name: 'Overdue', value: report.totalOverdueTasks, fill: 'var(--status-failed)' },
         ].filter(d => d.value > 0)
         : [];
 
@@ -2416,7 +2416,7 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                             <ResponsiveContainer width="100%" height={220}>
                                 <BarChart data={statusChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#a3aed0' }} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
                                     <Tooltip />
                                     <Bar dataKey="value" radius={[4, 4, 0, 0]} />
                                 </BarChart>
@@ -2825,7 +2825,7 @@ function ProfileTab() {
                             background: 'rgba(5,205,153,0.1)',
                             border: '1px solid rgba(5,205,153,0.25)',
                             borderRadius: 10, marginBottom: 12,
-                            fontSize: 13, color: '#05cd99', fontWeight: 600,
+                            fontSize: 13, color: 'var(--status-active)', fontWeight: 600,
                         }}>
                             <CheckCircle2 size={14} /> Profile updated successfully!
                         </div>
@@ -3007,7 +3007,7 @@ function ProfileTab() {
                                     <span className="system-name">Password</span>
                                     <span className="system-detail">Last updated recently</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#05cd99', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-active)', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
                                     Secure
                                 </span>
                             </div>
@@ -3029,7 +3029,7 @@ function ProfileTab() {
                                     <span className="system-name">Active Session</span>
                                     <span className="system-detail">Logged in on this device</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#ffb547', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-pending)', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
                                     Live
                                 </span>
                             </div>
@@ -3087,7 +3087,7 @@ function ProfileTab() {
                                                 <div key={level} style={{
                                                     flex: 1, height: 4, borderRadius: 2,
                                                     background: pwForm.next.length >= level * 4
-                                                        ? level === 1 ? '#ee5d50' : level === 2 ? '#ffb547' : '#05cd99'
+                                                        ? level === 1 ? 'var(--status-failed)' : level === 2 ? 'var(--status-pending)' : 'var(--status-active)'
                                                         : '#e9edf7',
                                                     transition: 'background 0.2s',
                                                 }} />
@@ -3124,7 +3124,7 @@ function ProfileTab() {
                                     </span>
                                 )}
                                 {pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && (
-                                    <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>
+                                    <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
                                         ✓ Passwords match
                                     </span>
                                 )}
@@ -3172,7 +3172,7 @@ function ProfileTab() {
                                 <span className="system-name">{name}</span>
                                 <span className="system-detail">{detail}</span>
                             </div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
                                 Full Access
                             </span>
                         </div>
@@ -3240,7 +3240,7 @@ const LeaveTab: React.FC<{
                     display: 'flex', alignItems: 'center', gap: 8,
                     background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
                     borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-                    fontSize: 13, color: '#05cd99', fontWeight: 600,
+                    fontSize: 13, color: 'var(--status-active)', fontWeight: 600,
                 }}>
                     <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
                 </div>
@@ -3308,8 +3308,8 @@ const LeaveTab: React.FC<{
 const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     const statusColors: Record<LeaveStatus, { bg: string; color: string }> = {
         Pending: { bg: 'rgba(255,181,71,0.12)', color: '#c05c00' },
-        Approved: { bg: 'rgba(5,205,153,0.12)', color: '#05cd99' },
-        Declined: { bg: 'rgba(238,93,80,0.12)', color: '#ee5d50' },
+        Approved: { bg: 'rgba(5,205,153,0.12)', color: 'var(--status-active)' },
+        Declined: { bg: 'rgba(238,93,80,0.12)', color: 'var(--status-failed)' },
     };
     const meta = statusColors[record.status];
 
@@ -3664,7 +3664,7 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicate
                                 </td>
                                 <td style={{
                                     padding: '10px 8px', fontWeight: 700,
-                                    color: d.similarityPercentage >= 90 ? '#ee5d50' :
+                                    color: d.similarityPercentage >= 90 ? 'var(--status-failed)' :
                                         d.similarityPercentage >= 80 ? '#c05c00' :
                                         d.similarityPercentage >= 70 ? '#9a6e00' : 'var(--text-primary)',
                                 }}>
@@ -4365,7 +4365,7 @@ export default function OpsAdminDashboard() {
                             <span style={{
                                 position: 'absolute', bottom: 1, right: 1,
                                 width: 9, height: 9, borderRadius: '50%',
-                                background: userPresenceStatus === 'Online' ? '#05cd99' : '#a3aed0',
+                                background: userPresenceStatus === 'Online' ? 'var(--status-active)' : 'var(--text-secondary)',
                                 border: '2px solid var(--sidebar-bg, #1b2559)',
                                 display: 'block'
                             }} />

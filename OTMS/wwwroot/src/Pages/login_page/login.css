@@ -1,26 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
-
-.login-page,
-.login-page * {
-    font-family: 'Montserrat', sans-serif !important;
-}
-
-/* ─────────────────────────────────────────
-   GLOBAL
-───────────────────────────────────────── */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Montserrat', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-}
-
 /* ─────────────────────────────────────────
    LOGIN PAGE
 ───────────────────────────────────────── */
@@ -100,10 +77,10 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
-    background: rgba(14, 165, 233, 0.16);
-    color: #38bdf8;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.12), 0 8px 20px rgba(56, 189, 248, 0.12);
+    border-radius: var(--radius-sm);
+    background: rgba(34, 211, 238, 0.16);
+    color: #22d3ee;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12), 0 8px 20px rgba(34, 211, 238, 0.12);
 }
 
 .brand-name {
@@ -219,10 +196,10 @@ body {
     display: inline-block;
     padding: 5px 12px;
     margin-bottom: 8px;
-    border-radius: 999px;
-    background: rgba(34, 211, 238, 0.08);
-    border: 1px solid rgba(34, 211, 238, 0.18);
-    color: #0891b2;
+    border-radius: var(--radius-full);
+    background: var(--status-new-bg);
+    border: 1px solid rgba(79, 70, 229, 0.18);
+    color: var(--status-new);
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 2px;
@@ -261,21 +238,21 @@ body {
 }
 
 .status-bar.error {
-    background: #fff1f1;
-    border: 1px solid #ffcdcd;
-    color: #e31a1a;
+    background: var(--status-failed-bg);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: var(--status-failed);
 }
 
 .status-bar.success {
-    background: #f0fff8;
-    border: 1px solid #a8efd4;
-    color: #0a7a45;
+    background: var(--status-active-bg);
+    border: 1px solid rgba(5, 150, 105, 0.2);
+    color: var(--status-active);
 }
 
 .status-bar.info {
-    background: #fff8eb;
-    border: 1px solid #ffe4a0;
-    color: #7a5e22;
+    background: var(--status-pending-bg);
+    border: 1px solid rgba(217, 119, 6, 0.2);
+    color: var(--status-pending);
 }
 
 /* ─────────────────────────────────────────
@@ -399,14 +376,15 @@ body {
     width: 100%;
     height: 48px;
     margin-top: 4px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
+    padding: 10px 20px;
     border: none;
     border-radius: var(--radius-sm);
-    background: var(--sidebar-bg);
-    color: white;
+    background: var(--primary-dark);
+    color: var(--text-white);
     font-size: 0.84rem;
     font-weight: 700;
     letter-spacing: 1px;
@@ -416,7 +394,7 @@ body {
 }
 
 .submit-btn:hover:not(:disabled) {
-    opacity: 0.9;
+    background: var(--primary-dark-hover);
 }
 
 .submit-btn:active:not(:disabled) {
@@ -429,23 +407,7 @@ body {
     cursor: not-allowed;
 }
 
-/* ─────────────────────────────────────────
-   BUTTON SPINNER
-───────────────────────────────────────── */
-.btn-spinner {
-    width: 18px;
-    height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-}
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
 
 /* ─────────────────────────────────────────
    FOOTER
@@ -508,18 +470,18 @@ body {
 }
 
 .field-wrapper.field-error {
-    border-color: #ee5d50;
-    box-shadow: 0 0 0 3px rgba(238, 93, 80, 0.12);
+    border-color: var(--status-failed);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
 .field-wrapper.field-success {
-    border-color: #05cd99;
-    box-shadow: 0 0 0 3px rgba(5, 205, 153, 0.12);
+    border-color: var(--status-active);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
 }
 
 .field-err-msg {
     font-size: 11px;
-    color: #ee5d50;
+    color: var(--status-failed);
     margin-top: 4px;
     display: flex;
     align-items: center;
@@ -528,7 +490,7 @@ body {
 
 .field-ok-msg {
     font-size: 11px;
-    color: #05cd99;
+    color: var(--status-active);
     margin-top: 4px;
     display: block;
 }
@@ -550,11 +512,6 @@ body {
     text-decoration: underline;
     font-weight: 600;
     transition: color 0.15s ease;
-}
-
-.login-terms a:hover {
-    color: #05738f;
-    ;
 }
 
 /* ─────────────────────────────────────────
@@ -590,17 +547,17 @@ APPLICANT SECTION DIVIDER
     align-items: center;
     gap: 14px;
     padding: 14px 16px;
-    border-radius: var(--radius-sm, 10px);
-    border: 1.5px solid rgba(34, 211, 238, 0.25);
-    background: rgba(34, 211, 238, 0.04);
+    border-radius: var(--radius-sm);
+    border: 1.5px solid rgba(0, 169, 157, 0.25);
+    background: rgba(0, 169, 157, 0.04);
     text-decoration: none;
     transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
     cursor: pointer;
 }
 
     .applicant-portal-btn:hover {
-        border-color: rgba(34, 211, 238, 0.55);
-        background: rgba(34, 211, 238, 0.08);
+        border-color: rgba(0, 169, 157, 0.55);
+        background: rgba(0, 169, 157, 0.08);
         transform: translateY(-1px);
     }
 
@@ -608,13 +565,13 @@ APPLICANT SECTION DIVIDER
     width: 38px;
     height: 38px;
     flex-shrink: 0;
-    border-radius: 9px;
-    background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.30);
+    box-shadow: 0 4px 12px rgba(0, 169, 157, 0.30);
 }
 
 .applicant-portal-content {
@@ -644,7 +601,7 @@ APPLICANT SECTION DIVIDER
 
 .applicant-portal-arrow {
     font-size: 1rem;
-    color: #0891b2;
+    color: var(--primary);
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
@@ -660,19 +617,19 @@ APPLICANT SECTION DIVIDER
     font-size: 0.72rem;
     font-weight: 500;
     line-height: 1.5;
-    color: var(--text-secondary, #A3AED0);
+    color: var(--text-secondary);
     text-align: center;
 }
 
     .login-terms .terms-link {
-        color: #0891b2;
+        color: var(--primary);
         text-decoration: underline;
         font-weight: 600;
         transition: color 0.15s ease;
     }
 
         .login-terms .terms-link:hover {
-            color: #05738f;
+            color: var(--primary-hover);
         }
 
 /* ─────────────────────────────────────────
@@ -764,26 +721,26 @@ APPLICANT SECTION DIVIDER
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #34d399;
+    color: var(--status-active);
 }
 
 .careers-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #34d399;
-    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22);
+    background: var(--status-active);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22);
     flex-shrink: 0;
     animation: pulse-dot 2s ease-in-out infinite;
 }
 
 @keyframes pulse-dot {
     0%, 100% {
-        box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22);
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22);
     }
 
     50% {
-        box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.08);
+        box-shadow: 0 0 0 6px rgba(5, 150, 105, 0.08);
     }
 }
 

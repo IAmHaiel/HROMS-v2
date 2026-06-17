@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Entities.Models;
@@ -133,7 +134,62 @@ namespace OTMS.Data
 
             await context.SaveChangesAsync();
 
-            // 4. Seed Default Approval Routing Matrices
+            // 4. Seed Default System Admin Account
+            var sysAdminAccount = await context.Accounts
+                .Include(a => a.Role)
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == systemAdminRoleName);
+
+            if (sysAdminAccount == null && systemAdminRole != null)
+            {
+                var employee = new Employee
+                {
+                    EmployeeId = Guid.NewGuid(),
+                    EmployeeNumber = "0000",
+                    FirstName = "System",
+                    MiddleName = null,
+                    LastName = "Admin",
+                    Suffix = null,
+                    ContactNumber = "09170000000",
+                    Email = "system.admin@otms.com",
+                    IsEmailVerified = true,
+                    EmailVerificationToken = null,
+                    EmailVerificationTokenExpiry = null,
+                    EmploymentStatus = "Active",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                var account = new Account
+                {
+                    AccountId = Guid.NewGuid(),
+                    EmployeeId = employee.EmployeeId,
+                    RoleId = systemAdminRole.RoleId,
+                    AccountStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    IsPasswordChanged = true
+                };
+
+                account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, "SystemAdmin1001");
+
+                employee.Account = account;
+                context.Employees.Add(employee);
+                context.Accounts.Add(account);
+                await context.SaveChangesAsync();
+            }
+            else if (sysAdminAccount != null)
+            {
+                // Ensure the default system admin has the correct settings
+                sysAdminAccount.IsPasswordChanged = true;
+                sysAdminAccount.AccountStatus = "Active";
+                if (sysAdminAccount.Employee != null)
+                {
+                    sysAdminAccount.Employee.IsEmailVerified = true;
+                    sysAdminAccount.Employee.Email = sysAdminAccount.Employee.Email ?? "system.admin@otms.com";
+                }
+                await context.SaveChangesAsync();
+            }
+
+            // 5. Seed Default Approval Routing Matrices
             await SeedApprovalRoutingMatricesAsync(context);
         }
 

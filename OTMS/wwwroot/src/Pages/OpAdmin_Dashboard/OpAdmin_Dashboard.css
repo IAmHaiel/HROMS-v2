@@ -1,27 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
 
-/* ─── CSS Variables (matches provided design system) ─────────────────────── */
+/* ─── Dashboard-specific Variables ───────────────────────────────────────── */
 :root {
-    --primary: #4318ff;
-    --bg-main: #f4f7fe;
-    --bg-card: #ffffff;
-    --border: #e9edf7;
-    --border-hover: #d1d9e8;
-    --text-primary: #2b3674;
-    --text-secondary: #a3aed0;
-    --text-muted: #a3aed0;
-    --status-active: #05cd99;
-    --status-active-bg: rgba(5, 205, 153, 0.1);
-    --status-pending: #ffb547;
-    --status-pending-bg: rgba(255, 181, 71, 0.15);
-    --status-failed: #ee5d50;
-    --status-failed-bg: rgba(238, 93, 80, 0.1);
-    --status-transit-bg: rgba(67, 24, 255, 0.1);
-    --gap: 20px;
+    --sidebar-bg: #0c1527;
+    --sidebar-text: #94a3b8;
+    --sidebar-text-hover: #f1f5f9;
+    --sidebar-text-active: #05cd99;
+    --sidebar-bg-hover: rgba(255, 255, 255, 0.02);
+    --sidebar-border: #1e293b;
+    --sidebar-width: 260px;
     --content-padding: 24px;
-    --radius-md: 12px;
-    --radius-full: 999px;
-    --shadow-md: 0px 4px 12px rgba(0, 0, 0, 0.05);
+    --border-hover: #c4c9e2;
+    --status-transit-bg: rgba(0, 169, 157, 0.1);
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
@@ -59,9 +49,9 @@
 
 /* ─── Sidebar ────────────────────────────────────────────────────────────── */
 .sidebar {
-    width: 260px;
+    width: var(--sidebar-width);
     height: 100vh;
-    background: #0c1527;
+    background: var(--sidebar-bg);
     color: white;
     display: flex;
     flex-direction: column;
@@ -72,7 +62,7 @@
     z-index: 100;
     overflow-y: auto;
     overflow-x: hidden;
-    border-right: 1px solid #1e293b;
+    border-right: 1px solid var(--sidebar-border);
 }
 
 .sidebar-logo {
@@ -101,7 +91,7 @@
     align-items: center;
     gap: 8px;
     padding: 7px 20px;
-    background: #00b574;
+    background: var(--status-active);
     border-radius: 999px;
     color: white;
     font-size: 0.72rem;
@@ -136,7 +126,7 @@
 .nav-section-title {
     font-size: 0.65rem;
     font-weight: 700;
-    color: #4b5563;
+    color: var(--sidebar-text);
     letter-spacing: 1.5px;
     text-transform: uppercase;
     padding: 0 24px 6px;
@@ -147,7 +137,7 @@
     align-items: center;
     gap: 14px;
     padding: 12px 24px;
-    color: #94a3b8;
+    color: var(--sidebar-text);
     font-size: 0.88rem;
     font-weight: 500;
     transition: all 0.22s ease;
@@ -159,23 +149,23 @@
     .nav-item svg {
         width: 18px;
         height: 18px;
-        color: #94a3b8;
+        color: var(--sidebar-text);
         transition: all 0.22s ease;
     }
 
     .nav-item:hover {
         background: rgba(255, 255, 255, 0.02);
-        color: #f1f5f9;
+        color: var(--sidebar-text-hover);
     }
 
         .nav-item:hover svg {
-            color: #f1f5f9;
+            color: var(--sidebar-text-hover);
         }
 
     .nav-item.active,
     .nav-item-active {
         background: rgba(255, 255, 255, 0.04);
-        color: #05cd99;
+        color: var(--sidebar-text-active);
         font-weight: 600;
         border-right: none; /* remove old right border */
     }
@@ -189,7 +179,7 @@
             top: 0;
             bottom: 0;
             width: 4px;
-            background: #05cd99;
+            background: var(--sidebar-text-active);
             border-top-right-radius: 4px;
             border-bottom-right-radius: 4px;
             box-shadow: 0 0 10px rgba(5, 205, 153, 0.4);
@@ -197,14 +187,14 @@
 
         .nav-item.active svg,
         .nav-item-active svg {
-            color: #05cd99;
+            color: var(--sidebar-text-active);
         }
 
 /* ── Footer Profile Card ── */
 .sidebar-footer-profile {
     margin-top: auto;
     padding: 16px;
-    border-top: 1px solid #1e293b;
+    border-top: 1px solid var(--sidebar-border);
 }
 
 .profile-card {
@@ -220,7 +210,7 @@
 .profile-avatar {
     width: 42px;
     height: 42px;
-    background: #00b574;
+    background: var(--status-active);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -248,7 +238,7 @@
 }
 
 .profile-role {
-    color: #64748b;
+    color: var(--sidebar-text);
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -257,7 +247,7 @@
 }
 
 .profile-logout {
-    color: #94a3b8;
+    color: var(--sidebar-text);
     width: 32px;
     height: 32px;
     border-radius: 8px;
@@ -273,7 +263,7 @@
 
     .profile-logout:hover {
         background: rgba(239, 68, 68, 0.1);
-        color: #ef4444;
+        color: var(--status-failed);
         border-color: rgba(239, 68, 68, 0.2);
     }
 
@@ -748,8 +738,8 @@
 .sr-section {
     margin: 12px 0;
     padding: 14px;
-    background: #f8faff;
-    border: 1px solid #dce4f5;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
     border-radius: 10px;
 }
 
@@ -789,7 +779,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #4318ff, #6a5cff);
+    background: var(--sidebar-bg);
     color: white;
     display: flex;
     align-items: center;

@@ -68,8 +68,15 @@ export default function OnboardingPage() {
     const [tokenError, setTokenError] = useState('');
     const [applicantInfo, setApplicantInfo] = useState<{ fullName: string; email: string; position: string } | null>(null);
 
+    const existingToken = localStorage.getItem('authToken');
+
     useEffect(() => {
         if (!onboardingToken) {
+            // If already authenticated via login, skip token validation
+            if (existingToken) {
+                setTokenValidating(false);
+                return;
+            }
             setTokenValidating(false);
             setTokenError('Missing onboarding token. Please check your email for a valid link.');
             return;
@@ -571,6 +578,11 @@ export default function OnboardingPage() {
                                 <button onClick={() => setStep('profile')} style={{ width: '100%', height: 46, border: 'none', borderRadius: 12, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 8px 24px rgba(67,24,255,0.3)', fontFamily: 'inherit' }}>
                                     Get Started <ArrowRight size={16} />
                                 </button>
+                                {existingToken && !onboardingToken && (
+                                    <button onClick={() => { const role = localStorage.getItem('role'); const routes: Record<string, string> = { 'System Admin': '/SystemAdmin_Dashboard', 'SuperAdmin': '/SystemAdmin_Dashboard', 'Operation Admin': '/OpAdmin_Dashboard', 'OpAdmin': '/OpAdmin_Dashboard', 'Coordinator': '/OpEmployee_Dashboard', 'Encoder': '/OpEmployee_Dashboard' }; navigate(routes[role ?? ''] ?? '/'); }} style={{ width: '100%', height: 44, marginTop: 8, border: '1px solid #e2e8f0', borderRadius: 12, background: 'white', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit' }}>
+                                        Go to Dashboard <ArrowRight size={14} />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

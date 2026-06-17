@@ -36,9 +36,9 @@ const isPasswordValid = (pw: string) => Object.values(getPwChecks(pw)).every(Boo
 const getStrength = (pw: string): { level: 0 | 1 | 2 | 3; label: string; color: string } => {
     if (!pw) return { level: 0, label: '', color: '' };
     const passed = Object.values(getPwChecks(pw)).filter(Boolean).length;
-    if (passed <= 2) return { level: 1, label: 'Weak', color: '#ee5d50' };
-    if (passed <= 4) return { level: 2, label: 'Fair', color: '#ffb547' };
-    return { level: 3, label: 'Strong', color: '#05cd99' };
+    if (passed <= 2) return { level: 1, label: 'Weak', color: 'var(--status-failed)' };
+    if (passed <= 4) return { level: 2, label: 'Fair', color: 'var(--status-pending)' };
+    return { level: 3, label: 'Strong', color: 'var(--status-active)' };
 };
 
 export default function ResetPassword() {
@@ -240,7 +240,7 @@ export default function ResetPassword() {
                                                     <div
                                                         key={lvl}
                                                         className="strength-bar"
-                                                        style={{ background: strength.level >= lvl ? strength.color : '#e9edf7' }}
+                                                        style={{ background: strength.level >= lvl ? strength.color : 'var(--border)' }}
                                                     />
                                                 ))}
                                             </div>

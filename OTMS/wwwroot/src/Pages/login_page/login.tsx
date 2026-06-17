@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Package, User, Lock, Eye, EyeOff, Briefcase, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { useToast } from '../../components/Toast/Toast';
 import './login.css';
 
@@ -207,7 +208,7 @@ export default function Login() {
                     {/* Brand */}
                     <div className="login-brand">
                         <div className="brand-icon">
-                            <PackageIcon />
+                            <Package size={22} />
                         </div>
                         <div>
                             <h1 className="brand-name">Speedex</h1>
@@ -293,7 +294,7 @@ export default function Login() {
                             </label>
                             <div className={`field-wrapper${employeeIdError ? ' field-error' : employeeId && !employeeIdError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
-                                    <IdIcon />
+                                    <User size={16} />
                                 </span>
                                 <input
                                     id="employeeId"
@@ -324,7 +325,7 @@ export default function Login() {
                             </label>
                             <div className={`field-wrapper${passwordError ? ' field-error' : password && !passwordError ? ' field-success' : ''}`}>
                                 <span className="field-icon">
-                                    <LockIcon />
+                                    <Lock size={16} />
                                 </span>
                                 <input
                                     id="password"
@@ -348,7 +349,7 @@ export default function Login() {
                                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                                     tabIndex={-1}
                                 >
-                                    {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                             {passwordError && (
@@ -374,7 +375,7 @@ export default function Login() {
                             disabled={isLoading}
                         >
                             {isLoading
-                                ? <span className="btn-spinner" aria-hidden="true" />
+                                ? <Loader2 size={18} className="spin" />
                                 : 'LOGIN'
                             }
                         </button>
@@ -391,7 +392,7 @@ export default function Login() {
                     {/* ── Apply now banner ── */}
                     <Link to="/apply" className="applicant-portal-btn">
                         <span className="applicant-portal-icon">
-                            <BriefcaseIcon />
+                            <Briefcase size={18} />
                         </span>
                         <span className="applicant-portal-content">
                             <span className="applicant-portal-label">Apply for a position</span>
@@ -427,85 +428,7 @@ function FeatureItem({ title, description }: { title: string; description: strin
 }
 
 function StatusIcon({ type }: { type: StatusType }) {
-    if (type === 'error') return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10" opacity="0.2" />
-            <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-    );
-    if (type === 'success') return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9 12l2 2 4-4" />
-        </svg>
-    );
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-    );
-}
-
-/* ── Icons ── */
-function PackageIcon() {
-    return (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
-            <path d="M12 2L3 7v10l9 5 9-5V7L12 2z" />
-            <path d="M12 2v20M3 7l9 5 9-5" />
-        </svg>
-    );
-}
-
-function IdIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <rect x="2" y="7" width="20" height="14" rx="2" />
-            <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
-            <line x1="12" y1="12" x2="12" y2="16" />
-            <line x1="10" y1="14" x2="14" y2="14" />
-        </svg>
-    );
-}
-
-function LockIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <rect x="3" y="11" width="18" height="11" rx="2" />
-            <path d="M7 11V7a5 5 0 0110 0v4" />
-        </svg>
-    );
-}
-
-function EyeIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-        </svg>
-    );
-}
-
-function EyeOffIcon() {
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-            <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
-            <line x1="1" y1="1" x2="23" y2="23" />
-        </svg>
-    );
-}
-
-function BriefcaseIcon() {
-    return (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="7" width="20" height="14" rx="2" />
-            <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
-            <line x1="12" y1="12" x2="12" y2="12" />
-            <path d="M2 12h20" />
-        </svg>
-    );
+    if (type === 'error') return <AlertCircle size={16} style={{ flexShrink: 0 }} />;
+    if (type === 'success') return <CheckCircle size={16} style={{ flexShrink: 0 }} />;
+    return <AlertCircle size={16} style={{ flexShrink: 0 }} />;
 }

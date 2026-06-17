@@ -123,7 +123,7 @@ function ContactAdminModal({
                             </button>
                         </div>
 
-                        <div style={{ background: '#f8f9fc', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
+                        <div style={{ background: 'var(--bg-input)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: '#666' }}>Employee Number</span>
                                 <strong>{employeeNumber}</strong>
@@ -136,7 +136,7 @@ function ContactAdminModal({
                         </div>
 
                         {error && (
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(238,93,80,0.08)', border: '1px solid rgba(238,93,80,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#ee5d50' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--status-failed-bg)', border: '1px solid rgba(238,93,80,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--status-failed)' }}>
                                 <AlertCircle size={14} />{error}
                             </div>
                         )}
@@ -158,7 +158,7 @@ function ContactAdminModal({
                             <button onClick={onClose} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #ddd', cursor: 'pointer', fontSize: 14, background: 'white' }}>
                                 Cancel
                             </button>
-                            <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, background: '#4318ff', color: 'white', fontWeight: 500 }}>
+                            <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, background: 'var(--primary)', color: 'white', fontWeight: 500 }}>
                                 {submitting ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Loader2 size={14} /> Sending…</span> : 'Send Request'}
                             </button>
                         </div>
@@ -262,12 +262,12 @@ function EmergencyOverrideModal({
                             </button>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,181,71,0.1)', border: '1px solid rgba(255,181,71,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#c05c00' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(255,181,71,0.1)', border: '1px solid rgba(255,181,71,0.3)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--status-pending)' }}>
                             <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                             This request will grant temporary system access for today only, subject to administrator approval.
                         </div>
 
-                        <div style={{ background: '#f8f9fc', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
+                        <div style={{ background: 'var(--bg-input)', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 13 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span style={{ color: '#666' }}>Employee Number</span>
                                 <strong>{employeeNumber}</strong>
@@ -280,7 +280,7 @@ function EmergencyOverrideModal({
                         </div>
 
                         {error && (
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(238,93,80,0.08)', border: '1px solid rgba(238,93,80,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: '#ee5d50' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--status-failed-bg)', border: '1px solid rgba(238,93,80,0.25)', borderRadius: 8, padding: '8px 12px', marginBottom: 12, fontSize: 13, color: 'var(--status-failed)' }}>
                                 <AlertCircle size={14} />{error}
                             </div>
                         )}
@@ -302,7 +302,7 @@ function EmergencyOverrideModal({
                             <button onClick={onClose} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #ddd', cursor: 'pointer', fontSize: 14, background: 'white' }}>
                                 Cancel
                             </button>
-                            <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, background: '#ffb547', color: 'white', fontWeight: 500 }}>
+                            <button onClick={handleSubmit} disabled={submitting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, background: 'var(--status-pending)', color: 'white', fontWeight: 500 }}>
                                 {submitting ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Loader2 size={14} /> Submitting…</span> : 'Submit Override Request'}
                             </button>
                         </div>
@@ -422,7 +422,7 @@ export default function AccountLocked() {
                     {meta.type === 'leave' && (
                         <button
                             className="locked-contact-btn"
-                            style={{ background: '#ffb547' }}
+                            style={{ background: 'var(--status-pending)' }}
                             onClick={() => setShowOverrideModal(true)}
                         >
                             <ShieldAlert size={18} />

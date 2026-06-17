@@ -1,39 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap');
 
-/* ─── VARIABLES ───────────────────────────────────────────────────────────── */
+/* ─── SIDEBAR VARIABLES (dashboard-specific) ──────────────────────────────── */
 :root {
-    --primary: #4318ff;
-    --primary-light: rgba(67, 24, 255, 0.08);
-    --bg-main: #f0f3fa;
-    --bg-card: #ffffff;
-    --text-primary: #1a2332;
-    --text-secondary: #8a95b0;
-    --border: #e8ecf4;
-    --border-hover: #c4c9e2;
-    --status-active: #01b574;
-    --status-active-bg: rgba(1, 181, 116, 0.1);
-    --status-failed: #ee5d50;
-    --status-failed-bg: rgba(238, 93, 80, 0.1);
-    --status-warning: #ffb547;
-    --status-warning-bg: rgba(255, 181, 71, 0.1);
-    --success: #01b574;
-    --warning: #ffb547;
-    --danger: #ee5d50;
     --sidebar-width: 260px;
-    --sidebar-bg: #0c1527;
-    --sidebar-text: #94a3b8;
+    --sidebar-bg: #0B1437;
+    --sidebar-text: #A3AED0;
     --sidebar-text-hover: #f1f5f9;
-    --sidebar-text-active: #05cd99;
-    --sidebar-bg-hover: rgba(255, 255, 255, 0.02);
+    --sidebar-text-active: #FFFFFF;
+    --sidebar-bg-hover: rgba(255, 255, 255, 0.05);
     --sidebar-border: #1e293b;
-    --content-padding: 12px 20px 14px;
-    --gap: 12px;
-    --radius: 12px;
-    --radius-md: 8px;
-    --radius-sm: 8px;
-    --radius-full: 999px;
-    --shadow-sm: 0 2px 12px rgba(15, 21, 53, 0.06);
-    --shadow-md: 0 8px 32px rgba(15, 21, 53, 0.10);
+    --sidebar-active-accent: #00A99D;
     --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -544,7 +520,7 @@ body {
 /* ─── CARD ────────────────────────────────────────────────────────────────── */
 .card {
     background: var(--bg-card);
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     padding: 20px 22px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border);
@@ -602,7 +578,7 @@ body {
 /* ─── STATS ROW ───────────────────────────────────────────── */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: 20px;
 }
 
@@ -616,8 +592,9 @@ body {
 
 .dashboard-bottom-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: var(--gap);
+    margin-top: var(--gap);
 }
 
 /* ─── DATA TABLE ──────────────────────────────────────────────────────────── */
@@ -1141,7 +1118,7 @@ body {
 .modal-card {
     background: white;
     padding: 26px;
-    border-radius: var(--radius);
+    border-radius: var(--radius-md);
     width: 100%;
     max-width: 800px;
     min-width: 600px;
@@ -1188,7 +1165,7 @@ body {
 .icon-btn:hover {
     background: var(--status-failed-bg);
     border-color: rgba(238, 93, 80, 0.3);
-    color: var(--danger);
+    color: var(--status-failed);
 }
 
 .modal-form {
@@ -1233,7 +1210,7 @@ body {
 
 .field input.input-error,
 .field select.input-error {
-    border-color: var(--danger);
+    border-color: var(--status-failed);
     background: rgba(238, 93, 80, 0.02);
 }
 
@@ -1242,7 +1219,7 @@ body {
     align-items: center;
     gap: 4px;
     font-size: 0.73rem;
-    color: var(--danger);
+    color: var(--status-failed);
     font-weight: 600;
 }
 
@@ -1260,7 +1237,7 @@ body {
     background: var(--status-failed-bg);
     border: 1px solid rgba(238, 93, 80, 0.2);
     border-radius: var(--radius-sm);
-    color: var(--danger);
+    color: var(--status-failed);
     font-size: 0.82rem;
     font-weight: 500;
     margin-bottom: 4px;
@@ -1315,12 +1292,12 @@ body {
 .btn-danger {
     background: var(--status-failed-bg);
     border-color: rgba(238, 93, 80, 0.25);
-    color: var(--danger);
+    color: var(--status-failed);
 }
 
 .btn-danger:hover:not(:disabled) {
     background: rgba(238, 93, 80, 0.14);
-    border-color: var(--danger);
+    border-color: var(--status-failed);
 }
 
 .btn-xs {

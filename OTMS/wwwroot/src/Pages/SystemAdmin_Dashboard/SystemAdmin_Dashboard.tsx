@@ -38,11 +38,17 @@ import {
     Mail,
     Download,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './SystemAdmin_Dashboard.css';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import { useToast } from '../../components/Toast/Toast';
+import SearchBar from '../../components/ui/SearchBar';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorBanner from '../../components/ui/ErrorBanner';
+import StatusBadge from '../../components/ui/StatusBadge';
+import Select from '../../components/ui/Select';
+import Pagination from '../../components/ui/Pagination';
 import EmployeeDetailPanel from './EmployeeDetailPanel/EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
@@ -605,13 +611,13 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     // ── Error helper UI ───────────────────────────────────────────────────────
     const FieldErr = ({ msg }: { msg?: string }) =>
         msg ? (
-            <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+            <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>
                 <AlertCircle size={12} /> {msg}
             </span>
         ) : null;
 
     const inputStyle = (hasErr?: string): React.CSSProperties => ({
-        border: hasErr ? '1px solid #ef4444' : '1px solid #cbd5e1',
+        border: hasErr ? '1px solid var(--status-failed)' : '1px solid var(--border)',
     });
 
     return (
@@ -634,7 +640,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         {/* Employee Number */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-number">
-                                Employee ID <span className="optional" style={{ fontWeight: 600, background: 'rgba(67,24,255,0.1)', color: '#4318ff', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>AUTO</span>
+                                Employee ID <span className="optional" style={{ fontWeight: 600, background: 'var(--status-new-bg)', color: 'var(--primary)', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase' }}>AUTO</span>
                             </label>
                             <div style={{ position: 'relative' }}>
                                 <input
@@ -645,30 +651,30 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                                     placeholder={empNumLoading ? 'Generating…' : ''}
                                     className="fm-input"
                                     style={{
-                                        background: '#f8fafc',
-                                        color: empNumLoading ? '#64748b' : '#0f172a',
+                                        background: 'var(--bg-input)',
+                                        color: empNumLoading ? 'var(--text-secondary)' : 'var(--text-primary)',
                                         cursor: 'not-allowed',
                                         paddingRight: 36,
-                                        border: empNumError ? '1px solid #ef4444' : '1px solid #cbd5e1'
+                                        border: empNumError ? '1px solid var(--status-failed)' : '1px solid var(--border)'
                                     }}
                                 />
-                                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: empNumLoading ? '#64748b' : '#10b981' }}>
+                                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: empNumLoading ? 'var(--text-secondary)' : 'var(--status-active)' }}>
                                     {empNumLoading ? <Loader2 size={13} className="fm-spin" /> : <CheckCircle2 size={13} />}
                                 </span>
                             </div>
                             {empNumError ? (
-                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#ef4444', fontSize: 11, marginTop: 4 }}>
+                                <span className="field-error" style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--status-failed)', fontSize: 11, marginTop: 4 }}>
                                     <AlertCircle size={12} /> {empNumError}
                                 </span>
                             ) : !empNumLoading && (
-                                <span style={{ fontSize: 11, color: '#64748b', marginTop: 4, display: 'block' }}>Assigned automatically. Cannot be changed.</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, display: 'block' }}>Assigned automatically. Cannot be changed.</span>
                             )}
                         </div>
 
                         {/* Email Address */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-email">
-                                Email Address <span style={{ color: '#ef4444' }}>*</span>
+                                Email Address <span style={{ color: 'var(--status-failed)' }}>*</span>
                             </label>
                             <input
                                 id="emp-email"
@@ -692,7 +698,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         {/* Department */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-dept">
-                                Department <span style={{ color: '#ef4444' }}>*</span>
+                                Department <span style={{ color: 'var(--status-failed)' }}>*</span>
                             </label>
                             <select
                                 id="emp-dept"
@@ -711,7 +717,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         {/* Position */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-position">
-                                Position <span style={{ color: '#ef4444' }}>*</span>
+                                Position <span style={{ color: 'var(--status-failed)' }}>*</span>
                             </label>
                             <select
                                 id="emp-position"
@@ -741,7 +747,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         {/* System Role */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-role">
-                                System Role <span style={{ color: '#ef4444' }}>*</span>
+                                System Role <span style={{ color: 'var(--status-failed)' }}>*</span>
                             </label>
                             <select
                                 id="emp-role"
@@ -763,7 +769,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         {/* Employment Status */}
                         <div className="fm-field">
                             <label className="fm-label" htmlFor="emp-status">
-                                Employment Status <span style={{ color: '#ef4444' }}>*</span>
+                                Employment Status <span style={{ color: 'var(--status-failed)' }}>*</span>
                             </label>
                             <select
                                 id="emp-status"
@@ -788,8 +794,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
                     <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: '8px 0 20px' }}>
-                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(5,205,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <CheckCircle2 size={28} color="#05cd99" />
+                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--status-active-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircle2 size={28} color="var(--status-active)" />
                             </div>
                             <div>
                                 <h3 style={{ margin: 0 }}>Employee registered</h3>
@@ -816,8 +822,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             ))}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
-                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="#05cd99" />
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'var(--status-active-bg)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
+                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="var(--status-active)" />
                             <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
                                 Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
                             </span>
@@ -1276,20 +1282,20 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
                     </button>
                 </div>
 
-                <div style={{ background: '#f8fafc', borderRadius: 14, padding: '20px', marginBottom: 20, border: '1px solid #eef2f6' }}>
+                <div style={{ background: 'var(--bg-input)', borderRadius: 14, padding: '20px', marginBottom: 20, border: '1px solid #eef2f6' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                         <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #4318ff, #868cff)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)' }}>{request.employeeName.charAt(0).toUpperCase()}</div>
                         <div>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{request.employeeName}</div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#4318ff', background: 'rgba(67, 24, 255, 0.08)', padding: '2px 8px', borderRadius: 6, marginTop: 3, display: 'inline-block' }}>{toDisplayRole(request.role)}</span>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{request.employeeName}</div>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--status-new-bg)', padding: '2px 8px', borderRadius: 6, marginTop: 3, display: 'inline-block' }}>{toDisplayRole(request.role)}</span>
                         </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         {[
-                            { icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff', label: 'TYPE', value: LEAVE_TYPE_LABELS[request.leaveType] },
+                            { icon: <CalendarRange size={14} />, bg: 'var(--status-new-bg)', color: 'var(--primary)', label: 'TYPE', value: LEAVE_TYPE_LABELS[request.leaveType] },
                             { icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547', label: 'DURATION', value: `${days} ${days === 1 ? 'day' : 'days'}` },
-                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', label: 'FROM', value: fmtDate(request.startDate) },
-                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99', label: 'TO', value: fmtDate(request.endDate) },
+                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)', label: 'FROM', value: fmtDate(request.startDate) },
+                            { icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)', label: 'TO', value: fmtDate(request.endDate) },
                         ].map(({ icon, bg, color, label, value }) => (
                             <div key={label} style={{ background: 'white', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <div style={{ background: bg, color, padding: 6, borderRadius: 8, display: 'flex' }}>{icon}</div>
@@ -1313,7 +1319,7 @@ function LeaveActionModal({ request, action, onClose, onConfirm }: LeaveActionMo
 
                 <div className="modal-actions" style={{ marginTop: 16 }}>
                     <button className="btn" onClick={onClose} disabled={submitting} style={{ background: '#f4f7fe', border: 'none', color: 'var(--text-secondary)', fontWeight: 600, padding: '10px 20px', borderRadius: 10 }}>Cancel</button>
-                    <button className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={submitting || (!isApprove && !note.trim())} style={{ fontWeight: 600, padding: '10px 24px', borderRadius: 10, border: 'none', background: isApprove ? '#05cd99' : '#ee5d50', color: 'white', boxShadow: isApprove ? '0 4px 14px rgba(5, 205, 153, 0.25)' : '0 4px 14px rgba(238, 93, 80, 0.25)' }}>
+                    <button className={`btn ${isApprove ? 'btn-primary' : 'btn-danger'}`} onClick={handleConfirm} disabled={submitting || (!isApprove && !note.trim())} style={{ fontWeight: 600, padding: '10px 24px', borderRadius: 10, border: 'none', background: isApprove ? 'var(--status-active)' : 'var(--status-failed)', color: 'white', boxShadow: isApprove ? '0 4px 14px rgba(5, 205, 153, 0.25)' : '0 4px 14px rgba(238, 93, 80, 0.25)' }}>
                         {submitting ? <><Loader2 size={14} className="spin" /> Processing…</> : isApprove ? <><CheckCircle2 size={14} /> Approve Request</> : <><X size={14} /> Decline Request</>}
                     </button>
                 </div>
@@ -1339,6 +1345,32 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
+    const roleDistribution = Object.entries(
+        employees.reduce<Record<string, number>>((acc, emp) => {
+            const role = toDisplayRole(emp.role) || 'Unassigned';
+            acc[role] = (acc[role] || 0) + 1;
+            return acc;
+        }, {})
+    ).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+
+    const statusDistribution = Object.entries(
+        employees.reduce<Record<string, number>>((acc, emp) => {
+            const status = emp.accountStatus || 'Unknown';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        }, {})
+    ).map(([name, value]) => ({ name, value }));
+
+    const PIE_COLORS: Record<string, string> = {
+        Active: '#059669',
+        Deactivated: '#DC2626',
+        'On Leave': '#D97706',
+        Locked: '#D97706',
+        Unknown: '#94A3B8',
+    };
+
+    const BAR_COLORS = ['#00A99D', '#0284C7', '#4F46E5', '#D97706', '#DC2626', '#FF7B42', '#8B5CF6'];
+
     return (
         <div className="dashboard-content">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
@@ -1360,6 +1392,73 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     <StatCard key={label} icon={icon} variant={variant} label={label} value={value} subtext={subtext} />
                 ))}
             </div>
+
+            {/* ── Charts Row ── */}
+            <div className="dashboard-bottom-row">
+                <div className="card">
+                    <div className="card-header-layout">
+                        <span className="text-link">Role Distribution</span>
+                    </div>
+                    {loading || employees.length === 0 ? (
+                        <EmptyState message="No data" />
+                    ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <BarChart data={roleDistribution} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                <Tooltip
+                                    contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                                    labelStyle={{ fontWeight: 700, marginBottom: 4 }}
+                                />
+                                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                                    {roleDistribution.map((_, i) => (
+                                        <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+                <div className="card">
+                    <div className="card-header-layout">
+                        <span className="text-link">Account Status</span>
+                    </div>
+                    {loading || employees.length === 0 ? (
+                        <EmptyState message="No data" />
+                    ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <PieChart>
+                                <Pie
+                                    data={statusDistribution}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={55}
+                                    outerRadius={90}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    labelLine={false}
+                                >
+                                    {statusDistribution.map((entry) => (
+                                        <Cell key={entry.name} fill={PIE_COLORS[entry.name] || '#94A3B8'} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                                />
+                                <Legend
+                                    verticalAlign="bottom"
+                                    iconType="circle"
+                                    iconSize={10}
+                                    formatter={(value: string) => <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{value}</span>}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+
             <div className="dashboard-grid">
                 <div className="card">
                     <div className="card-header-layout"><button className="text-link">Recent Employees</button><button className="view-all-link" onClick={onViewAll}>View more →</button></div>
@@ -1368,9 +1467,9 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                             <thead><tr><th>NAME</th><th>EMPLOYEE NO.</th><th>ROLE</th><th>STATUS</th></tr></thead>
                             <tbody>
                                 {loading
-                                    ? <tr><td colSpan={4}><div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div></td></tr>
+                                    ? <tr><td colSpan={4}><EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." /></td></tr>
                                     : recentEmployees.length === 0
-                                        ? <tr><td colSpan={4}><div className="empty-state"><Package size={22} /><p>No data available</p></div></td></tr>
+                                        ? <tr><td colSpan={4}><EmptyState message="No data available" /></td></tr>
                                         : recentEmployees.slice(0, 7).map(emp => {
                                             const name = getEmployeeDisplayName(emp);
                                             return (
@@ -1379,14 +1478,14 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                                         <div className="emp-name-cell">
                                                             <div style={{ position: 'relative', display: 'inline-block' }}>
                                                                 <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
-                                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
+                                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? 'var(--status-active)' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
                                                             </div>
                                                             <span className="cell-name">{name}</span>
                                                         </div>
                                                     </td>
                                                     <td className="cell-id">{emp.employeeNumber}</td>
                                                     <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                                    <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
+                                                    <td><StatusBadge status={emp.accountStatus || 'Active'} /></td>
                                                 </tr>
                                             );
                                         })}
@@ -1398,18 +1497,18 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     <div className="card-header-layout"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
                     <div className="activity-feed-list">
                         {loading
-                            ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
+                            ? <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." />
                             : activityLogs.length === 0
-                                ? <div className="empty-state"><ClipboardList size={22} /><p>No recent activity</p></div>
+                                ? <EmptyState icon={<ClipboardList size={22} />} message="No recent activity" />
                                 : activityLogs.slice(0, 8).map((log, index) => {
                                     let dotColor = '#4318FF';
-                                    let ringColor = 'rgba(67, 24, 255, 0.15)';
+                                    let ringColor = 'var(--status-new-bg)';
                                     if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
                                     else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
                                     else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
                                     return (
                                         <div key={log.activityLogId} className="activity-feed-item" style={{ display: 'flex', gap: 16, marginBottom: 20, position: 'relative' }}>
-                                            {index < Math.min(activityLogs.length, 8) - 1 && <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: '#e2e8f0', zIndex: 0 }} />}
+                                            {index < Math.min(activityLogs.length, 8) - 1 && <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: 'var(--border)', zIndex: 0 }} />}
                                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, boxShadow: `0 0 0 4px ${ringColor}`, zIndex: 1, flexShrink: 0, marginTop: 4 }} />
                                             <div className="activity-feed-content" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                                 <span className="activity-feed-text" style={{ fontWeight: 500, color: 'var(--text-primary)', fontSize: 13 }}>{log.description}</span>
@@ -1495,7 +1594,7 @@ function ManageEmployeesTab({
     const tabBarStyle: React.CSSProperties = {
         display: 'flex',
         gap: 0,
-        borderBottom: '1px solid #e2e8f0',
+        borderBottom: '1px solid var(--border)',
         marginBottom: 20,
     };
 
@@ -1503,11 +1602,11 @@ function ManageEmployeesTab({
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '11px 20px',
         border: 'none',
-        borderBottom: `2px solid ${active ? '#4318ff' : 'transparent'}`,
+        borderBottom: `2px solid ${active ? 'var(--primary)' : 'transparent'}`,
         background: 'none',
         cursor: 'pointer',
         fontWeight: active ? 700 : 500,
-        color: active ? '#4318ff' : 'var(--text-secondary)',
+        color: active ? 'var(--primary)' : 'var(--text-secondary)',
         fontSize: 13,
         transition: 'all 0.15s',
         marginBottom: -1, // overlap the container border
@@ -1516,27 +1615,11 @@ function ManageEmployeesTab({
     // ── Shared toolbar ────────────────────────────────────────────────────────
     const EmployeesToolbar = (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-                <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input
-                    type="text"
-                    placeholder="Search by name or ID…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    style={{ width: '100%', paddingLeft: 32, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                />
-            </div>
-            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
-                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
-                <option value="">All Roles</option>
-                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
-                <option value="">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Deactivated">Deactivated</option>
-            </select>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search by name or ID…" />
+            <Select value={filterRole} onChange={setFilterRole} placeholder="All Roles"
+                options={rolesList.map(r => ({ value: r, label: r }))} />
+            <Select value={filterStatus} onChange={setFilterStatus} placeholder="All Statuses"
+                options={[{ value: 'Active', label: 'Active' }, { value: 'Deactivated', label: 'Deactivated' }]} />
             <button className="btn btn-primary" onClick={onAddEmployee}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 9, fontSize: 13, whiteSpace: 'nowrap' }}>
                 <Plus size={14} /> Add Employee
@@ -1546,28 +1629,16 @@ function ManageEmployeesTab({
 
     const LeaveToolbar = (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-                <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                <input
-                    type="text"
-                    placeholder="Search leave requests…"
-                    value={leaveSearch}
-                    onChange={e => setLeaveSearch(e.target.value)}
-                    style={{ width: '100%', paddingLeft: 32, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                />
-            </div>
-            <select value={leaveFilterStatus} onChange={e => setLeaveFilterStatus(e.target.value as any)}
-                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
-                <option value="pending">Pending</option>
-                <option value="all">All Statuses</option>
-                <option value="approved">Approved</option>
-                <option value="declined">Declined</option>
-            </select>
-            <select value={leaveFilterRole} onChange={e => setLeaveFilterRole(e.target.value)}
-                style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary,#fff)' }}>
-                <option value="">All Roles</option>
-                {rolesList.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <SearchBar value={leaveSearch} onChange={setLeaveSearch} placeholder="Search leave requests…" />
+            <Select value={leaveFilterStatus} onChange={v => setLeaveFilterStatus(v as any)}
+                options={[
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'all', label: 'All Statuses' },
+                    { value: 'approved', label: 'Approved' },
+                    { value: 'declined', label: 'Declined' },
+                ]} />
+            <Select value={leaveFilterRole} onChange={setLeaveFilterRole} placeholder="All Roles"
+                options={rolesList.map(r => ({ value: r, label: r }))} />
         </div>
     );
 
@@ -1582,11 +1653,11 @@ function ManageEmployeesTab({
         onPage: (p: number) => void;
         resultCount: number;
     }) => (
-        <div className="unified-table-wrap" style={{ background: 'var(--bg-primary,#fff)', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
+        <div className="unified-table-wrap" style={{ background: 'var(--bg-primary,#fff)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
             <style>{`
                 .unified-table-wrap td {
                     padding: 13px 14px;
-                    border-bottom: 1px solid #e2e8f0;
+                    border-bottom: 1px solid var(--border);
                     color: var(--text-primary);
                     font-weight: 500;
                 }
@@ -1602,7 +1673,7 @@ function ManageEmployeesTab({
                     <thead>
                         <tr>
                             {headers.map(h => (
-                                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', padding: '10px 14px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                                <th key={h} style={{ textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-secondary)', padding: '10px 14px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
                                     {h}
                                 </th>
                             ))}
@@ -1628,18 +1699,18 @@ function ManageEmployeesTab({
             {totalPages > 1 && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '12px 16px', borderTop: '1px solid #f1f5f9', gap: 4 }}>
                     <button onClick={() => onPage(page - 1)} disabled={page === 1}
-                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: 'transparent', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <ChevronLeft size={15} />
                     </button>
                     {getPageNumbers(totalPages, page).map((p, i) =>
                         p === '...' ? <span key={`e${i}`} style={{ width: 32, textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>…</span> :
                             <button key={p} onClick={() => onPage(p as number)}
-                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: page === p ? '#4318ff' : 'transparent', color: page === p ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: page === p ? 'var(--primary)' : 'transparent', color: page === p ? 'white' : 'var(--text-secondary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                                 {p}
                             </button>
                     )}
                     <button onClick={() => onPage(page + 1)} disabled={page === totalPages}
-                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid #e2e8f0', background: 'transparent', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <ChevronRight size={15} />
                     </button>
                 </div>
@@ -1660,7 +1731,7 @@ function ManageEmployeesTab({
                         {t.icon}
                         {t.label}
                         {'badge' in t && t.badge ? (
-                            <span style={{ background: '#ee5d50', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999 }}>
+                            <span style={{ background: 'var(--status-failed)', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999 }}>
                                 {t.badge}
                             </span>
                         ) : null}
@@ -1689,7 +1760,7 @@ function ManageEmployeesTab({
                                         <div className="emp-name-cell">
                                             <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
                                                 <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
-                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? '#05cd99' : '#a3aed0', border: '2px solid var(--bg-primary,#fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
+                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? 'var(--status-active)' : '#a3aed0', border: '2px solid var(--bg-primary,#fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
                                             </div>
                                             {name}
                                         </div>
@@ -1697,7 +1768,7 @@ function ManageEmployeesTab({
                                     <td style={{ fontSize: 13 }}>{emp.employeeNumber}</td>
                                     <td style={{ fontSize: 13 }}>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
                                     <td style={{ fontSize: 13 }}>{emp.contactNumber}</td>
-                                    <td><span className={`status-badge ${getStatusBadgeClass(emp.accountStatus)}`}>{emp.accountStatus ?? 'Active'}</span></td>
+                                                    <td><StatusBadge status={emp.accountStatus || 'Active'} /></td>
                                     <td onClick={e => e.stopPropagation()}>
                                         <ActionsDropdown actions={[
                                             { label: 'View Details', icon: <Eye size={12} />, onClick: () => onViewEmployee(emp) },
@@ -1791,20 +1862,20 @@ function ManageEmployeesTab({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                             <div className="emp-avatar" style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #4318ff, #868cff)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, boxShadow: '0 4px 12px rgba(67, 24, 255, 0.15)' }}>{detailModal.employeeName.charAt(0).toUpperCase()}</div>
                             <div>
-                                <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{detailModal.employeeName}</h4>
-                                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: '#4318ff' }}>{toDisplayRole(detailModal.role)}</span></div>
+                                <h4 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{detailModal.employeeName}</h4>
+                                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{detailModal.employeeNumber} · <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{toDisplayRole(detailModal.role)}</span></div>
                             </div>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                             {[
-                                { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
+                                { label: 'Leave Type', value: LEAVE_TYPE_LABELS[detailModal.leaveType], icon: <CalendarRange size={14} />, bg: 'var(--status-new-bg)', color: 'var(--primary)' },
                                 { label: 'Duration', value: `${calcDays(detailModal.startDate, detailModal.endDate)} days`, icon: <Clock size={14} />, bg: 'rgba(255, 181, 71, 0.1)', color: '#ffb547' },
-                                { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
-                                { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: '#05cd99' },
-                                { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'rgba(67, 24, 255, 0.08)', color: '#4318ff' },
-                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'rgba(5,205,153,0.08)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? '#05cd99' : detailModal.status === 'declined' ? '#ee5d50' : '#ffb547' },
+                                { label: 'Start Date', value: fmtDate(detailModal.startDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)' },
+                                { label: 'End Date', value: fmtDate(detailModal.endDate), icon: <CalendarDays size={14} />, bg: 'rgba(5, 205, 153, 0.08)', color: 'var(--status-active)' },
+                                { label: 'Submitted', value: fmtDate(detailModal.submittedAt), icon: <CalendarDays size={14} />, bg: 'var(--status-new-bg)', color: 'var(--primary)' },
+                                { label: 'Status', value: LEAVE_STATUS_META[detailModal.status].label, icon: LEAVE_STATUS_META[detailModal.status].icon, bg: detailModal.status === 'approved' ? 'var(--status-active-bg)' : detailModal.status === 'declined' ? 'rgba(238,93,80,0.08)' : 'rgba(255, 181, 71, 0.1)', color: detailModal.status === 'approved' ? 'var(--status-active)' : detailModal.status === 'declined' ? 'var(--status-failed)' : '#ffb547' },
                             ].map(({ label, value, icon, bg, color }) => (
-                                <div key={label} style={{ background: '#f8fafc', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div key={label} style={{ background: 'var(--bg-input)', border: '1px solid #eef2f6', borderRadius: 10, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <div style={{ background: bg, color, padding: 6, borderRadius: 8, display: 'flex' }}>{icon}</div>
                                     <div><span style={{ color: 'var(--text-secondary)', fontSize: 10, display: 'block', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span><strong style={{ fontSize: 13, color: 'var(--text-primary)' }}>{value}</strong></div>
                                 </div>
@@ -1815,7 +1886,7 @@ function ManageEmployeesTab({
                             <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{detailModal.reason}</p>
                         </div>
                         {detailModal.reviewNote && (
-                            <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', borderLeft: `3px solid ${detailModal.status === 'approved' ? '#05cd99' : '#ee5d50'}`, borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 16 }}>
+                            <div style={{ background: detailModal.status === 'approved' ? 'rgba(5,205,153,0.06)' : 'rgba(238,93,80,0.06)', borderLeft: `3px solid ${detailModal.status === 'approved' ? 'var(--status-active)' : 'var(--status-failed)'}`, borderRadius: '0 8px 8px 0', padding: '12px 14px', fontSize: 13, color: 'var(--text-primary)', marginBottom: 16 }}>
                                 <span style={{ display: 'block', color: 'var(--text-secondary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>REVIEW NOTE</span>
                                 <p style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.4 }}>{detailModal.reviewNote}</p>
                             </div>
@@ -2164,17 +2235,17 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                         <div className="avatar-circle large" style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}>{displayName.charAt(0).toUpperCase()}</div>
                         <div style={{ textAlign: 'center' }}>
                             <h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</h4>
-                            <span className="status-badge active" style={{ marginTop: 6, display: 'inline-block' }}>Active</span>
+                            <StatusBadge status="Active" />
                         </div>
                     </div>
                     {profileSuccess && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: '#05cd99', fontWeight: 600 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--status-active-bg)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: 'var(--status-active)', fontWeight: 600 }}>
                             <CheckCircle2 size={14} /> Profile updated successfully!
                         </div>
                     )}
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {profileError && <div className="form-api-error"><AlertCircle size={14} /><span>{profileError}</span></div>}
+                            {profileError && <ErrorBanner message={profileError} />}
                             <div className="field-row">
                                 <div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}</div>
                                 <div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}</div>
@@ -2222,18 +2293,18 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     </div>
                     {!editingPassword ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-success"><CheckCircle2 size={16} /></div><div className="system-info"><span className="system-name">Password</span><span className="system-detail">Last updated recently</span></div><span style={{ fontSize: 12, fontWeight: 600, color: '#05cd99', background: 'rgba(5,205,153,0.12)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Secure</span></div>
+                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-success"><CheckCircle2 size={16} /></div><div className="system-info"><span className="system-name">Password</span><span className="system-detail">Last updated recently</span></div><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-active)', background: 'var(--status-active-bg)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Secure</span></div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-primary"><Shield size={16} /></div><div className="system-info"><span className="system-name">Role Permissions</span><span className="system-detail">Full system access granted</span></div><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(67,24,255,0.1)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Admin</span></div>
+                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-primary"><Shield size={16} /></div><div className="system-info"><span className="system-name">Role Permissions</span><span className="system-detail">Full system access granted</span></div><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--status-new-bg)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Admin</span></div>
                             <div style={{ height: 1, background: 'var(--border)' }} />
                             <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-warning"><AlertCircle size={16} /></div><div className="system-info"><span className="system-name">Active Session</span><span className="system-detail">Logged in on this device</span></div><span style={{ fontSize: 12, fontWeight: 600, color: '#ffb547', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Live</span></div>
                         </div>
                     ) : (
                         <div className="modal-form" style={{ padding: '4px 0 0' }}>
-                            {pwError && <div className="form-api-error" style={{ marginBottom: 8 }}><AlertCircle size={14} /><span>{pwError}</span></div>}
+                            {pwError && <ErrorBanner message={pwError} />}
                             <div className="field"><label>Current Password</label><div style={{ position: 'relative' }}><input type={showCurrent ? 'text' : 'password'} value={pwForm.current} onChange={handlePwChange('current')} placeholder="Enter current password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowCurrent(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
-                            <div className="field"><label>New Password</label><div style={{ position: 'relative' }}><input type={showNext ? 'text' : 'password'} value={pwForm.next} onChange={handlePwChange('next')} placeholder="At least 6 characters" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowNext(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showNext ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.next.length > 0 && <div style={{ marginTop: 6 }}><div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3].map(level => <div key={level} style={{ flex: 1, height: 4, borderRadius: 2, background: pwForm.next.length >= level * 4 ? level === 1 ? '#ee5d50' : level === 2 ? '#ffb547' : '#05cd99' : '#e9edf7', transition: 'background 0.2s' }} />)}</div><span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>{pwForm.next.length < 4 ? 'Weak' : pwForm.next.length < 8 ? 'Fair' : 'Strong'}</span></div>}</div>
-                            <div className="field"><label>Confirm New Password</label><div style={{ position: 'relative' }}><input type={showConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={handlePwChange('confirm')} placeholder="Re-enter new password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>}{pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && <span style={{ fontSize: 11, color: '#05cd99', marginTop: 3, display: 'block' }}>✓ Passwords match</span>}</div>
+                            <div className="field"><label>New Password</label><div style={{ position: 'relative' }}><input type={showNext ? 'text' : 'password'} value={pwForm.next} onChange={handlePwChange('next')} placeholder="At least 6 characters" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowNext(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showNext ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.next.length > 0 && <div style={{ marginTop: 6 }}><div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3].map(level => <div key={level} style={{ flex: 1, height: 4, borderRadius: 2, background: pwForm.next.length >= level * 4 ? level === 1 ? 'var(--status-failed)' : level === 2 ? '#ffb547' : 'var(--status-active)' : '#e9edf7', transition: 'background 0.2s' }} />)}</div><span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>{pwForm.next.length < 4 ? 'Weak' : pwForm.next.length < 8 ? 'Fair' : 'Strong'}</span></div>}</div>
+                            <div className="field"><label>Confirm New Password</label><div style={{ position: 'relative' }}><input type={showConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={handlePwChange('confirm')} placeholder="Re-enter new password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>}{pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>✓ Passwords match</span>}</div>
                             <div className="modal-actions" style={{ padding: '4px 0 0' }}>
                                 <button className="btn" onClick={() => { setEditingPassword(false); setPwError(''); setPwForm({ current: '', next: '', confirm: '' }); }} disabled={pwSaving}>Cancel</button>
                                 <button className="btn btn-primary" onClick={handlePwSave} disabled={pwSaving}>
@@ -2676,43 +2747,30 @@ const GovernmentRecordsTab: React.FC = () => {
                 <div className="card-header-layout" style={{ padding: '20px 22px', borderBottom: '1px solid var(--border)' }}>
                     <div className="field" style={{ margin: 0, flex: 1 }}>
                         <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Select Employee</label>
-                        <select
+                        <Select
                             value={selectedEmployeeNumber}
-                            onChange={e => setSelectedEmployeeNumber(e.target.value)}
-                            style={{ marginTop: 6, width: '100%', maxWidth: 360, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', padding: '0 12px', fontSize: 13, background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)' }}
-                        >
-                            <option value="">— Choose an employee —</option>
-                            {employees.map(emp => (
-                                <option key={emp.employeeNumber} value={emp.employeeNumber}>
-                                    {(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} ({emp.employeeNumber})
-                                </option>
-                            ))}
-                        </select>
+                            onChange={setSelectedEmployeeNumber}
+                            placeholder="— Choose an employee —"
+                            options={employees.map(emp => ({
+                                value: emp.employeeNumber,
+                                label: `${(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} (${emp.employeeNumber})`,
+                            }))}
+                        />
                     </div>
                 </div>
 
                 <div style={{ padding: '20px 22px' }}>
                     {!selectedEmployeeNumber && (
-                        <div className="empty-state" style={{ padding: '48px 0' }}>
-                            <ShieldCheck size={40} color="#cbd5e1" />
-                            <p style={{ fontSize: 15, color: '#64748b', marginTop: 12 }}>Select an employee to view or update their government records.</p>
-                        </div>
+                        <EmptyState icon={<ShieldCheck size={32} />} message="Select an employee to view or update their government records." />
                     )}
 
                     {selectedEmployeeNumber && fetchingData && (
-                        <div className="empty-state" style={{ padding: '48px 0' }}>
-                            <Loader2 size={24} className="spin" />
-                            <p style={{ fontSize: 14, color: '#64748b', marginTop: 10 }}>Loading compliance data...</p>
-                        </div>
+                        <EmptyState icon={<Loader2 size={24} className="spin" />} message="Loading compliance data..." />
                     )}
 
                     {selectedEmployeeNumber && !fetchingData && (
                         <>
-                            {apiError && (
-                                <div style={{ background: 'rgba(238,93,80,0.08)', borderRadius: 9, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#ee5d50', marginBottom: 16, border: '1px solid rgba(238,93,80,0.2)' }}>
-                                    <AlertCircle size={14} /><span>{apiError}</span>
-                                </div>
-                            )}
+                            {apiError && <ErrorBanner message={apiError} />}
 
                             <div className="card-header-layout" style={{ margin: 0 }}>
                                 <h3 style={{ margin: 0, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2730,7 +2788,7 @@ const GovernmentRecordsTab: React.FC = () => {
                                 <div style={{ position: 'relative', marginTop: 6 }}>
                                     <Hash size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                                     <input type="text" value={selectedEmployeeNumber} readOnly
-                                        style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: '#f8fafc', color: 'var(--text-secondary)', boxSizing: 'border-box' }} />
+                                        style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-input)', color: 'var(--text-secondary)', boxSizing: 'border-box' }} />
                                 </div>
                             </div>
 
@@ -2755,18 +2813,18 @@ const GovernmentRecordsTab: React.FC = () => {
                                                     maxLength={field === 'sssNumber' ? 12 : field === 'philhealthNumber' ? 14 : field === 'pagibigNumber' ? 14 : 14}
                                                     style={{
                                                         width: '100%', height: 38, borderRadius: 9, padding: '0 12px', fontSize: 13,
-                                                        border: `1px solid ${errors[field] ? '#ee5d50' : '#e2e8f0'}`,
+                                                        border: `1px solid ${errors[field] ? 'var(--status-failed)' : 'var(--border)'}`,
                                                         background: 'var(--bg-primary,#fff)', color: 'var(--text-primary)',
                                                         boxSizing: 'border-box',
                                                     }}
                                                 />
-                                                {errors[field] && <span style={{ fontSize: 11, color: '#ee5d50', marginTop: 4, display: 'block' }}>{errors[field]}</span>}
+                                                {errors[field] && <span style={{ fontSize: 11, color: 'var(--status-failed)', marginTop: 4, display: 'block' }}>{errors[field]}</span>}
                                             </>
                                         ) : (
                                             <div style={{ position: 'relative', marginTop: 6 }}>
                                                 <Hash size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                                                 <input type="text" value={form[field] || '—'} readOnly
-                                                    style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: '#f8fafc', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
+                                                    style={{ width: '100%', paddingLeft: 36, height: 38, borderRadius: 9, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' }} />
                                             </div>
                                         )}
                                     </div>
@@ -2793,13 +2851,9 @@ const GovernmentRecordsTab: React.FC = () => {
                                     </h3>
                                 </div>
                                 {syncRecordsLoading ? (
-                                    <div className="empty-state" style={{ padding: '32px 0' }}>
-                                        <Loader2 size={20} className="spin" /><p style={{ fontSize: 14, color: '#64748b', marginTop: 8 }}>Loading sync records...</p>
-                                    </div>
+                                    <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading sync records..." />
                                 ) : syncRecords.length === 0 ? (
-                                    <div style={{ fontSize: 13, color: '#64748b', padding: '16px 0' }}>
-                                        No synchronization records yet. Submit the form to generate one.
-                                    </div>
+                                    <EmptyState message="No synchronization records yet. Submit the form to generate one." />
                                 ) : (
                                     <table className="data-table">
                                         <thead>
@@ -2815,11 +2869,7 @@ const GovernmentRecordsTab: React.FC = () => {
                                                 <tr key={r.syncRecordId ?? r.statutorySyncRecordId}>
                                                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.targetSystem ?? 'FOMS'}</td>
                                                     <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{r.syncTimestamp ? new Date(r.syncTimestamp).toLocaleString() : '—'}</td>
-                                                    <td>
-                                                        <span className={`status-badge ${r.syncStatus === 'Successful' ? 'active' : r.syncStatus === 'Failed' ? 'deactivated' : 'pending-badge'}`}>
-                                                            {r.syncStatus ?? 'Pending'}
-                                                        </span>
-                                                    </td>
+                                                    <td><StatusBadge status={r.syncStatus || 'Pending'} /></td>
                                                     <td style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{r.errorMessage || '—'}</td>
                                                 </tr>
                                             ))}
@@ -3251,8 +3301,8 @@ export default function Dashboard() {
 
                 {activeTab === 'roles' && <RoleManagementTab />}
 
-                {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><Truck size={32} /><p>Delivery module coming soon.</p></div></div></div>}
-                {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><div className="empty-state" style={{ padding: 48 }}><BarChart3 size={32} /><p>Analytics module coming soon.</p></div></div></div>}
+                {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><EmptyState icon={<Truck size={32} />} message="Delivery module coming soon." /></div></div>}
+                {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><EmptyState icon={<BarChart3 size={32} />} message="Analytics module coming soon." /></div></div>}
 
                 {activeTab === 'government_records' && <GovernmentRecordsTab />}
 
@@ -3273,22 +3323,22 @@ export default function Dashboard() {
                                 <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}><Activity size={20} color="#4f46e5" /> System Activity Logs</h3>
                             </div>
                             {activityLogs.length === 0 ? (
-                                <div className="empty-state" style={{ padding: '60px 20px' }}><Activity size={40} color="#cbd5e1" style={{ marginBottom: '12px' }} /><p style={{ fontSize: '15px', color: '#64748b' }}>No activity logs found in the system.</p></div>
+                                <EmptyState icon={<Activity size={32} />} message="No activity logs found in the system." />
                             ) : (
                                 <div className="global-timeline" style={{ padding: '24px 36px' }}>
                                     {activityLogs.map((log, index) => {
                                         let dotColor = '#4318FF';
-                                        let ringColor = 'rgba(67, 24, 255, 0.15)';
+                                        let ringColor = 'var(--status-new-bg)';
                                         if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
                                         else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
                                         else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
                                         return (
                                             <div key={log.activityLogId} className="global-timeline-item" style={{ display: 'flex', gap: 24, marginBottom: 32, position: 'relative' }}>
-                                                {index < activityLogs.length - 1 && <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: '#e2e8f0', zIndex: 0 }} />}
+                                                {index < activityLogs.length - 1 && <div style={{ position: 'absolute', left: 4, top: 20, bottom: -32, width: 2, background: 'var(--border)', zIndex: 0 }} />}
                                                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: dotColor, boxShadow: `0 0 0 6px ${ringColor}`, zIndex: 1, flexShrink: 0, marginTop: 4 }} />
                                                 <div className="global-timeline-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                     <div style={{ fontSize: 14, color: '#1e293b', fontWeight: 500 }}>{log.description}</div>
-                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f8fafc', color: '#64748b', padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 500, alignSelf: 'flex-start', border: '1px solid #e2e8f0' }}>
+                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg-input)', color: 'var(--text-secondary)', padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 500, alignSelf: 'flex-start', border: '1px solid var(--border)' }}>
                                                         <Clock size={13} />{new Date(log.createdAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                 </div>

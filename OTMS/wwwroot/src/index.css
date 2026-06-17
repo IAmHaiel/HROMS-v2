@@ -9,33 +9,30 @@
     --sidebar-text: #A3AED0;
     --sidebar-text-active: #FFFFFF;
     --sidebar-width: 290px;
-    /* Primary */
+    /* Brand */
     --primary: #00A99D;
     --primary-hover: #009189;
     --primary-dark: #1B254B;
     --primary-dark-hover: #2D3A6A;
+    --sidebar-bg: #0B1437;
+    /* Status */
+    --status-active: #059669;
+    --status-pending: #D97706;
+    --status-failed: #DC2626;
+    --status-transit: #0284C7;
+    --status-new: #4F46E5;
     /* Backgrounds */
-    --bg-main: #F4F7FE;
+    --bg-main: #F0F4FF;
     --bg-card: #FFFFFF;
-    --bg-header: #FFFFFF;
+    --bg-input: #F8FAFF;
+    --bg-body: #F7F9FF;
     --bg-overlay: rgba(0, 0, 0, 0.5);
     /* Text */
-    --text-primary: #1B254B;
-    --text-secondary: #A3AED0;
-    --text-tertiary: #8F9BBA;
+    --text-primary: #0F172A;
+    --text-secondary: #374151;
+    --text-tertiary: #6B7280;
+    --text-muted: #9CA3AF;
     --text-white: #FFFFFF;
-    /* Status */
-    --status-active: #01B574;
-    --status-active-bg: rgba(1, 181, 116, 0.1);
-    --status-pending: #FFB547;
-    --status-pending-bg: rgba(255, 181, 71, 0.1);
-    --status-failed: #E31A1A;
-    --status-failed-bg: rgba(227, 26, 26, 0.1);
-    --status-transit: #00A99D;
-    --status-transit-bg: rgba(0, 169, 157, 0.1);
-    --status-locked: #E31A1A;
-    --status-new: #4318FF;
-    --status-new-bg: rgba(67, 24, 255, 0.1);
     /* Borders */
     --border: #E9EDF7;
     --border-hover: #CBD5E0;
@@ -48,8 +45,8 @@
     /* Radius */
     --radius-sm: 8px;
     --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
+    --radius-lg: 18px;
+    --radius-xl: 24px;
     --radius-full: 9999px;
     /* Spacing */
     --content-padding: 28px;
@@ -61,11 +58,11 @@
     --role-ops-team: #FF7B42;
     /* Chart colors */
     --chart-teal: #00A99D;
-    --chart-green: #01B574;
-    --chart-orange: #FFB547;
-    --chart-red: #E31A1A;
-    --chart-purple: #4318FF;
-    --chart-gray: #E9EDF7;
+    --chart-green: #059669;
+    --chart-orange: #D97706;
+    --chart-red: #DC2626;
+    --chart-purple: #4F46E5;
+    --chart-gray: #E2E8F0;
 }
 
 /* ─── Reset ─── */

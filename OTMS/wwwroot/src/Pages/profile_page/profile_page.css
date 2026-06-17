@@ -2,13 +2,13 @@
 .profile-page {
     display: flex;
     min-height: 100vh;
-    background: #f4f7fe;
+    background: var(--bg-main);
 }
 
 /* Sidebar */
 .profile-sidebar {
     width: 240px;
-    background: #1b254b;
+    background: var(--primary-dark);
     color: white;
     padding: 20px;
 }
@@ -25,7 +25,7 @@
     }
 
     .profile-sidebar a {
-        color: #a3aed0;
+        color: var(--sidebar-text);
         text-decoration: none;
     }
 
@@ -43,7 +43,7 @@
 
 /* Topbar */
 .profile-topbar {
-    background: #1b254b;
+    background: var(--primary-dark);
     padding: 12px 20px;
     display: flex;
     justify-content: space-between;
@@ -79,7 +79,7 @@
 .profile-card {
     display: flex;
     gap: 30px;
-    background: white;
+    background: var(--bg-card);
     padding: 30px;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -95,7 +95,7 @@
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: #1b254b;
+    background: var(--primary-dark);
     color: white;
     display: flex;
     align-items: center;
@@ -108,7 +108,7 @@
     padding: 6px 10px;
     border-radius: 10px;
     border: none;
-    background: #e9edf7;
+    background: var(--bg-input);
     cursor: pointer;
 }
 
@@ -131,7 +131,7 @@
 
     .form-group label {
         font-size: 0.8rem;
-        color: #2b3674;
+        color: var(--text-primary);
         margin-bottom: 6px;
     }
 
@@ -139,7 +139,7 @@
         padding: 10px;
         border-radius: 12px;
         border: none;
-        background: #e9edf7;
+        background: var(--bg-input);
     }
 
 /* Actions */
@@ -160,17 +160,17 @@
 }
 
     .btn.edit {
-        background: #2b3674;
-        color: white;
+        background: var(--primary-dark);
+        color: var(--text-white);
     }
 
     .btn.save {
-        background: #05cd99;
-        color: white;
+        background: var(--status-active);
+        color: var(--text-white);
     }
 
     .btn.cancel {
-        background: #eee;
+        background: var(--bg-input);
     }
 
 /* Responsive */
