@@ -3,6 +3,16 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import './index.css'
 import '@tabler/icons-webfont/dist/tabler-icons.min.css'
+import axios from 'axios'
+
+// Attach JWT token to all outgoing axios requests automatically
+axios.interceptors.request.use((config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 import LoginPage from './Pages/login_page/login'
 import SystemAdmin_Dashboard from './Pages/SystemAdmin_Dashboard/SystemAdmin_Dashboard'
 import ForgotPasswordPage from './Pages/forgotpassword_page/forgotpassword_page'
