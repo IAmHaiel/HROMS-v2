@@ -52,6 +52,8 @@ namespace OTMS.Entities.Models
         // Educational and Professional Background
         public string? HighestEducationalAttainment { get; set; }
         public string? InstitutionAndYearGraduated { get; set; }
+        public string? Institution { get; set; }
+        public string? YearGraduated { get; set; }
         public string? ProfessionalLicensesCertifications { get; set; }
 
         // Job

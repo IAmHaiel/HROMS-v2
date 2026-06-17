@@ -14,6 +14,7 @@ import ProtectedRoute from './components/Auth/ProtectedRoute'
 import ChangePassword from './Pages/change_password/change_password'
 import EmailVerificationPage from './Pages/email_verification_page/email_verification_page'
 import ApplicantVerifyEmail from './Pages/applicant_verify_email/applicant_verify_email'
+import SetPasswordPage from './Pages/set_password_page/set_password_page'
 import { ToastProvider } from './components/Toast/Toast'
 import AuthSyncWatcher from './components/Auth/AuthSyncWatcher'
 import OnboardingPage from './Pages/onboarding_page/onboarding_page'
@@ -39,6 +40,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/account_locked" element={<AccountLocked />} />
                     <Route path="/change-password" element={<ChangePassword />} />
+                    <Route path="/set-password" element={<SetPasswordPage />} />
                     <Route path="/verify-email" element={<EmailVerificationPage />} />
                     <Route path="/applicant/verify-email" element={<ApplicantVerifyEmail />} />
                     <Route path="/onboarding" element={<OnboardingPage />} />

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Entities.Models;
@@ -132,6 +133,43 @@ namespace OTMS.Data
             }
 
             await context.SaveChangesAsync();
+
+            // 5. Seed default System Admin employee account (bypasses email verification)
+            var sysAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SystemAdmin");
+            if (sysAdminRole != null && !await context.Employees.AnyAsync(e => e.EmployeeNumber == "0000"))
+            {
+                var sysAdmin = new Employee
+                {
+                    EmployeeId = Guid.NewGuid(),
+                    EmployeeNumber = "0000",
+                    FirstName = "System",
+                    MiddleName = null,
+                    LastName = "Admin",
+                    Suffix = null,
+                    ContactNumber = "09170000000",
+                    EmploymentStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    Email = "operationalmanagementsystemoms@gmail.com",
+                    IsEmailVerified = true
+                };
+
+                var sysAdminAccount = new Account
+                {
+                    AccountId = Guid.NewGuid(),
+                    EmployeeId = sysAdmin.EmployeeId,
+                    RoleId = sysAdminRole.RoleId,
+                    Role = sysAdminRole,
+                    AccountStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    IsPasswordChanged = false
+                };
+                sysAdminAccount.PasswordHash = new PasswordHasher<Account>().HashPassword(sysAdminAccount, "SystemAdmin1001!");
+
+                sysAdmin.Account = sysAdminAccount;
+                context.Employees.Add(sysAdmin);
+                context.Accounts.Add(sysAdminAccount);
+                await context.SaveChangesAsync();
+            }
 
             // 4. Seed Default Approval Routing Matrices
             await SeedApprovalRoutingMatricesAsync(context);

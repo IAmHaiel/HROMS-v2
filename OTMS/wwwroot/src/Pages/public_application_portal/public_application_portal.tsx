@@ -35,7 +35,7 @@ type FormKey =
     | 'bankName' | 'bankAccountName' | 'bankAccountNumber'
     | 'nbiClearance' | 'medicalClearance' | 'psaBirthCertificate' | 'resume' | 'signedEmploymentContract'
     | 'emergencyContactName' | 'emergencyContactRelationship' | 'emergencyContactMobileNumber' | 'declaredDependents'
-    | 'highestEducationalAttainment' | 'institutionAndYearGraduated' | 'professionalLicensesCertifications'
+    | 'highestEducationalAttainment' | 'institution' | 'yearGraduated' | 'professionalLicensesCertifications'
     | 'position';
 
 interface ApplicationForm {
@@ -66,7 +66,8 @@ interface ApplicationForm {
     emergencyContactMobileNumber: string;
     declaredDependents: string;
     highestEducationalAttainment: string;
-    institutionAndYearGraduated: string;
+    institution: string;
+    yearGraduated: string;
     professionalLicensesCertifications: string;
     positionId: string;
 }
@@ -136,7 +137,7 @@ const EMPTY_FORM: ApplicationForm = {
     bankName: '', bankAccountName: '', bankAccountNumber: '',
     nbiClearance: null, medicalClearance: null, psaBirthCertificate: null, resume: null, signedEmploymentContract: null,
     emergencyContactName: '', emergencyContactRelationship: '', emergencyContactMobileNumber: '', declaredDependents: '',
-    highestEducationalAttainment: '', institutionAndYearGraduated: '', professionalLicensesCertifications: '',
+    highestEducationalAttainment: '', institution: '', yearGraduated: '', professionalLicensesCertifications: '',
     positionId: '',
 };
 
@@ -213,8 +214,18 @@ export default function PublicApplicationPortal() {
         document.head.appendChild(script);
     };
 
+    const decodeGoogleJwt = (token: string): { email?: string; name?: string } => {
+        try {
+            const payload = token.split('.')[1];
+            const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+            return { email: json.email, name: json.name };
+        } catch { return {}; }
+    };
+
     const handleGoogleCredentialResponse = (response: { credential: string }) => {
+        const decoded = decodeGoogleJwt(response.credential);
         setGoogleToken(response.credential);
+        setForm(p => ({ ...p, email: decoded.email || '' }));
         setAuthLoading(false);
         setStage('form');
     };
@@ -227,6 +238,18 @@ export default function PublicApplicationPortal() {
         setAuthLoading(true);
         setSubmitError('');
         window.google.accounts.id.prompt();
+    };
+
+    const applySSS = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 10); if (d.length <= 2) return d; if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 9)}-${d.slice(9)}`; };
+    const applyPhilHealth = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 2) return d; if (d.length <= 11) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 11)}-${d.slice(11)}`; };
+    const applyPagIBIG = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 4) return d; if (d.length <= 8) return `${d.slice(0, 4)}-${d.slice(4)}`; return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`; };
+    const applyTIN = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 3) return d; if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`; if (d.length <= 9) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`; return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}-${d.slice(9)}`; };
+
+    const formatStatutory = (key: 'sssNumber' | 'philHealthNumber' | 'pagIBIGNumber' | 'tin', raw: string) => {
+        const formatted = key === 'sssNumber' ? applySSS(raw) : key === 'philHealthNumber' ? applyPhilHealth(raw) : key === 'pagIBIGNumber' ? applyPagIBIG(raw) : applyTIN(raw);
+        setForm(p => ({ ...p, [key]: formatted }));
+        const err = validateField(key, formatted);
+        setErrors(p => ({ ...p, [key]: err || undefined }));
     };
 
     const validateField = (key: FormKey, value: string | File | null): string => {
@@ -243,6 +266,10 @@ export default function PublicApplicationPortal() {
         }
         if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
         if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
+        if (key === 'sssNumber') { if (!(value as string)?.trim()) return 'SSS Number is required.'; if (!/^\d{2}-\d{7}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXX-X'; }
+        if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
+        if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
+        if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
         if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
         if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
         if (key === 'emergencyContactMobileNumber') {
@@ -251,7 +278,8 @@ export default function PublicApplicationPortal() {
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit emergency contact number.';
         }
         if (key === 'highestEducationalAttainment' && !(value as string)?.trim()) return 'Highest educational attainment is required.';
-        if (key === 'institutionAndYearGraduated' && !(value as string)?.trim()) return 'Institution and year graduated is required.';
+        if (key === 'institution' && !(value as string)?.trim()) return 'Institution is required.';
+        if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
         return '';
@@ -303,8 +331,9 @@ export default function PublicApplicationPortal() {
         const requiredText: FormKey[] = [
             'firstName', 'lastName', 'gender', 'civilStatus', 'contactNumber',
             'currentResidentialAddress', 'permanentAddress',
+            'sssNumber', 'philHealthNumber', 'pagIBIGNumber', 'tin',
             'emergencyContactName', 'emergencyContactRelationship', 'emergencyContactMobileNumber',
-            'highestEducationalAttainment', 'institutionAndYearGraduated',
+            'highestEducationalAttainment', 'institution', 'yearGraduated',
             'position'
         ];
         const errs: FormErrors = {};
@@ -354,7 +383,8 @@ export default function PublicApplicationPortal() {
             formData.append('EmergencyContactMobileNumber', form.emergencyContactMobileNumber.trim());
             if (form.declaredDependents.trim()) formData.append('DeclaredDependents', form.declaredDependents.trim());
             formData.append('HighestEducationalAttainment', form.highestEducationalAttainment.trim());
-            formData.append('InstitutionAndYearGraduated', form.institutionAndYearGraduated.trim());
+            formData.append('Institution', form.institution.trim());
+            formData.append('YearGraduated', form.yearGraduated.trim());
             if (form.professionalLicensesCertifications.trim()) formData.append('ProfessionalLicensesCertifications', form.professionalLicensesCertifications.trim());
             formData.append('JobPositionId', form.positionId);
 
@@ -398,7 +428,7 @@ export default function PublicApplicationPortal() {
 
             <header style={s.header}>
                 <div style={s.headerInner}>
-                    <div style={s.headerLogo}>
+                    <div style={{ ...s.headerLogo, cursor: 'pointer' }} onClick={() => window.location.href = '/'}>
                         <div style={s.logoMark}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3" />
@@ -611,6 +641,7 @@ export default function PublicApplicationPortal() {
                                         <option value="">Select…</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
                                         <option value="Prefer not to say">Prefer not to say</option>
                                     </select>
                                     {errors.gender && <span style={s.errMsg}><AlertIcon />{errors.gender}</span>}
@@ -630,7 +661,7 @@ export default function PublicApplicationPortal() {
                                     {errors.civilStatus && <span style={s.errMsg}><AlertIcon />{errors.civilStatus}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Suffix</label>
+                                    <label style={s.label}>&nbsp;</label>
                                     <div />
                                 </div>
                             </div>
@@ -677,28 +708,32 @@ export default function PublicApplicationPortal() {
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Statutory &amp; Government Identifiers</div>
                             <div style={s.fieldRow4}>
                                 <div style={s.field}>
-                                    <label style={s.label}>SSS Number</label>
-                                    <input type="text" placeholder="SSS No." value={form.sssNumber}
-                                        onChange={handleTextChange('sssNumber')}
-                                        style={s.input} />
+                                    <label style={s.label}>SSS Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XX-XXXXXXX-X" value={form.sssNumber}
+                                        onChange={e => formatStatutory('sssNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.sssNumber ? s.inputErr : {}) }} />
+                                    {errors.sssNumber && <span style={s.errMsg}><AlertIcon />{errors.sssNumber}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>PhilHealth Number</label>
-                                    <input type="text" placeholder="PhilHealth No." value={form.philHealthNumber}
-                                        onChange={handleTextChange('philHealthNumber')}
-                                        style={s.input} />
+                                    <label style={s.label}>PhilHealth Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XX-XXXXXXXXX-X" value={form.philHealthNumber}
+                                        onChange={e => formatStatutory('philHealthNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.philHealthNumber ? s.inputErr : {}) }} />
+                                    {errors.philHealthNumber && <span style={s.errMsg}><AlertIcon />{errors.philHealthNumber}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Pag-IBIG Number</label>
-                                    <input type="text" placeholder="Pag-IBIG No." value={form.pagIBIGNumber}
-                                        onChange={handleTextChange('pagIBIGNumber')}
-                                        style={s.input} />
+                                    <label style={s.label}>Pag-IBIG Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XXXX-XXXX-XXXX" value={form.pagIBIGNumber}
+                                        onChange={e => formatStatutory('pagIBIGNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.pagIBIGNumber ? s.inputErr : {}) }} />
+                                    {errors.pagIBIGNumber && <span style={s.errMsg}><AlertIcon />{errors.pagIBIGNumber}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>TIN</label>
-                                    <input type="text" placeholder="TIN" value={form.tin}
-                                        onChange={handleTextChange('tin')}
-                                        style={s.input} />
+                                    <label style={s.label}>TIN <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XXX-XXX-XXX-XXX" value={form.tin}
+                                        onChange={e => formatStatutory('tin', e.target.value)}
+                                        style={{ ...s.input, ...(errors.tin ? s.inputErr : {}) }} />
+                                    {errors.tin && <span style={s.errMsg}><AlertIcon />{errors.tin}</span>}
                                 </div>
                             </div>
 
@@ -817,11 +852,78 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
                             <div style={s.field}>
-                                <label style={s.label}>Declared Dependents (JSON)</label>
-                                <textarea placeholder='[{"name":"Child Name","dob":"YYYY-MM-DD"}]' value={form.declaredDependents}
-                                    onChange={handleTextChange('declaredDependents')}
-                                    style={s.textarea} rows={2} />
-                                <span style={s.hint}>Optional. JSON array of dependent names and dates of birth for HMO/benefits enrollment.</span>
+                                <label style={s.label}>Declared Dependents</label>
+                                <span style={s.hint}>Optional. Add dependents for HMO/benefits enrollment.</span>
+                                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                    <input type="text" placeholder="Full name" id="dep-name" style={s.input}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                const input = e.currentTarget;
+                                                const name = input.value.trim();
+                                                if (!name) return;
+                                                const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
+                                                current.push({ name });
+                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
+                                                input.value = '';
+                                            }
+                                        }} />
+                                    <input type="date" id="dep-dob" style={{ ...s.input, width: 160 }}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                const nameInput = document.getElementById('dep-name') as HTMLInputElement;
+                                                const dobInput = e.currentTarget;
+                                                const name = nameInput.value.trim();
+                                                if (!name) return;
+                                                const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
+                                                current.push({ name, dob: dobInput.value || undefined });
+                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
+                                                nameInput.value = '';
+                                                dobInput.value = '';
+                                            }
+                                        }} />
+                                    <button type="button" style={{
+                                        background: '#4318ff', color: 'white', border: 'none', borderRadius: 10,
+                                        padding: '0 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+                                    }} onClick={() => {
+                                        const nameInput = document.getElementById('dep-name') as HTMLInputElement;
+                                        const dobInput = document.getElementById('dep-dob') as HTMLInputElement;
+                                        const name = nameInput.value.trim();
+                                        if (!name) return;
+                                        const current = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
+                                        current.push({ name, dob: dobInput.value || undefined });
+                                        setForm(p => ({ ...p, declaredDependents: JSON.stringify(current) }));
+                                        nameInput.value = '';
+                                        dobInput.value = '';
+                                    }}>+ Add</button>
+                                </div>
+                                {form.declaredDependents && (() => {
+                                    const deps = JSON.parse(form.declaredDependents) as { name: string; dob?: string }[];
+                                    return deps.length > 0 ? (
+                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                            {deps.map((dep, i) => (
+                                                <div key={i} style={{
+                                                    display: 'flex', alignItems: 'center', gap: 8,
+                                                    background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8,
+                                                    padding: '8px 12px', fontSize: 13
+                                                }}>
+                                                    <span style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>{dep.name}</span>
+                                                    {dep.dob && <span style={{ color: '#64748b', fontSize: 12 }}>{dep.dob}</span>}
+                                                    <button type="button" style={{
+                                                        background: 'none', border: 'none', cursor: 'pointer',
+                                                        color: '#ef4444', padding: 2, display: 'flex'
+                                                    }} onClick={() => {
+                                                        const updated = deps.filter((_, j) => j !== i);
+                                                        setForm(p => ({ ...p, declaredDependents: updated.length > 0 ? JSON.stringify(updated) : '' }));
+                                                    }}>
+                                                        <XIcon />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
                             </div>
 
                             {/* ── Education ──────────────────────────── */}
@@ -835,11 +937,18 @@ export default function PublicApplicationPortal() {
                                     {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Institution &amp; Year Graduated <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="University Name, 2020" value={form.institutionAndYearGraduated}
-                                        onChange={handleTextChange('institutionAndYearGraduated')}
-                                        style={{ ...s.input, ...(errors.institutionAndYearGraduated ? s.inputErr : {}) }} />
-                                    {errors.institutionAndYearGraduated && <span style={s.errMsg}><AlertIcon />{errors.institutionAndYearGraduated}</span>}
+                                    <label style={s.label}>Institution <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. University of the Philippines" value={form.institution}
+                                        onChange={handleTextChange('institution')}
+                                        style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
+                                    {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
+                                        onChange={handleTextChange('yearGraduated')}
+                                        style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
+                                    {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
                                 </div>
                             </div>
                             <div style={s.field}>

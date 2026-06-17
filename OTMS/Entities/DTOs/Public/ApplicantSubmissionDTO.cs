@@ -39,10 +39,14 @@ namespace OTMS.Entities.DTOs.Public
         public string PermanentAddress { get; set; } = string.Empty;
 
         // ─── Statutory and Government Identifiers ──────────────────────────
-        public string? SSSNumber { get; set; }
-        public string? PhilHealthNumber { get; set; }
-        public string? PagIBIGNumber { get; set; }
-        public string? TIN { get; set; }
+        [Required]
+        public string SSSNumber { get; set; } = string.Empty;
+        [Required]
+        public string PhilHealthNumber { get; set; } = string.Empty;
+        [Required]
+        public string PagIBIGNumber { get; set; } = string.Empty;
+        [Required]
+        public string TIN { get; set; } = string.Empty;
 
         // ─── Financial and Payroll Data ────────────────────────────────────
         public string? BankName { get; set; }
@@ -77,7 +81,10 @@ namespace OTMS.Entities.DTOs.Public
         public string HighestEducationalAttainment { get; set; } = string.Empty;
 
         [Required]
-        public string InstitutionAndYearGraduated { get; set; } = string.Empty;
+        public string Institution { get; set; } = string.Empty;
+
+        [Required]
+        public string YearGraduated { get; set; } = string.Empty;
 
         public string? ProfessionalLicensesCertifications { get; set; }
 
