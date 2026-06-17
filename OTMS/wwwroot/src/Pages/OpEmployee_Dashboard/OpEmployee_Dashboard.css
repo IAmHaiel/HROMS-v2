@@ -1021,6 +1021,28 @@ body {
     margin-top: 3px;
 }
 
+/* ─── Modal header (shared ui/Modal component compat) ─── */
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    gap: 12px;
+}
+
+.modal-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.modal-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
 .modal-actions {
     display: flex;
     align-items: center;

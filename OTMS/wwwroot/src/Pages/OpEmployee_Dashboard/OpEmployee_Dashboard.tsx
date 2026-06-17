@@ -46,6 +46,7 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
+import Modal from '../../components/ui/Modal';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
@@ -476,91 +477,53 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose, on
     }));
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div>
-                        <h3>Update Progress</h3>
-                        <p className="modal-sub">{task.name}</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-
-                {error && (
-                    <div className="form-api-error" style={{ marginBottom: 10 }}>
-                        <AlertCircle size={14} /><span>{error}</span>
-                    </div>
-                )}
-                {fsmError && (
-                    <div className="form-api-error" style={{ marginBottom: 10, background: 'rgba(238,93,80,0.1)', color: 'var(--status-failed)' }}>
-                        <AlertCircle size={14} /><span>{fsmError}</span>
-                    </div>
-                )}
-
-                {validNext.length === 0 ? (
-                    <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        <AlertCircle size={18} style={{ marginBottom: 6 }} />
-                        <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. The Operations Admin will review it.</p>
-                    </div>
-                ) : (
-                    <>
-                        <div className="field">
-                            <label>Task Status <span style={{ color: 'var(--status-failed)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
-                            <select
-                                className="report-select"
-                                value={status}
-                                onChange={e => handleStatusChange(e.target.value as TaskStatus)}
-                            >
-                                <option value={baseStatus}>{statusMeta[baseStatus]?.label ?? baseStatus} (current)</option>
-                                {statusOptions.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="field">
-                            <label>Progress — {progress}%</label>
-                            <input
-                                type="range" min={0} max={100} step={5} value={progress}
-                                onChange={e => setProgress(Number(e.target.value))}
-                                style={{ width: '100%', accentColor: 'var(--primary)' }}
-                            />
-                    <div className="tc-bar" style={{ marginTop: 6, height: 8 }}>
-                        <div
-                            className={`tc-fill ${priorityMeta[task.priority].bar}`}
-                            style={{ width: `${progress}%`, transition: 'width 0.2s' }}
-                        />
-                    </div>
-                </div>
-                        </>
-                )}
-
-                <div className="field">
-                    <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-                    <textarea
-                        className="leave-reason-textarea" rows={3} maxLength={1000}
-                        placeholder="Add any notes about your progress…"
-                        value={remarks}
-                        onChange={e => setRemarks(e.target.value)}
-                    />
-                    <div className="leave-char-count">{remarks.length} / 1000</div>
-                </div>
-
-                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+        <Modal isOpen onClose={onClose} title="Update Progress" subtitle={task.name} size="md"
+            footer={
+                <div className="modal-actions" style={{ width: '100%', justifyContent: 'flex-end' }}>
                     <button className="btn" onClick={onClose}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving
-                            ? <><Loader2 size={13} className="spin" /> Saving…</>
-                            : status === 'pending-admin-review'
-                                ? <><Save size={13} /> Submit for Review</>
-                                : <><Save size={13} /> Save Progress</>
-                        }
+                        {saving ? <><Loader2 size={13} className="spin" /> Saving…</>
+                            : status === 'pending-admin-review' ? <><Save size={13} /> Submit for Review</>
+                            : <><Save size={13} /> Save Progress</>}
                     </button>
                 </div>
+            }
+        >
+            {error && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{error}</span></div>}
+            {fsmError && <div className="form-api-error" style={{ marginBottom: 10, background: 'rgba(238,93,80,0.1)', color: 'var(--status-failed)' }}><AlertCircle size={14} /><span>{fsmError}</span></div>}
+
+            {validNext.length === 0 ? (
+                <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <AlertCircle size={18} style={{ marginBottom: 6 }} />
+                    <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. The Operations Admin will review it.</p>
+                </div>
+            ) : (
+                <>
+                    <div className="field">
+                        <label>Task Status <span style={{ color: 'var(--status-failed)' }}>*</span> <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
+                        <select className="report-select" value={status} onChange={e => handleStatusChange(e.target.value as TaskStatus)}>
+                            <option value={baseStatus}>{statusMeta[baseStatus]?.label ?? baseStatus} (current)</option>
+                            {statusOptions.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                        </select>
+                    </div>
+                    <div className="field">
+                        <label>Progress — {progress}%</label>
+                        <input type="range" min={0} max={100} step={5} value={progress} onChange={e => setProgress(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--primary)' }} />
+                        <div className="tc-bar" style={{ marginTop: 6, height: 8 }}>
+                            <div className={`tc-fill ${priorityMeta[task.priority].bar}`} style={{ width: `${progress}%`, transition: 'width 0.2s' }} />
+                        </div>
+                    </div>
+                </>
+            )}
+
+            <div className="field">
+                <label>Remarks <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
+                <textarea className="leave-reason-textarea" rows={3} maxLength={1000} placeholder="Add any notes about your progress…" value={remarks} onChange={e => setRemarks(e.target.value)} />
+                <div className="leave-char-count">{remarks.length} / 1000</div>
             </div>
-        </div>
+        </Modal>
     );
-};
+}
 
 // ─── Submit for Review Modal ────────────────────────────────────────────────────
 
@@ -648,15 +611,16 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card submit-review-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div>
-                        <h3>Submit for Admin Review</h3>
-                        <p className="modal-sub">{task.name}</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+         <Modal isOpen onClose={onClose} title="Submit for Admin Review" subtitle={task.name} size="md"
+            footer={
+                <div className="modal-actions" style={{ width: '100%', justifyContent: 'flex-end' }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving ? <><Loader2 size={13} className="spin" /> Submitting…</> : <><Save size={13} /> Submit for Review</>}
+                    </button>
                 </div>
+            }
+        >
 
                 {error && (
                     <div className="form-api-error" style={{ marginBottom: 10 }}>
@@ -748,8 +712,7 @@ const SubmitForReviewModal: React.FC<SubmitForReviewModalProps> = ({ task, onSav
                         }
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

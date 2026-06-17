@@ -793,20 +793,20 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             </FormModal>
 
             {/* ── Success Screen ── */}
-            {successData && (
-                <div className="modal-overlay" onClick={() => { setSuccessData(null); onClose(); }}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: '8px 0 20px' }}>
-                            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--status-active-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <CheckCircle2 size={28} color="var(--status-active)" />
-                            </div>
-                            <div>
-                                <h3 style={{ margin: 0 }}>Employee registered</h3>
-                                <p className="modal-subtitle">Account has been created successfully.</p>
-                            </div>
+            <Modal isOpen={!!successData} onClose={() => { setSuccessData(null); onClose(); }} size="sm"
+                title="Employee registered"
+                subtitle="Account has been created successfully."
+            >
+                {successData && (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--status-active-bg)', border: '1px solid rgba(5,150,105,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
+                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="var(--status-active)" />
+                            <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                                Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
+                            </span>
                         </div>
 
-                        <div style={{ background: 'var(--bg-secondary, #f8f9fc)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ background: 'var(--bg-input)', borderRadius: 10, border: '1px solid var(--border)', padding: '12px 16px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
                             {[
                                 { label: 'Employee ID', value: successData.employeeNumber },
                                 { label: 'Department', value: departments.find(d => d.departmentId === form.departmentId)?.name },
@@ -825,19 +825,10 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                             ))}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, background: 'var(--status-active-bg)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13 }}>
-                            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} color="var(--status-active)" />
-                            <span style={{ color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                                Login credentials have been sent to <strong>{form.email.trim()}</strong>. Ask the employee to check their inbox to activate their account.
-                            </span>
-                        </div>
-
-                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>
-                            Done
-                        </button>
-                    </div>
-                </div>
-            )}
+                        <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>Done</button>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 }

@@ -29,6 +29,7 @@ import {
     X, Plus, Calendar, User, Hash, Tag, Info,
 } from 'lucide-react';
 import DataTable from '../../../components/ui/DataTable';
+import Modal from '../../../components/ui/Modal';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -185,45 +186,22 @@ function UploadContractModal({ employees, onClose, onUploaded }: { employees: an
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div
-                className="modal-card"
-                onClick={e => e.stopPropagation()}
-                style={{ maxWidth: 560, borderRadius: 18, padding: '28px 32px' }}
-            >
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Upload Contract</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
-                            Step {step} of 2 — {step === 1 ? 'Choose employee' : 'Document details'}
-                        </p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose} style={{ borderRadius: '50%', width: 32, height: 32 }}>
-                        <X size={15} />
-                    </button>
-                </div>
+        <Modal isOpen onClose={onClose} title="Upload Contract"
+            subtitle={`Step ${step} of 2 — ${step === 1 ? 'Choose employee' : 'Document details'}`} size="md"
+        >
+            {/* Step indicator */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                {[1, 2].map(s => (
+                    <div key={s} style={{ flex: 1, height: 4, borderRadius: 4, background: s <= step ? 'var(--primary)' : 'var(--border)', transition: 'background 0.2s' }} />
+                ))}
+            </div>
 
-                {/* Step indicator */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                    {[1, 2].map(s => (
-                        <div
-                            key={s}
-                            style={{
-                                flex: 1, height: 4, borderRadius: 4,
-                                background: s <= step ? '#4318ff' : '#e2e8f0',
-                                transition: 'background 0.2s',
-                            }}
-                        />
-                    ))}
+            {error && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--status-failed-bg)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: 'var(--status-failed)' }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>{error}</span>
                 </div>
-
-                {error && (
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'rgba(238,93,80,0.08)', border: '1px solid rgba(238,93,80,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#ee5d50' }}>
-                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <span>{error}</span>
-                    </div>
-                )}
+            )}
 
                 {/* ── Step 1: Employee picker ── */}
                 {step === 1 && (
@@ -425,8 +403,7 @@ function UploadContractModal({ employees, onClose, onUploaded }: { employees: an
                         </div>
                     </div>
                 )}
-            </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -438,34 +415,19 @@ function ContractDetailModal({ doc, onClose }: { doc: any, onClose: () => void }
     const isArchived = contractStatus === 'Archived';
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div
-                className="modal-card"
-                onClick={e => e.stopPropagation()}
-                style={{ maxWidth: 500, borderRadius: 18, padding: '28px 32px' }}
-            >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-                    <div>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Document Details</h3>
-                        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>Contract record information</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose} style={{ borderRadius: '50%', width: 32, height: 32 }}>
-                        <X size={15} />
-                    </button>
-                </div>
-
-                {/* Status banner */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px 14px', borderRadius: 10, marginBottom: 18,
-                    background: isArchived ? 'rgba(100,116,139,0.08)' : 'rgba(5,205,153,0.08)',
-                    border: `1px solid ${isArchived ? 'rgba(100,116,139,0.2)' : 'rgba(5,205,153,0.2)'}`,
-                    fontSize: 13, fontWeight: 600,
-                    color: isArchived ? '#64748b' : '#05cd99',
-                }}>
-                    {isArchived ? <Archive size={14} /> : <CheckCircle2 size={14} />}
-                    {isArchived ? 'This contract has been archived (superseded by a newer version).' : 'This is the current active contract.'}
-                </div>
+        <Modal isOpen onClose={onClose} title="Document Details" subtitle="Contract record information" size="md">
+            {/* Status banner */}
+            <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 14px', borderRadius: 10, marginBottom: 18,
+                background: isArchived ? 'rgba(100,116,139,0.08)' : 'var(--status-active-bg)',
+                border: `1px solid ${isArchived ? 'rgba(100,116,139,0.2)' : 'rgba(5,150,105,0.2)'}`,
+                fontSize: 13, fontWeight: 600,
+                color: isArchived ? 'var(--text-secondary)' : 'var(--status-active)',
+            }}>
+                {isArchived ? <Archive size={14} /> : <CheckCircle2 size={14} />}
+                {isArchived ? 'This contract has been archived (superseded by a newer version).' : 'This is the current active contract.'}
+            </div>
 
                 {/* Employee */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
@@ -502,16 +464,11 @@ function ContractDetailModal({ doc, onClose }: { doc: any, onClose: () => void }
 
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                     <button className="btn" onClick={onClose} style={{ padding: '9px 18px', borderRadius: 10 }}>Close</button>
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => window.open(doc.fileUrl, '_blank')}
-                        style={{ padding: '9px 20px', borderRadius: 10 }}
-                    >
+                    <button className="btn btn-primary" onClick={() => window.open(doc.fileUrl, '_blank')} style={{ padding: '9px 20px', borderRadius: 10 }}>
                         <Download size={13} /> Download PDF
                     </button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
 
