@@ -1459,53 +1459,66 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                 </div>
             </div>
 
+            {/* Main Content Grid */}
             <div className="dashboard-grid">
                 <div className="card">
-                    <div className="card-header-layout"><button className="text-link">Recent Employees</button><button className="view-all-link" onClick={onViewAll}>View more →</button></div>
-                    <div className="data-table-wrap">
-                        <table className="data-table">
-                            <thead><tr><th>NAME</th><th>EMPLOYEE NO.</th><th>ROLE</th><th>STATUS</th></tr></thead>
-                            <tbody>
-                                {loading
-                                    ? <tr><td colSpan={4}><EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." /></td></tr>
-                                    : recentEmployees.length === 0
-                                        ? <tr><td colSpan={4}><EmptyState message="No data available" /></td></tr>
-                                        : recentEmployees.slice(0, 7).map(emp => {
-                                            const name = getEmployeeDisplayName(emp);
-                                            return (
-                                                <tr key={emp.employeeNumber} onClick={() => onSelectEmployee(emp)} className="clickable-row">
-                                                    <td>
-                                                        <div className="emp-name-cell">
-                                                            <div style={{ position: 'relative', display: 'inline-block' }}>
-                                                                <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
-                                                                <span style={{ position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: '50%', background: emp.presenceStatus === 'Online' ? 'var(--status-active)' : '#a3aed0', border: '2px solid var(--bg-primary, #fff)', display: 'block' }} title={emp.presenceStatus ?? 'Offline'} />
-                                                            </div>
-                                                            <span className="cell-name">{name}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="cell-id">{emp.employeeNumber}</td>
-                                                    <td>{emp.role ? toDisplayRole(emp.role) : <span className="no-role">—</span>}</td>
-                                                    <td><StatusBadge status={emp.accountStatus || 'Active'} /></td>
-                                                </tr>
-                                            );
-                                        })}
-                            </tbody>
-                        </table>
+                    <div className="card-header">
+                        <h3>Recent Employees</h3>
+                        <button className="view-all-link" onClick={onViewAll}>View all →</button>
                     </div>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>NAME</th>
+                                <th>ID</th>
+                                <th>ROLE</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loading
+                                ? <tr><td colSpan={5}><EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." /></td></tr>
+                                : recentEmployees.length === 0
+                                    ? <tr><td colSpan={5}><EmptyState message="No data available" /></td></tr>
+                                    : recentEmployees.slice(0, 7).map(emp => {
+                                        const name = getEmployeeDisplayName(emp);
+                                        return (
+                                            <tr key={emp.employeeNumber}>
+                                                <td>
+                                                    <div className="emp-name-cell">
+                                                        <div className="emp-avatar">{name.charAt(0).toUpperCase()}</div>
+                                                        <span className="cell-name">{name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="cell-id">{emp.employeeNumber}</td>
+                                                <td><RoleBadge role={toDisplayRole(emp.role)} size="sm" /></td>
+                                                <td><StatusBadge status={emp.accountStatus || 'Active'} size="sm" /></td>
+                                                <td className="cell-actions">
+                                                    <button className="action-icon-btn" title="Edit" onClick={() => onSelectEmployee(emp)}><Pencil size={14} /></button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                        </tbody>
+                    </table>
                 </div>
                 <div className="card activity-card">
-                    <div className="card-header-layout"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
+                    <div className="card-header">
+                        <h3>Recent Activity</h3>
+                        <a href="/activity-logs" className="view-all-link">View all →</a>
+                    </div>
                     <div className="activity-feed-list">
                         {loading
                             ? <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." />
                             : activityLogs.length === 0
                                 ? <EmptyState icon={<ClipboardList size={22} />} message="No recent activity" />
                                 : activityLogs.slice(0, 8).map((log, index) => {
-                                    let dotColor = '#4318FF';
-                                    let ringColor = 'var(--status-new-bg)';
-                                    if (log.activityType === 'Login') { dotColor = '#05CD99'; ringColor = 'rgba(5, 205, 153, 0.15)'; }
-                                    else if (log.activityType === 'Logout') { dotColor = '#FFCE20'; ringColor = 'rgba(255, 206, 32, 0.15)'; }
-                                    else if (log.activityType === 'Profile Update') { dotColor = '#39B8FF'; ringColor = 'rgba(57, 184, 255, 0.15)'; }
+                                    let dotColor = 'var(--primary)';
+                                    let ringColor = 'rgba(0, 169, 157, 0.15)';
+                                    if (log.activityType === 'Login') { dotColor = 'var(--status-active)'; ringColor = 'rgba(5, 150, 105, 0.15)'; }
+                                    else if (log.activityType === 'Logout') { dotColor = 'var(--status-pending)'; ringColor = 'rgba(217, 119, 6, 0.15)'; }
+                                    else if (log.activityType === 'Profile Update') { dotColor = 'var(--status-transit)'; ringColor = 'rgba(2, 132, 199, 0.15)'; }
                                     return (
                                         <div key={log.activityLogId} className="activity-feed-item" style={{ display: 'flex', gap: 16, marginBottom: 20, position: 'relative' }}>
                                             {index < Math.min(activityLogs.length, 8) - 1 && <div style={{ position: 'absolute', left: 4, top: 16, bottom: -24, width: 2, background: 'var(--border)', zIndex: 0 }} />}

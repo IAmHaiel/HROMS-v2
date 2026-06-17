@@ -15,8 +15,8 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function RoleBadge({ role, size = 'md' }: RoleBadgeProps) {
     const color = ROLE_COLORS[role.toUpperCase()] ?? 'var(--text-secondary)';
-    const fontSize = size === 'sm' ? '0.65rem' : '0.72rem';
-    const padding = size === 'sm' ? '2px 8px' : '3px 12px';
+    const fontSize = size === 'sm' ? '0.62rem' : '0.72rem';
+    const padding = size === 'sm' ? '2px 6px' : '3px 12px';
     return (
         <span
             style={{

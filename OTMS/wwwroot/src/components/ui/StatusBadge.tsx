@@ -1,5 +1,6 @@
 interface StatusBadgeProps {
     status: string;
+    size?: 'sm' | 'md';
     className?: string;
 }
 
@@ -22,7 +23,8 @@ const BADGE_CLASSES: Record<string, string> = {
     Rejected: 'badge badge-red',
 };
 
-export default function StatusBadge({ status, className = '' }: StatusBadgeProps) {
+export default function StatusBadge({ status, size = 'md', className = '' }: StatusBadgeProps) {
     const cls = BADGE_CLASSES[status] ?? 'badge badge-blue';
-    return <span className={`${cls} ${className}`}>{status}</span>;
+    const style = size === 'sm' ? { fontSize: '0.65rem', padding: '1px 8px' } : undefined;
+    return <span className={`${cls} ${className}`} style={style}>{status}</span>;
 }
