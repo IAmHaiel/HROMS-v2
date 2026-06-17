@@ -26,9 +26,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     FileText, Download, Eye, Upload, Search, Filter,
     CheckCircle2, Clock, Archive, AlertCircle, Loader2,
-    X, ChevronLeft, ChevronRight, Plus, Calendar,
-    User, Hash, Tag, Info,
+    X, Plus, Calendar, User, Hash, Tag, Info,
 } from 'lucide-react';
+import DataTable from '../../../components/ui/DataTable';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -749,64 +749,12 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
         }
       `}</style>
 
-            {/* ── Toolbar ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                {/* Search */}
-                <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
-                    <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                    <input
-                        type="text"
-                        placeholder="Search by employee name or ID…"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        style={{ width: '100%', paddingLeft: 32, paddingRight: 12, height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                    />
-                </div>
-
-                {/* Status filter tabs */}
-                <div style={{ display: 'flex', gap: 4, background: '#f4f7fe', borderRadius: 10, padding: 3 }}>
-                    {[
-                        { value: 'active', label: 'Active' },
-                        { value: 'archived', label: 'Archived' },
-                        { value: 'all', label: 'All' },
-                    ].map(opt => (
-                        <button
-                            key={opt.value}
-                            className={`filter-tab-btn${filterStatus === opt.value ? ' active' : ''}`}
-                            onClick={() => setFilterStatus(opt.value)}
-                        >
-                            {opt.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Document type filter */}
-                {/* Document type filter (client-side on documentTitle) */}
-                <select
-                    value={filterDocType}
-                    onChange={e => setFilterDocType(e.target.value)}
-                    style={{ height: 36, borderRadius: 9, border: '1px solid #e2e8f0', fontSize: 13, padding: '0 10px', color: 'var(--text-primary)', background: 'var(--bg-primary, #fff)' }}
-                >
-                    <option value="">All Contract Types</option>
-                    {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-
-                {/* Upload button */}
-                <button
-                    className="btn btn-primary"
-                    onClick={() => setShowUploadModal(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 36, padding: '0 16px', borderRadius: 9, fontSize: 13 }}
-                >
-                    <Plus size={14} /> Upload Contract
-                </button>
-            </div>
-
             {/* ── Summary chips ── */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(5,205,153,0.08)', border: '1px solid rgba(5,205,153,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#059669' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--status-active-bg)', border: '1px solid rgba(5,150,105,0.2)', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: 'var(--status-active)' }}>
                     <CheckCircle2 size={12} /> {activeCount} active
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: '#64748b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                     <Archive size={12} /> {archivedCount} archived
                 </div>
                 <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -815,8 +763,8 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
             </div>
 
             {/* ── Criteria #2 notice ── */}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.12)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--text-primary)' }}>
-                <Info size={13} style={{ flexShrink: 0, marginTop: 1, color: '#4318ff' }} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--status-new-bg)', border: '1px solid rgba(79,70,229,0.12)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--text-primary)' }}>
+                <Info size={13} style={{ flexShrink: 0, marginTop: 1, color: 'var(--primary)' }} />
                 <span>
                     Contracts are displayed in chronological order by their <strong>Effective Start Date</strong>.
                     Previous versions are preserved as archived records for audit purposes.
@@ -824,195 +772,91 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
                 </span>
             </div>
 
-            {/* ── Table ── */}
-            <div style={{ background: 'var(--bg-primary, #fff)', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
-                <div className="doc-table-wrap">
-                    <table className="doc-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: 200 }}>Employee</th>
-                                <th>Document Type</th>
-                                <th>Effective Start Date</th>
-                                <th>File</th>
-                                <th>Version</th>
-                                <th>Uploaded</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={8}>
-                                        <div className="doc-empty">
-                                            <Loader2 size={28} className="spin" />
-                                            <p>Loading contracts…</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : contracts.length === 0 ? (
-                                <tr>
-                                    <td colSpan={8}>
-                                        <div className="doc-empty">
-                                            <FileText size={36} />
-                                            <p>No contracts match your filters.</p>
-                                            <button
-                                                className="btn btn-primary"
-                                                onClick={() => setShowUploadModal(true)}
-                                                style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8, marginTop: 4 }}
-                                            >
-                                                <Plus size={13} /> Upload first contract
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : displayedContracts.map((doc) => {
-                                const name = buildName(doc.firstName, doc.lastName);
-                                // Use server-calculated contractStatus ("Active", "Archived", "Pending Activation")
-                                const contractStatus: string = doc.contractStatus ?? (doc.isArchived ? 'Archived' : 'Active');
-                                const statusMeta = STATUS_META[contractStatus] ?? STATUS_META['Active'];
-
-                                return (
-                                    <tr
-                                        key={doc.employeeAttachmentId}
-                                        className={`doc-row${contractStatus === 'Archived' ? ' archived-row' : ''}`}
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => setDetailDoc(doc)}
-                                    >
-                                        {/* Employee */}
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                                                <div className="emp-avatar" style={{ width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>
-                                                    {getInitial(doc.firstName, doc.lastName)}
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
-                                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>#{doc.employeeNumber}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        {/* Contract type — documentTitle = user-selected ContractType from upload */}
-                                        <td>
-                                            <span className="doc-type-pill">{doc.documentTitle || doc.documentType}</span>
-                                        </td>
-
-                                        {/* Effective Start Date = issueDate on the backend DTO */}
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                                <Calendar size={12} style={{ color: '#4318ff', flexShrink: 0 }} />
-                                                <span style={{ fontWeight: 600 }}>
-                                                    {fmtDate(doc.issueDate)}
-                                                </span>
-                                            </div>
-                                        </td>
-
-                                        {/* File name */}
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                <FileText size={13} style={{ color: '#ee5d50', flexShrink: 0 }} />
-                                                <span
-                                                    style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
-                                                    title={doc.fileName}
-                                                >
-                                                    {doc.fileName}
-                                                </span>
-                                            </div>
-                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{fmt(doc.fileSize)}</div>
-                                        </td>
-
-                                        {/* Version */}
-                                        <td>
-                                            <span className="version-chip">v{doc.version}</span>
-                                        </td>
-
-                                        {/* Uploaded at */}
-                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                                            {fmtDate(doc.uploadedAt)}
-                                        </td>
-
-                                        {/* Status from server-calculated contractStatus */}
-                                        <td>
-                                            <span className={statusMeta.cls}>
-                                                {statusMeta.icon}
-                                                {statusMeta.label}
-                                            </span>
-                                        </td>
-
-                                        {/* Actions */}
-                                        <td onClick={e => e.stopPropagation()}>
-                                            <div style={{ display: 'flex', gap: 5 }}>
-                                                <button
-                                                    className="doc-action-btn primary"
-                                                    onClick={() => setDetailDoc(doc)}
-                                                    title="View details"
-                                                >
-                                                    <Eye size={12} /> View
-                                                </button>
-                                                <button
-                                                    className="doc-action-btn"
-                                                    onClick={() => window.open(doc.fileUrl, '_blank')}
-                                                    title="Download PDF"
-                                                >
-                                                    <Download size={12} />
-                                                </button>
-                                                {employees.find(e => e.employeeNumber === doc.employeeNumber) && (
-                                                    <button
-                                                        className="doc-action-btn"
-                                                        title="Open Digital 201 File"
-                                                        onClick={() => {
-                                                            const emp = employees.find(e => e.employeeNumber === doc.employeeNumber);
-                                                            if (emp) onOpenDigital201(emp);
-                                                        }}
-                                                    >
-                                                        <User size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* ── Pagination ── */}
-                {totalPages > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 10 }}>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                            Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} contracts
-                        </span>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                            <button
-                                className="doc-page-btn"
-                                disabled={page === 1}
-                                onClick={() => fetchContracts(page - 1)}
-                            >
-                                <ChevronLeft size={15} />
-                            </button>
-                            {pageNumbers.map((p, i) =>
-                                p === '...'
-                                    ? <span key={`e${i}`} style={{ width: 32, textAlign: 'center', lineHeight: '32px', color: 'var(--text-secondary)', fontSize: 13 }}>…</span>
-                                    : <button
-                                        key={p}
-                                        className={`doc-page-btn${page === p ? ' current' : ''}`}
-                                        onClick={() => fetchContracts(p as number)}
-                                    >
-                                        {p}
-                                    </button>
-                            )}
-                            <button
-                                className="doc-page-btn"
-                                disabled={page === totalPages}
-                                onClick={() => fetchContracts(page + 1)}
-                            >
-                                <ChevronRight size={15} />
-                            </button>
+            {/* ── DataTable ── */}
+            <DataTable
+                searchQuery={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search by employee name or ID…"
+                filterElements={
+                    <>
+                        <div style={{ display: 'flex', gap: 4, background: 'var(--bg-main)', borderRadius: 10, padding: 3 }}>
+                            {[
+                                { value: 'active', label: 'Active' },
+                                { value: 'archived', label: 'Archived' },
+                                { value: 'all', label: 'All' },
+                            ].map(opt => (
+                                <button key={opt.value}
+                                    className={`filter-tab-btn${filterStatus === opt.value ? ' active' : ''}`}
+                                    onClick={() => setFilterStatus(opt.value)}
+                                    style={{ padding: '4px 10px', borderRadius: 7, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: filterStatus === opt.value ? 'white' : 'transparent', color: filterStatus === opt.value ? 'var(--primary)' : 'var(--text-secondary)', boxShadow: filterStatus === opt.value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
+                                    {opt.label}
+                                </button>
+                            ))}
                         </div>
-                    </div>
-                )}
-            </div>
+                        <select value={filterDocType} onChange={e => setFilterDocType(e.target.value)}
+                            style={{ height: 36, borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 32px 0 14px', background: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 500, outline: 'none' }}>
+                            <option value="">All Contract Types</option>
+                            {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </>
+                }
+                actionButton={{ label: 'Upload Contract', icon: <Plus size={14} />, onClick: () => setShowUploadModal(true) }}
+                headers={['Employee', 'Document Type', 'Effective Start Date', 'File', 'Version', 'Uploaded', 'Status', 'Actions']}
+                loading={loading}
+                emptyMessage="No contracts match your filters."
+                emptyIcon={<FileText size={24} />}
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(p) => fetchContracts(p)}
+                totalRecords={totalCount}
+            >
+                {displayedContracts.map((doc) => {
+                    const name = buildName(doc.firstName, doc.lastName);
+                    const contractStatus: string = doc.contractStatus ?? (doc.isArchived ? 'Archived' : 'Active');
+                    const statusMeta = STATUS_META[contractStatus] ?? STATUS_META['Active'];
+                    return (
+                        <tr key={doc.employeeAttachmentId} onClick={() => setDetailDoc(doc)} style={{ cursor: 'pointer', opacity: contractStatus === 'Archived' ? 0.7 : 1 }}>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                                    <div className="emp-avatar" style={{ width: 32, height: 32, fontSize: 12, flexShrink: 0 }}>{getInitial(doc.firstName, doc.lastName)}</div>
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: 13 }}>{name}</div>
+                                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>#{doc.employeeNumber}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span className="doc-type-pill">{doc.documentTitle || doc.documentType}</span></td>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                    <Calendar size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                    <span style={{ fontWeight: 600 }}>{fmtDate(doc.issueDate)}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <FileText size={13} style={{ color: 'var(--status-failed)', flexShrink: 0 }} />
+                                    <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }} title={doc.fileName}>{doc.fileName}</span>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{fmt(doc.fileSize)}</div>
+                            </td>
+                            <td><span className="version-chip">v{doc.version}</span></td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(doc.uploadedAt)}</td>
+                            <td>
+                                <span className={statusMeta.cls}>{statusMeta.icon}{statusMeta.label}</span>
+                            </td>
+                            <td onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: 5 }}>
+                                    <button className="action-icon-btn" onClick={() => setDetailDoc(doc)} title="View details"><Eye size={13} /></button>
+                                    <button className="action-icon-btn" onClick={() => window.open(doc.fileUrl, '_blank')} title="Download PDF"><Download size={13} /></button>
+                                    {employees.find(e => e.employeeNumber === doc.employeeNumber) && (
+                                        <button className="action-icon-btn" title="Open Digital 201 File" onClick={() => { const emp = employees.find(e => e.employeeNumber === doc.employeeNumber); if (emp) onOpenDigital201(emp); }}><User size={13} /></button>
+                                    )}
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </DataTable>
 
             {/* ── Modals ── */}
             {showUploadModal && (
