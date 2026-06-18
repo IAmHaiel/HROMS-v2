@@ -113,6 +113,8 @@ namespace OTMS.Service.Services
         public async Task<IEnumerable<object>> GetRecentActivityLogsAsync(int count = 50)
         {
             return await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
                 .OrderByDescending(al => al.CreatedAt)
                 .Take(count)
                 .Select(al => new
@@ -120,6 +122,11 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
                     createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
@@ -130,6 +137,8 @@ namespace OTMS.Service.Services
             var totalRecords = await context.ActivityLogs.CountAsync();
             var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
             var logs = await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
                 .OrderByDescending(al => al.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -138,6 +147,11 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
                     createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
@@ -161,13 +175,20 @@ namespace OTMS.Service.Services
             if (employee == null || employee.Account == null) return new List<object>();
 
             return await context.ActivityLogs
-                .Where(al => al.AccountId == employee.Account.AccountId) // [Code Addition] Filtering logs tied explicitly to the queried employee
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .Where(al => al.AccountId == employee.Account.AccountId)
                 .OrderByDescending(al => al.CreatedAt)
                 .Select(al => new
                 {
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
                     createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
