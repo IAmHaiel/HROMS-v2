@@ -3250,7 +3250,7 @@ export default function Dashboard() {
 
                 {activeTab === 'recruitment' && (
                     <RecruitmentTab
-                        onSuccess={msg => success(msg)}
+                        onSuccess={msg => { success(msg); fetchActivityLogs(1); }}
                         onError={msg => error(msg)}
                     />
                 )}
