@@ -20,7 +20,6 @@ namespace OTMS.Service.Services
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
-            // Get Logged In User
             var accountIdClaim = httpContextAccessor
                 .HttpContext?
                 .User
@@ -34,31 +33,25 @@ namespace OTMS.Service.Services
 
             var creatorId = Guid.Parse(accountIdClaim);
 
-            // Check Assigned Employee
-            Account? assignedAccount = null;
-            if (request.AssignedTo.HasValue)
+            // Validate deadline is in the future
+            if (request.DueAt <= DateTime.UtcNow)
             {
-                assignedAccount = await context.Accounts
-                    .Include(a => a.Employee)
-                    .Include(a => a.ActivityLogs)
-                    .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo.Value);
+                throw new Exception("Deadline must be a future date and time.");
+            }
 
-                if (assignedAccount == null)
-                {
-                    throw new Exception("Assigned employee not found.");
-                }
+            // Validate assigned employee exists and is active
+            var assignedAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
 
-                if (assignedAccount.AccountStatus == "On Leave")
-                {
-                    throw new Exception("Cannot assign task to an employee who is on leave.");
-                }
+            if (assignedAccount == null)
+            {
+                throw new Exception("Assigned employee not found.");
+            }
 
-                var latestLog = assignedAccount.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
-                if (presenceStatus == "Offline")
-                {
-                    throw new Exception("Cannot assign task to an offline employee.");
-                }
+            if (assignedAccount.AccountStatus == "On Leave")
+            {
+                throw new Exception("Cannot assign task to an employee who is on leave.");
             }
 
             // Get Creator
@@ -71,9 +64,11 @@ namespace OTMS.Service.Services
                 throw new Exception("Creator account not found.");
             }
 
-            // Check for duplicate or similar tasks using Jaccard Similarity (70% threshold)
+            // Check for duplicate tasks (only check recent 200 to avoid performance issues)
             var existingTasks = await context.Tasks
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                .OrderByDescending(t => t.CreatedAt)
+                .Take(200)
                 .Select(t => new { t.TaskId, t.TaskTitle, t.TaskDescription, t.TaskStatus })
                 .ToListAsync();
 
@@ -111,7 +106,26 @@ namespace OTMS.Service.Services
                     $"Admin proceeded with task creation despite duplicate warnings for '{request.TaskTitle}'.");
             }
 
+            // Upload supporting document if provided
+            string? supportingEvidenceUrl = null;
+            if (request.SupportingEvidence != null)
+            {
+                var allowedExts = new[] { ".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png" };
+                var ext = Path.GetExtension(request.SupportingEvidence.FileName).ToLowerInvariant();
+                if (!allowedExts.Contains(ext))
+                {
+                    throw new Exception("Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.");
+                }
 
+                try
+                {
+                    supportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
+                }
+                catch (Exception)
+                {
+                    throw new Exception("Failed to upload supporting document. Please try again.");
+                }
+            }
 
             // Create Task
             var task = new OTMS.Entities.Models.Task
@@ -119,15 +133,13 @@ namespace OTMS.Service.Services
                 TaskId = Guid.NewGuid(),
                 CreatedBy = creatorId,
                 AssignedTo = request.AssignedTo,
-
                 TaskTitle = request.TaskTitle,
                 TaskDescription = request.TaskDescription,
                 TaskCategory = request.TaskCategory,
                 Priority = request.Priority,
                 DueAt = request.DueAt,
-
-                TaskStatus = request.AssignedTo.HasValue ? "Assigned" : "Draft",
-
+                TaskStatus = request.AssignedTo != Guid.Empty ? "Assigned" : "Draft",
+                SupportingEvidenceUrl = supportingEvidenceUrl,
                 CreatedAt = DateTime.UtcNow,
                 Deleted = false
             };
@@ -136,7 +148,7 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             await RecordTaskStatusAsync(task.TaskId, "None", "Draft", creatorId, true);
-            if (request.AssignedTo.HasValue)
+            if (request.AssignedTo != Guid.Empty)
             {
                 await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", creatorId, true);
             }
@@ -145,54 +157,50 @@ namespace OTMS.Service.Services
                 creatorId,
                 ActivityTypes.TaskCreated,
                 $"{string.Join(" ", new[]
-                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created the task {request.TaskTitle} at {DateTime.Now:hh:mm tt}");
+                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created and assigned task '{request.TaskTitle}' to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}.");
 
-            if (request.AssignedTo.HasValue)
+            // Send notification to assigned employee
+            await notificationService.CreateTaskAssignedNotificationAsync(task);
+
+            if (request.RecommendedEmployeeId.HasValue)
             {
-                // Integrate Notification
-                await notificationService
-                    .CreateTaskAssignedNotificationAsync(task);
-
-                if (request.RecommendedEmployeeId.HasValue)
+                if (request.AssignedTo == request.RecommendedEmployeeId.Value)
                 {
-                    if (request.AssignedTo == request.RecommendedEmployeeId.Value)
-                    {
-                        await activityLogService.LogActivityAsync(
-                            creatorId,
-                            "Task Assignment Recommendation",
-                            $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                        );
-                    }
-                    else
-                    {
-                        await activityLogService.LogActivityAsync(
-                            creatorId,
-                            "Task Assignment Recommendation",
-                            $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                        );
-                    }
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
+                }
+                else
+                {
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
                 }
             }
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
                 TaskTitle = task.TaskTitle,
                 TaskDescription = task.TaskDescription,
+                TaskCategory = task.TaskCategory,
                 Priority = task.Priority,
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
-
+                SupportingEvidenceUrl = task.SupportingEvidenceUrl,
                 AssignedEmployee = string.Join(" ", new[]
                     {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedByEmployee = string.Join(" ", new[]
                     {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
-
-            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request)

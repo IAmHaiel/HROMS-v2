@@ -25,7 +25,7 @@ namespace OTMS.Controllers
         [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPost("create-task")]
         public async Task<ActionResult<TaskResponseDTO>> CreateTask(
-            CreateTaskDTO request)
+            [FromForm] CreateTaskDTO request)
         {
             try
             {

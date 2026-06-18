@@ -1,0 +1,34 @@
+Tech Stack — OTMS (Operational Task Management System)
+
+Backend — ASP.NET Core 8 (.NET 8):
+- Framework: ASP.NET Core 8 (Minimal API + Controllers pattern)
+- ORM: Entity Framework Core 8 with SQL Server provider (Microsoft.EntityFrameworkCore.SqlServer)
+- Auth: JWT Bearer (Microsoft.AspNetCore.Authentication.JwtBearer) with custom Permission-based authorization policy
+- Database: SQL Server (via EF Core)
+- Email: NETCore.MailKit (SMTP via Gmail, port 587 STARTTLS)
+- Real-time: SignalR (Microsoft.AspNetCore.SignalR)
+- PDF Generation: QuestPDF
+- Excel Export: ClosedXML
+- API Docs: Swashbuckle / Swagger (SwaggerUI)
+- Google Auth: Google.Apis.Auth (server-side token validation)
+- OpenAPI: Microsoft.AspNetCore.OpenApi
+- Background Jobs: Hosted Services (TaskTemplateSchedulingService, EmailRetryBackgroundService)
+
+Frontend — React 18 + TypeScript + Vite:
+- UI Library: React 18.3.1
+- Language: TypeScript 5.6
+- Bundler: Vite 8 (with @vitejs/plugin-react-swc)
+- HTTP Client: Axios 1.16
+- Routing: react-router-dom 7.14
+- Icons: lucide-react 1.9
+- Charts: Recharts 3.8
+- Real-time Client: @microsoft/signalr 10.0
+- CSS: Inline styles (no CSS framework, all styles defined as React.CSSProperties objects)
+- Testing: Vitest 4.1 + jsdom/happy-dom + @testing-library/react
+
+Other Services / Infrastructure:
+- Real-time Hub: SignalR endpoint at /hubs/workflow
+- Dev Proxy: Vite dev server proxies /api to http://localhost:5100
+- File Storage: Local filesystem under wwwroot/uploads/ (resumes/, applicant-docs/, attachments/, license-docs/)
+- Seeder: DatabaseSeeder runs on startup to seed SystemAdmin account and default roles/permissions
+- MailKit Config: SMTP configured for Gmail (smtp.gmail.com:587)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace OTMS.Entities.Models
 {
@@ -11,19 +12,28 @@ namespace OTMS.Entities.Models
         public Guid? AssignedTo { get; set; }
         public Guid? EvaluatedBy { get; set; }
 
+        [MaxLength(150)]
         public string TaskTitle { get; set; } = string.Empty;
+
+        [MaxLength(2000)]
         public string? TaskDescription { get; set; }
+
+        [MaxLength(100)]
         public string? TaskCategory { get; set; }
-        public string Priority { get; set; } = "Normal";
+
+        public string Priority { get; set; } = "Medium";
         public DateTime? DueAt { get; set; }
         public bool Deleted { get; set; } = false;
         public bool PermanentlyDeleted { get; set; } = false;
 
+        [MaxLength(500)]
         public string? TaskRemarks { get; set; }
         public string TaskStatus { get; set; } = "Draft";
 
         public string? ProgressNotes { get; set; }
         public string? ProgressEvidenceUrl { get; set; }
+
+        public string? SupportingEvidenceUrl { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -42,3 +52,4 @@ namespace OTMS.Entities.Models
         public TaskTemplate? TaskTemplate { get; set; }
     }
 }
+

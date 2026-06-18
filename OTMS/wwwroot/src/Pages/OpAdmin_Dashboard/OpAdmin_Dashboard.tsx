@@ -148,6 +148,7 @@ interface Task {
     taskId: string;
     taskTitle: string;
     taskDescription: string;
+    taskCategory?: string;
     priority: Priority;
     dueAt: string | null;
     taskStatus: TaskStatus;
@@ -158,16 +159,20 @@ interface Task {
     createdAt: string;
     deleted?: boolean;
     Deleted?: boolean;
+    supportingEvidenceUrl?: string;
 }
 
 // DTOs matching backend
 interface CreateTaskDTO {
     taskTitle: string;
     taskDescription: string;
-    priority: Priority;
-    dueAt: string | null;
-    assignedTo: string;      // accountId Guid
+    priority: string;
+    dueAt: string;
+    assignedTo: string;
+    taskCategory?: string;
     recommendedEmployeeId?: string;
+    taskRemarks?: string;
+    supportingEvidence?: File;
     IsDuplicateAcknowledged?: boolean;
 }
 
@@ -488,8 +493,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         dueAt: initial.dueAt ? initial.dueAt.substring(0, 16) : '',
         priority: initial.priority ?? '' as Priority,
         assignedTo: resolvedAssignedTo,
+        taskCategory: initial.taskCategory ?? '',
         taskRemarks: initial.taskRemarks ?? '',
     });
+    const [supportingEvidence, setSupportingEvidence] = useState<File | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -545,23 +552,24 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 const v = value.trim();
                 if (!v) return 'Task title is required.';
                 if (v.length < 3) return 'Title must be at least 3 characters.';
-                if (v.length > 100) return 'Title must not exceed 100 characters.';
+                if (v.length > 150) return 'Title must not exceed 150 characters.';
                 return '';
             }
             case 'taskDescription': {
                 const v = value.trim();
-                if (v.length > 500) return 'Description must not exceed 500 characters.';
+                if (!v) return 'Task description is required.';
+                if (v.length > 2000) return 'Description must not exceed 2,000 characters.';
                 return '';
             }
             case 'dueAt': {
-                if (!value) return 'Due date/time is required.';
+                if (!value) return 'Deadline is required.';
                 const selected = new Date(value);
                 const now = new Date();
-                if (selected < now) return 'Due date/time cannot be in the past.';
+                if (selected < now) return 'Deadline must be a future date and time.';
                 return '';
             }
             case 'assignedTo': {
-                if (!value) return 'Please assign the task to someone.';
+                if (!value) return 'Assigned employee is required.';
                 return '';
             }
             case 'priority': {
@@ -598,20 +606,25 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const handleSave = () => {
         if (!validateAll()) return;
         setSubmitting(true);
-        onSave({
+        const payload: CreateTaskDTO = {
             taskTitle: form.taskTitle.trim(),
             taskDescription: form.taskDescription.trim(),
             priority: form.priority,
-            dueAt: form.dueAt || null,
+            dueAt: form.dueAt || '',
             assignedTo: form.assignedTo,
+            taskCategory: form.taskCategory.trim() || undefined,
             recommendedEmployeeId: recommendation?.accountId || undefined,
             taskRemarks: form.taskRemarks.trim() || undefined,
-        });
+        };
+        if (supportingEvidence) {
+            payload.supportingEvidence = supportingEvidence;
+        }
+        onSave(payload);
         if (mode === 'new' && showSuccess) {
             if (recommendationAccepted) {
-                showSuccess('Recommendation accepted � Final assignment saved � Audit Log entry created.');
+                showSuccess('Task created and assigned successfully.');
             } else {
-                showSuccess('Recommendation overridden � Final assignment saved � Audit Log entry created.');
+                showSuccess('Task created and assigned successfully.');
             }
         }
         setSubmitting(false);
@@ -658,31 +671,31 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             onChange={set('taskTitle')}
                             placeholder="e.g. Route planning update"
                             className={errors.taskTitle ? 'input-error' : ''}
-                            maxLength={100}
+                            maxLength={150}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <FieldErr name="taskTitle" />
                             {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
                                 <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>? Looks good</span>
                             )}
-                            <CharCount value={form.taskTitle} max={100} />
+                            <CharCount value={form.taskTitle} max={150} />
                         </div>
                     </div>
 
                     {/* -- Description -- */}
                     <div className="field">
-                        <label>Description</label>
+                        <label>Description <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span></label>
                         <textarea
                             value={form.taskDescription}
                             onChange={set('taskDescription')}
                             placeholder="Describe the task..."
                             rows={3}
                             className={errors.taskDescription ? 'input-error' : ''}
-                            maxLength={500}
+                            maxLength={2000}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <FieldErr name="taskDescription" />
-                            <CharCount value={form.taskDescription} max={500} />
+                            <CharCount value={form.taskDescription} max={2000} />
                         </div>
                     </div>
 
@@ -738,6 +751,66 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 </span>
                             )}
                         </div>
+                    </div>
+
+                    {/* -- Task Category -- */}
+                    <div className="field">
+                        <label>Task Category <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                        <select
+                            value={form.taskCategory}
+                            onChange={set('taskCategory')}
+                        >
+                            <option value="">Select category</option>
+                            <option value="Operations">Operations</option>
+                            <option value="Logistics">Logistics</option>
+                            <option value="IT & Admin">IT & Admin</option>
+                            <option value="Customer Service">Customer Service</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    {/* -- Supporting Document -- */}
+                    <div className="field">
+                        <label>Supporting Document <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                            <input
+                                type="file"
+                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                                onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+                                        const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
+                                        if (!allowed.includes(ext)) {
+                                            setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
+                                            return;
+                                        }
+                                        if (file.size > 20 * 1024 * 1024) {
+                                            setFormError('File size must not exceed 20MB.');
+                                            return;
+                                        }
+                                        setFormError('');
+                                        setSupportingEvidence(file);
+                                    }
+                                }}
+                                style={{ flex: 1, fontSize: 13 }}
+                            />
+                            {supportingEvidence && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSupportingEvidence(null)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        {supportingEvidence && (
+                            <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
+                                ? {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
+                            </span>
+                        )}
                     </div>
 
                     {/* -- Smart Task Routing Recommendation -- */}
@@ -3684,13 +3757,20 @@ export default function OpsAdminDashboard() {
     // -- Create Task --
     const handleNewTask = async (data: CreateTaskDTO) => {
         try {
+            const formData = new FormData();
+            formData.append('taskTitle', data.taskTitle);
+            formData.append('taskDescription', data.taskDescription);
+            formData.append('priority', data.priority);
+            formData.append('dueAt', new Date(data.dueAt).toISOString());
+            formData.append('assignedTo', data.assignedTo);
+            if (data.taskCategory) formData.append('taskCategory', data.taskCategory);
+            if (data.recommendedEmployeeId) formData.append('recommendedEmployeeId', data.recommendedEmployeeId);
+            if (data.supportingEvidence) formData.append('supportingEvidence', data.supportingEvidence);
+
             const res = await fetch('/api/task/create-task', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token()}`,
-                },
-                body: JSON.stringify(data),
+                headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (res.status === 409) {
                 const errBody = await res.json().catch(() => ({}));
