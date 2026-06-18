@@ -16,5 +16,7 @@ namespace OTMS.Entities.DTOs.Recruitment
         [Required]
         [MaxLength(255)]
         public string LocationOrLink { get; set; } = string.Empty;
+
+        public string? Remarks { get; set; }
     }
 }

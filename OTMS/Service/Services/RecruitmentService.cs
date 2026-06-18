@@ -202,6 +202,18 @@ namespace OTMS.Service.Services
             applicant.Status = request.NewStatus;
             applicant.UpdatedAt = DateTime.UtcNow;
 
+            // Expire any active onboarding tokens if status is no longer "Job Offered" or becomes "Rejected"
+            if (request.NewStatus == "Rejected" || oldStatus == "Job Offered")
+            {
+                var activeTokens = await context.OnboardingTokens
+                    .Where(ot => ot.ApplicantRecordId == applicant.ApplicantRecordId && ot.Status == "Active")
+                    .ToListAsync();
+                foreach (var t in activeTokens)
+                {
+                    t.Status = "Expired";
+                }
+            }
+
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(
@@ -341,6 +353,12 @@ namespace OTMS.Service.Services
 
             context.InterviewSchedules.Add(interviewSchedule);
 
+            // Expire any active onboarding tokens
+            var activeTokens = await context.OnboardingTokens
+                .Where(ot => ot.ApplicantRecordId == applicant.ApplicantRecordId && ot.Status == "Active")
+                .ToListAsync();
+            foreach (var t in activeTokens) { t.Status = "Expired"; }
+
             // Update applicant status to Interview Scheduled
             var oldStatus = applicant.Status;
             applicant.Status = "Interview Scheduled";
@@ -351,7 +369,7 @@ namespace OTMS.Service.Services
                 ApplicantRecordId = applicant.ApplicantRecordId,
                 OldStatus = oldStatus,
                 NewStatus = "Interview Scheduled",
-                Remarks = "Interview scheduled and email sent.",
+                Remarks = string.IsNullOrWhiteSpace(request.Remarks) ? "Interview scheduled and email sent." : request.Remarks.Trim(),
                 UpdatedById = currentAccountId.Value,
                 UpdatedAt = DateTime.UtcNow
             });

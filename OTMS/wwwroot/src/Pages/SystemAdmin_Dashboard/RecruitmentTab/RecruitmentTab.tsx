@@ -798,9 +798,10 @@ interface InterviewSchedulingModalProps {
     applicant: ApplicantRecord;
     onClose: () => void;
     onScheduled: (applicantId: string, details: InterviewDetails) => void;
+    adminRemarks?: string;
 }
 
-function InterviewSchedulingModal({ applicant, onClose, onScheduled }: InterviewSchedulingModalProps) {
+function InterviewSchedulingModal({ applicant, onClose, onScheduled, adminRemarks }: InterviewSchedulingModalProps) {
     const [step, setStep] = useState<ScheduleStep>('form');
 
     // Form fields
@@ -847,6 +848,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 interviewDate: date,
                 interviewTime: time,
                 locationOrLink: location.trim(),
+                remarks: adminRemarks || null,
             };
             const res = await axios.post('/api/recruitment/schedule-interview', payload);
             const apiResult = res.data as any;
@@ -1115,7 +1117,7 @@ interface UpdateStatusModalProps {
         remarks: string,
     ) => Promise<void>;
     /** Called when admin picks "Interview Scheduled" so the scheduling form can open */
-    onNeedsSchedule?: (applicant: ApplicantRecord) => void;
+    onNeedsSchedule?: (applicant: ApplicantRecord, remarks?: string) => void;
 }
 
 function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: UpdateStatusModalProps) {
@@ -1134,7 +1136,7 @@ function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: U
             await onConfirm(applicant.applicantId, newStatus as RecruitmentStatus, remarks.trim());
             // If moving to Interview Scheduled, open scheduling form
             if (newStatus === 'Interview Scheduled' && onNeedsSchedule) {
-                onNeedsSchedule(applicant);
+                onNeedsSchedule(applicant, remarks.trim());
             }
             onClose();
         } catch (err: unknown) {
@@ -1500,6 +1502,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     const [detailApplicant, setDetailApplicant] = useState<ApplicantRecord | null>(null);
     const [updateApplicant, setUpdateApplicant] = useState<ApplicantRecord | null>(null);
     const [scheduleApplicant, setScheduleApplicant] = useState<ApplicantRecord | null>(null);
+    const [scheduleRemarks, setScheduleRemarks] = useState<string>('');
 
     const [toast, setToast] = useState<ToastState | null>(null);
     const [positions, setPositions] = useState<{ id: string; name: string }[]>([]);
@@ -1815,10 +1818,10 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     applicant={updateApplicant}
                     onClose={() => setUpdateApplicant(null)}
                     onConfirm={handleUpdateStatus}
-                    onNeedsSchedule={(a) => {
-                        // Snapshot the updated applicant with the new status before opening scheduler
+                    onNeedsSchedule={(a, remarks) => {
                         const updated = applicants.find((x) => x.applicantId === a.applicantId) ?? a;
                         setScheduleApplicant({ ...updated, currentStatus: 'Interview Scheduled' });
+                        setScheduleRemarks(remarks || '');
                     }}
                 />
             )}
@@ -1826,8 +1829,9 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
             {scheduleApplicant && (
                 <InterviewSchedulingModal
                     applicant={scheduleApplicant}
-                    onClose={() => setScheduleApplicant(null)}
+                    onClose={() => { setScheduleApplicant(null); setScheduleRemarks(''); }}
                     onScheduled={handleInterviewScheduled}
+                    adminRemarks={scheduleRemarks}
                 />
             )}
         </>
