@@ -403,6 +403,10 @@ namespace OTMS.Service.Services
                 if (!string.IsNullOrWhiteSpace(formData.FatherFirstName)) applicant.FatherFirstName = formData.FatherFirstName;
                 if (!string.IsNullOrWhiteSpace(formData.FatherMiddleName)) applicant.FatherMiddleName = formData.FatherMiddleName;
                 if (!string.IsNullOrWhiteSpace(formData.FatherLastName)) applicant.FatherLastName = formData.FatherLastName;
+                if (!string.IsNullOrWhiteSpace(formData.EducationLevel)) applicant.HighestEducationalAttainment = formData.EducationLevel;
+                if (!string.IsNullOrWhiteSpace(formData.EducationInstitution)) applicant.Institution = formData.EducationInstitution;
+                if (!string.IsNullOrWhiteSpace(formData.EducationDegree)) applicant.Degree = formData.EducationDegree;
+                if (formData.EducationYearGraduated.HasValue) applicant.YearGraduated = formData.EducationYearGraduated.Value.ToString();
                 applicant.UpdatedAt = DateTime.UtcNow;
             }
 

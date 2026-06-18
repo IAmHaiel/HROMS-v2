@@ -84,6 +84,8 @@ namespace OTMS.Entities.Models
         public string? InstitutionAndYearGraduated { get; set; }
         [MaxLength(128)]
         public string? Institution { get; set; }
+        [MaxLength(128)]
+        public string? Degree { get; set; }
         public string? YearGraduated { get; set; }
         [MaxLength(512)]
         public string? ProfessionalLicensesCertifications { get; set; }

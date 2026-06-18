@@ -25,5 +25,12 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string? FatherFirstName { get; set; }
         public string? FatherMiddleName { get; set; }
         public string? FatherLastName { get; set; }
+
+        // Education
+        public string? EducationLevel { get; set; }
+        public string? EducationInstitution { get; set; }
+        public string? EducationDegree { get; set; }
+        public int? EducationYearGraduated { get; set; }
+        public bool EducationIsCurrentlyEnrolled { get; set; }
     }
 }

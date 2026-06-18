@@ -193,8 +193,8 @@ namespace OTMS.Migrations
                         .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("BankAccountNumber")
-                        .HasMaxLength(34)
-                        .HasColumnType("nvarchar(34)");
+                        .HasMaxLength(35)
+                        .HasColumnType("nvarchar(35)");
 
                     b.Property<string>("BankName")
                         .HasMaxLength(128)
@@ -229,6 +229,10 @@ namespace OTMS.Migrations
                     b.Property<string>("DeclaredDependents")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Degree")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<string>("EmailAddress")
                         .IsRequired()
