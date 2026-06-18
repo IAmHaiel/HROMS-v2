@@ -124,12 +124,29 @@ namespace OTMS.Service.Services
             var verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
             var fullName = BuildFullName(request.FirstName, request.MiddleName, request.LastName, request.Suffix);
 
-            // 6. Collect uploaded file paths for cleanup on failure
+            // 6. Upload license/certificate files
+            var licensePaths = new List<string>();
+            if (request.ProfessionalLicenseFiles != null)
+            {
+                foreach (var file in request.ProfessionalLicenseFiles)
+                {
+                    try
+                    {
+                        var path = await fileService.UploadFileAsync(file, "license-docs");
+                        licensePaths.Add(path);
+                    }
+                    catch { }
+                }
+            }
+            var licensePathsJson = licensePaths.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(licensePaths) : null;
+
+            // 7. Collect uploaded file paths for cleanup on failure
             var uploadedFiles = new[] { resumeFilePath, nbiPath, medicalPath, psaPath, contractPath }.Where(f => f != null).Cast<string>().ToList();
+            uploadedFiles.AddRange(licensePaths);
 
             try
             {
-            // 7. Generate unique reference number
+            // 8. Generate unique reference number
             var referenceNumber = await GenerateReferenceNumberAsync();
 
             // 8. Create ApplicantRecord
@@ -167,7 +184,7 @@ namespace OTMS.Service.Services
                 Institution = request.Institution.Trim(),
                 YearGraduated = request.YearGraduated.Trim(),
                 InstitutionAndYearGraduated = $"{request.Institution.Trim()}, {request.YearGraduated.Trim()}",
-                ProfessionalLicensesCertifications = request.ProfessionalLicensesCertifications?.Trim(),
+                ProfessionalLicensesCertifications = licensePathsJson,
                 JobPositionId = request.JobPositionId,
                 ReferenceNumber = referenceNumber,
                 Status = "Pending Review",

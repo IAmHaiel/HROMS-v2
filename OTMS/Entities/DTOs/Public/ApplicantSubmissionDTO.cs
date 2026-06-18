@@ -99,8 +99,7 @@ namespace OTMS.Entities.DTOs.Public
         [Required]
         public string YearGraduated { get; set; } = string.Empty;
 
-        [MaxLength(512)]
-        public string? ProfessionalLicensesCertifications { get; set; }
+        public List<IFormFile>? ProfessionalLicenseFiles { get; set; }
 
         // ─── Position ─────────────────────────────────────────────────────
         [Required]
