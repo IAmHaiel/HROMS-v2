@@ -163,22 +163,7 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
     const isDirty = JSON.stringify(form) !== JSON.stringify(initialValues);
 
     const handleClose = () => {
-        if (isDirty) {
-            setConfirmModal({
-                isOpen: true,
-                variant: 'warning',
-                title: 'Discard Unsaved Changes',
-                description: `Discard unsaved changes? You have unsaved changes to ${profile.employeeName}'s profile. Cancelling now will discard all modifications.`,
-                confirmLabel: 'Discard',
-                cancelLabel: 'Keep Editing',
-                onConfirm: () => {
-                    setConfirmModal(CONFIRM_CLOSED);
-                    onClose();
-                }
-            });
-        } else {
-            onClose();
-        }
+        onClose();
     };
 
     const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -337,6 +322,8 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
                 onSubmit={handleSave}
                 isSubmitting={submitting}
                 size="md"
+                confirmOnCancel={true}
+                dirty={isDirty}
             >
                 <div className="fm-section">
                     <h5 className="fm-section-title">Personal Information</h5>
@@ -727,21 +714,21 @@ export default function EmployeeDetailPanel({
                                         {profile.attachments.map(att => {
                                             const sizeMB = (att.fileSize / (1024 * 1024)).toFixed(2);
                                             return (
-                                                <div key={att.employeeAttachmentId} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', justifyContent: 'space-between' }}>
+                                                <div key={att.employeeAttachmentId} style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border)', justifyContent: 'space-between' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                                                         <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(67, 24, 255, 0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                            <FileText size={16} color="#4318ff" />
+                                                            <FileText size={16} color="var(--primary)" />
                                                         </div>
                                                         <div style={{ minWidth: 0 }}>
-                                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.fileName}>
+                                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.fileName}>
                                                                 {att.fileName}
                                                             </div>
-                                                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                                                            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                                                                 {sizeMB} MB
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, border: '1.5px solid #cbd5e1', color: '#64748b', transition: 'all 0.15s ease' }} title="Download / Open file">
+                                                    <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 6, border: '1.5px solid var(--border)', color: 'var(--text-secondary)', transition: 'all 0.15s ease' }} title="Download / Open file">
                                                         <Download size={14} />
                                                     </a>
                                                 </div>

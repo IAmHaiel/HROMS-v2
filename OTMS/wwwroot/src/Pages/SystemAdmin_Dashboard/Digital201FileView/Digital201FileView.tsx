@@ -162,6 +162,7 @@ export default function Digital201FileView({
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploadDocType, setUploadDocType] = useState('');
     const [uploading, setUploading] = useState(false);
+    const [uploadDirty, setUploadDirty] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Sub-modal: Update (new version)
@@ -169,6 +170,7 @@ export default function Digital201FileView({
     const [updateFile, setUpdateFile] = useState<File | null>(null);
     const [updateDocType, setUpdateDocType] = useState('');
     const [updating, setUpdating] = useState(false);
+    const [updateDirty, setUpdateDirty] = useState(false);
     const updateFileInputRef = useRef<HTMLInputElement>(null);
 
     // Sub-modal: Archive confirm
@@ -231,12 +233,14 @@ export default function Digital201FileView({
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setUploadFile(e.target.files[0]);
+            setUploadDirty(true);
         }
     };
 
     const handleUpdateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             setUpdateFile(e.target.files[0]);
+            setUpdateDirty(true);
         }
     };
 
@@ -273,6 +277,7 @@ export default function Digital201FileView({
                 setShowUpload(false);
                 setUploadFile(null);
                 setUploadDocType('');
+                setUploadDirty(false);
                 await fetch201File();
             } else {
                 throw new Error(json.message || 'Upload failed.');
@@ -285,26 +290,9 @@ export default function Digital201FileView({
     };
 
     const handleUploadClose = () => {
-        const defaultDocType = DOC_TYPE_CATEGORIES[activeTab][0];
-        const isDirty = uploadFile !== null || uploadDocType !== defaultDocType;
-        if (isDirty) {
-            setConfirmModal({
-                isOpen: true,
-                variant: 'warning',
-                title: 'Discard Upload Changes',
-                description: 'Discard unsaved upload document changes? Cancelling now will discard the selected file and inputs.',
-                confirmLabel: 'Discard',
-                cancelLabel: 'Keep Editing',
-                onConfirm: () => {
-                    setConfirmModal(CONFIRM_CLOSED);
-                    setShowUpload(false);
-                    setUploadFile(null);
-                }
-            });
-        } else {
-            setShowUpload(false);
-            setUploadFile(null);
-        }
+        setUploadDirty(false);
+        setShowUpload(false);
+        setUploadFile(null);
     };
 
     // Trigger Update
@@ -335,6 +323,7 @@ export default function Digital201FileView({
                 setUpdateTarget(null);
                 setUpdateFile(null);
                 setUpdateDocType('');
+                setUpdateDirty(false);
                 await fetch201File();
             } else {
                 throw new Error(json.message || 'Update failed.');
@@ -398,6 +387,7 @@ export default function Digital201FileView({
 
     const openUploadForActiveTab = () => {
         setUploadDocType(DOC_TYPE_CATEGORIES[activeTab][0]);
+        setUploadDirty(false);
         setShowUpload(true);
     };
 
@@ -405,6 +395,7 @@ export default function Digital201FileView({
         setUpdateTarget(att);
         setUpdateDocType(att.documentType);
         setUpdateFile(null);
+        setUpdateDirty(false);
     };
 
     if (loading) {
@@ -580,6 +571,8 @@ export default function Digital201FileView({
                 isSubmitting={uploading}
                 submitDisabled={!uploadFile}
                 size="md"
+                confirmOnCancel={true}
+                dirty={uploadDirty}
             >
                 <div className="fm-section">
                     <div className="fm-field-grid">
@@ -590,7 +583,7 @@ export default function Digital201FileView({
 
                         <div className="fm-field fm-field-full">
                             <label className="fm-label">Specific Document Type</label>
-                            <select value={uploadDocType} onChange={(e) => setUploadDocType(e.target.value)} required className="fm-select">
+                            <select value={uploadDocType} onChange={(e) => { setUploadDocType(e.target.value); setUploadDirty(true); }} required className="fm-select">
                                 {DOC_TYPE_CATEGORIES[activeTab].map(t => (
                                     <option key={t} value={t}>{t}</option>
                                 ))}
@@ -621,7 +614,7 @@ export default function Digital201FileView({
                                     <button
                                         type="button"
                                         className="d201-action-btn delete"
-                                        onClick={() => setUploadFile(null)}
+                                        onClick={() => { setUploadFile(null); setUploadDirty(true); }}
                                         style={{ border: 'none', background: 'transparent' }}
                                     >
                                         <X size={14} />
@@ -636,7 +629,7 @@ export default function Digital201FileView({
             {/* ── SUB-MODAL: UPDATE FILE (NEW VERSION) ───────────────────────────── */}
             <FormModal
                 isOpen={!!updateTarget}
-                onClose={() => { setUpdateTarget(null); setUpdateFile(null); }}
+                onClose={() => { setUpdateTarget(null); setUpdateFile(null); setUpdateDirty(false); }}
                 title="Update Document Version"
                 subtitle={updateTarget ? `Update document version and details for ${updateTarget.fileName}.` : ''}
                 onSubmit={handleUpdateSubmit}
@@ -644,6 +637,8 @@ export default function Digital201FileView({
                 cancelLabel="Cancel"
                 isSubmitting={updating}
                 size="md"
+                confirmOnCancel={true}
+                dirty={updateDirty}
             >
                 {updateTarget && (
                     <div className="fm-section">
@@ -662,7 +657,7 @@ export default function Digital201FileView({
 
                             <div className="fm-field fm-field-full">
                                 <label className="fm-label">Specific Document Type</label>
-                                <select value={updateDocType} onChange={(e) => setUpdateDocType(e.target.value)} required className="fm-select">
+                                <select value={updateDocType} onChange={(e) => { setUpdateDocType(e.target.value); setUpdateDirty(true); }} required className="fm-select">
                                     {DOC_TYPE_CATEGORIES[activeTab].map(t => (
                                         <option key={t} value={t}>{t}</option>
                                     ))}
@@ -692,7 +687,7 @@ export default function Digital201FileView({
                                         <button
                                             type="button"
                                             className="d201-action-btn delete"
-                                            onClick={() => setUpdateFile(null)}
+                                            onClick={() => { setUpdateFile(null); setUpdateDirty(true); }}
                                             style={{ border: 'none', background: 'transparent' }}
                                         >
                                             <X size={14} />

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
@@ -54,11 +54,12 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import PendingApprovalsTab from './PendingApprovalsTab';
+import RoutingManagementTab from './RoutingManagementTab';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
-import Modal from '../../components/ui/Modal';
+import FormModal from '../../components/FormModal/FormModal';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import StatusBadge from '../../components/ui/StatusBadge';
@@ -83,7 +84,7 @@ const CONFIRM_CLOSED: ConfirmModalState = {
     onConfirm: () => { },
 };
 
-// ─── Dashboard API Types ──────────────────────────────────────────────────────
+// --- Dashboard API Types ------------------------------------------------------
 
 interface DashboardEmployeeWorkload {
     employeeId: string;
@@ -121,7 +122,7 @@ interface ApiResponse<T> {
     data: T | null;
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// --- Types --------------------------------------------------------------------
 
 type Priority = 'Critical' | 'High' | 'Medium' | 'Low';  // match backend casing
 type TaskStatus = 'Draft' | 'Assigned' | 'Pending' | 'In Progress' | 'Pending Admin Review' | 'Done' | 'Completed' | 'Overdue';
@@ -187,7 +188,7 @@ interface DuplicateWarningDTO {
     similarityPercentage: number;
 }
 
-// ─── Reopen Request Types ──────────────────────────────────────────────────────
+// --- Reopen Request Types ------------------------------------------------------
 
 interface ReopenRequest {
     requestId: string;
@@ -204,7 +205,7 @@ interface ReopenRequest {
     adminRemarks?: string;
 }
 
-// ─── Report Types ──────────────────────────────────────────────────────────────
+// --- Report Types --------------------------------------------------------------
 
 interface ReportFilter {
     dateRangeStart: string;
@@ -253,7 +254,7 @@ const TASK_STATUSES_FILTER = [
 
 const PRIORITY_LEVELS = ['Critical', 'High', 'Medium', 'Low'];
 
-// ─── Task Template Types ───────────────────────────────────────────────────────
+// --- Task Template Types -------------------------------------------------------
 
 interface TaskTemplateDTO {
     templateId: string;
@@ -286,7 +287,7 @@ const RECURRENCE_TYPES = ['Daily', 'Weekly', 'Monthly'];
 const TEMPLATE_STATUSES = ['Active', 'Inactive'];
 const RECURRENCE_LABELS: Record<string, string> = { Daily: 'Every day', Weekly: 'Every week', Monthly: 'Every month' };
 
-// ─── Mock Template Data (toggle to test without backend) ──────────────────────
+// --- Mock Template Data (toggle to test without backend) ----------------------
 
 
 
@@ -330,7 +331,7 @@ const NAV_GROUPS = [
     },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// --- Helpers ------------------------------------------------------------------
 const isEffectivelyOverdue = (t: Task): boolean =>
     t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Pending Admin Review' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
@@ -353,7 +354,7 @@ const statusBadgeClass = (s: string): string =>
     'Overdue': 'badge badge-red'
 }[s] ?? 'badge badge-blue');
 
-// ─── FSM (Finite State Machine) Task Status Transitions ──────────────────────
+// --- FSM (Finite State Machine) Task Status Transitions ----------------------
 const FSM_TRANSITIONS: Record<string, string[]> = {
     'Draft': ['Assigned'],
     'Assigned': ['In Progress'],
@@ -372,11 +373,11 @@ const priorityDotClass = (p: Priority): string =>
     ({ Critical: 'prio-dot critical', High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
 
 const fmtDate = (d: string): string => {
-    if (!d) return '—';
+    if (!d) return '�';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// --- Sub-components -----------------------------------------------------------
 
 const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, size = 'sm' }) => (
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -438,13 +439,13 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
             </div>
             <div className="task-row-bottom">
                 <span className="task-assignee">{task.assignedEmployee || 'Unassigned'}</span>
-                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
+                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '�'}</span>
             </div>
         </div>
     );
 };
 
-// ─── Modal: New / Edit Task ───────────────────────────────────────────────────
+// --- Modal: New / Edit Task ---------------------------------------------------
 
 interface WorkloadInfo {
     employeeName: string;
@@ -537,7 +538,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         fetchRecommendations();
     }, []);
 
-    // ── Per-field live validator ──────────────────────────────────────────
+    // -- Per-field live validator ------------------------------------------
     const validateField = (key: string, value: string): string => {
         switch (key) {
             case 'taskTitle': {
@@ -573,7 +574,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         }
     };
 
-    // ── Validate all fields on submit ─────────────────────────────────────
+    // -- Validate all fields on submit -------------------------------------
     const validateAll = (): boolean => {
         const newErrors: Record<string, string> = {};
         (['taskTitle', 'taskDescription', 'dueAt', 'assignedTo', 'priority'] as const).forEach(key => {
@@ -584,7 +585,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         return Object.keys(newErrors).length === 0;
     };
 
-    // ── Live change handler ───────────────────────────────────────────────
+    // -- Live change handler -----------------------------------------------
     const set = (key: keyof typeof form) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
             const value = e.target.value;
@@ -608,15 +609,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         });
         if (mode === 'new' && showSuccess) {
             if (recommendationAccepted) {
-                showSuccess('Recommendation accepted · Final assignment saved · Audit Log entry created.');
+                showSuccess('Recommendation accepted � Final assignment saved � Audit Log entry created.');
             } else {
-                showSuccess('Recommendation overridden · Final assignment saved · Audit Log entry created.');
+                showSuccess('Recommendation overridden � Final assignment saved � Audit Log entry created.');
             }
         }
         setSubmitting(false);
     };
 
-    // ── Shared field error renderer ───────────────────────────────────────
+    // -- Shared field error renderer ---------------------------------------
     const FieldErr = ({ name }: { name: string }) =>
         errors[name] ? (
             <span style={{ fontSize: 11, color: 'var(--status-failed, #ee5d50)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -624,7 +625,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
             </span>
         ) : null;
 
-    // ── Char counter renderer ─────────────────────────────────────────────
+    // -- Char counter renderer ---------------------------------------------
     const CharCount = ({ value, max }: { value: string; max: number }) => (
         <span style={{
             fontSize: 11, marginTop: 3, display: 'block', textAlign: 'right',
@@ -649,7 +650,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
 
                 <div className="modal-form">
 
-                    {/* ── Task Title ── */}
+                    {/* -- Task Title -- */}
                     <div className="field">
                         <label>Task Title <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span></label>
                         <input
@@ -662,13 +663,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <FieldErr name="taskTitle" />
                             {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
-                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>✓ Looks good</span>
+                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>? Looks good</span>
                             )}
                             <CharCount value={form.taskTitle} max={100} />
                         </div>
                     </div>
 
-                    {/* ── Description ── */}
+                    {/* -- Description -- */}
                     <div className="field">
                         <label>Description</label>
                         <textarea
@@ -685,7 +686,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                     </div>
 
-                    {/* ── Due Date + Priority ── */}
+                    {/* -- Due Date + Priority -- */}
                     <div className="field-row">
                         <div className="field">
                             <label>
@@ -700,7 +701,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             <FieldErr name="dueAt" />
                             {!errors.dueAt && form.dueAt && (
                                 <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                    ✓ {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    ? {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
                             {!form.dueAt && !errors.dueAt && (
@@ -719,10 +720,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 className={errors.priority ? 'input-error' : ''}
                             >
                                 <option value="">Select priority</option>
-                                <option value="Critical">⚫ Critical</option>
-                                <option value="High">🔴 High</option>
-                                <option value="Medium">🟡 Medium</option>
-                                <option value="Low">🟢 Low</option>
+                                <option value="Critical">? Critical</option>
+                                <option value="High">?? High</option>
+                                <option value="Medium">?? Medium</option>
+                                <option value="Low">?? Low</option>
                             </select>
                             <FieldErr name="priority" />
                             {!errors.priority && form.priority && (
@@ -730,16 +731,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     fontSize: 11, marginTop: 3, display: 'block',
                                     color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? 'var(--status-failed)' : form.priority === 'Medium' ? 'var(--status-pending)' : 'var(--status-active)',
                                 }}>
-                                    {form.priority === 'Critical' && '🚨 Critical — requires immediate attention'}
-                                    {form.priority === 'High' && '⚠ High priority — will be flagged for urgent attention'}
-                                    {form.priority === 'Medium' && '✓ Medium priority selected'}
-                                    {form.priority === 'Low' && '✓ Low priority selected'}
+                                    {form.priority === 'Critical' && '?? Critical � requires immediate attention'}
+                                    {form.priority === 'High' && '? High priority � will be flagged for urgent attention'}
+                                    {form.priority === 'Medium' && '? Medium priority selected'}
+                                    {form.priority === 'Low' && '? Low priority selected'}
                                 </span>
                             )}
                         </div>
                     </div>
 
-                    {/* ── Smart Task Routing Recommendation ── */}
+                    {/* -- Smart Task Routing Recommendation -- */}
                     {mode === 'new' && recommendation && (
                         <div className="sr-section">
                             <div className="sr-header">
@@ -793,7 +794,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                             <span className={`sr-status-tag ${m.presenceStatus === 'Offline' ? 'offline' : 'leave'}`}>
                                                 {m.presenceStatus}
                                             </span>
-                                            <span className="sr-workload">—</span>
+                                            <span className="sr-workload">�</span>
                                             <span className="sr-excluded-tag">Excluded</span>
                                         </div>
                                     ))}
@@ -807,7 +808,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                     )}
 
-                    {/* ── Assign To ── */}
+                    {/* -- Assign To -- */}
                     <div className="field">
                         <label>
                             {mode === 'new' ? 'Final Assigned Employee' : 'Assign To'}
@@ -874,12 +875,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <FieldErr name="assignedTo" />
                         {!errors.assignedTo && form.assignedTo && (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                ✓ {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
+                                ? {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
                             </span>
                         )}
                     </div>
 
-                    {/* ── Remarks (edit mode only) ── */}
+                    {/* -- Remarks (edit mode only) -- */}
                     {mode === 'edit' && (
                         <div className="field">
                             <label>Remarks</label>
@@ -912,7 +913,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
                         <button className="btn btn-primary" onClick={handleSave} disabled={submitting}>
                             {submitting
-                                ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                ? <><Loader2 size={13} className="spin" /> Saving�</>
                                 : <><Save size={13} /> Save Changes</>}
                         </button>
                     </div>
@@ -922,7 +923,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     );
 };
 
-// ─── Modal: View Task ─────────────────────────────────────────────────────────
+// --- Modal: View Task ---------------------------------------------------------
 
 interface ViewModalProps {
     task: Task;
@@ -959,7 +960,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
                 <div className="view-modal-meta">
                     <div className="view-modal-meta-item">
                         <span className="view-modal-label">Due Date</span>
-                        <span className="view-modal-meta-value">{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
+                        <span className="view-modal-meta-value">{task.dueAt ? fmtDate(task.dueAt) : '�'}</span>
                     </div>
                     <div className="view-modal-meta-item">
                         <span className="view-modal-label">Priority</span>
@@ -983,7 +984,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
                 <div className="view-modal-section">
                     <label className="view-modal-label">Assigned To:</label>
                     <div className="view-modal-assignee-box">
-                        {task.assignedEmployee || '—'}
+                        {task.assignedEmployee || '�'}
                     </div>
                 </div>
 
@@ -1030,7 +1031,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
     );
 };
 
-// ─── Admin Override Modal ──────────────────────────────────────────────────────
+// --- Admin Override Modal ------------------------------------------------------
 const OVERRIDE_TARGETS = ['Assigned', 'In Progress', 'Done'];
 
 interface AdminOverrideModalProps {
@@ -1059,7 +1060,7 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
     };
 
     return (
-        <Modal isOpen onClose={onClose} title="Admin Override" subtitle={`Modifying completed task: ${task.taskTitle}`} size="sm"
+        <FormModal isOpen onClose={onClose} title="Admin Override" subtitle={`Modifying completed task: ${task.taskTitle}`} size="sm" confirmOnCancel={true}
             footer={
                 <>
                     <button className="btn" onClick={onClose}>Cancel</button>
@@ -1127,11 +1128,11 @@ const AdminOverrideModal: React.FC<AdminOverrideModalProps> = ({ task, onSubmit,
                 </label>
             </div>
             {errors.confirmed && <span className="report-field-error">{errors.confirmed}</span>}
-        </Modal>
+        </FormModal>
     );
 };
 
-// ─── Task Review Modal (Approve & Close / Return for Rework) ──────────────────
+// --- Task Review Modal (Approve & Close / Return for Rework) ------------------
 interface TaskReviewModalProps {
     task: Task;
     onSubmit: (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => Promise<void>;
@@ -1163,13 +1164,13 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
     };
 
     return (
-        <Modal isOpen onClose={onClose} title="Review Task Submission" subtitle={`Reviewing: ${task.taskTitle}`} size="md"
+        <FormModal isOpen onClose={onClose} title="Review Task Submission" subtitle={`Reviewing: ${task.taskTitle}`} size="md" confirmOnCancel={true}
             footer={
                 <>
                     <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
                         {submitting
-                            ? <><Loader2 size={13} className="spin" /> Submitting…</>
+                            ? <><Loader2 size={13} className="spin" /> Submitting�</>
                             : <><Shield size={13} /> Submit Review Decision</>
                         }
                     </button>
@@ -1226,11 +1227,11 @@ const TaskReviewModal: React.FC<TaskReviewModalProps> = ({ task, onSubmit, onClo
             </div>
 
             {error && <div className="form-api-error" style={{ marginBottom: 10 }}><AlertCircle size={14} /><span>{error}</span></div>}
-        </Modal>
+        </FormModal>
     );
 };
 
-// ─── Dashboard Tab ────────────────────────────────────────────────────────────
+// --- Dashboard Tab ------------------------------------------------------------
 
 const DashboardTab: React.FC<{
     dashboardData: DashboardResponse | null;
@@ -1282,7 +1283,7 @@ const DashboardTab: React.FC<{
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
                         <div style={{ position: 'relative', width: 300, margin: 0 }}>
                             <Search size={14} style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                            <input type="text" placeholder="Search employee…"
+                            <input type="text" placeholder="Search employee�"
                                 style={{ width: '100%', height: 46, borderRadius: 999, border: '1px solid #dbe3f0', background: '#f8fafc', padding: '0 20px 0 42px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                                 onFocus={e => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#14b8a6'; e.target.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.08)'; }}
                                 onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#dbe3f0'; e.target.style.boxShadow = 'none'; }} />
@@ -1324,7 +1325,7 @@ const DashboardTab: React.FC<{
                                     {completed} of {total} tasks completed
                                 </p>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                    {overdue > 0 ? `${overdue} overdue · ` : ''}
+                                    {overdue > 0 ? `${overdue} overdue � ` : ''}
                                     {pendingReview > 0 ? `${pendingReview} pending review` : 'No pending reviews'}
                                 </span>
                             </div>
@@ -1449,7 +1450,7 @@ const DashboardTab: React.FC<{
                                     <td style={{ textAlign: 'center', color: 'var(--status-pending)', fontWeight: 700 }}>{w.activeTasks}</td>
                                     <td style={{ textAlign: 'center', color: 'var(--status-active)', fontWeight: 700 }}>{w.completedTasks}</td>
                                     <td style={{ textAlign: 'center', color: w.overdueTasks > 0 ? 'var(--status-failed)' : 'var(--text-muted)', fontWeight: 700 }}>
-                                        {w.overdueTasks || '—'}
+                                        {w.overdueTasks || '�'}
                                     </td>
                                     <td>
                                         {w.totalAssigned > 0 ? (
@@ -1459,7 +1460,7 @@ const DashboardTab: React.FC<{
                                                 </div>
                                                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{compPct}%</span>
                                             </div>
-                                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+                                        ) : <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>�</span>}
                                     </td>
                                 </tr>
                             );
@@ -1471,7 +1472,7 @@ const DashboardTab: React.FC<{
     );
 };
 
-// ─── Tasks Tab ────────────────────────────────────────────────────────────────
+// --- Tasks Tab ----------------------------------------------------------------
 
 const TASK_STATUS_FILTERS = ['Pending', 'In Progress', 'Done', 'Completed', 'Overdue'];
 
@@ -1637,11 +1638,11 @@ const TasksTab: React.FC<{
                                 )}
                             </td>
                             <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                {t.assignedEmployee || '—'}
+                                {t.assignedEmployee || '�'}
                             </td>
                             <td><PrioBadge p={t.priority} /></td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                {t.dueAt ? fmtDate(t.dueAt) : '—'}
+                                {t.dueAt ? fmtDate(t.dueAt) : '�'}
                             </td>
                             <td>
                                 <ActionsDropdown
@@ -1665,7 +1666,7 @@ const TasksTab: React.FC<{
 
 
 
-// ─── Task Template Tab ─────────────────────────────────────────────────────────
+// --- Task Template Tab ---------------------------------------------------------
 
 const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
     const { success, error } = useToast();
@@ -1735,7 +1736,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
         setShowModal(true);
     };
 
-    const fmtTemplateDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    const fmtTemplateDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '�';
 
     return (
         <div className="dashboard-content">
@@ -1794,7 +1795,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
     );
 };
 
-// ─── Template Create/Edit Modal ──────────────────────────────────────────────
+// --- Template Create/Edit Modal ----------------------------------------------
 
 interface TemplateModalProps {
     template: TaskTemplateDTO | null;
@@ -1858,15 +1859,15 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, teamMembers, on
     const FieldErr = ({ name }: { name: string }) => errors[name] ? <span className="report-field-error">{errors[name]}</span> : null;
 
     return (
-        <Modal isOpen onClose={onClose}
+        <FormModal isOpen onClose={onClose}
             title={isEdit ? 'Edit Task Template' : 'Create Task Template'}
             subtitle={isEdit ? 'Update the template details below.' : 'Fill in the details to create a recurring task template.'}
-            size="md"
+            size="md" confirmOnCancel={true}
             footer={
                 <>
                     <button className="btn" onClick={onClose}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-                        {submitting ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> {isEdit ? 'Update Template' : 'Create Template'}</>}
+                        {submitting ? <><Loader2 size={13} className="spin" /> Saving�</> : <><Save size={13} /> {isEdit ? 'Update Template' : 'Create Template'}</>}
                     </button>
                 </>
             }
@@ -1931,11 +1932,11 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, teamMembers, on
                     ))}
                 </div>
             </div>
-        </Modal>
+        </FormModal>
     );
 };
 
-// ─── Team Tab ─────────────────────────────────────────────────────────────────
+// --- Team Tab -----------------------------------------------------------------
 
 const TeamTab: React.FC<{
     tasks: Task[];
@@ -2006,7 +2007,28 @@ const TeamTab: React.FC<{
     );
 };
 
-// ─── Reports Tab ──────────────────────────────────────────────────────────────
+// --- Approvals Wrapper (sub-tab navigation) -----------------------------------
+
+const ApprovalsWrapper: React.FC = () => {
+    const [subTab, setSubTab] = useState<'pending' | 'matrices'>('pending');
+    return (
+        <div className="dashboard-content">
+            <div className="report-subtabs">
+                <button className={`filter-pill${subTab === 'pending' ? ' active' : ''}`}
+                    onClick={() => setSubTab('pending')}>
+                    <Shield size={14} /> Pending Approvals
+                </button>
+                <button className={`filter-pill${subTab === 'matrices' ? ' active' : ''}`}
+                    onClick={() => setSubTab('matrices')}>
+                    <RotateCcw size={14} /> Routing Config
+                </button>
+            </div>
+            {subTab === 'pending' ? <PendingApprovalsTab /> : <RoutingManagementTab />}
+        </div>
+    );
+};
+
+// --- Reports Tab --------------------------------------------------------------
 
 const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
     const { success, error } = useToast();
@@ -2272,7 +2294,7 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
     );
 };
 
-// ─── Profile Tab ──────────────────────────────────────────────────────────────
+// --- Profile Tab --------------------------------------------------------------
 
 function ProfileTab() {
     const { success, error } = useToast();
@@ -2284,7 +2306,7 @@ function ProfileTab() {
     const employeeContact = localStorage.getItem('contactNumber') ?? '';
     const storedEmail = localStorage.getItem('email') ?? '';
 
-    // ── Profile edit state ───────────────────────────────────────────────────
+    // -- Profile edit state ---------------------------------------------------
     const [editingProfile, setEditingProfile] = useState(false);
     const [profileForm, setProfileForm] = useState({
         firstName: firstName,
@@ -2296,16 +2318,15 @@ function ProfileTab() {
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
-    const [profileSuccess, setProfileSuccess] = useState(false);
 
-    // ── Password Gate state ──────────────────────────────────────────────────
+    // -- Password Gate state --------------------------------------------------
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
     const [gateLoading, setGateLoading] = useState(false);
     const [showGatePassword, setShowGatePassword] = useState(false);
 
-    // ── Password change state ────────────────────────────────────────────────
+    // -- Password change state ------------------------------------------------
     const [editingPassword, setEditingPassword] = useState(false);
     const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
     const [pwError, setPwError] = useState('');
@@ -2355,7 +2376,7 @@ function ProfileTab() {
         Authorization: `Bearer ${localStorage.getItem('authToken')}`,
     });
 
-    // ── "Save Changes" clicked: validate first, then open gate ───────────────
+    // -- "Save Changes" clicked: validate first, then open gate ---------------
     const requestSave = () => {
         if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) {
             setProfileError('Given Name must contain letters only and be up to 50 characters.');
@@ -2385,7 +2406,7 @@ function ProfileTab() {
         setPasswordGate(true);
     };
 
-    // ── Gate confirmed: verify password then save ────────────────────────────
+    // -- Gate confirmed: verify password then save ----------------------------
     const handleGateConfirm = async () => {
         if (!gatePassword) { setGateError('Please enter your password.'); return; }
         setGateLoading(true);
@@ -2413,7 +2434,7 @@ function ProfileTab() {
         }
     };
 
-    // ── Actual save (only called after password verified) ────────────────────
+    // -- Actual save (only called after password verified) --------------------
     const performSave = async () => {
         setProfileSaving(true);
         setProfileError('');
@@ -2442,9 +2463,7 @@ function ProfileTab() {
             localStorage.setItem('lastName', profileForm.lastName.trim());
             localStorage.setItem('contactNumber', profileForm.contactNumber.trim());
             localStorage.setItem('email', profileForm.email.trim());
-            setProfileSuccess(true);
             setEditingProfile(false);
-            setTimeout(() => setProfileSuccess(false), 2500);
             success('Profile updated successfully.');
         } catch (err: any) {
             setProfileError(err.message ?? 'Something went wrong.');
@@ -2483,7 +2502,6 @@ function ProfileTab() {
             setProfileForm(prev => ({ ...prev, [key]: val }));
             validateField(key, val);
             setProfileError('');
-            setProfileSuccess(false);
         };
 
     const handlePwSave = async () => {
@@ -2518,15 +2536,15 @@ function ProfileTab() {
     return (
         <div className="dashboard-content">
 
-            {/* ── Password Gate Modal ──────────────────────────────────────── */}
+            {/* -- Password Gate Modal ---------------------------------------- */}
             {passwordGate && (
-                <Modal isOpen={passwordGate} onClose={() => setPasswordGate(false)}
+                <FormModal isOpen={passwordGate} onClose={() => setPasswordGate(false)}
                     title="Confirm Your Identity" subtitle="Enter your password to save your profile changes." size="sm"
                     footer={
                         <>
                             <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
                             <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
-                                {gateLoading ? <><Loader2 size={13} className="spin" /> Verifying…</> : <><Shield size={13} /> Confirm & Save</>}
+                                {gateLoading ? <><Loader2 size={13} className="spin" /> Verifying�</> : <><Shield size={13} /> Confirm & Save</>}
                             </button>
                         </>
                     }
@@ -2555,12 +2573,12 @@ function ProfileTab() {
                             </button>
                         </div>
                     </div>
-                </Modal>
+                </FormModal>
             )}
 
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
 
-                {/* ── Profile Card ─────────────────────────────────────────── */}
+                {/* -- Profile Card ------------------------------------------- */}
                 <div className="card">
                     <div className="card-header-layout">
                         <h3>My Profile</h3>
@@ -2570,7 +2588,6 @@ function ProfileTab() {
                                 style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }}
                                 onClick={() => {
                                     setEditingProfile(true);
-                                    setProfileSuccess(false);
                                     ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
                                 }}
                             >
@@ -2595,19 +2612,6 @@ function ProfileTab() {
                             <StatusBadge status="Active" />
                         </div>
                     </div>
-
-                    {profileSuccess && (
-                        <div style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '8px 12px',
-                            background: 'rgba(5,205,153,0.1)',
-                            border: '1px solid rgba(5,205,153,0.25)',
-                            borderRadius: 10, marginBottom: 12,
-                            fontSize: 13, color: 'var(--status-active)', fontWeight: 600,
-                        }}>
-                            <CheckCircle2 size={14} /> Profile updated successfully!
-                        </div>
-                    )}
 
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -2677,7 +2681,7 @@ function ProfileTab() {
                             <div className="detail-grid" style={{ marginTop: 4 }}>
                                 <div className="detail-item">
                                     <span className="detail-label">Employee ID</span>
-                                    <span className="detail-value">{employeeId || '—'}</span>
+                                    <span className="detail-value">{employeeId || '�'}</span>
                                 </div>
                                 <div className="detail-item">
                                     <span className="detail-label">Role</span>
@@ -2708,7 +2712,7 @@ function ProfileTab() {
                                     disabled={profileSaving}
                                 >
                                     {profileSaving
-                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        ? <><Loader2 size={13} className="spin" /> Saving�</>
                                         : <><Save size={13} /> Save Changes</>
                                     }
                                 </button>
@@ -2720,31 +2724,31 @@ function ProfileTab() {
                                 <span className="detail-label">
                                     <Hash size={11} style={{ display: 'inline', marginRight: 4 }} />Employee ID
                                 </span>
-                                <span className="detail-value">{employeeId || '—'}</span>
+                                <span className="detail-value">{employeeId || '�'}</span>
                             </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name
                                 </span>
-                                <span className="detail-value">{profileForm.firstName || '—'}</span>
+                                <span className="detail-value">{profileForm.firstName || '�'}</span>
                             </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name
                                 </span>
-                                <span className="detail-value">{profileForm.middleName || '—'}</span>
+                                <span className="detail-value">{profileForm.middleName || '�'}</span>
                             </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name
                                 </span>
-                                <span className="detail-value">{profileForm.lastName || '—'}</span>
+                                <span className="detail-value">{profileForm.lastName || '�'}</span>
                             </div>
                             <div className="detail-item">
                                 <span className="detail-label">
                                     <Mail size={11} style={{ display: 'inline', marginRight: 4 }} />Email Address
                                 </span>
-                                <span className="detail-value">{profileForm.email || '—'}</span>
+                                <span className="detail-value">{profileForm.email || '�'}</span>
                             </div>
                             <div className="detail-item">
                                 <span className="detail-label">
@@ -2756,13 +2760,13 @@ function ProfileTab() {
                                 <span className="detail-label">
                                     <Phone size={11} style={{ display: 'inline', marginRight: 4 }} />Contact
                                 </span>
-                                <span className="detail-value">{displayContact || '—'}</span>
+                                <span className="detail-value">{displayContact || '�'}</span>
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* ── Security Card ─────────────────────────────────────────── */}
+                {/* -- Security Card ------------------------------------------- */}
                 <div className="card">
                     <div className="card-header-layout">
                         <h3>Security Settings</h3>
@@ -2903,7 +2907,7 @@ function ProfileTab() {
                                 )}
                                 {pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && (
                                     <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                        ✓ Passwords match
+                                        ? Passwords match
                                     </span>
                                 )}
                             </div>
@@ -2925,7 +2929,7 @@ function ProfileTab() {
                                     disabled={pwSaving}
                                 >
                                     {pwSaving
-                                        ? <><Loader2 size={13} className="spin" /> Saving…</>
+                                        ? <><Loader2 size={13} className="spin" /> Saving�</>
                                         : <><Save size={13} /> Update Password</>
                                     }
                                 </button>
@@ -2935,7 +2939,7 @@ function ProfileTab() {
                 </div>
             </div>
 
-            {/* ── Account Overview ─────────────────────────────────────────── */}
+            {/* -- Account Overview ------------------------------------------- */}
             <div className="card">
                 <div className="card-header-layout"><h3>Account Overview</h3></div>
                 <div className="system-status-list">
@@ -2962,15 +2966,15 @@ function ProfileTab() {
 }
 
 
-// ─── Leave Requests Tab ──────────────────────────────────────────────────────────────
+// --- Leave Requests Tab --------------------------------------------------------------
 
 const LeaveTab: React.FC<{
     records: LeaveRecord[];
     loading: boolean;
     onNewRecord: (r: LeaveRecord) => void;
 }> = ({ records, loading, onNewRecord }) => {
+    const { success } = useToast();
     const [showModal, setShowModal] = useState(false);
-    const [submitSuccess, setSubmitSuccess] = useState(false);
     const [histFilter, setHistFilter] = useState<'all' | LeaveStatus>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 5;
@@ -2998,8 +3002,7 @@ const LeaveTab: React.FC<{
 
     const handleSubmit = (record: LeaveRecord) => {
         onNewRecord(record);
-        setSubmitSuccess(true);
-        setTimeout(() => setSubmitSuccess(false), 3500);
+        success('Request submitted — your manager will review it shortly.');
     };
 
     return (
@@ -3011,18 +3014,6 @@ const LeaveTab: React.FC<{
                     <Plus size={14} /> Request Leave
                 </button>
             </div>
-
-            {/* Success toast */}
-            {submitSuccess && (
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
-                    borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-                    fontSize: 13, color: 'var(--status-active)', fontWeight: 600,
-                }}>
-                    <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
-                </div>
-            )}
 
             {/* Stat cards */}
             <div className="stats-row" style={{ marginBottom: 16 }}>
@@ -3129,7 +3120,7 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
     );
 };
 
-// ─── Modal: Reopen Approval ──────────────────────────────────────────────────
+// --- Modal: Reopen Approval --------------------------------------------------
 
 interface ReopenApprovalModalProps {
     request: ReopenRequest;
@@ -3165,13 +3156,13 @@ const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onAp
     };
 
     return (
-        <Modal isOpen onClose={onClose} title="Reopen Task Approval" subtitle="Review and decide on the reopening request." size="md"
+        <FormModal isOpen onClose={onClose} title="Reopen Task Approval" subtitle="Review and decide on the reopening request." size="md" confirmOnCancel={true}
             footer={
                 <>
                     <div style={{ flex: 1 }} />
                     <button className="btn" onClick={onClose} disabled={submitting}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || !decision}>
-                        {submitting ? <><Loader2 size={13} className="spin" /> Submitting…</> : <><ThumbsUp size={13} /> Submit Decision</>}
+                        {submitting ? <><Loader2 size={13} className="spin" /> Submitting�</> : <><ThumbsUp size={13} /> Submit Decision</>}
                     </button>
                 </>
             }
@@ -3248,11 +3239,11 @@ const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onAp
                     {remarks.length}/500
                 </span>
             </div>
-        </Modal>
+        </FormModal>
     );
 };
 
-// ─── Tab: Reopen Requests ─────────────────────────────────────────────────────
+// --- Tab: Reopen Requests -----------------------------------------------------
 
 const ReopenTab: React.FC<{
     requests: ReopenRequest[];
@@ -3320,8 +3311,8 @@ const ReopenTab: React.FC<{
                                 <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                                 <td style={{ fontSize: 13 }}>{r.employeeName}</td>
                                 <td><StatusBadge status={r.status} size="sm" /></td>
-                                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.adminRemarks || '—'}</td>
-                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '—'}</td>
+                                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.adminRemarks || '�'}</td>
+                                <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '�'}</td>
                             </tr>
                         ))}
                     </DataTable>
@@ -3331,7 +3322,7 @@ const ReopenTab: React.FC<{
     );
 };
 
-// ─── Duplicate Warning Modal ──────────────────────────────────────────────────
+// --- Duplicate Warning Modal --------------------------------------------------
 
 interface DuplicateWarningModalProps {
     duplicates: DuplicateWarningDTO[];
@@ -3340,7 +3331,7 @@ interface DuplicateWarningModalProps {
 }
 
 const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicates, onContinue, onCancel }) => (
-    <Modal isOpen onClose={onCancel}
+    <FormModal isOpen onClose={onCancel}
         title="Potential duplicate task detected."
         subtitle={`The system found ${duplicates.length} similar task${duplicates.length !== 1 ? 's' : ''} in existing records. Review the matches below.`}
         size="lg"
@@ -3379,10 +3370,10 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ duplicate
                 </tbody>
             </table>
         </div>
-    </Modal>
+    </FormModal>
 );
 
-// ─── Root Component ───────────────────────────────────────────────────────────
+// --- Root Component -----------------------------------------------------------
 
 export default function OpsAdminDashboard() {
     const navigate = useNavigate();
@@ -3412,7 +3403,7 @@ export default function OpsAdminDashboard() {
 
     const token = () => localStorage.getItem('authToken');
 
-    // ── Fetch Tasks ──
+    // -- Fetch Tasks --
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [deletedTaskIds, setDeletedTaskIds] = useState<Set<string>>(new Set());
     const [binTasks, setBinTasks] = useState<Task[]>([]);
@@ -3430,7 +3421,7 @@ export default function OpsAdminDashboard() {
     const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarningDTO[]>([]);
     const [pendingTaskData, setPendingTaskData] = useState<CreateTaskDTO | null>(null);
 
-    // ── Dashboard Data ──
+    // -- Dashboard Data --
     const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
     const [dashboardLoading, setDashboardLoading] = useState(false);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
@@ -3492,7 +3483,7 @@ export default function OpsAdminDashboard() {
         setDashboardFilters({ dateStart: '', dateEnd: '', employeeId: '', departmentId: '', taskStatus: '' });
     }, []);
 
-    // ── Update fetchTasks ──
+    // -- Update fetchTasks --
     const fetchTasks = async () => {
         setLoadingTasks(true);
         try {
@@ -3536,7 +3527,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Restore task ──
+    // -- Restore task --
     const handleRestoreTask = async (taskId: string) => {
         try {
             const res = await fetch(`/api/task/${taskId}/restore-task`, {
@@ -3597,7 +3588,7 @@ export default function OpsAdminDashboard() {
         });
     };
 
-    // ── Fetch Team Members (for assignee dropdown) ──
+    // -- Fetch Team Members (for assignee dropdown) --
     const fetchTeamMembers = async () => {
         try {
             const res = await fetch('/api/systemadmin/assignable-employees', {
@@ -3606,7 +3597,7 @@ export default function OpsAdminDashboard() {
             if (!res.ok) throw new Error();
             const data: any[] = await res.json();
 
-            console.log('Team members raw:', data); // ← ADD THIS to inspect shape
+            console.log('Team members raw:', data); // ? ADD THIS to inspect shape
 
             setTeamMembers(data.map(e => ({
                 accountId: e.accountId ?? e.AccountId ?? e.id,       // try variants
@@ -3700,7 +3691,7 @@ export default function OpsAdminDashboard() {
             .catch(() => { });
     }, []);
 
-    // ── Create Task ──
+    // -- Create Task --
     const handleNewTask = async (data: CreateTaskDTO) => {
         try {
             const res = await fetch('/api/task/create-task', {
@@ -3732,7 +3723,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Update Task ──
+    // -- Update Task --
     const handleEditTask = async (taskId: string, data: UpdateTaskDTO) => {
         try {
             const res = await fetch(`/api/task/update-task/${taskId}`, {
@@ -3755,7 +3746,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Reopen Task (direct admin override) ──
+    // -- Reopen Task (direct admin override) --
     const handleReopenTask = async (taskId: string) => {
         try {
             const res = await fetch(`/api/task/${taskId}/reopen`, {
@@ -3774,12 +3765,12 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── FSM Status Transition ──
+    // -- FSM Status Transition --
     const handleStatusTransition = async (taskId: string, newStatus: TaskStatus) => {
         const task = tasks.find(t => t.taskId === taskId);
         if (!task) { error('Task not found.'); return; }
         if (!isTransitionValid(task.taskStatus, newStatus)) {
-            error(`Invalid task status transition: ${task.taskStatus} → ${newStatus}. Status sequence violation detected.`);
+            error(`Invalid task status transition: ${task.taskStatus} ? ${newStatus}. Status sequence violation detected.`);
             return;
         }
         try {
@@ -3802,7 +3793,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Task Review (Approve & Close / Return for Rework) ──
+    // -- Task Review (Approve & Close / Return for Rework) --
     const handleReviewTask = async (taskId: string, adminDecision: 'Approve & Close' | 'Return for Rework', reviewerRemarks: string) => {
         try {
             const res = await fetch(`/api/task/${taskId}/review`, {
@@ -3831,7 +3822,7 @@ export default function OpsAdminDashboard() {
         }
     };
 
-    // ── Admin Override (completed task) ──
+    // -- Admin Override (completed task) --
     const handleAdminOverride = async (taskId: string, reason: string, remarks: string, requestedStatus: string) => {
         try {
             const res = await fetch(`/api/task/${taskId}/override`, {
@@ -3853,13 +3844,13 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             setOverrideTask(null);
-            success('Administrator override applied · Task reopened · Audit Log entry generated.');
+            success('Administrator override applied � Task reopened � Audit Log entry generated.');
         } catch (err: any) {
             error(err.message ?? 'Administrator override failed.');
         }
     };
 
-    // ── Approve Reopen Request ──
+    // -- Approve Reopen Request --
     const handleApproveReopen = async (requestId: string, adminRemarks: string) => {
         try {
             const res = await fetch(`/api/task/reopen-requests/${requestId}/review`, {
@@ -3884,13 +3875,13 @@ export default function OpsAdminDashboard() {
             ));
             await fetchTasks();
             setReviewingRequest(null);
-            success('Reopening request approved · Task reopened · Task history preserved · Audit Log entry generated.');
+            success('Reopening request approved � Task reopened � Task history preserved � Audit Log entry generated.');
         } catch (err: any) {
             error(err.message ?? 'Failed to approve reopen request.');
         }
     };
 
-    // ── Reject Reopen Request ──
+    // -- Reject Reopen Request --
     const handleRejectReopen = async (requestId: string, adminRemarks: string) => {
         try {
             const res = await fetch(`/api/task/reopen-requests/${requestId}/review`, {
@@ -3914,7 +3905,7 @@ export default function OpsAdminDashboard() {
                     : r
             ));
             setReviewingRequest(null);
-            success('Reopening request rejected · Original task preserved · Audit Log entry generated.');
+            success('Reopening request rejected � Original task preserved � Audit Log entry generated.');
         } catch (err: any) {
             error(err.message ?? 'Failed to reject reopen request.');
         }
@@ -3970,7 +3961,7 @@ export default function OpsAdminDashboard() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-            }).catch(() => { }); // non-fatal — clear localStorage regardless
+            }).catch(() => { }); // non-fatal � clear localStorage regardless
         }
 
         ['employeeId', 'refreshToken', 'authToken', 'employeeName',
@@ -3991,12 +3982,12 @@ export default function OpsAdminDashboard() {
         approvals: 'Approvals',
     };
 
-    // ── Fetch dashboard data when filters change ──
+    // -- Fetch dashboard data when filters change --
     useEffect(() => {
         fetchDashboardData();
     }, [fetchDashboardData]);
 
-    // ── SignalR: Auto-refresh dashboard when task data changes ──
+    // -- SignalR: Auto-refresh dashboard when task data changes --
     useEffect(() => {
         const connection = new signalR.HubConnectionBuilder()
             .withUrl('/hubs/workflow')
@@ -4075,7 +4066,7 @@ export default function OpsAdminDashboard() {
                 </div>
             </aside>
 
-            {/* ── Main ── */}
+            {/* -- Main -- */}
             <main className="main-viewport">
                 <DashboardHeader
                     title={pageTitles[activeTab]}
@@ -4123,7 +4114,7 @@ export default function OpsAdminDashboard() {
                     />
                 )}
                 {activeTab === 'templates' && <TemplateTab teamMembers={teamMembers} />}
-                {activeTab === 'approvals' && <PendingApprovalsTab />}
+                {activeTab === 'approvals' && <ApprovalsWrapper />}
                 {activeTab === 'reports' && <ReportsTab teamMembers={teamMembers} />}
                 {activeTab === 'profile' && <ProfileTab />}
                 {activeTab === 'leave' && (
@@ -4141,7 +4132,7 @@ export default function OpsAdminDashboard() {
                 )}
             </main>
 
-            {/* ── Modals ── */}
+            {/* -- Modals -- */}
             {showNew && (
                 <TaskModal
                     mode="new"

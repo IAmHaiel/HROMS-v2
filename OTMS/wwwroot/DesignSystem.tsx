@@ -7,7 +7,7 @@ import {
 import StatusBadge from '../../components/ui/StatusBadge';
 import RoleBadge from '../../components/ui/RoleBadge';
 import StatCard from '../../components/ui/StatCard';
-import Modal from '../../components/ui/Modal';
+import FormModal from '../../components/FormModal/FormModal';
 import DataTable from '../../components/ui/DataTable';
 import EmptyState from '../../components/ui/EmptyState';
 import ProgressStepper from '../../components/ui/ProgressStepper';
@@ -450,7 +450,7 @@ export default function DesignSystem() {
           <button className="btn btn-outline btn-sm" onClick={() => openModal('xl')}>xl (1000px)</button>
         </Group>
 
-        <Modal
+        <FormModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           title={`Modal — size="${modalSize}"`}
@@ -469,7 +469,7 @@ export default function DesignSystem() {
               <input className="form-input" placeholder="Type something..." />
             </div>
           </div>
-        </Modal>
+        </FormModal>
       </Section>
 
       {/* ── 11. EmptyState ───────────────────────────────────────────── */}

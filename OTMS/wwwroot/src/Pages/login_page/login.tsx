@@ -82,10 +82,9 @@ export default function Login() {
     const validateEmployeeId = (value: string): string => {
         if (!value.trim()) return 'Employee ID is required.';
         if (value.trim().length > 20) return 'Employee ID must not exceed 20 characters.';
-        const isDigitsOnly = /^\d{1,5}$/.test(value.trim());
-        const isSuperAdmin = /^SPDX-SPR-\d{2,}$/.test(value.trim());
-        if (!isDigitsOnly && !isSuperAdmin) {
-            return 'Enter a valid Employee ID (e.g. 0001 or SPDX-SPR-01).';
+        const isStandard = /^[A-Za-z0-9-]{1,20}$/.test(value.trim());
+        if (!isStandard) {
+            return 'Enter a valid Employee ID (e.g. 0000 or 0001).';
         }
         return '';
     };
@@ -182,8 +181,8 @@ export default function Login() {
             success('Login successful! Welcome back.');
 
             if (!data.isPasswordChanged) {
-                updateStatus('Please complete your account setup.', 'info');
-                setTimeout(() => navigate('/onboarding'), 800);
+                updateStatus('Please set your password.', 'info');
+                setTimeout(() => navigate('/set-password'), 800);
                 return;
             }
 

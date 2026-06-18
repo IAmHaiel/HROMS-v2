@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, ReactNode } from 'react';
 import axios from 'axios';
+import { useToast } from '../../../components/Toast/Toast';
 import StatCard from '../../../components/StatCard/StatCard';
 import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -42,9 +43,39 @@ export interface AuditLogEntry {
 
 export interface ApplicantRecord {
     applicantId: string;
+    referenceNumber: string;
     fullName: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    suffix: string;
+    gender: string;
+    civilStatus: string;
     email: string;
     contactNumber: string;
+    currentResidentialAddress: string;
+    permanentAddress: string;
+    sssNumber: string;
+    philHealthNumber: string;
+    pagIBIGNumber: string;
+    tin: string;
+    bankName: string;
+    bankAccountName: string;
+    bankAccountNumber: string;
+    nbiClearanceFilePath: string;
+    medicalClearanceFilePath: string;
+    psaBirthCertificateFilePath: string;
+    resumeFilePath: string;
+    signedEmploymentContractFilePath: string;
+    emergencyContactName: string;
+    emergencyContactRelationship: string;
+    emergencyContactMobileNumber: string;
+    declaredDependents: string;
+    highestEducationalAttainment: string;
+    institution: string;
+    yearGraduated: string;
+    professionalLicensesCertifications: string;
+    isEmailVerified: boolean;
     position: string;
     currentStatus: RecruitmentStatus;
     submittedAt: string;
@@ -456,10 +487,6 @@ function todayISO(): string {
 
 const css = `
   .rec-content { padding: 24px; font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; min-height: 100vh; }
-  .rec-toast { position: fixed; top: 20px; right: 20px; z-index: 9999; background: #065f46; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); animation: slideIn 0.2s ease; max-width: 360px; }
-  .rec-toast--error { background: #b91c1c; }
-  .rec-toast--warn { background: #b45309; }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
   .rec-stats-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .rec-stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; flex: 1; min-width: 140px; }
   .rec-stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -739,7 +766,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
     const [date, setDate] = useState<string>('');
     const [time, setTime] = useState<string>('');
     const [location, setLocation] = useState<string>('');
-    const [interviewer, setInterviewer] = useState<string>('');
 
     // Field errors
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -757,7 +783,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
         if (!time) errs.time = 'Interview time is required.';
         if (!location.trim()) errs.location = 'Location or meeting link is required.';
         else if (location.trim().length > 255) errs.location = 'Maximum 255 characters.';
-        if (!interviewer) errs.interviewer = 'Interviewer / contact person is required.';
         setErrors(errs);
         return Object.keys(errs).length === 0;
     }
@@ -769,7 +794,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
     async function handleSend(): Promise<void> {
         setStep('sending');
         const details: InterviewDetails = {
-            date, time, location: location.trim(), interviewer,
+            date, time, location: location.trim(), interviewer: '',
         };
 
         setEmailStatus('sending');
@@ -781,7 +806,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 interviewDate: date,
                 interviewTime: time,
                 locationOrLink: location.trim(),
-                interviewerName: interviewer,
             };
             const res = await axios.post('/api/recruitment/schedule-interview', payload);
             const apiResult = res.data as any;
@@ -832,7 +856,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                     <div>
                         <h3 className="rec-modal-title">Schedule Interview</h3>
                         <p className="rec-modal-subtitle">
-                            Ref: <code className="rec-modal-ref">{applicant.applicantId}</code>
+                            Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code>
                         </p>
                     </div>
                     {step !== 'sending' && (
@@ -926,23 +950,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                                     </div>
                                 </div>
 
-                                {/* Interviewer */}
-                                <div className="rec-form-field rec-form-field--full">
-                                    <label className="rec-field-label">Interviewer / Contact Person <span>*</span></label>
-                                    <div className="rec-input-icon-wrap">
-                                        <User size={13} className="rec-input-icon" />
-                                        <select
-                                            className={`rec-input${errors.interviewer ? ' rec-input--error' : ''}`}
-                                            value={interviewer}
-                                            onChange={(e) => { setInterviewer(e.target.value); setErrors((p) => ({ ...p, interviewer: '' })); }}
-                                            style={{ paddingLeft: 30 }}
-                                        >
-                                            <option value="">Select interviewer…</option>
-                                            {INTERVIEWERS.map((iv) => <option key={iv} value={iv}>{iv}</option>)}
-                                        </select>
-                                    </div>
-                                    {errors.interviewer && <span className="rec-field-error">{errors.interviewer}</span>}
-                                </div>
                             </div>
 
                             <div className="rec-modal-actions">
@@ -972,7 +979,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                                     </div>
                                 </div>
                                 <div className="rec-email-body">
-                                    {buildEmailBody(applicant, { date, time, location: location.trim(), interviewer })}
+                                    {buildEmailBody(applicant, { date, time, location: location.trim(), interviewer: '' })}
                                 </div>
                             </div>
 
@@ -996,7 +1003,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                                 <div>
                                     <strong>Interview schedule saved to database.</strong><br />
                                     <span style={{ fontWeight: 400 }}>
-                                        {fmtDateTime(date, time)} · {location.trim()} · {interviewer}
+                                        {fmtDateTime(date, time)} · {location.trim()}
                                     </span>
                                 </div>
                             </div>
@@ -1070,7 +1077,7 @@ interface UpdateStatusModalProps {
 }
 
 function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: UpdateStatusModalProps) {
-    const available: RecruitmentStatus[] = STATUS_TRANSITIONS[applicant.currentStatus];
+    const available: RecruitmentStatus[] = STATUS_TRANSITIONS[applicant.currentStatus] ?? [];
     const [newStatus, setNewStatus] = useState<RecruitmentStatus | ''>('');
     const [remarks, setRemarks] = useState<string>('');
     const [submitting, setSubmitting] = useState<boolean>(false);
@@ -1101,7 +1108,7 @@ function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: U
                 <div className="rec-modal-header">
                     <div>
                         <h3 className="rec-modal-title">Update Application Status</h3>
-                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.applicantId}</code></p>
+                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code></p>
                     </div>
                     <button className="rec-close-btn" onClick={onClose}><X size={14} /></button>
                 </div>
@@ -1187,8 +1194,34 @@ interface ApplicantDetailModalProps {
 }
 
 function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantDetailModalProps) {
-    const hasTransitions = STATUS_TRANSITIONS[applicant.currentStatus].length > 0;
+    const hasTransitions = (STATUS_TRANSITIONS[applicant.currentStatus]?.length ?? 0) > 0;
     const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
+
+    function CollapsibleSection({ title, children, defaultOpen }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+        const [open, setOpen] = useState(defaultOpen ?? false);
+        return (
+            <div style={{ marginTop: 16, border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+                <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: '#f8fafc', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: '#1e293b', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    <span style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', fontSize: 10 }}>▶</span>
+                    {title}
+                </div>
+                {open && <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>}
+            </div>
+        );
+    }
+
+    function DetailRow({ label, value, link }: { label: string; value: string; link?: string }) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#64748b', fontWeight: 500 }}>{label}</span>
+                {link ? (
+                    <a href={link} target="_blank" rel="noopener noreferrer" style={{ color: '#4318ff', fontWeight: 600, textDecoration: 'none' }}>{value}</a>
+                ) : (
+                    <span style={{ color: '#0f172a', fontWeight: 600, textAlign: 'right' }}>{value || '—'}</span>
+                )}
+            </div>
+        );
+    }
 
     useEffect(() => {
         if (applicant.currentStatus === 'Job Offered') {
@@ -1211,7 +1244,7 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                 <div className="rec-modal-header rec-modal-header--sticky">
                     <div>
                         <h3 className="rec-modal-title">Application Details</h3>
-                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.applicantId}</code></p>
+                        <p className="rec-modal-subtitle">Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code></p>
                     </div>
                     <button className="rec-close-btn" onClick={onClose}><X size={14} /></button>
                 </div>
@@ -1222,7 +1255,7 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                             <div className="rec-detail-name">{applicant.fullName}</div>
                             <div className="rec-detail-position">{applicant.position}</div>
                         </div>
-                        <StatusBadge status={applicant.currentStatus} />
+                        <RecruitmentStatusBadge status={applicant.currentStatus} />
                     </div>
 
                     <div className="rec-detail-grid">
@@ -1238,6 +1271,62 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                             </div>
                         ))}
                     </div>
+
+                    {/* Collapsible details */}
+                    <CollapsibleSection title="Personal Information">
+                        <DetailRow label="First Name" value={applicant.firstName} />
+                        <DetailRow label="Middle Name" value={applicant.middleName} />
+                        <DetailRow label="Last Name" value={applicant.lastName} />
+                        <DetailRow label="Suffix" value={applicant.suffix} />
+                        <DetailRow label="Gender" value={applicant.gender} />
+                        <DetailRow label="Civil Status" value={applicant.civilStatus} />
+                        <DetailRow label="Email" value={applicant.email} />
+                        <DetailRow label="Contact Number" value={applicant.contactNumber} />
+                        <DetailRow label="Email Verified" value={applicant.isEmailVerified ? 'Yes' : 'No'} />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Address">
+                        <DetailRow label="Current Address" value={applicant.currentResidentialAddress} />
+                        <DetailRow label="Permanent Address" value={applicant.permanentAddress} />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Government Identifiers">
+                        <DetailRow label="SSS Number" value={applicant.sssNumber} />
+                        <DetailRow label="PhilHealth Number" value={applicant.philHealthNumber} />
+                        <DetailRow label="Pag-IBIG Number" value={applicant.pagIBIGNumber} />
+                        <DetailRow label="TIN" value={applicant.tin} />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Financial & Payroll Data">
+                        <DetailRow label="Bank Name" value={applicant.bankName} />
+                        <DetailRow label="Bank Account Name" value={applicant.bankAccountName} />
+                        <DetailRow label="Bank Account Number" value={applicant.bankAccountNumber} />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Documents">
+                        {applicant.nbiClearanceFilePath && <DetailRow label="NBI Clearance" value="View" link={applicant.nbiClearanceFilePath} />}
+                        {applicant.medicalClearanceFilePath && <DetailRow label="Medical Clearance" value="View" link={applicant.medicalClearanceFilePath} />}
+                        {applicant.psaBirthCertificateFilePath && <DetailRow label="PSA Birth Cert" value="View" link={applicant.psaBirthCertificateFilePath} />}
+                        {applicant.resumeFilePath && <DetailRow label="Resume" value="View" link={applicant.resumeFilePath} />}
+                        {applicant.signedEmploymentContractFilePath && <DetailRow label="Employment Contract" value="View" link={applicant.signedEmploymentContractFilePath} />}
+                        {!applicant.nbiClearanceFilePath && !applicant.medicalClearanceFilePath && !applicant.psaBirthCertificateFilePath && !applicant.resumeFilePath && !applicant.signedEmploymentContractFilePath && (
+                            <span style={{ fontSize: 13, color: '#94a3b8' }}>No documents uploaded</span>
+                        )}
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Emergency Contact">
+                        <DetailRow label="Name" value={applicant.emergencyContactName} />
+                        <DetailRow label="Relationship" value={applicant.emergencyContactRelationship} />
+                        <DetailRow label="Mobile Number" value={applicant.emergencyContactMobileNumber} />
+                    </CollapsibleSection>
+
+                    <CollapsibleSection title="Education & Qualifications">
+                        <DetailRow label="Highest Education" value={applicant.highestEducationalAttainment} />
+                        <DetailRow label="Institution" value={applicant.institution} />
+                        <DetailRow label="Year Graduated" value={applicant.yearGraduated} />
+                        <DetailRow label="Licenses/Certifications" value={applicant.professionalLicensesCertifications} />
+                        <DetailRow label="Dependents" value={applicant.declaredDependents} />
+                    </CollapsibleSection>
 
                     {applicant.adminRemarks && (
                         <div className="rec-remarks-strip">
@@ -1307,11 +1396,6 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
     );
 }
 
-// ─── Toast helper type ────────────────────────────────────────────────────────
-
-type ToastVariant = 'success' | 'error' | 'warn';
-interface ToastState { msg: string; variant: ToastVariant; }
-
 // ─── RecruitmentTab ───────────────────────────────────────────────────────────
 
 interface RecruitmentTabProps {
@@ -1320,6 +1404,7 @@ interface RecruitmentTabProps {
 }
 
 export default function RecruitmentTab({ onSuccess, onError: _onError }: RecruitmentTabProps) {
+    const { success, error } = useToast();
     const [applicants, setApplicants] = useState<ApplicantRecord[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [page, setPage] = useState<number>(1);
@@ -1334,7 +1419,6 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     const [updateApplicant, setUpdateApplicant] = useState<ApplicantRecord | null>(null);
     const [scheduleApplicant, setScheduleApplicant] = useState<ApplicantRecord | null>(null);
 
-    const [toast, setToast] = useState<ToastState | null>(null);
     const [positions, setPositions] = useState<{ id: string; name: string }[]>([]);
 
     useEffect(() => {
@@ -1347,12 +1431,6 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
             })
             .catch(() => { /* positions remain empty */ });
     }, []);
-
-    const showToast = (msg: string, variant: ToastVariant = 'success'): void => {
-        setToast({ msg, variant });
-        if (variant === 'success') onSuccess?.(msg);
-        setTimeout(() => setToast(null), 4000);
-    };
 
     const fetchApplicants = useCallback(async (p: number = 1): Promise<void> => {
         setLoading(true);
@@ -1413,7 +1491,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     ): Promise<void> => {
         const applicant = applicants.find((a) => a.applicantId === applicantId);
         if (!applicant) throw new Error('Applicant not found.');
-        if (!STATUS_TRANSITIONS[applicant.currentStatus].includes(newStatus)) throw new Error('Invalid status transition.');
+        if (!(STATUS_TRANSITIONS[applicant.currentStatus] ?? []).includes(newStatus)) throw new Error('Invalid status transition.');
 
         const res = await axios.put('/api/recruitment/status', {
             applicantRecordId: applicantId,
@@ -1428,7 +1506,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         await fetchApplicants(page);
 
         if (newStatus !== 'Interview Scheduled') {
-            showToast('Applicant status updated successfully.');
+            success('Applicant status updated successfully.');
         }
     };
 
@@ -1446,7 +1524,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     : a,
             ),
         );
-        showToast('Interview scheduled and email notification sent successfully.');
+        success('Interview scheduled and email notification sent successfully.');
         setScheduleApplicant(null);
     };
 
@@ -1463,13 +1541,6 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     return (
         <>
             <style>{css}</style>
-
-            {toast && (
-                <div className={`rec-toast${toast.variant === 'error' ? ' rec-toast--error' : toast.variant === 'warn' ? ' rec-toast--warn' : ''}`}>
-                    {toast.variant === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
-                    {toast.msg}
-                </div>
-            )}
 
             <div className="rec-content">
                 {/* ── Stat Cards ── */}

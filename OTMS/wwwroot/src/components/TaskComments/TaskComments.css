@@ -27,19 +27,6 @@
     color: #fff;
 }
 
-.tc-toast-success {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: rgba(5, 205, 153, 0.1);
-    border: 1px solid rgba(5, 205, 153, 0.2);
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--status-active);
-}
-
 .tc-error {
     display: flex;
     align-items: center;

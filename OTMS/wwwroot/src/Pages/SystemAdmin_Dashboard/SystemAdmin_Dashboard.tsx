@@ -50,11 +50,10 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import RoleBadge from '../../components/ui/RoleBadge';
 import Select from '../../components/ui/Select';
 import Pagination from '../../components/ui/Pagination';
-import Modal from '../../components/ui/Modal';
+import FormModal from '../../components/FormModal/FormModal';
 import EmployeeDetailPanel from './EmployeeDetailPanel/EmployeeDetailPanel';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
-import FormModal from '../../components/FormModal/FormModal';
 import RoleManagementTab, { DepartmentResponseDTO, JobPositionResponseDTO } from './RoleManagementTab/RoleManagementTab';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
@@ -424,6 +423,7 @@ interface AddEmployeeModalProps {
 function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
     const [errors, setErrors] = useState<FieldError>({});
+    const [dirty, setDirty] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
     const [successData, setSuccessData] = useState<{ employeeNumber: string } | null>(null);
@@ -541,6 +541,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     };
 
     const handleChange = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        setDirty(true);
         const value = e.target.value;
 
         // If department changes, reset position
@@ -591,6 +592,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
 
             const data = responseData.data;
             success('Employee registered successfully!');
+            setDirty(false);
             onSuccess({
                 employeeNumber: data.employeeNumber ?? form.employeeNumber,
                 employeeName: form.email.trim(),
@@ -627,7 +629,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
         <div style={{ display: 'contents' }}>
             <FormModal
                 isOpen={true}
-                onClose={onClose}
+                onClose={() => { setDirty(false); onClose(); }}
                 title="Add New Employee"
                 subtitle="Fill in all details to register a new employee account."
                 apiError={apiError}
@@ -636,6 +638,8 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                 submitDisabled={empNumLoading || !!empNumError || loadingOrg}
                 submitLabel="Register Employee"
                 size="md"
+                confirmOnCancel={true}
+                dirty={dirty}
             >
                 <div className="fm-section">
                     <h5 className="fm-section-title">Account Information</h5>
@@ -793,7 +797,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             </FormModal>
 
             {/* ── Success Screen ── */}
-            <Modal isOpen={!!successData} onClose={() => { setSuccessData(null); onClose(); }} size="sm"
+            <FormModal isOpen={!!successData} onClose={() => { setSuccessData(null); onClose(); }} size="sm"
                 title="Employee registered"
                 subtitle="Account has been created successfully."
             >
@@ -828,7 +832,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { setSuccessData(null); onClose(); }}>Done</button>
                     </>
                 )}
-            </Modal>
+            </FormModal>
         </div>
     );
 }
@@ -885,27 +889,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
     };
 
     const handleCloseModal = () => {
-        if (isEditing && isDirty) {
-            setConfirmModal({
-                isOpen: true,
-                variant: 'warning',
-                icon: 'ti-alert-triangle',
-                title: 'Discard unsaved changes?',
-                description: (
-                    <>
-                        You have unsaved changes to <strong>{displayName}</strong>'s profile.
-                        Closing now will discard all modifications.
-                    </>
-                ),
-                confirmLabel: 'Discard changes',
-                onConfirm: () => {
-                    setConfirmModal(CONFIRM_CLOSED);
-                    onClose();
-                },
-            });
-        } else {
-            onClose();
-        }
+        onClose();
     };
 
     const handleCancelEdit = () => {
@@ -1116,6 +1100,8 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
                 onSubmit={isEditing ? handleSave : undefined}
                 isSubmitting={submitting}
                 size="md"
+                confirmOnCancel={true}
+                dirty={isDirty}
                 footer={
                     isEditing ? (
                         <>
@@ -1333,9 +1319,12 @@ interface DashboardTabProps {
     onViewAll: () => void;
     onAddEmployee: () => void;
     rolesCount?: number;
+    activityLogPage?: number;
+    activityLogTotalPages?: number;
+    onActivityLogPageChange?: (page: number) => void;
 }
 
-function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee, rolesCount }: DashboardTabProps) {
+function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee, rolesCount, activityLogPage, activityLogTotalPages, onActivityLogPageChange }: DashboardTabProps) {
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
@@ -1533,7 +1522,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     </table>
                 </div>
                 <div className="card activity-card">
-                    <div className="card-header-layout"><span className="text-link">Recent Activity</span><a href="/activity-logs" className="view-all-link">View all →</a></div>
+                    <div className="card-header-layout"><span className="text-link">Recent Activity</span></div>
                     <div className="activity-feed-list">
                         {loading
                             ? <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." />
@@ -1560,6 +1549,9 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                     );
                                 })}
                     </div>
+                    {activityLogs.length > 0 && activityLogTotalPages && activityLogTotalPages > 1 && (
+                        <Pagination currentPage={activityLogPage ?? 1} totalPages={activityLogTotalPages} onPageChange={p => onActivityLogPageChange?.(p)} />
+                    )}
                 </div>
             </div>
         </div>
@@ -1770,7 +1762,7 @@ function ManageEmployeesTab({
                 />
             )}
             {/* ── Leave detail modal ── */}
-            <Modal isOpen={!!detailModal} onClose={() => setDetailModal(null)} title="Leave Request Detail" subtitle="Full details for this request" size="sm">
+            <FormModal isOpen={!!detailModal} onClose={() => setDetailModal(null)} title="Leave Request Detail" subtitle="Full details for this request" size="sm">
                 {detailModal && (
                     <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
@@ -1817,7 +1809,7 @@ function ManageEmployeesTab({
                         </div>
                     </>
                 )}
-            </Modal>
+            </FormModal>
             {actionModal && (
                 <LeaveActionModal
                     request={actionModal.request}
@@ -1859,9 +1851,9 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
         email: storedEmail,
     });
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    const { success } = useToast();
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
-    const [profileSuccess, setProfileSuccess] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem('authToken');
@@ -1933,7 +1925,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
 
     const requestEditProfile = () => {
         setEditingProfile(true);
-        setProfileSuccess(false);
         ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (profileForm as any)[k]));
     };
 
@@ -2048,7 +2039,7 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     if (onProfileUpdate) {
                         onProfileUpdate(newFullName);
                     }
-                    setProfileSuccess(true);
+                    success('Profile updated successfully.');
                     setEditingProfile(false);
                     setConfirmModal(CONFIRM_CLOSED);
                 } catch (err: any) {
@@ -2066,7 +2057,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
         setProfileForm(prev => ({ ...prev, [key]: val }));
         validateField(key, val);
         setProfileError('');
-        setProfileSuccess(false);
     };
 
     // ── Password Change ────────────────────────────────────────────────────────
@@ -2152,11 +2142,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                             <StatusBadge status="Active" />
                         </div>
                     </div>
-                    {profileSuccess && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--status-active-bg)', border: '1px solid rgba(5,205,153,0.25)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: 'var(--status-active)', fontWeight: 600 }}>
-                            <CheckCircle2 size={14} /> Profile updated successfully!
-                        </div>
-                    )}
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {profileError && <ErrorBanner message={profileError} />}
@@ -2850,7 +2835,28 @@ export default function Dashboard() {
     // ── Activity Logs ──
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
     const [activityLogPage, setActivityLogPage] = useState(1);
+    const [activityLogTotalPages, setActivityLogTotalPages] = useState(1);
     const ACTIVITY_LOG_PAGE_SIZE = 15;
+
+    const fetchActivityLogs = (page: number) => {
+        const token = localStorage.getItem('authToken');
+        fetch(`/api/activity-logs/recent?page=${page}&pageSize=${ACTIVITY_LOG_PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+            .then(res => { if (!res.ok) return null; return res.json(); })
+            .then(data => {
+                if (data && Array.isArray(data.data)) {
+                    setActivityLogs(data.data);
+                    setActivityLogPage(data.pageNumber || page);
+                    setActivityLogTotalPages(data.totalPages || 1);
+                } else if (Array.isArray(data)) {
+                    setActivityLogs(data);
+                    setActivityLogPage(1);
+                    setActivityLogTotalPages(1);
+                } else {
+                    setActivityLogs([]);
+                }
+            })
+            .catch(() => setActivityLogs([]));
+    };
 
     // ── Employment Contracts / Documents ──
     const [contracts, setContracts] = useState<EmploymentContract[]>([]);
@@ -3043,19 +3049,7 @@ export default function Dashboard() {
             })
             .catch((err) => console.error('Profile fetch error:', err));
 
-        fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
-            .then(async res => {
-                if (!res.ok) return [];
-                const text = await res.text();
-                try { return JSON.parse(text); } catch (e) { console.error('Failed to parse JSON. Response was:', text); throw e; }
-            })
-            .then(data => {
-                if (Array.isArray(data)) { setActivityLogs(data); setActivityLogPage(1); }
-                else if (data && Array.isArray(data.data)) { setActivityLogs(data.data); setActivityLogPage(1); }
-                else if (data && Array.isArray(data.$values)) { setActivityLogs(data.$values); setActivityLogPage(1); }
-                else { setActivityLogs([]); setActivityLogPage(1); }
-            })
-            .catch((err) => { console.error('Activity logs fetch error:', err); setActivityLogs([]); });
+        fetchActivityLogs(1);
     }, []);
 
     useEffect(() => {
@@ -3165,6 +3159,9 @@ export default function Dashboard() {
                         onViewAll={() => { setActiveTab('employees'); setSelectedPanelEmployee(null); }}
                         onAddEmployee={() => setShowAddModal(true)}
                         rolesCount={rolesList.length}
+                        activityLogPage={activityLogPage}
+                        activityLogTotalPages={activityLogTotalPages}
+                        onActivityLogPageChange={fetchActivityLogs}
                     />
                 )}
 
@@ -3279,16 +3276,7 @@ export default function Dashboard() {
                 <AddEmployeeModal onClose={() => setShowAddModal(false)} onSuccess={newEmp => {
                     setEmployees(prev => [newEmp, ...prev]);
                     setRecentEmployees(prev => [newEmp, ...prev]);
-                    const token = localStorage.getItem('authToken');
-                    fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
-                        .then(res => { if (!res.ok) return []; return res.json(); })
-                        .then(data => {
-                            if (Array.isArray(data)) { setActivityLogs(data); setActivityLogPage(1); }
-                            else if (data && Array.isArray(data.data)) { setActivityLogs(data.data); setActivityLogPage(1); }
-                            else if (data && Array.isArray(data.$values)) { setActivityLogs(data.$values); setActivityLogPage(1); }
-                            else { setActivityLogs([]); setActivityLogPage(1); }
-                        })
-                        .catch((err) => { console.error('Activity logs fetch error:', err); });
+                    fetchActivityLogs(1);
                 }} />
             )}
 

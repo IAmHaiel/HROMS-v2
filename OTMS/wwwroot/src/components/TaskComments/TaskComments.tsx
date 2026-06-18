@@ -3,6 +3,7 @@ import {
     Send, X, Paperclip, Loader2, AlertCircle, CheckCircle2,
     Pencil, Trash2, FileText, XCircle,
 } from 'lucide-react';
+import { useToast } from '../Toast/Toast';
 import EmptyState from '../ui/EmptyState';
 import './TaskComments.css';
 
@@ -45,16 +46,11 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
     const [newMessage, setNewMessage] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
     const [sending, setSending] = useState(false);
+    const { success } = useToast();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editMessage, setEditMessage] = useState('');
     const [savingEdit, setSavingEdit] = useState(false);
-    const [successMsg, setSuccessMsg] = useState('');
     const endRef = useRef<HTMLDivElement>(null);
-
-    const showSuccess = useCallback((msg: string) => {
-        setSuccessMsg(msg);
-        setTimeout(() => setSuccessMsg(''), 3000);
-    }, []);
 
     const fetchComments = useCallback(async () => {
         setLoading(true);
@@ -115,7 +111,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
             }
             setNewMessage('');
             setAttachment(null);
-            showSuccess('Comment added successfully.');
+            success('Comment added successfully.');
             await fetchComments();
         } catch (err: any) {
             setError(err.message);
@@ -155,7 +151,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                 throw new Error(err.message || 'Failed to update comment.');
             }
             cancelEdit();
-            showSuccess('Comment updated successfully.');
+            success('Comment updated successfully.');
             await fetchComments();
         } catch (err: any) {
             setError(err.message);
@@ -175,7 +171,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message || 'Failed to delete comment.');
             }
-            showSuccess('Comment deleted successfully.');
+            success('Comment deleted successfully.');
             await fetchComments();
         } catch (err: any) {
             setError(err.message);
@@ -194,12 +190,6 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                     Task ID: {taskId.slice(0, 8)}...
                 </span>
             </div>
-
-            {successMsg && (
-                <div className="tc-toast-success">
-                    <CheckCircle2 size={14} /> {successMsg}
-                </div>
-            )}
 
             {error && (
                 <div className="tc-error"><AlertCircle size={14} /> {error}</div>

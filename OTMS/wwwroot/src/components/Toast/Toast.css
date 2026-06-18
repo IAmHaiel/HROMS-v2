@@ -9,7 +9,7 @@
     flex-direction: column;
     gap: 10px;
     pointer-events: none;
-    width: 360px;
+    width: 380px;
     max-width: calc(100vw - 32px);
 }
 
@@ -18,25 +18,22 @@
 .toast {
     position: relative;
     pointer-events: all;
-    background: var(--bg-card);
+    background: #fff;
     border-radius: 14px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 10px 24px -4px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     overflow: hidden;
-    transform: translateX(0);
-    opacity: 1;
     animation: toast-enter 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-    .toast.toast-exit {
-        animation: toast-exit 0.28s cubic-bezier(0.4, 0, 1, 1) both;
-    }
+.toast.toast-exit {
+    animation: toast-exit 0.28s cubic-bezier(0.4, 0, 1, 1) both;
+}
 
 @keyframes toast-enter {
     from {
         transform: translateX(110%) scale(0.92);
         opacity: 0;
     }
-
     to {
         transform: translateX(0) scale(1);
         opacity: 1;
@@ -47,15 +44,10 @@
     from {
         transform: translateX(0) scale(1);
         opacity: 1;
-        max-height: 120px;
-        margin-bottom: 0;
     }
-
     to {
         transform: translateX(110%) scale(0.92);
         opacity: 0;
-        max-height: 0;
-        margin-bottom: -10px;
     }
 }
 
@@ -73,13 +65,8 @@
 }
 
 @keyframes toast-progress {
-    from {
-        transform: scaleX(1);
-    }
-
-    to {
-        transform: scaleX(0);
-    }
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
 }
 
 /* ─── Body ────────────────────────────────────────────────────────────────── */
@@ -88,13 +75,13 @@
     display: flex;
     align-items: flex-start;
     gap: 11px;
-    padding: 14px 14px 14px 16px;
+    padding: 16px 16px 16px 18px;
 }
 
 .toast-icon {
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -102,17 +89,18 @@
 }
 
 .toast-svg {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
 }
 
 .toast-message {
     flex: 1;
-    font-size: 13.5px;
-    font-weight: 500;
+    font-size: 14px;
+    font-weight: 600;
     line-height: 1.45;
     color: var(--text-primary);
     word-break: break-word;
+    padding-top: 1px;
 }
 
 .toast-close {
@@ -120,22 +108,20 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border: none;
     background: none;
     cursor: pointer;
     border-radius: 6px;
-    color: var(--text-tertiary);
-    margin-top: -1px;
-    margin-right: -2px;
+    color: var(--text-muted);
     transition: background 0.15s, color 0.15s;
 }
 
-    .toast-close:hover {
-        background: var(--bg-main);
-        color: var(--text-secondary);
-    }
+.toast-close:hover {
+    background: var(--bg-main);
+    color: var(--text-secondary);
+}
 
 /* ─── Confirm Actions ─────────────────────────────────────────────────────── */
 
@@ -147,8 +133,8 @@
 }
 
 .toast-btn {
-    padding: 6px 16px;
-    border-radius: 8px;
+    padding: 7px 18px;
+    border-radius: var(--radius-full);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -156,18 +142,18 @@
     transition: opacity 0.15s, transform 0.12s;
 }
 
-    .toast-btn:active {
-        transform: scale(0.97);
-    }
+.toast-btn:active {
+    transform: scale(0.97);
+}
 
 .toast-btn-cancel {
     background: var(--bg-main);
     color: var(--text-secondary);
 }
 
-    .toast-btn-cancel:hover {
-        background: var(--border);
-    }
+.toast-btn-cancel:hover {
+    background: var(--border);
+}
 
 /* ─── Variant: Success ────────────────────────────────────────────────────── */
 
@@ -175,22 +161,22 @@
     border-left: 4px solid var(--status-active);
 }
 
-    .toast-success .toast-icon {
-        color: var(--status-active);
-    }
+.toast-success .toast-icon {
+    color: var(--status-active);
+}
 
-    .toast-success .toast-progress {
-        background: var(--status-active);
-    }
+.toast-success .toast-progress {
+    background: var(--status-active);
+}
 
-    .toast-success .toast-btn-confirm {
-        background: var(--status-active);
-        color: #fff;
-    }
+.toast-success .toast-btn-confirm {
+    background: var(--status-active);
+    color: #fff;
+}
 
-        .toast-success .toast-btn-confirm:hover {
-            background: var(--status-active);
-        }
+.toast-success .toast-btn-confirm:hover {
+    background: #04b981;
+}
 
 /* ─── Variant: Error ──────────────────────────────────────────────────────── */
 
@@ -198,22 +184,22 @@
     border-left: 4px solid var(--status-failed);
 }
 
-    .toast-error .toast-icon {
-        color: var(--status-failed);
-    }
+.toast-error .toast-icon {
+    color: var(--status-failed);
+}
 
-    .toast-error .toast-progress {
-        background: var(--status-failed);
-    }
+.toast-error .toast-progress {
+    background: var(--status-failed);
+}
 
-    .toast-error .toast-btn-confirm {
-        background: var(--status-failed);
-        color: #fff;
-    }
+.toast-error .toast-btn-confirm {
+    background: var(--status-failed);
+    color: #fff;
+}
 
-        .toast-error .toast-btn-confirm:hover {
-            background: var(--status-failed);
-        }
+.toast-error .toast-btn-confirm:hover {
+    background: #dc2626;
+}
 
 /* ─── Variant: Warning ────────────────────────────────────────────────────── */
 
@@ -221,22 +207,22 @@
     border-left: 4px solid var(--status-pending);
 }
 
-    .toast-warning .toast-icon {
-        color: var(--status-pending);
-    }
+.toast-warning .toast-icon {
+    color: var(--status-pending);
+}
 
-    .toast-warning .toast-progress {
-        background: var(--status-pending);
-    }
+.toast-warning .toast-progress {
+    background: var(--status-pending);
+}
 
-    .toast-warning .toast-btn-confirm {
-        background: var(--status-pending);
-        color: #fff;
-    }
+.toast-warning .toast-btn-confirm {
+    background: var(--status-pending);
+    color: #fff;
+}
 
-        .toast-warning .toast-btn-confirm:hover {
-            background: var(--status-pending);
-        }
+.toast-warning .toast-btn-confirm:hover {
+    background: #d97706;
+}
 
 /* ─── Variant: Info ───────────────────────────────────────────────────────── */
 
@@ -244,22 +230,22 @@
     border-left: 4px solid var(--primary);
 }
 
-    .toast-info .toast-icon {
-        color: var(--primary);
-    }
+.toast-info .toast-icon {
+    color: var(--primary);
+}
 
-    .toast-info .toast-progress {
-        background: var(--primary);
-    }
+.toast-info .toast-progress {
+    background: var(--primary);
+}
 
-    .toast-info .toast-btn-confirm {
-        background: var(--primary);
-        color: #fff;
-    }
+.toast-info .toast-btn-confirm {
+    background: var(--primary);
+    color: #fff;
+}
 
-        .toast-info .toast-btn-confirm:hover {
-            background: var(--primary-dark-hover);
-        }
+.toast-info .toast-btn-confirm:hover {
+    background: var(--primary-dark-hover);
+}
 
 /* ─── Variant: Confirm ────────────────────────────────────────────────────── */
 
@@ -267,18 +253,18 @@
     border-left: 4px solid var(--primary);
 }
 
-    .toast-confirm .toast-icon {
-        color: var(--primary);
-    }
+.toast-confirm .toast-icon {
+    color: var(--primary);
+}
 
-    .toast-confirm .toast-btn-confirm {
-        background: var(--primary);
-        color: #fff;
-    }
+.toast-confirm .toast-btn-confirm {
+    background: var(--primary);
+    color: #fff;
+}
 
-        .toast-confirm .toast-btn-confirm:hover {
-            background: var(--primary);
-        }
+.toast-confirm .toast-btn-confirm:hover {
+    background: var(--primary);
+}
 
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 

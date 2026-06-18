@@ -146,6 +146,8 @@ const CATEGORY_LABELS: Record<string, string> = {
     SystemAdmin: 'System Administration', Users: 'User Management',
     Roles: 'Role Management', Departments: 'Department Management',
     JobPositions: 'Job Position Management', Tasks: 'Task Management',
+    Approvals: 'Approval Management', Recruitment: 'Recruitment Management',
+    Dashboard: 'Dashboard', Reporting: 'Reporting',
 };
 function formatCategory(cat: string) { return CATEGORY_LABELS[cat] || cat.replace(/([A-Z])/g, ' $1').trim(); }
 function groupPermissions(perms: PermissionResponseDTO[]): Record<string, PermissionResponseDTO[]> {
@@ -232,43 +234,65 @@ interface PermSelectorProps {
     setSelected: (s: Set<string>) => void;
     disabled?: boolean;
 }
-const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, setSelected, disabled }) => (
-    <div className="rm2-perm-selector">
-        <div className="rm2-perm-selector__header">
-            <span className="rm2-form-label">Assign Permissions</span>
-            <span className="rm2-perm-count">{selected.size} selected</span>
-        </div>
-        <div className="rm2-perm-groups">
-            {Object.entries(grouped).map(([cat, perms]) => {
-                const allSel = perms.every(p => selected.has(p.name));
-                const someSel = perms.some(p => selected.has(p.name)) && !allSel;
-                return (
-                    <div key={cat} className="rm2-perm-group">
-                        <label className="rm2-perm-category">
-                            <input type="checkbox" checked={allSel} disabled={disabled}
-                                ref={el => { if (el) el.indeterminate = someSel; }}
-                                onChange={e => setSelected(toggleCat(selected, perms, e.target.checked))} />
-                            <span>{formatCategory(cat)}</span>
-                        </label>
-                        <div className="rm2-perm-items">
-                            {perms.map(perm => (
-                                <label key={perm.permissionId} className="rm2-perm-item" title={perm.description}>
-                                    <input type="checkbox" checked={selected.has(perm.name)} disabled={disabled}
-                                        onChange={() => setSelected(togglePerm(selected, perm.name))} />
-                                    <div className="rm2-perm-item__info">
-                                        <span className="rm2-perm-item__name">{getFriendlyName(perm.name)}</span>
-                                        {perm.description && <span className="rm2-perm-item__desc">{perm.description}</span>}
-                                    </div>
-                                </label>
-                            ))}
+const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, setSelected, disabled }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filtered = Object.entries(grouped).reduce((acc, [cat, perms]) => {
+        const filteredPerms = searchQuery
+            ? perms.filter(p =>
+                p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                getFriendlyName(p.name).toLowerCase().includes(searchQuery.toLowerCase())
+              )
+            : perms;
+        if (filteredPerms.length > 0) acc[cat] = filteredPerms;
+        return acc;
+    }, {} as Record<string, PermissionResponseDTO[]>);
+
+    return (
+        <div className="rm2-perm-selector">
+            <div className="rm2-perm-selector__header">
+                <span className="rm2-form-label">Assign Permissions</span>
+                <span className="rm2-perm-count">{selected.size} selected</span>
+            </div>
+            <div style={{ padding: '0 16px 8px' }}>
+                <input type="text" className="report-input" placeholder="Search permissions..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{ width: '100%', fontSize: 13 }} />
+            </div>
+            <div className="rm2-perm-groups">
+                {Object.entries(filtered).map(([cat, perms]) => {
+                    const allSel = perms.every(p => selected.has(p.name));
+                    const someSel = perms.some(p => selected.has(p.name)) && !allSel;
+                    return (
+                        <div key={cat} className="rm2-perm-group">
+                            <label className="rm2-perm-category">
+                                <input type="checkbox" checked={allSel} disabled={disabled}
+                                    ref={el => { if (el) el.indeterminate = someSel; }}
+                                    onChange={e => setSelected(toggleCat(selected, perms, e.target.checked))} />
+                                <span>{formatCategory(cat)} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({perms.length})</span></span>
+                            </label>
+                            <div className="rm2-perm-items">
+                                {perms.map(perm => (
+                                    <label key={perm.permissionId} className="rm2-perm-item" title={perm.description}>
+                                        <input type="checkbox" checked={selected.has(perm.name)} disabled={disabled}
+                                            onChange={() => setSelected(togglePerm(selected, perm.name))} />
+                                        <div className="rm2-perm-item__info">
+                                            <span className="rm2-perm-item__name">{getFriendlyName(perm.name)}</span>
+                                            {perm.description && <span className="rm2-perm-item__desc">{perm.description}</span>}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                );
-            })}
-            {Object.keys(grouped).length === 0 && <p className="rm2-perm-empty">No permissions available.</p>}
+                    );
+                })}
+                {Object.keys(filtered).length === 0 && <p className="rm2-perm-empty">No permissions match your search.</p>}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -335,6 +359,8 @@ export default function RoleManagementTab() {
     const [createRoleDesc, setCreateRoleDesc] = useState('');
     const [createRolePerms, setCreateRolePerms] = useState<Set<string>>(new Set());
     const [createRoleErrors, setCreateRoleErrors] = useState<Record<string, string>>({});
+    const [createRoleDirty, setCreateRoleDirty] = useState(false);
+    const [editRoleDirty, setEditRoleDirty] = useState(false);
     const [editRoleDesc, setEditRoleDesc] = useState('');
     const [editRolePerms, setEditRolePerms] = useState<Set<string>>(new Set());
     const [editRoleError, setEditRoleError] = useState('');
@@ -344,12 +370,14 @@ export default function RoleManagementTab() {
     const [editingDept, setEditingDept] = useState<DepartmentResponseDTO | null>(null);
     const [deptForm, setDeptForm] = useState(DEFAULT_DEPT_FORM);
     const [deptFormErrors, setDeptFormErrors] = useState<Record<string, string>>({});
+    const [deptDirty, setDeptDirty] = useState(false);
 
     // Position form
     const [isCreatePosOpen, setIsCreatePosOpen] = useState(false);
     const [editingPos, setEditingPos] = useState<JobPositionResponseDTO | null>(null);
     const [posForm, setPosForm] = useState(DEFAULT_POS_FORM);
     const [posFormErrors, setPosFormErrors] = useState<Record<string, string>>({});
+    const [posDirty, setPosDirty] = useState(false);
 
     // Quick-create dept from within position modal
     const [showQuickDept, setShowQuickDept] = useState(false);
@@ -574,12 +602,12 @@ export default function RoleManagementTab() {
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create role.'); }
             toastSuccess('Role created successfully!');
-            setIsCreateRoleOpen(false); fetchRoles();
+            setCreateRoleDirty(false); setIsCreateRoleOpen(false); fetchRoles();
         } catch (e: any) { toastError(e.message); setCreateRoleErrors({ api: e.message }); } finally { setActionLoading(false); }
     };
 
     const openEditRole = (role: RoleResponseDTO) => {
-        setEditingRole(role); setEditRoleDesc(role.description || ''); setEditRolePerms(new Set(role.permissions)); setEditRoleError('');
+        setEditRoleDirty(false); setEditingRole(role); setEditRoleDesc(role.description || ''); setEditRolePerms(new Set(role.permissions)); setEditRoleError('');
     };
 
     const handleEditRole = async (e: React.FormEvent) => {
@@ -593,7 +621,7 @@ export default function RoleManagementTab() {
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update role.'); }
             toastSuccess('Role updated successfully!');
-            setEditingRole(null); fetchRoles();
+            setEditRoleDirty(false); setEditingRole(null); fetchRoles();
         } catch (e: any) { toastError(e.message); setEditRoleError(e.message); } finally { setActionLoading(false); }
     };
 
@@ -686,7 +714,7 @@ export default function RoleManagementTab() {
             const res = await fetch('/api/organization/departments', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to create department.'); }
             toastSuccess('Department created successfully!');
-            setIsCreateDeptOpen(false); fetchDepartments();
+            setDeptDirty(false); setIsCreateDeptOpen(false); fetchDepartments();
         } catch (e: any) { toastError(e.message); setDeptFormErrors({ api: e.message }); } finally { setActionLoading(false); }
     };
 
@@ -944,11 +972,13 @@ export default function RoleManagementTab() {
     // ─── Shared form helpers ──────────────────────────────────────────────────
 
     const setDeptField = <K extends keyof typeof deptForm>(key: K, value: typeof deptForm[K]) => {
+        setDeptDirty(true);
         setDeptForm(f => ({ ...f, [key]: value }));
         setDeptFormErrors(p => ({ ...p, [key]: '' }));
     };
 
     const setPosField = <K extends keyof typeof posForm>(key: K, value: typeof posForm[K]) => {
+        setPosDirty(true);
         setPosForm(f => ({ ...f, [key]: value }));
         setPosFormErrors(p => ({ ...p, [key]: '' }));
     };
@@ -1512,32 +1542,34 @@ export default function RoleManagementTab() {
             )}
 
             {/* ─── CREATE ROLE MODAL ───────────────────────────────────────── */}
-            <FormModal isOpen={isCreateRoleOpen} onClose={() => setIsCreateRoleOpen(false)}
+            <FormModal isOpen={isCreateRoleOpen} onClose={() => { setCreateRoleDirty(false); setIsCreateRoleOpen(false); }}
                 title="Create Custom Role" subtitle="Define a new role and assign permissions."
                 onSubmit={handleCreateRole} submitLabel="Create Role" isSubmitting={actionLoading}
-                apiError={createRoleErrors.api} size="md">
+                apiError={createRoleErrors.api} size="md"
+                confirmOnCancel={true} dirty={createRoleDirty}>
                 <div className="rm2-form-body">
                     <div className="rm2-field">
                         <label className="rm2-form-label">Role Name <span className="rm2-req">*</span></label>
                         <input type="text" className={`form-input${createRoleErrors.name ? ' rm2-input--error' : ''}`}
                             placeholder="e.g. Operation Auditor" value={createRoleName}
-                            onChange={e => { setCreateRoleName(e.target.value); setCreateRoleErrors(p => ({ ...p, name: '' })); }} />
+                            onChange={e => { setCreateRoleName(e.target.value); setCreateRoleDirty(true); setCreateRoleErrors(p => ({ ...p, name: '' })); }} />
                         {createRoleErrors.name && <span className="rm2-field-error"><AlertCircle size={11} /> {createRoleErrors.name}</span>}
                     </div>
                     <div className="rm2-field">
                         <label className="rm2-form-label">Description</label>
                         <textarea className="form-input" rows={2} placeholder="Briefly describe what this role does…"
-                            value={createRoleDesc} onChange={e => setCreateRoleDesc(e.target.value)} />
+                            value={createRoleDesc} onChange={e => { setCreateRoleDesc(e.target.value); setCreateRoleDirty(true); }} />
                     </div>
-                    <PermissionSelector grouped={grouped} selected={createRolePerms} setSelected={setCreateRolePerms} />
+                    <PermissionSelector grouped={grouped} selected={createRolePerms} setSelected={(s) => { setCreateRolePerms(s); setCreateRoleDirty(true); }} />
                 </div>
             </FormModal>
 
             {/* ─── EDIT ROLE MODAL ─────────────────────────────────────────── */}
-            <FormModal isOpen={!!editingRole} onClose={() => setEditingRole(null)}
+            <FormModal isOpen={!!editingRole} onClose={() => { setEditRoleDirty(false); setEditingRole(null); }}
                 title={editingRole ? `Edit Role: ${editingRole.name}` : ''} subtitle="Update role description and permissions."
                 onSubmit={handleEditRole} submitLabel="Save Changes" isSubmitting={actionLoading}
-                apiError={editRoleError} size="md">
+                apiError={editRoleError} size="md"
+                confirmOnCancel={true} dirty={editRoleDirty}>
                 {editingRole && (
                     <div className="rm2-form-body">
                         <div className="rm2-field">
@@ -1547,9 +1579,9 @@ export default function RoleManagementTab() {
                         </div>
                         <div className="rm2-field">
                             <label className="rm2-form-label">Description</label>
-                            <textarea className="form-input" rows={2} value={editRoleDesc} onChange={e => setEditRoleDesc(e.target.value)} />
+                            <textarea className="form-input" rows={2} value={editRoleDesc} onChange={e => { setEditRoleDesc(e.target.value); setEditRoleDirty(true); }} />
                         </div>
-                        <PermissionSelector grouped={grouped} selected={editRolePerms} setSelected={setEditRolePerms} />
+                        <PermissionSelector grouped={grouped} selected={editRolePerms} setSelected={(s) => { setEditRolePerms(s); setEditRoleDirty(true); }} />
                     </div>
                 )}
             </FormModal>
@@ -1557,7 +1589,7 @@ export default function RoleManagementTab() {
             {/* ─── CREATE DEPT MODAL ───────────────────────────────────────── */}
             <FormModal
                 isOpen={isCreateDeptOpen}
-                onClose={() => setIsCreateDeptOpen(false)}
+                onClose={() => { setDeptDirty(false); setIsCreateDeptOpen(false); }}
                 title="Add Department"
                 subtitle="Create a new department in the organization."
                 onSubmit={handleCreateDept}
@@ -1565,6 +1597,8 @@ export default function RoleManagementTab() {
                 isSubmitting={actionLoading}
                 apiError={deptFormErrors.api}
                 size="md"
+                confirmOnCancel={true}
+                dirty={deptDirty}
             >
                 {renderDeptFormBody()}
             </FormModal>
@@ -1572,7 +1606,7 @@ export default function RoleManagementTab() {
             {/* ─── EDIT DEPT MODAL ─────────────────────────────────────────── */}
             <FormModal
                 isOpen={!!editingDept}
-                onClose={() => setEditingDept(null)}
+                onClose={() => { setDeptDirty(false); setEditingDept(null); }}
                 title={editingDept ? `Edit: ${editingDept.name}` : ''}
                 subtitle="Update department information."
                 onSubmit={handleEditDept}
@@ -1580,6 +1614,8 @@ export default function RoleManagementTab() {
                 isSubmitting={actionLoading}
                 apiError={deptFormErrors.api}
                 size="md"
+                confirmOnCancel={true}
+                dirty={deptDirty}
             >
                 {editingDept && renderDeptFormBody()}
             </FormModal>
@@ -1587,7 +1623,7 @@ export default function RoleManagementTab() {
             {/* ─── CREATE POSITION MODAL ───────────────────────────────────── */}
             <FormModal
                 isOpen={isCreatePosOpen}
-                onClose={() => setIsCreatePosOpen(false)}
+                onClose={() => { setPosDirty(false); setIsCreatePosOpen(false); }}
                 title="Add Job Position"
                 subtitle="Create a new position and associate it with a department."
                 onSubmit={handleCreatePos}
@@ -1595,6 +1631,8 @@ export default function RoleManagementTab() {
                 isSubmitting={actionLoading}
                 apiError={posFormErrors.api}
                 size="md"
+                confirmOnCancel={true}
+                dirty={posDirty}
             >
                 {renderPosFormBody()}
             </FormModal>
@@ -1602,7 +1640,7 @@ export default function RoleManagementTab() {
             {/* ─── EDIT POSITION MODAL ─────────────────────────────────────── */}
             <FormModal
                 isOpen={!!editingPos}
-                onClose={() => setEditingPos(null)}
+                onClose={() => { setPosDirty(false); setEditingPos(null); }}
                 title={editingPos ? `Edit: ${editingPos.name}` : ''}
                 subtitle="Update position information."
                 onSubmit={handleEditPos}
@@ -1610,6 +1648,8 @@ export default function RoleManagementTab() {
                 isSubmitting={actionLoading}
                 apiError={posFormErrors.api}
                 size="md"
+                confirmOnCancel={true}
+                dirty={posDirty}
             >
                 {editingPos && renderPosFormBody()}
             </FormModal>

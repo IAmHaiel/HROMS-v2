@@ -41,9 +41,13 @@ import LeaveRequestModal, {
     LEAVE_TYPES,
 } from '../../components/LeaveRequestModal/LeaveRequestModal';
 import { usePreventBackNav } from '../../components/Auth/usePreventBackNav';
+import { useToast } from '../../components/Toast/Toast';
 import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
+import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
+import FormModal from '../../components/FormModal/FormModal';
+import EmptyState from '../../components/ui/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -241,56 +245,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     const pm = priorityMeta[task.priority];
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span
-                            className={`prio-strip ${pm.cls}`}
-                            style={{ width: 6, height: 36, borderRadius: 3, display: 'inline-block' }}
-                        />
-                        <div>
-                            <h3 style={{ margin: 0 }}>{task.name}</h3>
-                            <span className={`badge ${sm.cls}`} style={{ marginTop: 4 }}>
-                                {sm.icon}{sm.label}
-                            </span>
-                        </div>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
-                </div>
-
-                <div style={{ padding: '0 4px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {task.description && (
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
-                        </div>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        {[
-                            { label: 'Deadline', value: fmtDate(task.deadline) },
-                            { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
-                            { label: 'Assigned by', value: task.assignedBy },
-                            { label: 'Progress', value: `${task.progress}%` },
-                        ].map(({ label, value, style }) => (
-                            <div key={label}>
-                                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
-                                <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="tc-bar" style={{ height: 8 }}>
-                        <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
-                    </div>
-                    {task.remarks && (
-                        <div>
-                            <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
-                            <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+        <FormModal isOpen onClose={onClose} title={task.name} subtitle={sm.label} size="md"
+            footer={
+                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
                     <button className="btn" onClick={onClose}>Close</button>
                     {task.status !== 'completed' && task.status !== 'done' && (
                         <button className="btn btn-primary" onClick={onUpdate}>
@@ -298,8 +255,37 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                         </button>
                     )}
                 </div>
+            }
+        >
+            {task.description && (
+                <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
+                    <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.description}</p>
+                </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                {[
+                    { label: 'Deadline', value: fmtDate(task.deadline) },
+                    { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
+                    { label: 'Assigned by', value: task.assignedBy },
+                    { label: 'Progress', value: `${task.progress}%` },
+                ].map(({ label, value, style }) => (
+                    <div key={label}>
+                        <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
+                        <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
+                    </div>
+                ))}
             </div>
-        </div>
+            <div className="tc-bar" style={{ height: 8, marginBottom: 12 }}>
+                <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
+            </div>
+            {task.remarks && (
+                <div>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
+                    <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
+                </div>
+            )}
+        </FormModal>
     );
 };
 
@@ -356,33 +342,32 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
     }));
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-card" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-                <div className="modal-head">
-                    <div>
-                        <h3>Update Progress</h3>
-                        <p className="modal-sub">{task.name}</p>
-                    </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+        <FormModal isOpen onClose={onClose} title="Update Progress" subtitle={task.name} size="sm"
+            footer={
+                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save</>}
+                    </button>
                 </div>
-
-                {error && (
-                    <div className="form-api-error" style={{ marginBottom: 10 }}>
-                        <AlertCircle size={14} /><span>{error}</span>
-                    </div>
-                )}
-                {fsmError && (
-                    <div className="form-api-error" style={{ marginBottom: 10, background: 'rgba(238,93,80,0.1)', color: 'var(--status-failed)' }}>
-                        <AlertCircle size={14} /><span>{fsmError}</span>
-                    </div>
-                )}
-
-                {validNext.length === 0 ? (
-                    <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        <AlertCircle size={18} style={{ marginBottom: 6 }} />
-                        <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. The Operations Admin will review it.</p>
-                    </div>
-                ) : (
+            }
+        >
+            {error && (
+                <div className="form-api-error" style={{ marginBottom: 12 }}>
+                    <AlertCircle size={14} /><span>{error}</span>
+                </div>
+            )}
+            {fsmError && (
+                <div className="form-api-error" style={{ marginBottom: 12 }}>
+                    <AlertCircle size={14} /><span>{fsmError}</span>
+                </div>
+            )}
+            {validNext.length === 0 ? (
+                <div className="field" style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <AlertCircle size={18} style={{ marginBottom: 6 }} />
+                    <p style={{ fontSize: 13 }}>This task is in "{statusMeta[baseStatus]?.label ?? baseStatus}" status and cannot be updated further. Contact your admin if you need changes.</p>
+                </div>
+            ) : (
                     <>
                         <div className="field">
                             <label>Status — <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>current: {statusMeta[baseStatus]?.label ?? baseStatus}</span></label>
@@ -426,18 +411,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     />
                     <div className="leave-char-count">{remarks.length} / 300</div>
                 </div>
-
-                <div className="modal-actions" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
-                    <button className="btn" onClick={onClose}>Cancel</button>
-                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                        {saving
-                            ? <><Loader2 size={13} className="spin" /> Saving…</>
-                            : <><Save size={13} /> Save Progress</>
-                        }
-                    </button>
-                </div>
-            </div>
-        </div>
+        </FormModal>
     );
 };
 
@@ -518,6 +492,27 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     const urgent = tasks.filter(t => t.priority === 'high' && t.status !== 'completed');
     const firstName = user.fullName ? user.fullName.split(' ')[0] : 'Employee';
     const initials = getInitials(user.fullName);
+
+    const [recentTrackers, setRecentTrackers] = useState<TrackerData[]>([]);
+    const [activeTrackerCount, setActiveTrackerCount] = useState(0);
+    const [trackersLoading, setTrackersLoading] = useState(true);
+
+    const fetchRecentTrackers = async () => {
+        try {
+            const res = await fetch('/api/approvalrequests/my-trackers?pageSize=5', {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const list = json?.data?.data ?? json?.data ?? json ?? [];
+                setRecentTrackers(Array.isArray(list) ? list : []);
+                setActiveTrackerCount(json?.data?.activeCount ?? list.filter((t: any) => t.status === 'Pending').length);
+            }
+        } catch { /* silent */ }
+        finally { setTrackersLoading(false); }
+    };
+
+    useEffect(() => { fetchRecentTrackers(); }, []);
 
     return (
         <div className="tab-content">
@@ -613,6 +608,28 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                             </div>
                         ))}
                     </div>
+                </div>
+
+                <div className="card" style={{ marginTop: 16 }}>
+                    <div className="card-header-layout">
+                        <h3><Shield size={15} style={{ marginRight: 6, verticalAlign: 'middle' }} />Pending Approvals</h3>
+                        {activeTrackerCount > 0 && (
+                            <span className="badge badge-purple" style={{ fontSize: 12 }}>{activeTrackerCount} active</span>
+                        )}
+                    </div>
+                    {trackersLoading ? (
+                        <EmptyState icon={<Loader2 size={18} className="spin" />} title="Loading trackers..." />
+                    ) : recentTrackers.length === 0 ? (
+                        <EmptyState icon={<Shield size={22} />} title="No approval requests yet" />
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 0 4px' }}>
+                            {recentTrackers.slice(0, 3).map(t => (
+                                <div key={t.approvalRequestId} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', background: t.status === 'Pending' ? 'rgba(67,24,255,0.03)' : 'transparent' }}>
+                                    <ApprovalTracker tracker={t} compact />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -808,8 +825,8 @@ const LeaveTab: React.FC<{
     loading: boolean;
     onNewRecord: (r: LeaveRecord) => void;
 }> = ({ records, loading, onNewRecord }) => {
+    const { success } = useToast();
     const [showModal, setShowModal] = useState(false);
-    const [submitSuccess, setSubmitSuccess] = useState(false);
     const [histFilter, setHistFilter] = useState<'all' | LeaveStatus>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 5;
@@ -837,8 +854,7 @@ const LeaveTab: React.FC<{
 
     const handleSubmit = (record: LeaveRecord) => {
         onNewRecord(record);
-        setSubmitSuccess(true);
-        setTimeout(() => setSubmitSuccess(false), 3500);
+        success('Your request has been submitted — pending review.');
     };
 
     return (
@@ -850,18 +866,6 @@ const LeaveTab: React.FC<{
                     <Plus size={14} /> Request Leave
                 </button>
             </div>
-
-            {/* Success toast */}
-            {submitSuccess && (
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: 'rgba(5,205,153,0.1)', border: '1px solid rgba(5,205,153,0.25)',
-                    borderRadius: 10, padding: '10px 14px', marginBottom: 16,
-                    fontSize: 13, color: '#05cd99', fontWeight: 600,
-                }}>
-                    <CheckCircle2 size={14} /> Request submitted — your manager will review it shortly.
-                </div>
-            )}
 
             {/* Stat cards */}
             <div className="stats-row" style={{ marginBottom: 16 }}>
@@ -985,6 +989,7 @@ interface ProfileTabProps {
 }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
+    const { success } = useToast();
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
@@ -1003,7 +1008,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
-    const [profileSuccess, setProfileSuccess] = useState(false);
 
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
     const [showPwd, setShowPwd] = useState({ current: false, next: false, confirm: false });
@@ -1101,9 +1105,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
             localStorage.setItem('contactNumber', form.contactNumber.trim());
             localStorage.setItem('email', form.email.trim());
             onUpdateUser({ ...user, fullName: newFullName, phone: form.contactNumber.trim() });
-            setProfileSuccess(true);
+            success('Profile updated successfully.');
             setEditMode(false);
-            setTimeout(() => setProfileSuccess(false), 2500);
         } catch (err: any) {
             setProfileError(err.message ?? 'Something went wrong.');
         } finally {
@@ -1183,81 +1186,43 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         <div className="tab-content">
 
             {/* Password Gate Modal */}
-            {passwordGate && (
-                <div className="modal-overlay" onClick={() => setPasswordGate(false)}>
-                    <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-                        <div className="modal-head">
-                            <div>
-                                <h3>Confirm Your Identity</h3>
-                                <p className="modal-sub">Enter your password to save your profile changes.</p>
-                            </div>
-                            <button className="icon-btn" onClick={() => setPasswordGate(false)} aria-label="Close">
-                                <X size={16} />
-                            </button>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
-                            <div style={{
-                                width: 52, height: 52, borderRadius: '50%',
-                                background: 'rgba(67,24,255,0.1)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                                <Lock size={22} color="var(--primary)" />
-                            </div>
-                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
-                                For your security, please verify your identity before saving changes.
-                            </p>
-                        </div>
-                        {gateError && (
-                            <div className="form-api-error" style={{ marginBottom: 12 }}>
-                                <AlertCircle size={14} /><span>{gateError}</span>
-                            </div>
-                        )}
-                        <div className="field" style={{ marginBottom: 20 }}>
-                            <label>Password</label>
-                            <div style={{ position: 'relative' }}>
-                                <input
-                                    type={showGatePassword ? 'text' : 'password'}
-                                    value={gatePassword}
-                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
-                                    onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
-                                    placeholder="Enter your current password"
-                                    style={{ paddingRight: 40, width: '100%' }}
-                                    autoFocus
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowGatePassword(p => !p)}
-                                    style={{
-                                        position: 'absolute', right: 12, top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'none', border: 'none', cursor: 'pointer',
-                                        color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
-                                    }}
-                                    tabIndex={-1}
-                                >
-                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="modal-actions">
-                            <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
-                                {gateLoading
-                                    ? <><Loader2 size={13} className="spin" /> Verifying…</>
-                                    : <><Shield size={13} /> Confirm & Save</>
-                                }
-                            </button>
-                        </div>
+            <FormModal isOpen={passwordGate} onClose={() => setPasswordGate(false)}
+                title="Confirm Your Identity" subtitle="Enter your password to save your profile changes." size="sm"
+                footer={
+                    <>
+                        <button className="btn" onClick={() => setPasswordGate(false)} disabled={gateLoading}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleGateConfirm} disabled={gateLoading || !gatePassword}>
+                            {gateLoading
+                                ? <><Loader2 size={13} className="spin" /> Verifying…</>
+                                : <><Shield size={13} /> Confirm & Save</>
+                            }
+                        </button>
+                    </>
+                }
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0 16px', gap: 8 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(67,24,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Lock size={22} color="var(--primary)" />
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: 0 }}>
+                        For your security, please verify your identity before saving changes.
+                    </p>
+                </div>
+                {gateError && <div className="form-api-error" style={{ marginBottom: 12 }}><AlertCircle size={14} /><span>{gateError}</span></div>}
+                <div className="field" style={{ marginBottom: 20 }}>
+                    <label>Password</label>
+                    <div style={{ position: 'relative' }}>
+                        <input type={showGatePassword ? 'text' : 'password'} value={gatePassword}
+                            onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                            onKeyDown={e => e.key === 'Enter' && handleGateConfirm()}
+                            placeholder="Enter your current password" style={{ paddingRight: 40, width: '100%' }} autoFocus />
+                        <button type="button" onClick={() => setShowGatePassword(p => !p)}
+                            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>
+                            {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
                     </div>
                 </div>
-            )}
-
-            {/* Success toast */}
-            {profileSuccess && (
-                <div className="toast-success">
-                    <CheckCircle2 size={16} /> Profile updated successfully
-                </div>
-            )}
+            </FormModal>
 
             {/* Profile Hero */}
             <div className="profile-hero card">
@@ -1286,7 +1251,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                     className={`btn ${editMode ? 'btn-danger' : 'btn-primary'} ph-edit-btn`}
                     onClick={editMode ? handleCancelEdit : () => {
                         setEditMode(true);
-                        setProfileSuccess(false);
                         ['firstName', 'middleName', 'lastName', 'email', 'contactNumber'].forEach(k => validateField(k, (form as any)[k]));
                     }}
                 >

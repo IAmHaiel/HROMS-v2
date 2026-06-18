@@ -55,8 +55,13 @@ const uid = () => ++_uid;
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
     const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+    const activeToastKeys = useRef<Map<string, number>>(new Map()); // "message|variant" -> id
 
     const dismiss = useCallback((id: number) => {
+        // Remove from active keys
+        for (const [key, tid] of activeToastKeys.current) {
+            if (tid === id) { activeToastKeys.current.delete(key); break; }
+        }
         // Start exit animation
         setToasts(prev =>
             prev.map(t => (t.id === id ? { ...t, exiting: true } : t))
@@ -71,24 +76,35 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const push = useCallback(
         (message: string, options: ToastOptions = {}): number => {
-            const id = uid();
             const variant = options.variant ?? 'info';
             const duration = options.duration ?? (variant === 'confirm' ? 0 : 4000);
+            const key = `${message}|${variant}`;
+
+            // Dedup: if the same message+variant is already visible, renew its timer
+            const existingId = activeToastKeys.current.get(key);
+            if (existingId !== undefined) {
+                const existingTimer = timers.current.get(existingId);
+                if (existingTimer) clearTimeout(existingTimer);
+                if (duration > 0) {
+                    const t = setTimeout(() => dismiss(existingId), duration);
+                    timers.current.set(existingId, t);
+                }
+                return existingId;
+            }
+
+            const id = uid();
             const confirmLabel = options.confirmLabel ?? 'Confirm';
             const cancelLabel = options.cancelLabel ?? 'Cancel';
 
             const item: ToastItem = {
-                id,
-                message,
-                variant,
-                duration,
-                confirmLabel,
-                cancelLabel,
+                id, message, variant, duration,
+                confirmLabel, cancelLabel,
                 onConfirm: options.onConfirm,
                 onCancel: options.onCancel,
                 exiting: false,
             };
 
+            activeToastKeys.current.set(key, id);
             setToasts(prev => [...prev, item]);
 
             if (duration > 0) {

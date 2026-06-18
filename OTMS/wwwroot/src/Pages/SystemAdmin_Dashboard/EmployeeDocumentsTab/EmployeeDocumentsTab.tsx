@@ -29,7 +29,7 @@ import {
     X, Plus, Calendar, User, Hash, Tag, Info,
 } from 'lucide-react';
 import DataTable from '../../../components/ui/DataTable';
-import Modal from '../../../components/ui/Modal';
+import FormModal from '../../../components/FormModal/FormModal';
 import StatusBadge from '../../../components/ui/StatusBadge';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -187,8 +187,8 @@ function UploadContractModal({ employees, onClose, onUploaded }: { employees: an
     };
 
     return (
-        <Modal isOpen onClose={onClose} title="Upload Contract"
-            subtitle={`Step ${step} of 2 — ${step === 1 ? 'Choose employee' : 'Document details'}`} size="md"
+        <FormModal isOpen onClose={onClose} title="Upload Contract"
+            subtitle={`Step ${step} of 2 — ${step === 1 ? 'Choose employee' : 'Document details'}`} size="md" confirmOnCancel={true}
         >
             {/* Step indicator */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -404,7 +404,7 @@ function UploadContractModal({ employees, onClose, onUploaded }: { employees: an
                         </div>
                     </div>
                 )}
-        </Modal>
+        </FormModal>
     );
 }
 
@@ -416,7 +416,7 @@ function ContractDetailModal({ doc, onClose }: { doc: any, onClose: () => void }
     const isArchived = contractStatus === 'Archived';
 
     return (
-        <Modal isOpen onClose={onClose} title="Document Details" subtitle="Contract record information" size="md">
+        <FormModal isOpen onClose={onClose} title="Document Details" subtitle="Contract record information" size="md">
             {/* Status banner */}
             <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -469,7 +469,7 @@ function ContractDetailModal({ doc, onClose }: { doc: any, onClose: () => void }
                         <Download size={13} /> Download PDF
                     </button>
                 </div>
-        </Modal>
+        </FormModal>
     );
 }
 

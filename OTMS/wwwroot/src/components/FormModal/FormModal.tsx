@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Loader2, X } from 'lucide-react';
 import StatusBadge from '../ui/StatusBadge';
+import ConfirmationModal from '../ConfirmationModal/ConfirmationModal';
 import './FormModal.css';
 
 export interface FormModalProps {
@@ -21,9 +22,13 @@ export interface FormModalProps {
     isSubmitting?: boolean;
     submitDisabled?: boolean;
     apiError?: string;
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'xl';
     footer?: React.ReactNode;
     children: React.ReactNode;
+    /** If true, shows "Discard changes?" confirmation before closing when dirty */
+    confirmOnCancel?: boolean;
+    /** Indicates whether form fields have been modified */
+    dirty?: boolean;
 }
 
 const FormModal: React.FC<FormModalProps> = ({
@@ -41,10 +46,16 @@ const FormModal: React.FC<FormModalProps> = ({
     size = 'md',
     footer,
     children,
+    confirmOnCancel = false,
+    dirty = false,
 }) => {
     const cardRef = useRef<HTMLDivElement>(null);
+    const [showConfirm, setShowConfirm] = useState(false);
 
-    // Prevent background scrolling when open
+    useEffect(() => {
+        if (!isOpen) setShowConfirm(false);
+    }, [isOpen]);
+
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -56,22 +67,40 @@ const FormModal: React.FC<FormModalProps> = ({
         };
     }, [isOpen]);
 
-    // Close on Escape key press
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (isOpen && e.key === 'Escape') {
-                onClose();
+                if (showConfirm) setShowConfirm(false);
+                else handleCancelClick();
             }
         };
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, showConfirm]);
 
     const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) {
+            if (showConfirm) setShowConfirm(false);
+            else handleCancelClick();
+        }
+    };
+
+    const handleCancelClick = () => {
+        if (confirmOnCancel && dirty) {
+            setShowConfirm(true);
+        } else {
             onClose();
         }
     };
+
+    const handleConfirmDiscard = () => {
+        setShowConfirm(false);
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    if (!isOpen) return null;
 
     if (!isOpen) return null;
 
@@ -102,7 +131,7 @@ const FormModal: React.FC<FormModalProps> = ({
                         <button
                             type="button"
                             className="fm-btn fm-btn-cancel"
-                            onClick={onClose}
+                            onClick={handleCancelClick}
                             disabled={isSubmitting}
                         >
                             {cancelLabel}
@@ -130,6 +159,17 @@ const FormModal: React.FC<FormModalProps> = ({
 
     return (
         <div className="fm-overlay" onClick={handleOverlayClick}>
+            <ConfirmationModal
+                isOpen={showConfirm}
+                variant="warning"
+                icon="ti-alert-triangle"
+                title="Discard changes?"
+                description="You have unsaved changes. Are you sure you want to cancel?"
+                confirmLabel="Discard"
+                cancelLabel="Keep editing"
+                onConfirm={handleConfirmDiscard}
+                onCancel={() => setShowConfirm(false)}
+            />
             <div
                 className={`fm-card fm-size-${size}`}
                 ref={cardRef}
@@ -142,7 +182,7 @@ const FormModal: React.FC<FormModalProps> = ({
                         <h3 className="fm-title">{title}</h3>
                         {subtitle && <p className="fm-subtitle">{subtitle}</p>}
                     </div>
-                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
+                    <button className="icon-btn" onClick={handleCancelClick}><X size={16} /></button>
                 </div>
 
                 {apiError && (
