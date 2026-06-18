@@ -1,0 +1,62 @@
+Interview Scheduling
+
+Flow:
+
+1. Admin updates an applicant's status to 'Interview Scheduled'.
+2. System immediately prompts the Admin with the Interview Scheduling Form.
+3. Admin inputs the scheduled date, time, and physical/virtual location.
+4. Admin submits the schedule.
+5. System stores the interview details linked to the Applicant Record.
+6. System automatically generates an email template containing the applicant's name, position, and interview details.
+7. System dispatches the email via SMTP to the applicant's registered Gmail address.
+8. System displays a confirmation that the email was sent.
+9. System logs the scheduling and email dispatch in the Audit Log.
+
+Interview Scheduling Form:
+- Interview Date (Date Picker Input, Required, Must be a future date)
+- Interview Time (Time Picker Input, Required)
+- Location/Meeting Link (Text Input, Required, max 255 characters)
+
+Email Generation Data:
+- Applicant Email (System Stored Value)
+- Applicant Full Name (System Stored Value)
+- Job Position Title (System Stored Value)
+- Interview Date (From Admin Input, formatted as "dddd, MMMM dd, yyyy")
+- Interview Time (From Admin Input, formatted as "hh:mm tt" 12-hour format)
+- Location/Meeting Link (From Admin Input)
+
+Success Messages:
+- "Interview scheduled and email sent successfully."
+- "Interview schedule saved to database."
+- "Email notification sent successfully. Dispatched to {email}"
+- "Audit log entry generated — Action: Interview Scheduled · Target: {email}"
+
+Error Messages:
+- "Unauthorized. Please log in again."
+- "Applicant not found."
+- "Interview date must be in the future."
+- "Date must be in the future."
+- "Interview date is required."
+- "Interview time is required."
+- "Location or meeting link is required."
+- "Maximum 255 characters."
+- "Failed to send interview email. Please check the email configuration and try again."
+- "Email dispatch failed after retry."
+- "Failed to schedule interview: {error message}"
+
+System Output:
+- Interview schedule saved to database.
+- Automated Email Notification dispatched.
+- Audit log entry generated (Action: Interview Scheduled, Target: Applicant Email).
+- Applicant status updated to "Interview Scheduled".
+- Status history record created (old status -> "Interview Scheduled").
+- Active onboarding tokens expired (if any).
+- Recruitment Dashboard data grid refreshed.
+
+Business Rules:
+
+1. The system shall allow the Admin to set an interview date, time, and location for an applicant.
+2. Upon saving the schedule, the system shall automatically format and send an email notification to the applicant containing the specified interview details.
+3. The system shall validate that the interview date is not set in the past.
+4. The system shall handle SMTP timeouts gracefully and queue the email for retry if the initial dispatch fails.
+5. The applicant's status shall only transition to "Interview Scheduled" after the email has been successfully dispatched.

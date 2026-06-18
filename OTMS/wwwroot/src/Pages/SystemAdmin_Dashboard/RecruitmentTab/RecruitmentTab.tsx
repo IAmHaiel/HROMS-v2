@@ -1458,6 +1458,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                 const paginated = apiResult.data;
                 const mapped: ApplicantRecord[] = (paginated.data || []).map((item: any) => ({
                     applicantId: item.applicantRecordId,
+                    referenceNumber: item.referenceNumber,
                     fullName: item.fullName,
                     email: item.emailAddress,
                     contactNumber: item.contactNumber,
@@ -1596,7 +1597,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                 >
                     {applicants.map((a) => (
                         <tr key={a.applicantId} onClick={() => setDetailApplicant(a)} style={{ cursor: 'pointer' }}>
-                            <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>{a.applicantId}</td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-secondary)' }}>{a.referenceNumber}</td>
                             <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary), var(--primary-hover))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
@@ -1623,7 +1624,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                             <td onClick={(e) => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     <button className="action-icon-btn" onClick={() => setDetailApplicant(a)} title="View"><Eye size={13} /></button>
-                                    {STATUS_TRANSITIONS[a.currentStatus].length > 0 && a.currentStatus !== 'Job Offered' && (
+                                    {(STATUS_TRANSITIONS[a.currentStatus]?.length ?? 0) > 0 && a.currentStatus !== 'Job Offered' && (
                                         <button className="action-icon-btn" onClick={() => setUpdateApplicant(a)} title="Update" style={{ background: 'var(--bg-input)', color: 'var(--primary)' }}><RefreshCw size={13} /></button>
                                     )}
                                 </div>
