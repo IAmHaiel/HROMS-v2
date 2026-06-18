@@ -1385,7 +1385,28 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                         <DetailRow label="Highest Attainment" value={applicant.highestEducationalAttainment} />
                         <DetailRow label="Institution" value={applicant.institution} />
                         <DetailRow label="Year Graduated" value={applicant.yearGraduated} />
-                        <DetailRow label="Licenses/Certifications" value={applicant.professionalLicensesCertifications} />
+                        {(() => {
+                            const raw = applicant.professionalLicensesCertifications;
+                            if (!raw) return <DetailRow label="Licenses/Certifications" value="None" />;
+                            try {
+                                const files = JSON.parse(raw) as string[];
+                                if (files.length === 0) return <DetailRow label="Licenses/Certifications" value="None" />;
+                                return (
+                                    <div style={{ marginTop: 8 }}>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', display: 'block', marginBottom: 6 }}>Licenses &amp; Certifications</span>
+                                        {files.map((path, i) => (
+                                            <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                                                <a href={path} target="_blank" rel="noopener noreferrer" style={{ color: '#4318ff', fontWeight: 600, textDecoration: 'none' }}>
+                                                    📄 License/Certificate {i + 1}
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            } catch {
+                                return <DetailRow label="Licenses/Certifications" value={raw} />;
+                            }
+                        })()}
                     </CollapsibleSection>
 
                     {applicant.adminRemarks && (
