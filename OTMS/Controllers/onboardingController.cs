@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OTMS.Entities.DTOs;
 using OTMS.Entities.DTOs.Recruitment;
 using OTMS.Service.Interfaces;
 
@@ -11,6 +12,16 @@ namespace OTMS.Controllers
         [HttpPost("api/onboarding/validate")]
         public async Task<IActionResult> ValidateToken([FromBody] ValidateOnboardingTokenDTO request)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new ApiResponseDTO<OnboardingValidationResponseDTO>
+                {
+                    IsSuccess = false,
+                    Message = "Token is required.",
+                    Data = null
+                });
+            }
+
             var result = await onboardingService.ValidateOnboardingTokenAsync(request.Token);
 
             if (!result.IsSuccess)
@@ -35,6 +46,18 @@ namespace OTMS.Controllers
         public async Task<IActionResult> CompleteProfile([FromBody] CompleteProfileDTO request)
         {
             var result = await onboardingService.CompleteProfileAsync(request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        [HttpPost("api/onboarding/resend-link")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResendLink([FromBody] ValidateOnboardingTokenDTO request)
+        {
+            var result = await onboardingService.ResendOnboardingLinkByTokenAsync(request.Token);
 
             if (!result.IsSuccess)
                 return BadRequest(result);

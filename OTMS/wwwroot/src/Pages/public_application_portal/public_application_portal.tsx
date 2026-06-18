@@ -446,9 +446,10 @@ export default function PublicApplicationPortal() {
             setSubmitLoading(false);
             if (axios.isAxiosError(err) && err.response?.data) {
                 const data = err.response.data as { message?: string };
-                setSubmitError(data.message ?? 'An error occurred. Please try again.');
+                const isDown = err.response.status >= 502;
+                setSubmitError(isDown ? 'System not available at the moment. Please try again later.' : (data.message ?? 'An error occurred. Please try again.'));
             } else {
-                setSubmitError('An error occurred. Please try again.');
+                setSubmitError('System not available at the moment. Please try again later.');
             }
         }
     };
@@ -922,7 +923,7 @@ export default function PublicApplicationPortal() {
                                     <label style={s.label}>Highest Educational Attainment <span style={s.req}>*</span></label>
                                     <select value={form.highestEducationalAttainment}
                                         onChange={e => { const val = e.target.value; setForm(p => ({ ...p, highestEducationalAttainment: val })); const err = validateField('highestEducationalAttainment', val); setErrors(p => ({ ...p, highestEducationalAttainment: err || undefined })); }}
-                                        style={{ ...s.input, ...s.select, cursor: 'pointer', color: form.highestEducationalAttainment ? 'var(--text-primary)' : 'var(--text-muted)', ...(errors.highestEducationalAttainment ? s.inputErr : {}) }}>
+                                        style={{ ...s.input, ...s.select, cursor: 'pointer', color: '#000', ...(errors.highestEducationalAttainment ? s.inputErr : {}) }}>
                                         <option value="" disabled>Select your highest educational attainment...</option>
                                         {EDUCATION_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                                     </select>

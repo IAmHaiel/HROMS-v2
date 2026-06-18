@@ -546,24 +546,22 @@ namespace OTMS.Service.Services
                 };
             }
 
-            var complianceData = await context.Employee201FileDatas
-                .FirstOrDefaultAsync(c => c.EmployeeId == employee.EmployeeId);
+            var applicantRecord = await context.ApplicantRecords
+                .FirstOrDefaultAsync(ar => ar.EmailAddress == employee.Email);
 
             ComplianceDataDTO? compliance = null;
-            if (complianceData != null)
+            if (applicantRecord != null)
             {
                 compliance = new ComplianceDataDTO
                 {
-                    SssNumber = DataEncryptionHelper.Decrypt(complianceData.SssNumberEncrypted, configuration),
-                    PhilhealthNumber = DataEncryptionHelper.Decrypt(complianceData.PhilhealthNumberEncrypted, configuration),
-                    PagibigNumber = DataEncryptionHelper.Decrypt(complianceData.PagibigNumberEncrypted, configuration),
-                    TinNumber = complianceData.TinNumberEncrypted != null
-                        ? DataEncryptionHelper.Decrypt(complianceData.TinNumberEncrypted, configuration)
-                        : null,
-                    BankName = DataEncryptionHelper.Decrypt(complianceData.BankNameEncrypted, configuration),
-                    BankAccountNumber = DataEncryptionHelper.Decrypt(complianceData.BankAccountNumberEncrypted, configuration),
-                    EmergencyContactName = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNameEncrypted, configuration),
-                    EmergencyContactNumber = DataEncryptionHelper.Decrypt(complianceData.EmergencyContactNumberEncrypted, configuration)
+                    SssNumber = applicantRecord.SSSNumber ?? "",
+                    PhilhealthNumber = applicantRecord.PhilHealthNumber ?? "",
+                    PagibigNumber = applicantRecord.PagIBIGNumber ?? "",
+                    TinNumber = applicantRecord.TIN,
+                    BankName = applicantRecord.BankName ?? "",
+                    BankAccountNumber = applicantRecord.BankAccountNumber ?? "",
+                    EmergencyContactName = applicantRecord.EmergencyContactName ?? "",
+                    EmergencyContactNumber = applicantRecord.EmergencyContactMobileNumber ?? ""
                 };
             }
 

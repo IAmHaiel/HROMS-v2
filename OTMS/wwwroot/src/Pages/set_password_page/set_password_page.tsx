@@ -51,9 +51,10 @@ export default function SetPasswordPage() {
         } catch (err: unknown) {
             if (axios.isAxiosError(err) && err.response?.data) {
                 const d = err.response.data as { message?: string };
-                setError(d.message || 'Failed to set password.');
+                const isDown = err.response.status >= 502;
+                setError(isDown ? 'System not available at the moment. Please try again later.' : (d.message || 'Failed to set password.'));
             } else {
-                setError('Failed to set password. Please try again.');
+                setError('System not available at the moment. Please try again later.');
             }
         } finally {
             setLoading(false);

@@ -337,11 +337,17 @@ namespace OTMS.Service.Services
             {
                 // Update existing employee (admin-created flow)
                 employee = existingEmployee;
-                if (!string.IsNullOrWhiteSpace(applicant.FirstName)) employee.FirstName = applicant.FirstName;
-                if (!string.IsNullOrWhiteSpace(applicant.MiddleName)) employee.MiddleName = applicant.MiddleName;
-                if (!string.IsNullOrWhiteSpace(applicant.LastName)) employee.LastName = applicant.LastName;
-                if (!string.IsNullOrWhiteSpace(applicant.Suffix)) employee.Suffix = applicant.Suffix;
-                if (!string.IsNullOrWhiteSpace(applicant.ContactNumber)) employee.ContactNumber = applicant.ContactNumber;
+                var srcName = formData ?? (object)applicant;
+                var firstName = formData?.FirstName ?? applicant.FirstName;
+                var middleName = formData?.MiddleName ?? applicant.MiddleName;
+                var lastName = formData?.LastName ?? applicant.LastName;
+                var suffix = formData?.Suffix ?? applicant.Suffix;
+                var contactNumber = formData?.ContactNumber ?? applicant.ContactNumber;
+                if (!string.IsNullOrWhiteSpace(firstName)) employee.FirstName = firstName;
+                if (!string.IsNullOrWhiteSpace(middleName)) employee.MiddleName = middleName;
+                if (!string.IsNullOrWhiteSpace(lastName)) employee.LastName = lastName;
+                if (!string.IsNullOrWhiteSpace(suffix)) employee.Suffix = suffix;
+                if (!string.IsNullOrWhiteSpace(contactNumber)) employee.ContactNumber = contactNumber;
                 employee.UpdatedAt = DateTime.UtcNow;
 
                 if (employee.Account != null)
@@ -434,13 +440,17 @@ namespace OTMS.Service.Services
                 if (!string.IsNullOrWhiteSpace(formData.FatherFirstName)) applicant.FatherFirstName = formData.FatherFirstName;
                 if (!string.IsNullOrWhiteSpace(formData.FatherMiddleName)) applicant.FatherMiddleName = formData.FatherMiddleName;
                 if (!string.IsNullOrWhiteSpace(formData.FatherLastName)) applicant.FatherLastName = formData.FatherLastName;
+                if (!string.IsNullOrWhiteSpace(formData.FirstName)) applicant.FirstName = formData.FirstName;
+                if (!string.IsNullOrWhiteSpace(formData.MiddleName)) applicant.MiddleName = formData.MiddleName;
+                if (!string.IsNullOrWhiteSpace(formData.LastName)) applicant.LastName = formData.LastName;
+                if (!string.IsNullOrWhiteSpace(formData.Suffix)) applicant.Suffix = formData.Suffix;
+                if (!string.IsNullOrWhiteSpace(formData.ContactNumber)) applicant.ContactNumber = formData.ContactNumber;
                 if (!string.IsNullOrWhiteSpace(formData.EducationLevel)) applicant.HighestEducationalAttainment = formData.EducationLevel;
                 if (!string.IsNullOrWhiteSpace(formData.EducationInstitution)) applicant.Institution = formData.EducationInstitution;
                 if (!string.IsNullOrWhiteSpace(formData.EducationDegree)) applicant.Degree = formData.EducationDegree;
                 if (formData.EducationYearGraduated.HasValue) applicant.YearGraduated = formData.EducationYearGraduated.Value.ToString();
                 applicant.UpdatedAt = DateTime.UtcNow;
             }
-
             context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
             {
                 ApplicantStatusRecordId = Guid.NewGuid(),
@@ -451,6 +461,39 @@ namespace OTMS.Service.Services
                 UpdatedById = onboardingToken.CreatedByAccountId,
                 UpdatedAt = DateTime.UtcNow
             });
+
+            // Copy onboarding document paths from ApplicantRecord to EmployeeAttachment
+            if (employee != null)
+            {
+                var docMap = new Dictionary<string, string?>
+                {
+                    { "Resume / CV", applicant.ResumeFilePath },
+                    { "Medical Clearance", applicant.MedicalClearanceFilePath },
+                    { "NBI Clearance", applicant.NBIClearanceFilePath },
+                    { "PSA Birth Certificate", applicant.PSABirthCertificateFilePath },
+                    { "BIR Form 2316", applicant.BIRForm2316FilePath },
+                };
+                foreach (var (title, path) in docMap)
+                {
+                    if (!string.IsNullOrWhiteSpace(path) && !await context.EmployeeAttachments.AnyAsync(a => a.EmployeeId == employee.EmployeeId && a.FilePath == path))
+                    {
+                        context.EmployeeAttachments.Add(new EmployeeAttachment
+                        {
+                            EmployeeAttachmentId = Guid.NewGuid(),
+                            EmployeeId = employee.EmployeeId,
+                            FileName = Path.GetFileName(new Uri(path).AbsolutePath),
+                            FilePath = path,
+                            ContentType = "application/octet-stream",
+                            FileSize = 0,
+                            Version = 1,
+                            DocumentType = "Onboarding Document",
+                            DocumentTitle = title,
+                            IsArchived = false,
+                            UploadedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+            }
 
             await context.SaveChangesAsync();
 
@@ -662,6 +705,37 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             return await GenerateAndSendOnboardingLinkAsync(applicantRecordId, currentAccountId.Value);
+        }
+
+        public async Task<ApiResponseDTO<OnboardingLinkResponseDTO>> ResendOnboardingLinkByTokenAsync(string rawToken)
+        {
+            if (string.IsNullOrWhiteSpace(rawToken))
+            {
+                return new ApiResponseDTO<OnboardingLinkResponseDTO> { IsSuccess = false, Message = "Token is required.", Data = null };
+            }
+
+            var tokenHash = ComputeSha256Hash(rawToken);
+            var onboardingToken = await context.OnboardingTokens
+                .FirstOrDefaultAsync(ot => ot.TokenHash == tokenHash);
+
+            if (onboardingToken == null)
+            {
+                return new ApiResponseDTO<OnboardingLinkResponseDTO> { IsSuccess = false, Message = "Invalid token.", Data = null };
+            }
+
+            // Expire old tokens
+            var existingTokens = await context.OnboardingTokens
+                .Where(ot => ot.ApplicantRecordId == onboardingToken.ApplicantRecordId && ot.Status == "Active")
+                .ToListAsync();
+
+            foreach (var t in existingTokens)
+            {
+                t.Status = "Expired";
+            }
+
+            await context.SaveChangesAsync();
+
+            return await GenerateAndSendOnboardingLinkAsync(onboardingToken.ApplicantRecordId, onboardingToken.CreatedByAccountId);
         }
 
         public async Task<ApiResponseDTO<string>> CompleteProfileAsync(CompleteProfileDTO formData)

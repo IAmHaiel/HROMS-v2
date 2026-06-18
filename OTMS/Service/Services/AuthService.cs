@@ -313,7 +313,15 @@ namespace OTMS.Service.Services
             };
             context.OnboardingTokens.Add(onboardingToken);
 
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                var innerMsg = ex.InnerException?.Message ?? ex.Message;
+                throw new InvalidOperationException($"Failed to save account data: {innerMsg}");
+            }
 
             // Save Account Created Activity under the creator's account if available, fallback to the newly created account
             await activityLogService.LogActivityAsync(

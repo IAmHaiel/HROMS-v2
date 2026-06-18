@@ -197,7 +197,7 @@ export default function Login() {
             }, 800);
 
         } catch {
-            updateStatus('Unable to connect to the server. Please check your connection and try again.', 'error');
+            updateStatus('System not available at the moment. Please try again later.', 'error');
         } finally {
             setIsLoading(false);
         }

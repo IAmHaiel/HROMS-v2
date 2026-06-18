@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, ArrowLeft,
-    User, Lock, Upload, FileText, Trash2, ShieldCheck, CreditCard, Phone
+    User, Lock, Upload, FileText, Trash2, ShieldCheck, CreditCard, Phone, Mail
 } from 'lucide-react';
 
 type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'documents201' | 'done';
@@ -67,6 +67,8 @@ export default function OnboardingPage() {
 
     const [tokenValidating, setTokenValidating] = useState(!isFresh);
     const [tokenError, setTokenError] = useState('');
+    const [resending, setResending] = useState(false);
+    const [resent, setResent] = useState(false);
     const [applicantInfo, setApplicantInfo] = useState<{
         fullName: string; firstName: string; middleName: string; lastName: string; suffix: string;
         contactNumber: string; email: string; position: string;
@@ -145,7 +147,8 @@ export default function OnboardingPage() {
                 }
             })
             .catch((err) => {
-                const msg = err?.response?.data?.message || 'Failed to validate onboarding link.';
+                const isNetworkDown = !err?.response || err?.response?.status >= 502;
+                const msg = isNetworkDown ? 'System not available at the moment. Please try again later.' : (err?.response?.data?.message || 'Failed to validate onboarding link.');
                 setTokenError(msg);
                 setTokenValidating(false);
             });
@@ -552,6 +555,11 @@ export default function OnboardingPage() {
                     body: JSON.stringify({
                         token: onboardingToken,
                         password: pw.next || null,
+                        firstName: profile.firstName || null,
+                        middleName: profile.middleName || null,
+                        lastName: profile.lastName || null,
+                        suffix: profile.suffix || null,
+                        contactNumber: profile.contactNumber || null,
                         sssNumber: form201.sss || null,
                         philHealthNumber: form201.philhealth || null,
                         pagIBIGNumber: form201.pagibig || null,
@@ -582,7 +590,10 @@ export default function OnboardingPage() {
                 setCompletedCredentials((data as any).message || '');
             }
             setStep('done');
-        } catch (err: any) { setApi201Error(err.message ?? 'Something went wrong. Please try again.'); }
+        } catch (err: any) {
+            const isNetworkDown = !err?.response || err?.response?.status >= 502;
+            setApi201Error(isNetworkDown ? 'System not available at the moment. Please try again later.' : (err.message ?? 'Something went wrong. Please try again.'));
+        }
         finally { setSaving201(false); }
     };
 
@@ -714,7 +725,40 @@ export default function OnboardingPage() {
                         </div>
                         <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px' }}>Link Invalid or Expired</h2>
                         <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>{tokenError}</p>
-                        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Please contact the HR department or your recruiter for assistance.</p>
+                    </div>
+                )}
+
+                {tokenError && !resending && !resent && (
+                    <div style={{ textAlign: 'center', marginTop: 12 }}>
+                        <button
+                            onClick={async () => {
+                                setResending(true);
+                                try {
+                                    await axios.post('/api/onboarding/resend-link', { token: onboardingToken });
+                                    setResent(true);
+                                } catch { setTokenError('Failed to resend. Please contact HR.'); }
+                                finally { setResending(false); }
+                            }}
+                            style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 8,
+                                background: 'var(--primary)', color: 'white', border: 'none',
+                                borderRadius: 'var(--radius-md)', padding: '12px 24px',
+                                fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                            }}
+                        >
+                            {resending ? <><Loader2 size={14} className="spin-icon" /> Sending…</> : <><Mail size={14} /> Resend Link</>}
+                        </button>
+                    </div>
+                )}
+
+                {resent && (
+                    <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '48px 32px', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.35)', marginTop: 16 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(5,150,105,0.1)', border: '2px solid rgba(5,150,105,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                            <CheckCircle2 size={28} color="var(--status-active)" />
+                        </div>
+                        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px' }}>New Link Sent!</h2>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>Please check your email for the new onboarding link.</p>
+                        <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>You can close this page.</p>
                     </div>
                 )}
 
