@@ -20,5 +20,10 @@ namespace OTMS.Entities.DTOs.Public
 
         [Required]
         public IFormFile Resume { get; set; } = null!;
+
+        public string? HighestEducationalAttainment { get; set; }
+        public string? Institution { get; set; }
+        public string? Degree { get; set; }
+        public string? YearGraduated { get; set; }
     }
 }

@@ -189,12 +189,21 @@ namespace OTMS.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Degree")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("EmailAddress")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HighestEducationalAttainment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Institution")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("JobPositionId")
@@ -206,6 +215,9 @@ namespace OTMS.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("YearGraduated")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ApplicantRecordId");
@@ -543,6 +555,21 @@ namespace OTMS.Migrations
 
                     b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EducationDegree")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EducationInstitution")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EducationIsCurrentlyEnrolled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("EducationLevel")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("EducationYearGraduated")
+                        .HasColumnType("int");
 
                     b.Property<string>("Email")
                         .IsRequired()

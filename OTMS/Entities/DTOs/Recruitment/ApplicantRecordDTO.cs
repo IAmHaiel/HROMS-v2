@@ -9,5 +9,9 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string JobPositionName { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public string? HighestEducationalAttainment { get; set; }
+        public string? Institution { get; set; }
+        public string? Degree { get; set; }
+        public string? YearGraduated { get; set; }
     }
 }

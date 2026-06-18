@@ -116,7 +116,11 @@ namespace OTMS.Service.Services
                 JobPositionId = request.JobPositionId,
                 ResumeFilePath = resumeFilePath,
                 Status = "Pending Review",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                HighestEducationalAttainment = request.HighestEducationalAttainment,
+                Institution = request.Institution,
+                Degree = request.Degree,
+                YearGraduated = request.YearGraduated
             };
 
             context.ApplicantRecords.Add(applicantRecord);

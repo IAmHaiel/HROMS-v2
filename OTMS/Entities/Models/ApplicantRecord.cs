@@ -12,6 +12,11 @@ namespace OTMS.Entities.Models
         public string Status { get; set; } = "Pending Review";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public string? HighestEducationalAttainment { get; set; }
+        public string? Institution { get; set; }
+        public string? Degree { get; set; }
+        public string? YearGraduated { get; set; }
+
         public ICollection<ApplicantStatusRecord> StatusHistory { get; set; } = new List<ApplicantStatusRecord>();
     }
 }

@@ -67,7 +67,11 @@ namespace OTMS.Service.Services
                     ContactNumber = ar.ContactNumber,
                     JobPositionName = ar.JobPosition.Title,
                     Status = ar.Status,
-                    CreatedAt = ar.CreatedAt
+                    CreatedAt = ar.CreatedAt,
+                    HighestEducationalAttainment = ar.HighestEducationalAttainment,
+                    Institution = ar.Institution,
+                    Degree = ar.Degree,
+                    YearGraduated = ar.YearGraduated
                 })
                 .ToListAsync();
 

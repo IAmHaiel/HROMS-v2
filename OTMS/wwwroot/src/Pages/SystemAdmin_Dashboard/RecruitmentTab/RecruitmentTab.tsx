@@ -73,6 +73,7 @@ export interface ApplicantRecord {
     declaredDependents: string;
     highestEducationalAttainment: string;
     institution: string;
+    degree: string;
     yearGraduated: string;
     professionalLicensesCertifications: string;
     isEmailVerified: boolean;
@@ -1323,6 +1324,7 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                     <CollapsibleSection title="Education & Qualifications">
                         <DetailRow label="Highest Education" value={applicant.highestEducationalAttainment} />
                         <DetailRow label="Institution" value={applicant.institution} />
+                        <DetailRow label="Degree / Field of Study" value={applicant.degree} />
                         <DetailRow label="Year Graduated" value={applicant.yearGraduated} />
                         <DetailRow label="Licenses/Certifications" value={applicant.professionalLicensesCertifications} />
                         <DetailRow label="Dependents" value={applicant.declaredDependents} />
@@ -1460,6 +1462,10 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     resumeUrl: null,
                     statusHistory: [],
                     interviewDetails: null,
+                    highestEducationalAttainment: item.highestEducationalAttainment || '',
+                    institution: item.institution || '',
+                    degree: item.degree || '',
+                    yearGraduated: item.yearGraduated || '',
                 }));
                 setApplicants(mapped);
                 setTotalPages(paginated.totalPages ?? 1);

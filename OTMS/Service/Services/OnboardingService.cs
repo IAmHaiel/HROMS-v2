@@ -213,7 +213,12 @@ namespace OTMS.Service.Services
                         EmployeeId = existingEmployee.EmployeeId,
                         FullName = onboardingToken.ApplicantRecord.FullName,
                         EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
-                        JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? ""
+                        JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? "",
+                        EducationLevel = existingEmployee.EducationLevel,
+                        EducationInstitution = existingEmployee.EducationInstitution,
+                        EducationDegree = existingEmployee.EducationDegree,
+                        EducationYearGraduated = existingEmployee.EducationYearGraduated,
+                        EducationIsCurrentlyEnrolled = existingEmployee.EducationIsCurrentlyEnrolled
                     }
                 };
             }
@@ -308,7 +313,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token)
+        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token, CompleteOnboardingDTO? educationData = null)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -392,6 +397,16 @@ namespace OTMS.Service.Services
 
             if (provisionedEmployee != null)
             {
+                if (educationData?.EducationLevel != null)
+                {
+                    provisionedEmployee.EducationLevel = educationData.EducationLevel;
+                    provisionedEmployee.EducationInstitution = educationData.EducationInstitution;
+                    provisionedEmployee.EducationDegree = educationData.EducationDegree;
+                    provisionedEmployee.EducationYearGraduated = educationData.EducationYearGraduated;
+                    provisionedEmployee.EducationIsCurrentlyEnrolled = educationData.EducationIsCurrentlyEnrolled;
+                    await context.SaveChangesAsync();
+                }
+
                 var frontendBaseUrl = configuration["FrontendBaseUrl"] ?? "http://localhost:5173";
                 var subject = "Your Employee Account Has Been Created";
                 var body = $@"
