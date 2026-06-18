@@ -1443,7 +1443,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                     outerRadius={90}
                                     paddingAngle={3}
                                     dataKey="value"
-                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                                     labelLine={false}
                                 >
                                     {statusDistribution.map((entry) => (
@@ -1478,7 +1478,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                 <Tooltip
                                     contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                                     labelStyle={{ fontWeight: 700, marginBottom: 4 }}
-                                    formatter={(value: number) => [`${value} tasks/emp`, 'Avg Workload']}
+                                    formatter={(value: unknown) => [`${Number(value ?? 0)} tasks/emp`, 'Avg Workload'] as [string, string]}
                                 />
                                 <Bar dataKey="avg" radius={[0, 6, 6, 0]} maxBarSize={28}>
                                     {avgWorkloadByRole.map((_, i) => (

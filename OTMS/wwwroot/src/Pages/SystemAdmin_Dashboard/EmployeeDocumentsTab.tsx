@@ -5,7 +5,7 @@ import {
     X, ChevronLeft, ChevronRight, Plus, Calendar,
     User, Hash, Tag, Info,
 } from 'lucide-react';
-import StatusBadge from '../../../components/ui/StatusBadge';
+import StatusBadge from '../../components/ui/StatusBadge';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
