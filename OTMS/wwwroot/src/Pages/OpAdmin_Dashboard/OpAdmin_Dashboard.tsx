@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
@@ -497,6 +497,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         taskRemarks: initial.taskRemarks ?? '',
     });
     const [supportingEvidence, setSupportingEvidence] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -676,7 +677,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <FieldErr name="taskTitle" />
                             {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
-                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>? Looks good</span>
+                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>✓ Looks good</span>
                             )}
                             <CharCount value={form.taskTitle} max={150} />
                         </div>
@@ -714,7 +715,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             <FieldErr name="dueAt" />
                             {!errors.dueAt && form.dueAt && (
                                 <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                    ? {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    ✓ {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
                             {!form.dueAt && !errors.dueAt && (
@@ -733,10 +734,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 className={errors.priority ? 'input-error' : ''}
                             >
                                 <option value="">Select priority</option>
-                                <option value="Critical">? Critical</option>
-                                <option value="High">?? High</option>
-                                <option value="Medium">?? Medium</option>
-                                <option value="Low">?? Low</option>
+                                <option value="Critical">🔴 Critical</option>
+                                <option value="High">🟠 High</option>
+                                <option value="Medium">🟡 Medium</option>
+                                <option value="Low">🟢 Low</option>
                             </select>
                             <FieldErr name="priority" />
                             {!errors.priority && form.priority && (
@@ -744,10 +745,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     fontSize: 11, marginTop: 3, display: 'block',
                                     color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? 'var(--status-failed)' : form.priority === 'Medium' ? 'var(--status-pending)' : 'var(--status-active)',
                                 }}>
-                                    {form.priority === 'Critical' && '?? Critical � requires immediate attention'}
-                                    {form.priority === 'High' && '? High priority � will be flagged for urgent attention'}
-                                    {form.priority === 'Medium' && '? Medium priority selected'}
-                                    {form.priority === 'Low' && '? Low priority selected'}
+                                    {form.priority === 'Critical' && '🔴 Critical — requires immediate attention'}
+                                    {form.priority === 'High' && '🟠 High priority — will be flagged for urgent attention'}
+                                    {form.priority === 'Medium' && '🟡 Medium priority selected'}
+                                    {form.priority === 'Low' && '🟢 Low priority selected'}
                                 </span>
                             )}
                         </div>
@@ -775,6 +776,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <label>Supporting Document <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                             <input
+                                ref={fileInputRef}
                                 type="file"
                                 accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
                                 onChange={e => {
@@ -799,7 +801,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             {supportingEvidence && (
                                 <button
                                     type="button"
-                                    onClick={() => setSupportingEvidence(null)}
+                                    onClick={() => {
+                                        setSupportingEvidence(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    }}
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
                                 >
                                     <X size={14} />
@@ -808,7 +813,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         </div>
                         {supportingEvidence && (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                ? {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
+                                ✓ {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
                             </span>
                         )}
                     </div>
@@ -1398,7 +1403,7 @@ const DashboardTab: React.FC<{
                                     {completed} of {total} tasks completed
                                 </p>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                    {overdue > 0 ? `${overdue} overdue � ` : ''}
+                                    {overdue > 0 ? `${overdue} overdue — ` : ''}
                                     {pendingReview > 0 ? `${pendingReview} pending review` : 'No pending reviews'}
                                 </span>
                             </div>
@@ -3654,19 +3659,19 @@ export default function OpsAdminDashboard() {
     // -- Fetch Team Members (for assignee dropdown) --
     const fetchTeamMembers = async () => {
         try {
-            const res = await fetch('/api/systemadmin/assignable-employees', {
+            const res = await fetch('/api/task/assignable-employees?pageSize=100', {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: any[] = await res.json();
-
-            console.log('Team members raw:', data); // ? ADD THIS to inspect shape
+            const json = await res.json();
+            const rawList = json.data?.data ?? json.data ?? json ?? [];
+            const data: any[] = Array.isArray(rawList) ? rawList : [];
 
             setTeamMembers(data.map(e => ({
-                accountId: e.accountId ?? e.AccountId ?? e.id,       // try variants
-                employeeName: e.employeeName ?? e.EmployeeName ?? e.name,
+                accountId: e.accountId ?? e.AccountId ?? e.id,
+                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').trim(),
                 role: e.role ?? e.Role ?? '',
-                presenceStatus: e.presenceStatus ?? 'Offline',
+                presenceStatus: e.availabilityStatus ?? 'Active',
             })));
         } catch {
             setTeamMembers([]);

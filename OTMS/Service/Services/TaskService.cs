@@ -1117,10 +1117,9 @@ namespace OTMS.Service.Services
         {
             var query = context.Accounts
                 .Include(a => a.Employee)
-                .Include(a => a.ActivityLogs)
+                .Include(a => a.Role)
                 .Include(a => a.AssignedTasks)
-                .Where(a => a.Role != null && a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.View") && !a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.Manage"))
-                .Where(a => a.AccountStatus != "On Leave");
+                .Where(a => a.Role != null && a.Role.Name != Roles.SystemAdmin && a.AccountStatus != "On Leave");
 
             if (!string.IsNullOrEmpty(nameFilter))
             {
@@ -1138,14 +1137,6 @@ namespace OTMS.Service.Services
 
             foreach (var a in accounts)
             {
-                var latestLog = a.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
-
-                if (presenceStatus == "Offline")
-                {
-                    continue; // Exclude Offline
-                }
-
                 var activeTasks = a.AssignedTasks.Count(t => t.TaskStatus != "Completed" && t.TaskStatus != "Closed" && t.TaskStatus != "Cancelled" && !t.Deleted && !t.PermanentlyDeleted);
 
                 var fullName = string.Join(" ", new[] { a.Employee.FirstName, a.Employee.MiddleName, a.Employee.LastName, a.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)));
