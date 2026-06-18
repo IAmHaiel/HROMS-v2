@@ -47,17 +47,7 @@ export default function SetPasswordPage() {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             localStorage.setItem('isPasswordChanged', 'true');
-
-            const role = localStorage.getItem('userRole') ?? '';
-            const routes: Record<string, string> = {
-                SuperAdmin: '/SystemAdmin_Dashboard',
-                'System Admin': '/SystemAdmin_Dashboard',
-                'Operation Admin': '/OpAdmin_Dashboard',
-                OpAdmin: '/OpAdmin_Dashboard',
-                Coordinator: '/OpEmployee_Dashboard',
-                Encoder: '/OpEmployee_Dashboard',
-            };
-            navigate(routes[role] || '/');
+            navigate('/onboarding?fresh=true');
         } catch (err: unknown) {
             if (axios.isAxiosError(err) && err.response?.data) {
                 const d = err.response.data as { message?: string };

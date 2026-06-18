@@ -30,6 +30,18 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        [HttpPost("api/onboarding/complete-profile")]
+        [Authorize]
+        public async Task<IActionResult> CompleteProfile([FromBody] CompleteProfileDTO request)
+        {
+            var result = await onboardingService.CompleteProfileAsync(request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
         [HttpPost("api/onboarding/upload-document")]
         public async Task<IActionResult> UploadDocument([FromForm] UploadDocumentRequestDTO request)
         {

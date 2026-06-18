@@ -324,59 +324,90 @@ namespace OTMS.Service.Services
                 };
             }
 
-            // Create Employee and Account now (not during validation)
+            // Check if Employee already exists (admin-created flow) or needs to be created (applicant flow)
             var applicant = onboardingToken.ApplicantRecord;
+            var existingEmployee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == applicant.EmailAddress && e.Account != null);
 
-            var employeeNumber = await employeeNumberGenerator.GenerateNextEmployeeNumberAsync();
+            var empNumber = existingEmployee != null ? existingEmployee.EmployeeNumber : "";
+            Employee employee;
 
-            var defaultRoleName = configuration["AppSettings:DefaultNewHireRole"] ?? "Encoder";
-            var targetRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == defaultRoleName);
-            if (targetRole == null)
+            if (existingEmployee != null)
             {
-                return new ApiResponseDTO<string>
+                // Update existing employee (admin-created flow)
+                employee = existingEmployee;
+                if (!string.IsNullOrWhiteSpace(applicant.FirstName)) employee.FirstName = applicant.FirstName;
+                if (!string.IsNullOrWhiteSpace(applicant.MiddleName)) employee.MiddleName = applicant.MiddleName;
+                if (!string.IsNullOrWhiteSpace(applicant.LastName)) employee.LastName = applicant.LastName;
+                if (!string.IsNullOrWhiteSpace(applicant.Suffix)) employee.Suffix = applicant.Suffix;
+                if (!string.IsNullOrWhiteSpace(applicant.ContactNumber)) employee.ContactNumber = applicant.ContactNumber;
+                employee.UpdatedAt = DateTime.UtcNow;
+
+                if (employee.Account != null)
                 {
-                    IsSuccess = false,
-                    Message = $"Default role '{defaultRoleName}' not found. Please contact system administrator.",
-                    Data = null
-                };
+                    employee.Account.IsPasswordChanged = true;
+                    if (!string.IsNullOrEmpty(password))
+                    {
+                        employee.Account.PasswordHash = new PasswordHasher<Account>().HashPassword(employee.Account, password);
+                    }
+                }
             }
-
-            var useProvidedPassword = !string.IsNullOrEmpty(password) && password.Length >= PasswordLength.MinimumLength;
-            var tempPassword = useProvidedPassword ? password! : PasswordGenerator.Generate();
-
-            var employee = new Employee
+            else
             {
-                EmployeeId = Guid.NewGuid(),
-                EmployeeNumber = employeeNumber,
-                FirstName = applicant.FirstName,
-                MiddleName = applicant.MiddleName,
-                LastName = applicant.LastName,
-                Suffix = applicant.Suffix,
-                ContactNumber = applicant.ContactNumber,
-                EmploymentStatus = "Active",
-                CreatedAt = DateTime.UtcNow,
-                Email = applicant.EmailAddress,
-                IsEmailVerified = true,
-                DepartmentId = applicant.JobPosition?.DepartmentId,
-                JobPositionId = applicant.JobPositionId
-            };
+                // Create new employee (applicant-hired flow)
+                var employeeNumber = await employeeNumberGenerator.GenerateNextEmployeeNumberAsync();
+                empNumber = employeeNumber;
 
-            var account = new Account
-            {
-                AccountId = Guid.NewGuid(),
-                EmployeeId = employee.EmployeeId,
-                RoleId = targetRole.RoleId,
-                Role = targetRole,
-                AccountStatus = "Active",
-                CreatedAt = DateTime.UtcNow,
-                IsPasswordChanged = true
-            };
+                var defaultRoleName = configuration["AppSettings:DefaultNewHireRole"] ?? "Encoder";
+                var targetRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == defaultRoleName);
+                if (targetRole == null)
+                {
+                    return new ApiResponseDTO<string>
+                    {
+                        IsSuccess = false,
+                        Message = $"Default role '{defaultRoleName}' not found. Please contact system administrator.",
+                        Data = null
+                    };
+                }
 
-            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, tempPassword);
-            employee.Account = account;
+                var useProvidedPassword = !string.IsNullOrEmpty(password) && password.Length >= PasswordLength.MinimumLength;
+                var tempPassword = useProvidedPassword ? password! : PasswordGenerator.Generate();
 
-            context.Employees.Add(employee);
-            context.Accounts.Add(account);
+                employee = new Employee
+                {
+                    EmployeeId = Guid.NewGuid(),
+                    EmployeeNumber = employeeNumber,
+                    FirstName = applicant.FirstName,
+                    MiddleName = applicant.MiddleName,
+                    LastName = applicant.LastName,
+                    Suffix = applicant.Suffix,
+                    ContactNumber = applicant.ContactNumber,
+                    EmploymentStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    Email = applicant.EmailAddress,
+                    IsEmailVerified = true,
+                    DepartmentId = applicant.JobPosition?.DepartmentId,
+                    JobPositionId = applicant.JobPositionId
+                };
+
+                var account = new Account
+                {
+                    AccountId = Guid.NewGuid(),
+                    EmployeeId = employee.EmployeeId,
+                    RoleId = targetRole.RoleId,
+                    Role = targetRole,
+                    AccountStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    IsPasswordChanged = true
+                };
+
+                account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, tempPassword);
+                employee.Account = account;
+
+                context.Employees.Add(employee);
+                context.Accounts.Add(account);
+            }
 
             onboardingToken.Status = "Used";
             onboardingToken.UsedAt = DateTime.UtcNow;
@@ -425,12 +456,12 @@ namespace OTMS.Service.Services
 
             // Send welcome email with credentials
             var frontendBaseUrl = configuration["FrontendBaseUrl"] ?? "http://localhost:5173";
-            var subject = "Your Employee Account Has Been Created";
+            var subject = existingEmployee != null ? "Your Profile Has Been Updated" : "Your Employee Account Has Been Created";
             var body = $@"
                 <h2>Welcome to the Team!</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                <p>Your employee account has been created and is now active. You can log in using the password you set during onboarding.</p>
-                <p><strong>Employee Number:</strong> {employeeNumber}</p>
+                <p>Your {(existingEmployee != null ? "profile has been updated" : "employee account has been created and is now active")}. You can log in using your credentials.</p>
+                <p><strong>Employee Number:</strong> {empNumber}</p>
                 <p><strong>Login URL:</strong> <a href='{frontendBaseUrl}'>{frontendBaseUrl}</a></p>
                 <hr>
                 <p><small>This is an automated message from the Operational Task Management System.</small></p>";
@@ -440,7 +471,7 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 onboardingToken.CreatedByAccountId,
                 ActivityTypes.AccountProvisioned,
-                $"Employee {employeeNumber} account provisioned and credentials sent to {applicant.EmailAddress}."
+                $"Employee {empNumber} account provisioned and credentials sent to {applicant.EmailAddress}."
             );
 
             await activityLogService.LogActivityAsync(
@@ -452,7 +483,7 @@ namespace OTMS.Service.Services
             return new ApiResponseDTO<string>
             {
                 IsSuccess = true,
-                Message = $"Onboarding completed successfully. Your Employee Number is {employeeNumber}.",
+                Message = $"Onboarding completed successfully. Your Employee Number is {empNumber}.",
                 Data = onboardingToken.ApplicantRecordId.ToString()
             };
         }
@@ -631,6 +662,56 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             return await GenerateAndSendOnboardingLinkAsync(applicantRecordId, currentAccountId.Value);
+        }
+
+        public async Task<ApiResponseDTO<string>> CompleteProfileAsync(CompleteProfileDTO formData)
+        {
+            var currentAccountId = GetCurrentAccountId();
+            if (currentAccountId == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Unauthorized. Please log in again.",
+                    Data = null
+                };
+            }
+
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account != null && e.Account.AccountId == currentAccountId.Value);
+
+            if (employee == null)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Employee not found.",
+                    Data = null
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(formData.FirstName)) employee.FirstName = formData.FirstName;
+            if (!string.IsNullOrWhiteSpace(formData.MiddleName)) employee.MiddleName = formData.MiddleName;
+            if (!string.IsNullOrWhiteSpace(formData.LastName)) employee.LastName = formData.LastName;
+            if (!string.IsNullOrWhiteSpace(formData.Suffix)) employee.Suffix = formData.Suffix;
+            if (!string.IsNullOrWhiteSpace(formData.ContactNumber)) employee.ContactNumber = formData.ContactNumber;
+            employee.UpdatedAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                currentAccountId.Value,
+                ActivityTypes.ProfileUpdate,
+                $"Employee {employee.EmployeeNumber} completed their profile."
+            );
+
+            return new ApiResponseDTO<string>
+            {
+                IsSuccess = true,
+                Message = "Profile completed successfully.",
+                Data = employee.EmployeeNumber
+            };
         }
 
         private static string ComputeSha256Hash(string raw)

@@ -275,11 +275,45 @@ namespace OTMS.Service.Services
                 }
             }
 
-            await context.SaveChangesAsync();
-
             // Extract the AccountId of the user creating this account (e.g., SystemAdmin1)
             var currentUserIdStr = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             Guid.TryParse(currentUserIdStr, out Guid currentUserId);
+
+            // Create ApplicantRecord for onboarding
+            var applicantRecord = new ApplicantRecord
+            {
+                ApplicantRecordId = Guid.NewGuid(),
+                FullName = employee.Email,
+                FirstName = string.Empty,
+                LastName = string.Empty,
+                EmailAddress = employee.Email,
+                ContactNumber = string.Empty,
+                JobPositionId = employee.JobPositionId ?? Guid.Empty,
+                Status = "Pending Onboarding",
+                CreatedAt = DateTime.UtcNow,
+                ReferenceNumber = $"EMP-{employee.EmployeeNumber}"
+            };
+            context.ApplicantRecords.Add(applicantRecord);
+
+            // Generate onboarding token
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
+                .Replace('+', '-')
+                .Replace('/', '_')
+                .Replace("=", "");
+            var tokenHash = ComputeSha256Hash(rawToken);
+            var onboardingToken = new OnboardingToken
+            {
+                OnboardingTokenId = Guid.NewGuid(),
+                ApplicantRecordId = applicantRecord.ApplicantRecordId,
+                TokenHash = tokenHash,
+                Status = "Active",
+                ExpiresAt = DateTime.UtcNow.AddHours(72),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByAccountId = currentUserId != Guid.Empty ? currentUserId : account.AccountId
+            };
+            context.OnboardingTokens.Add(onboardingToken);
+
+            await context.SaveChangesAsync();
 
             // Save Account Created Activity under the creator's account if available, fallback to the newly created account
             await activityLogService.LogActivityAsync(
@@ -291,28 +325,32 @@ namespace OTMS.Service.Services
             var verificationLink =
                 $"{configuration["FrontendBaseUrl"]}/verify-email" +
                 $"?token={employee.EmailVerificationToken}";
+            var onboardingLink =
+                $"{configuration["FrontendBaseUrl"]}/onboarding?token={rawToken}";
 
             try
             {
-                // Sending email verification notification
+                // Sending email with verification link + onboarding link
                 await emailService.SendAsync(
-                            employee.Email,
-                                "Verify your Operational Management System Account",
-                                $"""
-                                Welcome to the Operational Management System.
+                    employee.Email,
+                    "Complete Your Account Setup",
+                    $"""
+                    Welcome to the Operational Management System.
 
-                                Your login credentials are:
+                    Your login credentials are:
 
-                                Employee Number: {employee.EmployeeNumber}
-                                Password: {GeneratedPassword}
+                    Employee Number: {employee.EmployeeNumber}
+                    Password: {GeneratedPassword}
 
-                                Please verify your account by clicking the link below:
+                    Step 1: Verify your account by clicking the link below:
+                    {verificationLink}
 
-                                {verificationLink}
+                    Step 2: After verification, complete your profile and submit required documents:
+                    {onboardingLink}
 
-                                After verifying your account, we recommend changing your password immediately after logging in.
-                                """
-                    );
+                    Please complete both steps to activate your account.
+                    """
+                );
             }
             catch (Exception ex)
             {
@@ -663,6 +701,12 @@ namespace OTMS.Service.Services
                 Data = null
             };
 
+        }
+
+        private static string ComputeSha256Hash(string raw)
+        {
+            var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
         }
     }
 }

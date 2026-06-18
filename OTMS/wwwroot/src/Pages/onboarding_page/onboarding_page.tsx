@@ -63,8 +63,9 @@ export default function OnboardingPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const onboardingToken = searchParams.get('token') || '';
+    const isFresh = searchParams.get('fresh') === 'true';
 
-    const [tokenValidating, setTokenValidating] = useState(true);
+    const [tokenValidating, setTokenValidating] = useState(!isFresh);
     const [tokenError, setTokenError] = useState('');
     const [applicantInfo, setApplicantInfo] = useState<{
         fullName: string; firstName: string; middleName: string; lastName: string; suffix: string;
@@ -78,6 +79,11 @@ export default function OnboardingPage() {
     } | null>(null);
 
     useEffect(() => {
+        if (isFresh) {
+            setTokenValidating(false);
+            setStep('profile');
+            return;
+        }
         if (!onboardingToken) {
             setTokenValidating(false);
             setTokenError('Missing onboarding token. Please check your email for a valid link.');
@@ -441,6 +447,35 @@ export default function OnboardingPage() {
     const handleProfileSave = async () => {
         const errs = validateProfile();
         if (Object.keys(errs).length > 0) { setProfileErrors(errs); return; }
+        if (isFresh) {
+            setProfileSaving(true);
+            try {
+                const token = localStorage.getItem('authToken');
+                await axios.post('/api/onboarding/complete-profile', {
+                    firstName: profile.firstName,
+                    middleName: profile.middleName,
+                    lastName: profile.lastName,
+                    suffix: profile.suffix,
+                    contactNumber: profile.contactNumber,
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                const role = localStorage.getItem('userRole') ?? '';
+                const routes: Record<string, string> = {
+                    SuperAdmin: '/SystemAdmin_Dashboard',
+                    'System Admin': '/SystemAdmin_Dashboard',
+                    'Operation Admin': '/OpAdmin_Dashboard',
+                    OpAdmin: '/OpAdmin_Dashboard',
+                    Coordinator: '/OpEmployee_Dashboard',
+                    Encoder: '/OpEmployee_Dashboard',
+                };
+                navigate(routes[role] || '/');
+                return;
+            } catch {
+                setProfileApiError('Failed to save profile. Please try again.');
+            } finally {
+                setProfileSaving(false);
+            }
+            return;
+        }
         setStep('password');
     };
 
