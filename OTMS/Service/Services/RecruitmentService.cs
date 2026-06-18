@@ -62,9 +62,39 @@ namespace OTMS.Service.Services
                 .Select(ar => new ApplicantRecordDTO
                 {
                     ApplicantRecordId = ar.ApplicantRecordId,
+                    ReferenceNumber = ar.ReferenceNumber,
                     FullName = ar.FullName,
+                    FirstName = ar.FirstName,
+                    MiddleName = ar.MiddleName,
+                    LastName = ar.LastName,
+                    Suffix = ar.Suffix,
+                    Gender = ar.Gender,
+                    CivilStatus = ar.CivilStatus,
                     EmailAddress = ar.EmailAddress,
                     ContactNumber = ar.ContactNumber,
+                    CurrentResidentialAddress = ar.CurrentResidentialAddress,
+                    PermanentAddress = ar.PermanentAddress,
+                    SSSNumber = ar.SSSNumber,
+                    PhilHealthNumber = ar.PhilHealthNumber,
+                    PagIBIGNumber = ar.PagIBIGNumber,
+                    TIN = ar.TIN,
+                    BankName = ar.BankName,
+                    BankAccountName = ar.BankAccountName,
+                    BankAccountNumber = ar.BankAccountNumber,
+                    NBIClearanceFilePath = ar.NBIClearanceFilePath,
+                    MedicalClearanceFilePath = ar.MedicalClearanceFilePath,
+                    PSABirthCertificateFilePath = ar.PSABirthCertificateFilePath,
+                    ResumeFilePath = ar.ResumeFilePath,
+                    SignedEmploymentContractFilePath = ar.SignedEmploymentContractFilePath,
+                    EmergencyContactName = ar.EmergencyContactName,
+                    EmergencyContactRelationship = ar.EmergencyContactRelationship,
+                    EmergencyContactMobileNumber = ar.EmergencyContactMobileNumber,
+                    DeclaredDependents = ar.DeclaredDependents,
+                    HighestEducationalAttainment = ar.HighestEducationalAttainment,
+                    Institution = ar.Institution,
+                    YearGraduated = ar.YearGraduated,
+                    ProfessionalLicensesCertifications = ar.ProfessionalLicensesCertifications,
+                    IsEmailVerified = ar.IsEmailVerified,
                     JobPositionName = ar.JobPosition.Title,
                     Status = ar.Status,
                     CreatedAt = ar.CreatedAt
@@ -227,6 +257,7 @@ namespace OTMS.Service.Services
             }
 
             var applicant = await context.ApplicantRecords
+                .Include(ar => ar.JobPosition)
                 .FirstOrDefaultAsync(ar => ar.ApplicantRecordId == request.ApplicantRecordId);
 
             if (applicant == null)
@@ -256,25 +287,28 @@ namespace OTMS.Service.Services
                 InterviewDate = request.InterviewDate,
                 InterviewTime = request.InterviewTime,
                 LocationOrLink = request.LocationOrLink,
-                InterviewerName = request.InterviewerName,
+                InterviewerName = string.Empty,
                 CreatedAt = DateTime.UtcNow
             };
 
             context.InterviewSchedules.Add(interviewSchedule);
             await context.SaveChangesAsync();
 
-            var subject = $"Interview Scheduled: {applicant.JobPosition.Title} Position";
+            var formattedTime = DateTime.TryParse(request.InterviewTime, out var parsedTime) ? parsedTime.ToString("hh:mm tt") : request.InterviewTime;
+            var formattedDate = request.InterviewDate.ToString("dddd, MMMM dd, yyyy");
+            var subject = $"Interview Schedule – {applicant.JobPosition.Title} at Speedex";
             var body = $@"
-                <h2>Interview Invitation</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                <p>You have been invited for an interview for the <strong>{applicant.JobPosition.Title}</strong> position.</p>
-                <p><strong>Date:</strong> {request.InterviewDate:MMMM dd, yyyy}</p>
-                <p><strong>Time:</strong> {request.InterviewTime}</p>
-                <p><strong>Location/Link:</strong> {request.LocationOrLink}</p>
-                <p><strong>Interviewer:</strong> {request.InterviewerName}</p>
-                <p>Please confirm your availability by replying to this email.</p>
-                <hr>
-                <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+                <p>We are pleased to inform you that you have been shortlisted for the position of <strong>{applicant.JobPosition.Title}</strong>.</p>
+                <p>Your interview has been scheduled as follows:</p>
+                <ul>
+                    <li><strong>Date & Time:</strong> {formattedDate} at {formattedTime}</li>
+                    <li><strong>Location / Meeting Link:</strong> {request.LocationOrLink}</li>
+    
+                </ul>
+                <p>Please confirm your availability by replying to this email. If you need to reschedule, kindly notify us at least 24 hours in advance.</p>
+                <p>We look forward to speaking with you.</p>
+                <p><strong>Best regards,</strong><br />Recruitment Team</p>";
 
             var emailSent = await notificationService.SendEmailWithStatusAsync(applicant.EmailAddress, subject, body);
 

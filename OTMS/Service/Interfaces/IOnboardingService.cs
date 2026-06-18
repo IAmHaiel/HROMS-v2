@@ -7,7 +7,7 @@ namespace OTMS.Service.Interfaces
     {
         Task<ApiResponseDTO<OnboardingLinkResponseDTO>> GenerateAndSendOnboardingLinkAsync(Guid applicantRecordId, Guid createdByAccountId);
         Task<ApiResponseDTO<OnboardingValidationResponseDTO>> ValidateOnboardingTokenAsync(string token);
-        Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token);
+        Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token, string? password = null);
         Task<ApiResponseDTO<OnboardingLinkResponseDTO>> GetOnboardingLinkStatusAsync(Guid applicantRecordId);
         Task<ApiResponseDTO<OnboardingLinkResponseDTO>> ResendOnboardingLinkAsync(Guid applicantRecordId);
     }

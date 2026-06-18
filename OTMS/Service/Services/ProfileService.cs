@@ -99,6 +99,49 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ChangePasswordResponseDTO?> SetInitialPassword(SetInitialPasswordDTO request)
+        {
+            var claimProfile = httpContextAccessor
+               .HttpContext?
+               .User
+               .FindFirst(ClaimTypes.NameIdentifier)?
+               .Value;
+
+            if (string.IsNullOrEmpty(claimProfile))
+                return null;
+
+            var profile = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Account.AccountId.ToString() == claimProfile);
+
+            if (profile is null || profile.Account is null)
+                return null;
+
+            if (request.NewPassword.Length < PasswordLength.MinimumLength || request.NewPassword.Length > PasswordLength.MaximumLength)
+            {
+                return new ChangePasswordResponseDTO
+                {
+                    EmployeeNumber = profile.EmployeeNumber,
+                    Success = false
+                };
+            }
+
+            var passwordHasher = new PasswordHasher<Account>();
+            profile.Account.PasswordHash = passwordHasher.HashPassword(profile.Account, request.NewPassword);
+            profile.UpdatedAt = DateTime.UtcNow;
+            profile.Account.UpdatedAt = DateTime.UtcNow;
+            profile.Account.IsPasswordChanged = true;
+
+            await context.SaveChangesAsync();
+
+            return new ChangePasswordResponseDTO
+            {
+                EmployeeNumber = profile.EmployeeNumber,
+                NewPassword = request.NewPassword,
+                Success = true
+            };
+        }
+
         public async Task<UpdateInformationResponseDTO?> UpdateBasicInformation(UpdateInformationDTO request)
         {
             var claimProfile = httpContextAccessor

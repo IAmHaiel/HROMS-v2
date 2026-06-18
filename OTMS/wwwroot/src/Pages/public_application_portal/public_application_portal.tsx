@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties, DragEvent, ChangeEvent } from 'react';
 import axios from 'axios';
 
@@ -26,14 +26,50 @@ declare global {
 
 type Stage = 'landing' | 'auth' | 'form' | 'success';
 
-type FormKey = 'fullName' | 'contactNumber' | 'position' | 'resume';
+type FormKey =
+    | 'firstName' | 'middleName' | 'lastName' | 'suffix'
+    | 'gender' | 'civilStatus'
+    | 'email' | 'contactNumber'
+    | 'currentResidentialAddress' | 'permanentAddress'
+    | 'sssNumber' | 'philHealthNumber' | 'pagIBIGNumber' | 'tin'
+    | 'bankName' | 'bankAccountName' | 'bankAccountNumber'
+    | 'nbiClearance' | 'medicalClearance' | 'psaBirthCertificate' | 'resume' | 'signedEmploymentContract'
+    | 'emergencyContactName' | 'emergencyContactRelationship' | 'emergencyContactMobileNumber' | 'declaredDependents'
+    | 'highestEducationalAttainment' | 'institution' | 'yearGraduated' | 'professionalLicensesCertifications'
+    | 'position';
 
 interface ApplicationForm {
-    fullName: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    suffix: string;
+    gender: string;
+    civilStatus: string;
     email: string;
     contactNumber: string;
-    positionId: string;
+    currentResidentialAddress: string;
+    permanentAddress: string;
+    sssNumber: string;
+    philHealthNumber: string;
+    pagIBIGNumber: string;
+    tin: string;
+    bankName: string;
+    bankAccountName: string;
+    bankAccountNumber: string;
+    nbiClearance: File | null;
+    medicalClearance: File | null;
+    psaBirthCertificate: File | null;
     resume: File | null;
+    signedEmploymentContract: File | null;
+    emergencyContactName: string;
+    emergencyContactRelationship: string;
+    emergencyContactMobileNumber: string;
+    declaredDependents: string;
+    highestEducationalAttainment: string;
+    institution: string;
+    yearGraduated: string;
+    professionalLicensesCertifications: string;
+    positionId: string;
 }
 
 type FormErrors = Partial<Record<FormKey, string>>;
@@ -93,11 +129,16 @@ const AlertIcon = () => (
 );
 
 const EMPTY_FORM: ApplicationForm = {
-    fullName: '',
-    email: '',
-    contactNumber: '',
+    firstName: '', middleName: '', lastName: '', suffix: '',
+    gender: '', civilStatus: '',
+    email: '', contactNumber: '',
+    currentResidentialAddress: '', permanentAddress: '',
+    sssNumber: '', philHealthNumber: '', pagIBIGNumber: '', tin: '',
+    bankName: '', bankAccountName: '', bankAccountNumber: '',
+    nbiClearance: null, medicalClearance: null, psaBirthCertificate: null, resume: null, signedEmploymentContract: null,
+    emergencyContactName: '', emergencyContactRelationship: '', emergencyContactMobileNumber: '', declaredDependents: '',
+    highestEducationalAttainment: '', institution: '', yearGraduated: '', professionalLicensesCertifications: '',
     positionId: '',
-    resume: null,
 };
 
 if (typeof document !== 'undefined' && !document.getElementById('portal-styles')) {
@@ -123,6 +164,7 @@ export default function PublicApplicationPortal() {
     const [configLoading, setConfigLoading] = useState(true);
     const [googleToken, setGoogleToken] = useState('');
     const [submitError, setSubmitError] = useState('');
+    const [genderCustom, setGenderCustom] = useState('');
     const gsiInitialized = useRef(false);
 
     useEffect(() => {
@@ -173,8 +215,18 @@ export default function PublicApplicationPortal() {
         document.head.appendChild(script);
     };
 
+    const decodeGoogleJwt = (token: string): { email?: string; name?: string } => {
+        try {
+            const payload = token.split('.')[1];
+            const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+            return { email: json.email, name: json.name };
+        } catch { return {}; }
+    };
+
     const handleGoogleCredentialResponse = (response: { credential: string }) => {
+        const decoded = decodeGoogleJwt(response.credential);
         setGoogleToken(response.credential);
+        setForm(p => ({ ...p, email: decoded.email || '' }));
         setAuthLoading(false);
         setStage('form');
     };
@@ -189,74 +241,126 @@ export default function PublicApplicationPortal() {
         window.google.accounts.id.prompt();
     };
 
+    const applySSS = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 10); if (d.length <= 2) return d; if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 9)}-${d.slice(9)}`; };
+    const applyPhilHealth = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 2) return d; if (d.length <= 11) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 11)}-${d.slice(11)}`; };
+    const applyPagIBIG = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 4) return d; if (d.length <= 8) return `${d.slice(0, 4)}-${d.slice(4)}`; return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`; };
+    const applyTIN = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 3) return d; if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`; if (d.length <= 9) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`; return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}-${d.slice(9)}`; };
+
+    const formatStatutory = (key: 'sssNumber' | 'philHealthNumber' | 'pagIBIGNumber' | 'tin', raw: string) => {
+        const formatted = key === 'sssNumber' ? applySSS(raw) : key === 'philHealthNumber' ? applyPhilHealth(raw) : key === 'pagIBIGNumber' ? applyPagIBIG(raw) : applyTIN(raw);
+        setForm(p => ({ ...p, [key]: formatted }));
+        const err = validateField(key, formatted);
+        setErrors(p => ({ ...p, [key]: err || undefined }));
+    };
+
     const validateField = (key: FormKey, value: string | File | null): string => {
-        if (key === 'fullName') {
-            const v = (value as string).trim();
-            if (!v) return 'Full name is required.';
-            if (v.length > 100) return 'Name must not exceed 100 characters.';
-        }
+        if ((key === 'firstName' || key === 'lastName') && !(value as string)?.trim()) return `${key === 'firstName' ? 'First' : 'Last'} name is required.`;
+        if (key === 'firstName' && (value as string).length > 128) return 'First name must not exceed 128 characters.';
+        if (key === 'lastName' && (value as string).length > 128) return 'Last name must not exceed 128 characters.';
+        if (key === 'middleName' && (value as string).length > 128) return 'Middle name must not exceed 128 characters.';
+        if (key === 'gender' && !(value as string)) return 'Gender is required.';
+        if (key === 'civilStatus' && !(value as string)) return 'Civil status is required.';
         if (key === 'contactNumber') {
             const v = (value as string).trim();
             if (!v) return 'Contact number is required.';
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit contact number.';
         }
-        if (key === 'position') {
-            if (!value) return 'Please select a position.';
+        if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
+        if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
+        if (key === 'sssNumber') { if (!(value as string)?.trim()) return 'SSS Number is required.'; if (!/^\d{2}-\d{7}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXX-X'; }
+        if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
+        if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
+        if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
+        if (key === 'bankName' && !(value as string)?.trim()) return 'Bank name is required.';
+        if (key === 'bankAccountName' && !(value as string)?.trim()) return 'Bank account name is required.';
+        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 64) return 'Must not exceed 64 characters.'; }
+        if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
+        if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
+        if (key === 'emergencyContactMobileNumber') {
+            const v = (value as string).trim();
+            if (!v) return 'Emergency contact number is required.';
+            if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit emergency contact number.';
         }
-        if (key === 'resume') {
-            if (!value) return 'Please upload your Resume/CV.';
+        if (key === 'highestEducationalAttainment' && !(value as string)?.trim()) return 'Highest educational attainment is required.';
+        if (key === 'institution' && !(value as string)?.trim()) return 'Institution is required.';
+        if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
+        if (key === 'position' && !value) return 'Please select a position.';
+        if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
+        if ((key === 'nbiClearance' || key === 'medicalClearance' || key === 'psaBirthCertificate' || key === 'signedEmploymentContract') && !value) {
+            const labels: Record<string, string> = { nbiClearance: 'NBI Clearance', medicalClearance: 'Medical Clearance', psaBirthCertificate: 'PSA Birth Certificate', signedEmploymentContract: 'Employment Contract' };
+            return `Please upload your ${labels[key] || key}.`;
         }
         return '';
     };
 
-    const handleChange = (key: keyof Pick<ApplicationForm, 'fullName' | 'contactNumber'>) =>
-        (e: ChangeEvent<HTMLInputElement>) => {
+    const handleTextChange = (key: FormKey) =>
+        (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
             const val = e.target.value;
             setForm(p => ({ ...p, [key]: val }));
-            const err = validateField(key as FormKey, val);
+            const err = validateField(key, val);
             setErrors(p => ({ ...p, [key]: err || undefined }));
         };
 
-    const handlePositionChange = (e: ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value;
-        setForm(p => ({ ...p, positionId: val }));
-        const err = validateField('position', val);
-        setErrors(p => ({ ...p, position: err || undefined }));
-    };
+    const handleSelectChange = (key: FormKey) =>
+        (e: ChangeEvent<HTMLSelectElement>) => {
+            const val = e.target.value;
+            setForm(p => ({ ...p, [key]: val }));
+            const err = validateField(key, val);
+            setErrors(p => ({ ...p, [key]: err || undefined }));
+        };
 
-    const handleFile = (file: File | undefined) => {
-        if (!file) return;
-        const allowed = [
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ];
-        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-        if (!allowed.includes(file.type) && !['pdf', 'docx'].includes(ext)) {
-            setErrors(p => ({ ...p, resume: 'Invalid file format. Please upload a PDF or DOCX.' }));
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            setErrors(p => ({ ...p, resume: 'File exceeds 5MB. Please upload a smaller file.' }));
-            return;
-        }
-        setForm(p => ({ ...p, resume: file }));
-        setErrors(p => ({ ...p, resume: undefined }));
-    };
+    const handleFileUpload = (key: 'resume' | 'nbiClearance' | 'medicalClearance' | 'psaBirthCertificate' | 'signedEmploymentContract') =>
+        (file: File | undefined) => {
+            if (!file) return;
+            const allowed = [
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ];
+            const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+            if (!allowed.includes(file.type) && !['pdf', 'docx'].includes(ext)) {
+                setErrors(p => ({ ...p, [key]: 'Invalid file format. Please upload a PDF or DOCX.' }));
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                setErrors(p => ({ ...p, [key]: 'File exceeds 5MB. Please upload a smaller file.' }));
+                return;
+            }
+            setForm(p => ({ ...p, [key]: file }));
+            setErrors(p => ({ ...p, [key]: undefined }));
+        };
 
     const handleDrop = (e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         setDragOver(false);
-        handleFile(e.dataTransfer.files[0]);
+        handleFileUpload('resume')(e.dataTransfer.files[0]);
+    };
+
+    const validateForm = (): FormErrors => {
+        const requiredText: FormKey[] = [
+            'firstName', 'lastName', 'gender', 'civilStatus', 'contactNumber',
+            'currentResidentialAddress', 'permanentAddress',
+            'sssNumber', 'philHealthNumber', 'pagIBIGNumber', 'tin',
+            'bankName', 'bankAccountName', 'bankAccountNumber',
+            'emergencyContactName', 'emergencyContactRelationship', 'emergencyContactMobileNumber',
+            'highestEducationalAttainment', 'institution', 'yearGraduated',
+            'position'
+        ];
+        const errs: FormErrors = {};
+        requiredText.forEach(k => {
+            const val = k === 'position' ? form.positionId : (form[k] as string);
+            const e = validateField(k, val);
+            if (e) errs[k] = e;
+        });
+        const docKeys: FormKey[] = ['resume', 'nbiClearance', 'medicalClearance', 'psaBirthCertificate', 'signedEmploymentContract'];
+        docKeys.forEach(k => {
+            const e = validateField(k, (form as any)[k] as File | null);
+            if (e) errs[k] = e;
+        });
+        return errs;
     };
 
     const handleSubmit = async () => {
-        const newErrors: FormErrors = {};
-        const keys: FormKey[] = ['fullName', 'contactNumber', 'position', 'resume'];
-        keys.forEach(k => {
-            const val = k === 'position' ? form.positionId : form[k];
-            const err = validateField(k, val);
-            if (err) newErrors[k] = err;
-        });
+        const newErrors = validateForm();
         if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
         setSubmitLoading(true);
@@ -265,12 +369,36 @@ export default function PublicApplicationPortal() {
         try {
             const formData = new FormData();
             formData.append('GoogleToken', googleToken);
-            formData.append('FullName', form.fullName.trim());
+            formData.append('FirstName', form.firstName.trim());
+            if (form.middleName.trim()) formData.append('MiddleName', form.middleName.trim());
+            formData.append('LastName', form.lastName.trim());
+            if (form.suffix.trim()) formData.append('Suffix', form.suffix.trim());
+            formData.append('Gender', form.gender === 'Other' && genderCustom.trim() ? `Other - ${genderCustom.trim()}` : form.gender);
+            formData.append('CivilStatus', form.civilStatus);
             formData.append('ContactNumber', form.contactNumber.trim());
+            formData.append('CurrentResidentialAddress', form.currentResidentialAddress.trim());
+            formData.append('PermanentAddress', form.permanentAddress.trim());
+            if (form.sssNumber.trim()) formData.append('SSSNumber', form.sssNumber.trim());
+            if (form.philHealthNumber.trim()) formData.append('PhilHealthNumber', form.philHealthNumber.trim());
+            if (form.pagIBIGNumber.trim()) formData.append('PagIBIGNumber', form.pagIBIGNumber.trim());
+            if (form.tin.trim()) formData.append('TIN', form.tin.trim());
+            if (form.bankName.trim()) formData.append('BankName', form.bankName.trim());
+            if (form.bankAccountName.trim()) formData.append('BankAccountName', form.bankAccountName.trim());
+            if (form.bankAccountNumber.trim()) formData.append('BankAccountNumber', form.bankAccountNumber.trim());
+            if (form.nbiClearance) formData.append('NBIClearance', form.nbiClearance);
+            if (form.medicalClearance) formData.append('MedicalClearance', form.medicalClearance);
+            if (form.psaBirthCertificate) formData.append('PSABirthCertificate', form.psaBirthCertificate);
+            if (form.resume) formData.append('Resume', form.resume);
+            if (form.signedEmploymentContract) formData.append('SignedEmploymentContract', form.signedEmploymentContract);
+            formData.append('EmergencyContactName', form.emergencyContactName.trim());
+            formData.append('EmergencyContactRelationship', form.emergencyContactRelationship.trim());
+            formData.append('EmergencyContactMobileNumber', form.emergencyContactMobileNumber.trim());
+            if (form.declaredDependents.trim()) formData.append('DeclaredDependents', form.declaredDependents.trim());
+            formData.append('HighestEducationalAttainment', form.highestEducationalAttainment.trim());
+            formData.append('Institution', form.institution.trim());
+            formData.append('YearGraduated', form.yearGraduated.trim());
+            if (form.professionalLicensesCertifications.trim()) formData.append('ProfessionalLicensesCertifications', form.professionalLicensesCertifications.trim());
             formData.append('JobPositionId', form.positionId);
-            if (form.resume) {
-                formData.append('Resume', form.resume);
-            }
 
             await axios.post('/api/public/apply/submit', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
@@ -312,7 +440,7 @@ export default function PublicApplicationPortal() {
 
             <header style={s.header}>
                 <div style={s.headerInner}>
-                    <div style={s.headerLogo}>
+                    <div style={{ ...s.headerLogo, cursor: 'pointer' }} onClick={() => window.location.href = '/'}>
                         <div style={s.logoMark}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3" />
@@ -322,7 +450,7 @@ export default function PublicApplicationPortal() {
                         </div>
                         <div>
                             <span style={s.logoName}>Speedex Courier</span>
-                            <span style={s.logoDivider}>·</span>
+                            <span style={s.logoDivider}>�</span>
                             <span style={s.logoSub}>Careers</span>
                         </div>
                     </div>
@@ -335,7 +463,7 @@ export default function PublicApplicationPortal() {
 
             <main style={s.main}>
 
-                {/* ══ LANDING ══════════════════════════════════════════════════════ */}
+                {/* -- LANDING ------------------------------------------------------ */}
                 {stage === 'landing' && (
                     <div style={s.landingWrap}>
                         <div style={s.landingLeft}>
@@ -405,7 +533,7 @@ export default function PublicApplicationPortal() {
                     </div>
                 )}
 
-                {/* ══ AUTH ═════════════════════════════════════════════════════════ */}
+                {/* -- AUTH --------------------------------------------------------- */}
                 {stage === 'auth' && (
                     <div style={s.centeredStage}>
                         <div style={s.authCard}>
@@ -435,17 +563,17 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,24,255,0.15)'; }}
                             >
                                 {authLoading ? (
-                                    <><div style={s.spinner} /><span>Verifying…</span></>
+                                    <><div style={s.spinner} /><span>Verifying�</span></>
                                 ) : (
                                     <><GoogleIcon /><span>Continue with Google</span></>
                                 )}
                             </button>
-                            <button style={s.ghostBtn} onClick={() => setStage('landing')}>← Back</button>
+                            <button style={s.ghostBtn} onClick={() => setStage('landing')}>? Back</button>
                         </div>
                     </div>
                 )}
 
-                {/* ══ FORM ═════════════════════════════════════════════════════════ */}
+                {/* -- FORM --------------------------------------------------------- */}
                 {stage === 'form' && (
                     <div style={s.formWrap}>
                         <div style={s.formSide}>
@@ -456,9 +584,11 @@ export default function PublicApplicationPortal() {
                             </p>
                             <div style={s.formStepList}>
                                 {[
-                                    { num: '01', title: 'Personal Details', desc: 'Name, contact, and email' },
-                                    { num: '02', title: 'Position', desc: 'Choose the role you\'re applying for' },
-                                    { num: '03', title: 'Resume/CV', desc: 'PDF or DOCX, max 5MB' },
+                                    { num: '01', title: 'Personal Details', desc: 'Name, contact, addresses' },
+                                    { num: '02', title: 'IDs & Financial', desc: 'Statutory and bank details' },
+                                    { num: '03', title: 'Documents', desc: 'Resume, clearances, contracts' },
+                                    { num: '04', title: 'Emergency & Education', desc: 'Contacts and background' },
+                                    { num: '05', title: 'Position', desc: 'Select your desired role' },
                                 ].map(({ num, title, desc }) => (
                                     <div key={num} style={s.formStep}>
                                         <span style={s.formStepNum}>{num}</span>
@@ -484,19 +614,72 @@ export default function PublicApplicationPortal() {
                                 <span style={s.formCardSub}>All fields marked * are required</span>
                             </div>
 
+                            {/* -- Personal Information ------------------- */}
                             <div style={s.sectionLabel}>Personal Information</div>
-                            <div style={{ marginBottom: 16 }}>
+                            <div style={s.fieldRow3}>
                                 <div style={s.field}>
-                                    <label style={s.label}>Full Name <span style={s.req}>*</span></label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Juan Dela Cruz"
-                                        value={form.fullName}
-                                        onChange={handleChange('fullName')}
-                                        maxLength={100}
-                                        style={{ ...s.input, ...(errors.fullName ? s.inputErr : {}) }}
-                                    />
-                                    {errors.fullName && <span style={s.errMsg}><AlertIcon />{errors.fullName}</span>}
+                                    <label style={s.label}>First Name <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="Juan" value={form.firstName}
+                                        onChange={handleTextChange('firstName')} maxLength={128}
+                                        style={{ ...s.input, ...(errors.firstName ? s.inputErr : {}) }} />
+                                    {errors.firstName && <span style={s.errMsg}><AlertIcon />{errors.firstName}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Middle Name</label>
+                                    <input type="text" placeholder="M." value={form.middleName}
+                                        onChange={handleTextChange('middleName')} maxLength={128}
+                                        style={s.input} />
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Last Name <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="Dela Cruz" value={form.lastName}
+                                        onChange={handleTextChange('lastName')} maxLength={128}
+                                        style={{ ...s.input, ...(errors.lastName ? s.inputErr : {}) }} />
+                                    {errors.lastName && <span style={s.errMsg}><AlertIcon />{errors.lastName}</span>}
+                                </div>
+                            </div>
+                            <div style={{ ...s.fieldRow4, marginTop: 12 }}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Suffix</label>
+                                    <input type="text" placeholder="Jr., III" value={form.suffix}
+                                        onChange={handleTextChange('suffix')} maxLength={20}
+                                        style={s.input} />
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Gender <span style={s.req}>*</span></label>
+                                    <select value={form.gender}
+                                        onChange={e => { handleSelectChange('gender')(e); if (e.target.value !== 'Other') setGenderCustom(''); }}
+                                        style={{ ...s.input, ...s.select, ...(errors.gender ? s.inputErr : {}) }}>
+                                        <option value="">Select</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                        <option value="Prefer not to say">Prefer not to say</option>
+                                    </select>
+                                    {form.gender === 'Other' && (
+                                        <input type="text" placeholder="Please specify" value={genderCustom}
+                                            onChange={e => { setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }}
+                                            style={{ ...s.input, marginTop: 6 }} />
+                                    )}
+                                    {errors.gender && <span style={s.errMsg}><AlertIcon />{errors.gender}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Civil Status <span style={s.req}>*</span></label>
+                                    <select value={form.civilStatus}
+                                        onChange={handleSelectChange('civilStatus')}
+                                        style={{ ...s.input, ...s.select, ...(errors.civilStatus ? s.inputErr : {}) }}>
+                                        <option value="">Select</option>
+                                        <option value="Single">Single</option>
+                                        <option value="Married">Married</option>
+                                        <option value="Divorced">Divorced</option>
+                                        <option value="Separated">Separated</option>
+                                        <option value="Widowed">Widowed</option>
+                                    </select>
+                                    {errors.civilStatus && <span style={s.errMsg}><AlertIcon />{errors.civilStatus}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>&nbsp;</label>
+                                    <div />
                                 </div>
                             </div>
 
@@ -504,85 +687,285 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Email Address</label>
                                     <div style={s.prefillWrap}>
-                                        <input
-                                            type="email"
-                                            value={form.email}
-                                            readOnly
-                                            style={{ ...s.input, ...s.inputReadonly }}
-                                        />
+                                        <input type="email" value={form.email} readOnly
+                                            style={{ ...s.input, ...s.inputReadonly }} />
                                         <span style={s.prefillTag}>Via Google</span>
                                     </div>
                                     <span style={s.hint}>Pre-filled from your Gmail account</span>
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Contact Number <span style={s.req}>*</span></label>
-                                    <input
-                                        type="tel"
-                                        placeholder="e.g. 09170000000"
-                                        value={form.contactNumber}
-                                        onChange={handleChange('contactNumber')}
-                                        maxLength={11}
-                                        style={{ ...s.input, ...(errors.contactNumber ? s.inputErr : {}) }}
-                                    />
+                                    <input type="tel" placeholder="09170000000" value={form.contactNumber}
+                                        onChange={handleTextChange('contactNumber')} maxLength={11}
+                                        style={{ ...s.input, ...(errors.contactNumber ? s.inputErr : {}) }} />
                                     {errors.contactNumber && <span style={s.errMsg}><AlertIcon />{errors.contactNumber}</span>}
                                 </div>
                             </div>
 
+                            {/* -- Address ------------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Address</div>
+                            <div style={s.fieldRow2}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Current Residential Address <span style={s.req}>*</span></label>
+                                    <textarea placeholder="Street, Barangay, City, Province" value={form.currentResidentialAddress}
+                                        onChange={handleTextChange('currentResidentialAddress')}
+                                        style={{ ...s.textarea, ...(errors.currentResidentialAddress ? s.textareaErr : {}) }} rows={2} />
+                                    {errors.currentResidentialAddress && <span style={s.errMsg}><AlertIcon />{errors.currentResidentialAddress}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Permanent Address <span style={s.req}>*</span></label>
+                                    <textarea placeholder="Street, Barangay, City, Province" value={form.permanentAddress}
+                                        onChange={handleTextChange('permanentAddress')}
+                                        style={{ ...s.textarea, ...(errors.permanentAddress ? s.textareaErr : {}) }} rows={2} />
+                                    {errors.permanentAddress && <span style={s.errMsg}><AlertIcon />{errors.permanentAddress}</span>}
+                                </div>
+                            </div>
+
+                            {/* -- Statutory & Gov ID -------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Statutory &amp; Government Identifiers</div>
+                            <div style={s.fieldRow4}>
+                                <div style={s.field}>
+                                    <label style={s.label}>SSS Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XX-XXXXXXX-X" value={form.sssNumber}
+                                        onChange={e => formatStatutory('sssNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.sssNumber ? s.inputErr : {}) }} />
+                                    {errors.sssNumber && <span style={s.errMsg}><AlertIcon />{errors.sssNumber}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>PhilHealth Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XX-XXXXXXXXX-X" value={form.philHealthNumber}
+                                        onChange={e => formatStatutory('philHealthNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.philHealthNumber ? s.inputErr : {}) }} />
+                                    {errors.philHealthNumber && <span style={s.errMsg}><AlertIcon />{errors.philHealthNumber}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Pag-IBIG Number <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XXXX-XXXX-XXXX" value={form.pagIBIGNumber}
+                                        onChange={e => formatStatutory('pagIBIGNumber', e.target.value)}
+                                        style={{ ...s.input, ...(errors.pagIBIGNumber ? s.inputErr : {}) }} />
+                                    {errors.pagIBIGNumber && <span style={s.errMsg}><AlertIcon />{errors.pagIBIGNumber}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>TIN <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="XXX-XXX-XXX-XXX" value={form.tin}
+                                        onChange={e => formatStatutory('tin', e.target.value)}
+                                        style={{ ...s.input, ...(errors.tin ? s.inputErr : {}) }} />
+                                    {errors.tin && <span style={s.errMsg}><AlertIcon />{errors.tin}</span>}
+                                </div>
+                            </div>
+
+                            {/* -- Financial ----------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Financial &amp; Payroll Data</div>
+                            <div style={s.fieldRow3}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Bank Name <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. BPI, BDO" value={form.bankName}
+                                        onChange={handleTextChange('bankName')}
+                                        style={{ ...s.input, ...(errors.bankName ? s.inputErr : {}) }} />
+                                    {errors.bankName && <span style={s.errMsg}><AlertIcon />{errors.bankName}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Bank Account Name <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="Account holder name" value={form.bankAccountName}
+                                        onChange={handleTextChange('bankAccountName')}
+                                        style={{ ...s.input, ...(errors.bankAccountName ? s.inputErr : {}) }} />
+                                    {errors.bankAccountName && <span style={s.errMsg}><AlertIcon />{errors.bankAccountName}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Bank Account No. <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="Account number" value={form.bankAccountNumber}
+                                        onChange={handleTextChange('bankAccountNumber')}
+                                        style={{ ...s.input, ...(errors.bankAccountNumber ? s.inputErr : {}) }} />
+                                    {errors.bankAccountNumber && <span style={s.errMsg}><AlertIcon />{errors.bankAccountNumber}</span>}
+                                </div>
+                            </div>
+
+                            {/* -- Documents ----------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Pre-Employment Documents</div>
+
+                            <label style={s.label}>Resume / CV <span style={s.req}>*</span></label>
+                            <div style={{ marginBottom: 12 }}>
+                                {!form.resume ? (
+                                    <div style={{ ...s.fileBtn, ...(errors.resume ? s.fileBtnErr : {}) }}
+                                        onClick={() => document.getElementById('fin-resume')?.click()}>
+                                        <input id="fin-resume" type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                                            onChange={e => handleFileUpload('resume')(e.target.files?.[0])} />
+                                        <UploadIcon />
+                                        <span>Click to upload Resume</span>
+                                        <span style={s.fileBtnHint}>PDF or DOCX � Max 5MB</span>
+                                    </div>
+                                ) : (
+                                    <div style={s.filePreview}>
+                                        <div style={s.fileIcon}><FileIcon /></div>
+                                        <div style={s.fileMeta}>
+                                            <div style={s.fileName}>{form.resume.name}</div>
+                                            <div style={s.fileSize}>{formatBytes(form.resume.size)}</div>
+                                        </div>
+                                        <button style={s.fileRemove} onClick={() => setForm(p => ({ ...p, resume: null }))}><XIcon /></button>
+                                    </div>
+                                )}
+                                {errors.resume && <span style={s.errMsg}><AlertIcon />{errors.resume}</span>}
+                            </div>
+
+                            {([
+                                { k: 'nbiClearance' as const, label: 'NBI Clearance', required: true },
+                                { k: 'medicalClearance' as const, label: 'Medical Clearance', required: true },
+                                { k: 'psaBirthCertificate' as const, label: 'PSA Birth Certificate', required: true },
+                                { k: 'signedEmploymentContract' as const, label: 'Employment Contract', required: true },
+                            ]).map(({ k, label, required }) => {
+                                const file = (form as any)[k] as File | null;
+                                const err = (errors as any)[k] as string | undefined;
+                                return (
+                                    <div key={k} style={{ marginBottom: 10 }}>
+                                        <label style={s.label}>{label} {required && <span style={s.req}>*</span>}</label>
+                                        <div style={{ marginTop: 6 }}>
+                                            {!file ? (
+                                                <div style={{ ...s.fileBtn, ...(err ? s.fileBtnErr : {}) }}
+                                                    onClick={() => document.getElementById(`doc-${k}`)?.click()}>
+                                                    <input id={`doc-${k}`} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                                                        onChange={e => handleFileUpload(k)(e.target.files?.[0])} />
+                                                    <UploadIcon />
+                                                    <span>Click to upload {label}</span>
+                                                    <span style={s.fileBtnHint}>PDF or DOCX · Max 5MB</span>
+                                                </div>
+                                            ) : (
+                                                <div style={s.filePreview}>
+                                                    <div style={s.fileIcon}><FileIcon /></div>
+                                                    <div style={s.fileMeta}>
+                                                        <div style={s.fileName}>{file.name}</div>
+                                                        <div style={s.fileSize}>{formatBytes(file.size)}</div>
+                                                    </div>
+                                                    <button style={s.fileRemove} onClick={() => setForm(p => ({ ...p, [k]: null }))}><XIcon /></button>
+                                                </div>
+                                            )}
+                                            {err && <span style={s.errMsg}><AlertIcon />{err}</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* -- Emergency ------------------------------ */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Emergency Contact &amp; Dependents</div>
+                            <div style={s.fieldRow3}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Contact Name <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="Full name" value={form.emergencyContactName}
+                                        onChange={handleTextChange('emergencyContactName')}
+                                        style={{ ...s.input, ...(errors.emergencyContactName ? s.inputErr : {}) }} />
+                                    {errors.emergencyContactName && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactName}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Relationship <span style={s.req}>*</span></label>
+                                    <select value={form.emergencyContactRelationship}
+                                        onChange={handleSelectChange('emergencyContactRelationship')}
+                                        style={{ ...s.input, ...s.select, ...(errors.emergencyContactRelationship ? s.inputErr : {}) }}>
+                                        <option value="">Select</option>
+                                        <option value="Mother">Mother</option>
+                                        <option value="Father">Father</option>
+                                        <option value="Spouse">Spouse</option>
+                                        <option value="Sibling">Sibling</option>
+                                        <option value="Relative">Relative</option>
+                                        <option value="Friend">Friend</option>
+                                    </select>
+                                    {errors.emergencyContactRelationship && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactRelationship}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Mobile No. <span style={s.req}>*</span></label>
+                                    <input type="tel" placeholder="09170000000" value={form.emergencyContactMobileNumber}
+                                        onChange={handleTextChange('emergencyContactMobileNumber')} maxLength={11}
+                                        style={{ ...s.input, ...(errors.emergencyContactMobileNumber ? s.inputErr : {}) }} />
+                                    {errors.emergencyContactMobileNumber && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactMobileNumber}</span>}
+                                </div>
+                            </div>
+                            <div style={s.field}>
+                                <label style={s.label}>Declared Dependents</label>
+                                <span style={s.hint}>Optional. Add dependents for HMO/benefits enrollment.</span>
+                                {(() => {
+                                    const deps: { name: string; dob?: string }[] = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
+                                    return (
+                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            {deps.map((dep, i) => (
+                                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                    <input type="text" value={dep.name}
+                                                        onChange={e => {
+                                                            const updated = [...deps];
+                                                            updated[i] = { ...updated[i], name: e.target.value };
+                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                                        }}
+                                                        placeholder="Full name"
+                                                        style={{ ...s.input, flex: 1 }} />
+                                                    <input type="date" value={dep.dob || ''}
+                                                        onChange={e => {
+                                                            const updated = [...deps];
+                                                            updated[i] = { ...updated[i], dob: e.target.value };
+                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                                        }}
+                                                        style={{ ...s.input, width: 160 }} />
+                                                    <button type="button" onClick={() => {
+                                                        const updated = deps.filter((_, j) => j !== i);
+                                                        setForm(p => ({ ...p, declaredDependents: updated.length > 0 ? JSON.stringify(updated) : '' }));
+                                                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
+                                                </div>
+                                            ))}
+                                            <button type="button" onClick={() => {
+                                                const updated = [...deps, { name: '', dob: '' }];
+                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
+                                            }} style={{
+                                                display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+                                                background: '#f1f5f9', border: '1px dashed #cbd5e1', borderRadius: 8,
+                                                padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#4318ff',
+                                                fontWeight: 600, fontFamily: 'inherit'
+                                            }}>+ Add Dependent</button>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* -- Education ---------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Educational &amp; Professional Background</div>
+                            <div style={s.fieldRow2}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Highest Educational Attainment <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. Bachelor of Science in Information Technology" value={form.highestEducationalAttainment}
+                                        onChange={handleTextChange('highestEducationalAttainment')}
+                                        style={{ ...s.input, ...(errors.highestEducationalAttainment ? s.inputErr : {}) }} />
+                                    {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Institution <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. University of the Philippines" value={form.institution}
+                                        onChange={handleTextChange('institution')}
+                                        style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
+                                    {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
+                                        onChange={handleTextChange('yearGraduated')}
+                                        style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
+                                    {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
+                                </div>
+                            </div>
+                            <div style={s.field}>
+                                <label style={s.label}>Professional Licenses &amp; Certifications</label>
+                                <textarea placeholder="e.g. PRC License No. 12345, Certified Public Accountant" value={form.professionalLicensesCertifications}
+                                    onChange={handleTextChange('professionalLicensesCertifications')}
+                                    style={s.textarea} rows={2} />
+                            </div>
+
+                            {/* -- Position ---------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Position Applied For</div>
                             <div style={s.field}>
                                 <label style={s.label}>Select Position <span style={s.req}>*</span></label>
-                                <select
-                                    value={form.positionId}
-                                    onChange={handlePositionChange}
-                                    style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}
-                                >
-                                    <option value="">Choose a position…</option>
+                                <select value={form.positionId}
+                                    onChange={e => { const val = e.target.value; setForm(p => ({ ...p, positionId: val })); const err = validateField('position', val); setErrors(p => ({ ...p, position: err || undefined })); }}
+                                    style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}>
+                                    <option value="">Choose a position�</option>
                                     {positions.length === 0 && <option value="" disabled>No positions available</option>}
                                     {positions.map(p => <option key={p.jobPositionId} value={p.jobPositionId}>{p.title}</option>)}
                                 </select>
                                 {errors.position && <span style={s.errMsg}><AlertIcon />{errors.position}</span>}
                             </div>
-
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Resume / CV</div>
-
-                            {!form.resume ? (
-                                <div
-                                    style={{ ...s.dropzone, ...(dragOver ? s.dropzoneActive : {}), ...(errors.resume ? s.dropzoneErr : {}) }}
-                                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                                    onDragLeave={() => setDragOver(false)}
-                                    onDrop={handleDrop}
-                                    onClick={() => (document.getElementById('resume-input') as HTMLInputElement)?.click()}
-                                >
-                                    <input
-                                        id="resume-input"
-                                        type="file"
-                                        accept=".pdf,.docx"
-                                        style={{ display: 'none' }}
-                                        onChange={e => handleFile(e.target.files?.[0])}
-                                    />
-                                    <div style={{ ...s.dropzoneIcon, ...(dragOver ? { background: 'rgba(67,24,255,0.15)', color: '#4318ff' } : {}) }}>
-                                        <UploadIcon />
-                                    </div>
-                                    <div style={s.dropzoneTitle}>{dragOver ? 'Drop to upload' : 'Drag & drop your resume here'}</div>
-                                    <div style={s.dropzoneHint}>or click to browse · PDF or DOCX · Max 5MB</div>
-                                </div>
-                            ) : (
-                                <div style={s.filePreview}>
-                                    <div style={s.fileIcon}><FileIcon /></div>
-                                    <div style={s.fileMeta}>
-                                        <div style={s.fileName}>{form.resume.name}</div>
-                                        <div style={s.fileSize}>{formatBytes(form.resume.size)}</div>
-                                    </div>
-                                    <button
-                                        style={s.fileRemove}
-                                        onClick={() => setForm(p => ({ ...p, resume: null }))}
-                                        title="Remove file"
-                                    >
-                                        <XIcon />
-                                    </button>
-                                </div>
-                            )}
-                            {errors.resume && <span style={{ ...s.errMsg, marginTop: 6 }}><AlertIcon />{errors.resume}</span>}
 
                             {submitError && (
                                 <div style={s.errorBanner}>
@@ -599,9 +982,9 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.background = '#4318ff'; }}
                             >
                                 {submitLoading ? (
-                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application…</>
+                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application�</>
                                 ) : (
-                                    'Submit Application →'
+                                    'Submit Application ?'
                                 )}
                             </button>
 
@@ -613,7 +996,7 @@ export default function PublicApplicationPortal() {
                     </div>
                 )}
 
-                {/* ══ SUCCESS ══════════════════════════════════════════════════════ */}
+                {/* -- SUCCESS ------------------------------------------------------ */}
                 {stage === 'success' && (
                     <div style={s.centeredStage}>
                         <div style={s.successCard}>
@@ -624,7 +1007,7 @@ export default function PublicApplicationPortal() {
                             </p>
                             <div style={s.successDetails}>
                                 {[
-                                    { label: 'Applicant', value: form.fullName },
+                                    { label: 'Applicant', value: `${form.firstName} ${form.middleName} ${form.lastName} ${form.suffix}`.replace(/\s+/g, ' ').trim() },
                                     { label: 'Email', value: form.email },
                                     { label: 'Status', value: 'Pending Review', highlight: true as const },
                                 ].map(({ label, value, highlight }) => (
@@ -637,26 +1020,37 @@ export default function PublicApplicationPortal() {
                             <div style={s.successNotice}>
                                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>What happens next?</div>
                                 <p style={{ margin: 0, fontSize: 13, color: '#475569', lineHeight: 1.6 }}>
-                                    Our recruitment team will review your application and reach out to{' '}
-                                    <strong>{form.email}</strong> within 3–5 business days. Please check your inbox, including your spam folder.
+                                    A verification email has been sent to your Google account. Please check your inbox and click the
+                                    verification link to activate your application. Our recruitment team will then review it and
+                                    reach out within 3�5 business days. Check your spam folder if you don't see the email.
                                 </p>
                             </div>
-                            <button
-                                style={{ ...s.submitBtn, background: '#0f172a' }}
-                                onClick={resetPortal}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
-                                onMouseLeave={e => (e.currentTarget.style.background = '#0f172a')}
-                            >
-                                Submit Another Application
-                            </button>
+                            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 28 }}>
+                                <button
+                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1 }}
+                                    onClick={resetPortal}
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#3510d9')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '#4318ff')}
+                                >
+                                    Submit Another Application
+                                </button>
+                                <button
+                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1, background: '#0f172a', boxShadow: '0 4px 16px rgba(15,23,42,0.2)' }}
+                                    onClick={() => window.location.href = '/'}
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = '#0f172a')}
+                                >
+                                    Back to Login
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
             </main>
 
             <footer style={s.footer}>
-                <span>© 2026 Speedex Courier Inc. · All rights reserved.</span>
-                <span style={s.footerRight}>Powered by OTMS · Recruitment Module</span>
+                <span>� 2026 Speedex Courier Inc. � All rights reserved.</span>
+                <span style={s.footerRight}>Powered by OTMS � Recruitment Module</span>
             </footer>
         </div>
     );
@@ -876,6 +1270,8 @@ const s: Record<string, CSSProperties> = {
         textTransform: 'uppercase', color: '#94a3b8', marginBottom: 14,
     },
     fieldRow2: { display: 'flex', gap: 16, marginBottom: 0, flexWrap: 'wrap' },
+    fieldRow3: { display: 'flex', gap: 12, marginBottom: 0, flexWrap: 'wrap' },
+    fieldRow4: { display: 'flex', gap: 10, marginBottom: 0, flexWrap: 'wrap' },
     field: { flex: 1, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
     label: { fontSize: 12, fontWeight: 700, color: '#374151' },
     req: { color: '#ef4444' },
@@ -888,6 +1284,33 @@ const s: Record<string, CSSProperties> = {
     inputErr: { border: '1px solid #ef4444', background: '#fff8f8' },
     inputReadonly: { background: '#f8fafc', color: '#64748b', cursor: 'not-allowed' },
     select: { appearance: 'none' },
+    textarea: {
+        borderRadius: 10, border: '1px solid #e2e8f0',
+        padding: '10px 14px', fontSize: 13, color: '#0f172a', background: 'white',
+        outline: 'none', width: '100%', boxSizing: 'border-box',
+        fontFamily: 'inherit', transition: 'border-color 0.15s', resize: 'vertical', minHeight: 60,
+    },
+    textareaErr: { border: '1px solid #ef4444', background: '#fff8f8' },
+    fileBtn: {
+        display: 'flex', alignItems: 'center', gap: 10,
+        border: '2px dashed #e2e8f0', borderRadius: 12, padding: '14px 18px',
+        cursor: 'pointer', transition: 'all 0.2s', background: '#fafbff', flexWrap: 'wrap',
+    },
+    fileBtnErr: { border: '2px dashed #ef4444', background: '#fff8f8' },
+    fileBtnSmall: {
+        display: 'flex', alignItems: 'center', gap: 6,
+        border: '1px dashed #d0d5dd', borderRadius: 8, padding: '8px 10px',
+        cursor: 'pointer', background: '#fafbff', minHeight: 36,
+    },
+    fileBtnHint: { fontSize: 11, color: '#94a3b8', marginLeft: 'auto' },
+    filePreviewSmall: {
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)',
+        borderRadius: 8, padding: '6px 8px', minHeight: 36,
+    },
+    inlineFileRow: { display: 'inline-flex' },
+    fileDocGrid: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+    fileDocCell: { flex: '1 1 calc(25% - 10px)', minWidth: 150 },
     prefillWrap: { position: 'relative' },
     prefillTag: {
         position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',

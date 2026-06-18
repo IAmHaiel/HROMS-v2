@@ -52,7 +52,8 @@ namespace OTMS.Service.Services
                 return null;
             }
 
-            if (!employee.IsEmailVerified)
+            var isSystemAdmin = employee.Account.Role?.Name == "SystemAdmin";
+            if (!employee.IsEmailVerified && !isSystemAdmin)
             {
                 throw new Exception(
                     "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support."
