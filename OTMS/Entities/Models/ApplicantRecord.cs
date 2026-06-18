@@ -7,22 +7,25 @@ namespace OTMS.Entities.Models
         public Guid ApplicantRecordId { get; set; }
 
         // Personal Information
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string FirstName { get; set; } = string.Empty;
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string? MiddleName { get; set; }
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string LastName { get; set; } = string.Empty;
-        [MaxLength(20)]
+        [MaxLength(50)]
         public string? Suffix { get; set; }
 
         public string FullName { get; set; } = string.Empty;
 
+        [MaxLength(50)]
         public string? Gender { get; set; }
         public string? CivilStatus { get; set; }
         public string EmailAddress { get; set; } = string.Empty;
         public string ContactNumber { get; set; } = string.Empty;
+        [MaxLength(256)]
         public string? CurrentResidentialAddress { get; set; }
+        [MaxLength(256)]
         public string? PermanentAddress { get; set; }
 
         // Statutory and Government Identifiers
@@ -32,8 +35,11 @@ namespace OTMS.Entities.Models
         public string? TIN { get; set; }
 
         // Financial and Payroll Data
+        [MaxLength(128)]
         public string? BankName { get; set; }
+        [MaxLength(128)]
         public string? BankAccountName { get; set; }
+        [MaxLength(34)]
         public string? BankAccountNumber { get; set; }
 
         // Pre-Employment Clearances and Documents (file paths)
@@ -44,16 +50,21 @@ namespace OTMS.Entities.Models
         public string? SignedEmploymentContractFilePath { get; set; }
 
         // Emergency and Dependent Information
+        [MaxLength(100)]
         public string? EmergencyContactName { get; set; }
         public string? EmergencyContactRelationship { get; set; }
         public string? EmergencyContactMobileNumber { get; set; }
+        [MaxLength(100)]
         public string? DeclaredDependents { get; set; }
 
         // Educational and Professional Background
+        [MaxLength(128)]
         public string? HighestEducationalAttainment { get; set; }
         public string? InstitutionAndYearGraduated { get; set; }
+        [MaxLength(128)]
         public string? Institution { get; set; }
         public string? YearGraduated { get; set; }
+        [MaxLength(512)]
         public string? ProfessionalLicensesCertifications { get; set; }
 
         // Job

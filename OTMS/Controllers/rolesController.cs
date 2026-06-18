@@ -8,8 +8,10 @@ namespace OTMS.Controllers
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Policy = "Permissions.Roles.View")]
-    public class rolesController(IRolesService rolesService) : ControllerBase
+    public class rolesController(IRolesService rolesService, IActivityLogService activityLogService) : ControllerBase
     {
+        private Guid? GetActorId() =>
+            Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;
         [HttpGet]
         public async Task<ActionResult<List<RoleResponseDTO>>> GetAllRoles()
         {
@@ -31,6 +33,9 @@ namespace OTMS.Controllers
             try
             {
                 var role = await rolesService.CreateRoleAsync(request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "RoleCreated", $"Created role '{role.Name}'");
                 return Ok(role);
             }
             catch (Exception ex)
@@ -46,6 +51,9 @@ namespace OTMS.Controllers
             try
             {
                 var role = await rolesService.UpdateRoleAsync(id, request);
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "RoleUpdated", $"Updated role '{role.Name}'");
                 return Ok(role);
             }
             catch (Exception ex)
@@ -62,6 +70,9 @@ namespace OTMS.Controllers
             {
                 var result = await rolesService.DeleteRoleAsync(id);
                 if (!result) return NotFound();
+                var actor = GetActorId();
+                if (actor.HasValue)
+                    await activityLogService.LogActivityAsync(actor.Value, "RoleDeleted", $"Deleted role ID: {id}");
                 return Ok(new { message = "Role deleted successfully." });
             }
             catch (Exception ex)

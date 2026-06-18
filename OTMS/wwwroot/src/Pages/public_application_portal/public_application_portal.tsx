@@ -255,10 +255,12 @@ export default function PublicApplicationPortal() {
 
     const validateField = (key: FormKey, value: string | File | null): string => {
         if ((key === 'firstName' || key === 'lastName') && !(value as string)?.trim()) return `${key === 'firstName' ? 'First' : 'Last'} name is required.`;
-        if (key === 'firstName' && (value as string).length > 128) return 'First name must not exceed 128 characters.';
-        if (key === 'lastName' && (value as string).length > 128) return 'Last name must not exceed 128 characters.';
-        if (key === 'middleName' && (value as string).length > 128) return 'Middle name must not exceed 128 characters.';
+        if (key === 'firstName' && (value as string).length > 50) return 'First name must not exceed 50 characters.';
+        if (key === 'lastName' && (value as string).length > 50) return 'Last name must not exceed 50 characters.';
+        if (key === 'middleName' && (value as string).length > 50) return 'Middle name must not exceed 50 characters.';
+        if (key === 'suffix' && (value as string).length > 50) return 'Suffix must not exceed 50 characters.';
         if (key === 'gender' && !(value as string)) return 'Gender is required.';
+        if (key === 'gender' && (value as string).length > 50) return 'Gender must not exceed 50 characters.';
         if (key === 'civilStatus' && !(value as string)) return 'Civil status is required.';
         if (key === 'contactNumber') {
             const v = (value as string).trim();
@@ -266,24 +268,33 @@ export default function PublicApplicationPortal() {
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit contact number.';
         }
         if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
+        if (key === 'currentResidentialAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
+        if (key === 'permanentAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'sssNumber') { if (!(value as string)?.trim()) return 'SSS Number is required.'; if (!/^\d{2}-\d{7}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXX-X'; }
         if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
         if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
         if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
-        if (key === 'bankName' && !(value as string)?.trim()) return 'Bank name is required.';
-        if (key === 'bankAccountName' && !(value as string)?.trim()) return 'Bank account name is required.';
-        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 64) return 'Must not exceed 64 characters.'; }
-        if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
+        if (key === 'bankName') { if (!(value as string)?.trim()) return 'Bank name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'bankAccountName') { if (!(value as string)?.trim()) return 'Bank account name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 34) return 'Must not exceed 34 characters.'; }
+        if (key === 'emergencyContactName') { if (!(value as string)?.trim()) return 'Emergency contact name is required.'; if ((value as string).length > 100) return 'Must not exceed 100 characters.'; }
         if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
         if (key === 'emergencyContactMobileNumber') {
             const v = (value as string).trim();
             if (!v) return 'Emergency contact number is required.';
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit emergency contact number.';
         }
-        if (key === 'highestEducationalAttainment' && !(value as string)?.trim()) return 'Highest educational attainment is required.';
-        if (key === 'institution' && !(value as string)?.trim()) return 'Institution is required.';
+        if (key === 'highestEducationalAttainment') { if (!(value as string)?.trim()) return 'Highest educational attainment is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'institution') { if (!(value as string)?.trim()) return 'Institution is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
+        if (key === 'yearGraduated') {
+            const v = (value as string).trim();
+            const year = parseInt(v, 10);
+            if (!/^\d{4}$/.test(v)) return 'Year must be exactly 4 digits.';
+            if (year < 1900) return 'Year must be 1900 or later.';
+        }
+        if (key === 'professionalLicensesCertifications' && (value as string).length > 512) return 'Must not exceed 512 characters.';
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
         if ((key === 'nbiClearance' || key === 'medicalClearance' || key === 'psaBirthCertificate' || key === 'signedEmploymentContract') && !value) {
