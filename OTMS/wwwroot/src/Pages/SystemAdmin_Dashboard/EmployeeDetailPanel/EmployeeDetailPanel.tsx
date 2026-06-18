@@ -218,24 +218,24 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
                 }
             }
 
-            const formData = new FormData();
-            formData.append('employeeNumber', profile.employeeNumber);
-            formData.append('firstName', firstName);
-            formData.append('middleName', middleName);
-            formData.append('lastName', lastName);
-            formData.append('suffix', suffix);
-            formData.append('contactNumber', form.contactNumber);
-            formData.append('email', form.email.trim());
-
             // 1. Update personal details
             const updateRes = await fetch(
                 `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(profile.employeeNumber)}`,
                 {
                     method: 'PUT',
                     headers: {
+                        'Content-Type': 'application/json',
                         Authorization: `Bearer ${token}`,
                     },
-                    body: formData,
+                    body: JSON.stringify({
+                        employeeNumber: profile.employeeNumber,
+                        firstName,
+                        middleName,
+                        lastName,
+                        suffix,
+                        contactNumber: form.contactNumber,
+                        email: form.email.trim(),
+                    }),
                 }
             );
             if (!updateRes.ok) throw new Error('Failed to update employee details. Please try again.');

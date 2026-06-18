@@ -1407,10 +1407,10 @@ export default function OnboardingPage() {
                                         </div>
                                     )}
                                     <button onClick={() => {
-                                        localStorage.setItem('userRole', 'Encoder');
-                                        navigate('/OpEmployee_Dashboard');
+                                        localStorage.clear();
+                                        navigate('/');
                                     }} style={{ width: '100%', height: 46, border: 'none', borderRadius: 'var(--radius-md)', background: 'linear-gradient(135deg, var(--sidebar-bg), var(--primary-dark))', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', boxShadow: 'var(--shadow-lg)' }}>
-                                        Continue to Login <ArrowRight size={16} />
+                                        Go to Login <ArrowRight size={16} />
                                     </button>
                                 </div>
                             )}

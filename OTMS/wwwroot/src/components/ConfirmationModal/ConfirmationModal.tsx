@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useRef } from "react";
+import { Trash2, AlertTriangle, AlertCircle, Info, HelpCircle, Check, Loader2, Lock } from "lucide-react";
 import "./ConfirmationModal.css";
 
 export type ConfirmationVariant =
@@ -11,7 +12,6 @@ export type ConfirmationVariant =
 export interface ConfirmationModalProps {
     isOpen: boolean;
     variant?: ConfirmationVariant;
-    icon?: string;
     title: string;
     description: React.ReactNode;
     notice?: string;
@@ -24,21 +24,21 @@ export interface ConfirmationModalProps {
 
 const VARIANT_DEFAULTS: Record<
     ConfirmationVariant,
-    { icon: string; confirmLabel: string }
+    { icon: React.ReactNode; confirmLabel: string }
 > = {
-    danger: { icon: "ti-trash", confirmLabel: "Delete" },
-    warning: { icon: "ti-alert-triangle", confirmLabel: "Proceed" },
-    info: { icon: "ti-info-circle", confirmLabel: "Confirm" },
-    success: { icon: "ti-check", confirmLabel: "Save" },
-    neutral: { icon: "ti-help-circle", confirmLabel: "Confirm" },
+    danger: { icon: <Trash2 size={22} />, confirmLabel: "Delete" },
+    warning: { icon: <AlertTriangle size={22} />, confirmLabel: "Proceed" },
+    info: { icon: <Info size={22} />, confirmLabel: "Confirm" },
+    success: { icon: <Check size={22} />, confirmLabel: "Save" },
+    neutral: { icon: <HelpCircle size={22} />, confirmLabel: "Confirm" },
 };
 
-const NOTICE_ICONS: Record<ConfirmationVariant, string> = {
-    danger: "ti-alert-triangle",
-    warning: "ti-alert-circle",
-    info: "ti-info-circle",
-    success: "ti-lock",
-    neutral: "ti-info-circle",
+const NOTICE_ICONS: Record<ConfirmationVariant, React.ReactNode> = {
+    danger: <AlertTriangle size={14} />,
+    warning: <AlertCircle size={14} />,
+    info: <Info size={14} />,
+    success: <Lock size={14} />,
+    neutral: <Info size={14} />,
 };
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -58,9 +58,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     const confirmBtnRef = useRef<HTMLButtonElement>(null);
 
     const defaults = VARIANT_DEFAULTS[variant];
-    const resolvedIcon = icon ?? defaults.icon;
     const resolvedConfirmLabel = confirmLabel ?? defaults.confirmLabel;
-    const noticeIcon = NOTICE_ICONS[variant];
 
     useEffect(() => {
         if (isOpen) {
@@ -97,7 +95,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
                 <div className="cm-header">
                     <div className={`cm-icon-circle cm-icon-${variant}`}>
-                        <i className={`ti ${resolvedIcon}`} aria-hidden="true" />
+                        {defaults.icon}
                     </div>
                     <div className="cm-header-text">
                         <p className="cm-title" id="cm-title">{title}</p>
@@ -107,7 +105,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
                 {notice && (
                     <div className={`cm-notice cm-notice-${variant}`}>
-                        <i className={`ti ${noticeIcon} cm-notice-icon`} aria-hidden="true" />
+                        <span className="cm-notice-icon">{NOTICE_ICONS[variant]}</span>
                         <span>{notice}</span>
                     </div>
                 )}
@@ -130,12 +128,12 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     >
                         {isLoading ? (
                             <>
-                                <i className="ti ti-loader-2 cm-spin" aria-hidden="true" />
+                                <Loader2 size={16} className="cm-spin" />
                                 <span>Processing...</span>
                             </>
                         ) : (
                             <>
-                                <i className={`ti ${resolvedIcon}`} aria-hidden="true" />
+                                {defaults.icon}
                                 <span>{resolvedConfirmLabel}</span>
                             </>
                         )}

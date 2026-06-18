@@ -935,22 +935,20 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             setApiError('');
             try {
                 const token = localStorage.getItem('authToken');
-                const builtName = buildDisplayName(form.firstName, form.middleName, form.lastName, form.suffix);
-                const formData = new FormData();
-                formData.append('employeeNumber', employee.employeeNumber);
-                formData.append('firstName', form.firstName.trim());
-                formData.append('middleName', form.middleName.trim());
-                formData.append('lastName', form.lastName.trim());
-                formData.append('suffix', form.suffix.trim());
-                formData.append('contactNumber', form.contactNumber);
-                formData.append('email', form.email.trim());
-
                 const updateRes = await fetch(
                     `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employee.employeeNumber)}`,
                     {
                         method: 'PUT',
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        body: formData,
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({
+                            employeeNumber: employee.employeeNumber,
+                            firstName: form.firstName.trim(),
+                            middleName: form.middleName.trim(),
+                            lastName: form.lastName.trim(),
+                            suffix: form.suffix.trim(),
+                            contactNumber: form.contactNumber,
+                            email: form.email.trim(),
+                        }),
                     }
                 );
                 if (!updateRes.ok) {
@@ -2007,21 +2005,20 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     }
                     // Verified — now save
                     setProfileSaving(true);
-                    const formData = new FormData();
-                    formData.append('employeeNumber', employeeId);
-                    formData.append('firstName', profileForm.firstName.trim());
-                    formData.append('middleName', profileForm.middleName.trim());
-                    formData.append('lastName', profileForm.lastName.trim());
-                    formData.append('suffix', profileForm.suffix.trim());
-                    formData.append('contactNumber', profileForm.contactNumber.trim());
-                    formData.append('email', profileForm.email.trim());
-
                     const saveRes = await fetch(
                         `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`,
                         {
                             method: 'PUT',
-                            headers: { 'Authorization': `Bearer ${token}` },
-                            body: formData,
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({
+                                employeeNumber: employeeId,
+                                firstName: profileForm.firstName.trim(),
+                                middleName: profileForm.middleName.trim(),
+                                lastName: profileForm.lastName.trim(),
+                                suffix: profileForm.suffix.trim(),
+                                contactNumber: profileForm.contactNumber.trim(),
+                                email: profileForm.email.trim(),
+                            }),
                         }
                     );
                     if (!saveRes.ok) {
@@ -2808,6 +2805,7 @@ export default function Dashboard() {
     const [deleteSubmitting, setDeleteSubmitting] = useState(false);
     const [selectedPanelEmployee, setSelectedPanelEmployee] = useState<RecentEmployee | null>(null);
     const [detailPanelInitialSection, setDetailPanelInitialSection] = useState<'overview' | 'digital_201'>('overview');
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [logoutConfirm, setLogoutConfirm] = useState(false);
     const [logoutLoading, setLogoutLoading] = useState(false);
 
@@ -3115,7 +3113,8 @@ export default function Dashboard() {
 
     return (
         <div className="dashboard-container">
-            <aside className="sidebar">
+            {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+            <aside className={`sidebar${sidebarOpen ? ' sidebar--open' : ''}`}>
                 <div className="sidebar-logo"><img src="/src/assets/SpeedexLogo.jpg" alt="Speedex Logo" className="logo-image" /></div>
                 <div className="sidebar-role-section"><div className="sidebar-role-badge super-admin"><div className="role-dot-inner" />SYSTEM ADMIN</div></div>
                 <nav className="sidebar-nav">
@@ -3146,6 +3145,7 @@ export default function Dashboard() {
                         userInitials={getInitials(employeeName)}
                         onSettingsClick={() => setActiveTab('settings')}
                         onLogout={handleLogout}
+                        onMenuToggle={() => setSidebarOpen(v => !v)}
                     />
                 )}
 
