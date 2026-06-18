@@ -9,20 +9,21 @@ namespace OTMS.Entities.DTOs.Public
 
         // ─── Personal Information ───────────────────────────────────────────
         [Required]
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string FirstName { get; set; } = string.Empty;
 
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string? MiddleName { get; set; }
 
         [Required]
-        [MaxLength(128)]
+        [MaxLength(50)]
         public string LastName { get; set; } = string.Empty;
 
-        [MaxLength(20)]
+        [MaxLength(50)]
         public string? Suffix { get; set; }
 
         [Required]
+        [MaxLength(50)]
         public string Gender { get; set; } = string.Empty;
 
         [Required]
@@ -33,9 +34,11 @@ namespace OTMS.Entities.DTOs.Public
         public string ContactNumber { get; set; } = string.Empty;
 
         [Required]
+        [MaxLength(256)]
         public string CurrentResidentialAddress { get; set; } = string.Empty;
 
         [Required]
+        [MaxLength(256)]
         public string PermanentAddress { get; set; } = string.Empty;
 
         // ─── Statutory and Government Identifiers ──────────────────────────
@@ -50,11 +53,13 @@ namespace OTMS.Entities.DTOs.Public
 
         // ─── Financial and Payroll Data ────────────────────────────────────
         [Required]
+        [MaxLength(128)]
         public string BankName { get; set; } = string.Empty;
         [Required]
+        [MaxLength(128)]
         public string BankAccountName { get; set; } = string.Empty;
         [Required]
-        [MaxLength(64)]
+        [MaxLength(34)]
         public string BankAccountNumber { get; set; } = string.Empty;
 
         // ─── Pre-Employment Documents ──────────────────────────────────────
@@ -69,6 +74,7 @@ namespace OTMS.Entities.DTOs.Public
 
         // ─── Emergency and Dependent Information ──────────────────────────
         [Required]
+        [MaxLength(100)]
         public string EmergencyContactName { get; set; } = string.Empty;
 
         [Required]
@@ -78,18 +84,22 @@ namespace OTMS.Entities.DTOs.Public
         [RegularExpression(@"^\d{11}$", ErrorMessage = "Emergency contact number must be exactly 11 digits.")]
         public string EmergencyContactMobileNumber { get; set; } = string.Empty;
 
+        [MaxLength(100)]
         public string? DeclaredDependents { get; set; }
 
         // ─── Educational and Professional Background ──────────────────────
         [Required]
+        [MaxLength(128)]
         public string HighestEducationalAttainment { get; set; } = string.Empty;
 
         [Required]
+        [MaxLength(128)]
         public string Institution { get; set; } = string.Empty;
 
         [Required]
         public string YearGraduated { get; set; } = string.Empty;
 
+        [MaxLength(512)]
         public string? ProfessionalLicensesCertifications { get; set; }
 
         // ─── Position ─────────────────────────────────────────────────────

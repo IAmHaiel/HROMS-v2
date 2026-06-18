@@ -253,12 +253,26 @@ export default function PublicApplicationPortal() {
         setErrors(p => ({ ...p, [key]: err || undefined }));
     };
 
+    const fieldMaxLengths: Partial<Record<FormKey, number>> = {
+        firstName: 50, middleName: 50, lastName: 50, suffix: 50,
+        currentResidentialAddress: 256, permanentAddress: 256,
+        bankName: 128, bankAccountName: 128, bankAccountNumber: 34,
+        emergencyContactName: 100, declaredDependents: 100,
+        highestEducationalAttainment: 128, institution: 128,
+        professionalLicensesCertifications: 512,
+    };
+
     const validateField = (key: FormKey, value: string | File | null): string => {
+        const max = fieldMaxLengths[key];
+        const strVal = value as string;
+        if (max && strVal && strVal.length >= max) return `Maximum ${max} characters reached.`;
         if ((key === 'firstName' || key === 'lastName') && !(value as string)?.trim()) return `${key === 'firstName' ? 'First' : 'Last'} name is required.`;
-        if (key === 'firstName' && (value as string).length > 128) return 'First name must not exceed 128 characters.';
-        if (key === 'lastName' && (value as string).length > 128) return 'Last name must not exceed 128 characters.';
-        if (key === 'middleName' && (value as string).length > 128) return 'Middle name must not exceed 128 characters.';
+        if (key === 'firstName' && (value as string).length > 50) return 'First name must not exceed 50 characters.';
+        if (key === 'lastName' && (value as string).length > 50) return 'Last name must not exceed 50 characters.';
+        if (key === 'middleName' && (value as string).length > 50) return 'Middle name must not exceed 50 characters.';
+        if (key === 'suffix' && (value as string).length > 50) return 'Suffix must not exceed 50 characters.';
         if (key === 'gender' && !(value as string)) return 'Gender is required.';
+        if (key === 'gender' && (value as string).length > 50) return 'Gender must not exceed 50 characters.';
         if (key === 'civilStatus' && !(value as string)) return 'Civil status is required.';
         if (key === 'contactNumber') {
             const v = (value as string).trim();
@@ -266,24 +280,33 @@ export default function PublicApplicationPortal() {
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit contact number.';
         }
         if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
+        if (key === 'currentResidentialAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
+        if (key === 'permanentAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'sssNumber') { if (!(value as string)?.trim()) return 'SSS Number is required.'; if (!/^\d{2}-\d{7}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXX-X'; }
         if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
         if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
         if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
-        if (key === 'bankName' && !(value as string)?.trim()) return 'Bank name is required.';
-        if (key === 'bankAccountName' && !(value as string)?.trim()) return 'Bank account name is required.';
-        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 64) return 'Must not exceed 64 characters.'; }
-        if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
+        if (key === 'bankName') { if (!(value as string)?.trim()) return 'Bank name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'bankAccountName') { if (!(value as string)?.trim()) return 'Bank account name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 34) return 'Must not exceed 34 characters.'; }
+        if (key === 'emergencyContactName') { if (!(value as string)?.trim()) return 'Emergency contact name is required.'; if ((value as string).length > 100) return 'Must not exceed 100 characters.'; }
         if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
         if (key === 'emergencyContactMobileNumber') {
             const v = (value as string).trim();
             if (!v) return 'Emergency contact number is required.';
             if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit emergency contact number.';
         }
-        if (key === 'highestEducationalAttainment' && !(value as string)?.trim()) return 'Highest educational attainment is required.';
-        if (key === 'institution' && !(value as string)?.trim()) return 'Institution is required.';
+        if (key === 'highestEducationalAttainment') { if (!(value as string)?.trim()) return 'Highest educational attainment is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
+        if (key === 'institution') { if (!(value as string)?.trim()) return 'Institution is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
+        if (key === 'yearGraduated') {
+            const v = (value as string).trim();
+            const year = parseInt(v, 10);
+            if (!/^\d{4}$/.test(v)) return 'Year must be exactly 4 digits.';
+            if (year < 1900) return 'Year must be 1900 or later.';
+        }
+        if (key === 'professionalLicensesCertifications' && (value as string).length > 512) return 'Must not exceed 512 characters.';
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
         if ((key === 'nbiClearance' || key === 'medicalClearance' || key === 'psaBirthCertificate' || key === 'signedEmploymentContract') && !value) {
@@ -620,20 +643,21 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>First Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Juan" value={form.firstName}
-                                        onChange={handleTextChange('firstName')} maxLength={128}
+                                        onChange={handleTextChange('firstName')} maxLength={50}
                                         style={{ ...s.input, ...(errors.firstName ? s.inputErr : {}) }} />
                                     {errors.firstName && <span style={s.errMsg}><AlertIcon />{errors.firstName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Middle Name</label>
                                     <input type="text" placeholder="M." value={form.middleName}
-                                        onChange={handleTextChange('middleName')} maxLength={128}
-                                        style={s.input} />
+                                        onChange={handleTextChange('middleName')} maxLength={50}
+                                        style={{ ...s.input, ...(errors.middleName ? s.inputErr : {}) }} />
+                                    {errors.middleName && <span style={s.errMsg}><AlertIcon />{errors.middleName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Last Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Dela Cruz" value={form.lastName}
-                                        onChange={handleTextChange('lastName')} maxLength={128}
+                                        onChange={handleTextChange('lastName')} maxLength={50}
                                         style={{ ...s.input, ...(errors.lastName ? s.inputErr : {}) }} />
                                     {errors.lastName && <span style={s.errMsg}><AlertIcon />{errors.lastName}</span>}
                                 </div>
@@ -642,8 +666,9 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Suffix</label>
                                     <input type="text" placeholder="Jr., III" value={form.suffix}
-                                        onChange={handleTextChange('suffix')} maxLength={20}
-                                        style={s.input} />
+                                        onChange={handleTextChange('suffix')} maxLength={50}
+                                        style={{ ...s.input, ...(errors.suffix ? s.inputErr : {}) }} />
+                                    {errors.suffix && <span style={s.errMsg}><AlertIcon />{errors.suffix}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Gender <span style={s.req}>*</span></label>
@@ -658,7 +683,8 @@ export default function PublicApplicationPortal() {
                                     </select>
                                     {form.gender === 'Other' && (
                                         <input type="text" placeholder="Please specify" value={genderCustom}
-                                            onChange={e => { setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }}
+                                            onChange={e => { setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }} maxLength={50}
+                                           
                                             style={{ ...s.input, marginTop: 6 }} />
                                     )}
                                     {errors.gender && <span style={s.errMsg}><AlertIcon />{errors.gender}</span>}
@@ -708,14 +734,14 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Current Residential Address <span style={s.req}>*</span></label>
                                     <textarea placeholder="Street, Barangay, City, Province" value={form.currentResidentialAddress}
-                                        onChange={handleTextChange('currentResidentialAddress')}
+                                        onChange={handleTextChange('currentResidentialAddress')} maxLength={256}
                                         style={{ ...s.textarea, ...(errors.currentResidentialAddress ? s.textareaErr : {}) }} rows={2} />
                                     {errors.currentResidentialAddress && <span style={s.errMsg}><AlertIcon />{errors.currentResidentialAddress}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Permanent Address <span style={s.req}>*</span></label>
                                     <textarea placeholder="Street, Barangay, City, Province" value={form.permanentAddress}
-                                        onChange={handleTextChange('permanentAddress')}
+                                        onChange={handleTextChange('permanentAddress')} maxLength={256}
                                         style={{ ...s.textarea, ...(errors.permanentAddress ? s.textareaErr : {}) }} rows={2} />
                                     {errors.permanentAddress && <span style={s.errMsg}><AlertIcon />{errors.permanentAddress}</span>}
                                 </div>
@@ -760,21 +786,21 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. BPI, BDO" value={form.bankName}
-                                        onChange={handleTextChange('bankName')}
+                                        onChange={handleTextChange('bankName')} maxLength={128}
                                         style={{ ...s.input, ...(errors.bankName ? s.inputErr : {}) }} />
                                     {errors.bankName && <span style={s.errMsg}><AlertIcon />{errors.bankName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Account Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account holder name" value={form.bankAccountName}
-                                        onChange={handleTextChange('bankAccountName')}
+                                        onChange={handleTextChange('bankAccountName')} maxLength={128}
                                         style={{ ...s.input, ...(errors.bankAccountName ? s.inputErr : {}) }} />
                                     {errors.bankAccountName && <span style={s.errMsg}><AlertIcon />{errors.bankAccountName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Account No. <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account number" value={form.bankAccountNumber}
-                                        onChange={handleTextChange('bankAccountNumber')}
+                                        onChange={handleTextChange('bankAccountNumber')} maxLength={34}
                                         style={{ ...s.input, ...(errors.bankAccountNumber ? s.inputErr : {}) }} />
                                     {errors.bankAccountNumber && <span style={s.errMsg}><AlertIcon />{errors.bankAccountNumber}</span>}
                                 </div>
@@ -850,7 +876,7 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Contact Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Full name" value={form.emergencyContactName}
-                                        onChange={handleTextChange('emergencyContactName')}
+                                        onChange={handleTextChange('emergencyContactName')} maxLength={100}
                                         style={{ ...s.input, ...(errors.emergencyContactName ? s.inputErr : {}) }} />
                                     {errors.emergencyContactName && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactName}</span>}
                                 </div>
@@ -927,21 +953,21 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Highest Educational Attainment <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. Bachelor of Science in Information Technology" value={form.highestEducationalAttainment}
-                                        onChange={handleTextChange('highestEducationalAttainment')}
+                                        onChange={handleTextChange('highestEducationalAttainment')} maxLength={128}
                                         style={{ ...s.input, ...(errors.highestEducationalAttainment ? s.inputErr : {}) }} />
                                     {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Institution <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. University of the Philippines" value={form.institution}
-                                        onChange={handleTextChange('institution')}
+                                        onChange={handleTextChange('institution')} maxLength={128}
                                         style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
                                     {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
-                                        onChange={handleTextChange('yearGraduated')}
+                                        onChange={handleTextChange('yearGraduated')} maxLength={4}
                                         style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
                                     {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
                                 </div>
@@ -949,7 +975,7 @@ export default function PublicApplicationPortal() {
                             <div style={s.field}>
                                 <label style={s.label}>Professional Licenses &amp; Certifications</label>
                                 <textarea placeholder="e.g. PRC License No. 12345, Certified Public Accountant" value={form.professionalLicensesCertifications}
-                                    onChange={handleTextChange('professionalLicensesCertifications')}
+                                    onChange={handleTextChange('professionalLicensesCertifications')} maxLength={512}
                                     style={s.textarea} rows={2} />
                             </div>
 
