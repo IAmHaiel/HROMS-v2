@@ -181,24 +181,31 @@ namespace OTMS.Controllers
         [Authorize(Policy = "Permissions.Users.Manage")]
         [ProducesResponseType(typeof(UpdateEmployeeResponseDTO), 200)]
         [HttpPut("update-user")]
-        public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, [FromForm] UpdateEmployeeDTO request)
+        public async Task<IActionResult> UpdateUser([Required][FromQuery]string employeeNumber, [FromBody] UpdateEmployeeJsonDTO request)
         {
-
             try
             {
-                var result = await accountManagementService.UpdateEmployee(employeeNumber, request);
+                var mapped = new UpdateEmployeeDTO
+                {
+                    EmployeeNumber = request.EmployeeNumber,
+                    FirstName = request.FirstName,
+                    MiddleName = request.MiddleName,
+                    LastName = request.LastName,
+                    Suffix = request.Suffix,
+                    ContactNumber = request.ContactNumber,
+                    Email = request.Email
+                };
+                var result = await accountManagementService.UpdateEmployee(employeeNumber, mapped);
+                if (result == null)
+                {
+                    return BadRequest(new ApiResponseDTO<object> { IsSuccess = false, Message = "Employee not found.", Data = null });
+                }
                 return Ok(new ApiResponseDTO<UpdateEmployeeResponseDTO> { IsSuccess = true, Message = "Employee updated successfully.", Data = result });
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                return BadRequest(new ApiResponseDTO<object>
-                {
-                    IsSuccess = false,
-                    Message = ex.Message,
-                    Data = null
-                });
+                return BadRequest(new ApiResponseDTO<object> { IsSuccess = false, Message = ex.Message, Data = null });
             }
-            
         }
 
 

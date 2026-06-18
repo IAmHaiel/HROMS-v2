@@ -68,6 +68,19 @@ namespace OTMS.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> Register([FromForm] EmployeeRegisterDTO request)
         {
+            if (!ModelState.IsValid)
+            {
+                var errors = string.Join("; ", ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage));
+                return BadRequest(new ApiResponseDTO<object>
+                {
+                    IsSuccess = false,
+                    Message = $"Validation failed: {errors}",
+                    Data = null
+                });
+            }
+
             try
             {
                 var result = await authService.RegisterAsync(request);

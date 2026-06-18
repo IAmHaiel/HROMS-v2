@@ -9,6 +9,7 @@ interface DashboardHeaderProps {
     userInitials?: string;
     onSettingsClick?: () => void;
     onLogout?: () => void;
+    onMenuToggle?: () => void;
     children?: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export default function DashboardHeader({
     userInitials,
     onSettingsClick,
     onLogout,
+    onMenuToggle,
     children,
 }: DashboardHeaderProps) {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -49,6 +51,11 @@ export default function DashboardHeader({
 
     return (
         <div className="dashboard-header">
+            {onMenuToggle && (
+                <button className="sidebar-toggle-btn" onClick={onMenuToggle} aria-label="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+            )}
             <div className="header-title">
                 <h2>{title}</h2>
             </div>

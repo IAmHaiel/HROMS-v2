@@ -826,6 +826,9 @@ namespace OTMS.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DegreeEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("EmergencyContactNameEncrypted")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -834,8 +837,35 @@ namespace OTMS.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("EmergencyContactRelationshipEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FatherFirstNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FatherLastNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FatherMiddleNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("HighestEducationalAttainmentEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("InstitutionEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MotherFirstNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MotherLastNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("MotherMiddleNameEncrypted")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PagibigNumberEncrypted")
                         .IsRequired()
@@ -854,6 +884,9 @@ namespace OTMS.Migrations
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("YearGraduatedEncrypted")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Employee201FileDataId");
 
