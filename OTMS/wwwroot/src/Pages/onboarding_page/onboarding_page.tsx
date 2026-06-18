@@ -203,6 +203,8 @@ export default function OnboardingPage() {
         govId: { name: '', size: '', status: 'idle' },
         nbi: { name: '', size: '', status: 'idle' },
         education: { name: '', size: '', status: 'idle' },
+        psa: { name: '', size: '', status: 'idle' },
+        bir2316: { name: '', size: '', status: 'idle' },
     });
 
     // ── 201 File state ──
@@ -238,6 +240,8 @@ export default function OnboardingPage() {
             govId: ['pdf', 'jpg', 'jpeg', 'png'],
             nbi: ['pdf', 'jpg', 'jpeg', 'png'],
             education: ['pdf', 'jpg', 'jpeg', 'png'],
+            psa: ['pdf', 'jpg', 'jpeg', 'png'],
+            bir2316: ['pdf', 'jpg', 'jpeg', 'png'],
         };
         const validExts = validExtensionsMap[key] || [];
         if (file.size > 10 * 1024 * 1024) {
@@ -260,7 +264,7 @@ export default function OnboardingPage() {
         setFileObjects(prev => { const n = { ...prev }; delete n[key]; return n; });
     };
 
-    const requiredKeys = ['biodata', 'medical', 'govId'];
+    const requiredKeys = ['biodata', 'medical', 'govId', 'nbi', 'psa'];
     const pendingRequiredCount = requiredKeys.filter(k => uploadedDocs[k]?.status !== 'done').length;
     const isSubmitDisabled = pendingRequiredCount > 0;
 
@@ -715,12 +719,14 @@ export default function OnboardingPage() {
                                         {renderUploadSlot('biodata', 'Biodata / Resume', 'PDF or DOCX up to 10MB', true)}
                                         {renderUploadSlot('medical', 'Medical Certificate', 'PDF, JPG, or PNG up to 10MB', true)}
                                         {renderUploadSlot('govId', 'Government-issued ID', 'JPG, PNG, or PDF up to 10MB', true)}
+                                        {renderUploadSlot('nbi', 'NBI / Police Clearance', 'JPG, PNG, or PDF up to 10MB', true)}
+                                        {renderUploadSlot('psa', 'PSA Birth Certificate', 'JPG, PNG, or PDF up to 10MB', true)}
                                     </div>
                                 </div>
                                 <div style={{ marginTop: 8 }}>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Optional Documents</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                        {renderUploadSlot('nbi', 'NBI / Police Clearance', 'JPG, PNG, or PDF up to 10MB', false)}
+                                        {renderUploadSlot('bir2316', 'BIR Form 2316', 'JPG, PNG, or PDF up to 10MB', false)}
                                         {renderUploadSlot('education', 'Educational Documents', 'PDF, JPG, or PNG up to 10MB', false)}
                                     </div>
                                 </div>
