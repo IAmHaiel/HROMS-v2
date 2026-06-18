@@ -120,11 +120,12 @@ export default function Login() {
             try {
                 data = await response.json();
             } catch {
-                throw new Error('Invalid server response');
+                // Non-JSON response — use status text if available
             }
 
             if (!response.ok) {
                 const message = data?.message?.toLowerCase() ?? '';
+                const statusMessage = data?.message || response.statusText || '';
 
                 if (message.includes('on leave') || message.includes('onleave')) {
                     navigate('/account_locked', {
@@ -150,7 +151,12 @@ export default function Login() {
                     return;
                 }
 
-                updateStatus(data?.message || 'Invalid Employee ID or password.', 'error');
+                if (message.includes('verified') || message.includes('unverified') || message.includes('verify your email') || message.includes('email not verified')) {
+                    updateStatus('Your account is not yet verified. Please check your email for the verification link.', 'error');
+                    return;
+                }
+
+                updateStatus(statusMessage || 'Invalid Employee ID or password.', 'error');
                 return;
             }
 
@@ -191,7 +197,7 @@ export default function Login() {
             }, 800);
 
         } catch {
-            updateStatus('Unable to connect to the server. Please try again.', 'error');
+            updateStatus('Unable to connect to the server. Please check your connection and try again.', 'error');
         } finally {
             setIsLoading(false);
         }

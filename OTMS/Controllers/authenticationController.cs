@@ -54,6 +54,9 @@ namespace OTMS.Controllers
 
             var status = employee.Account.AccountStatus;
 
+            if (!employee.IsEmailVerified)
+                return Unauthorized(new { message = "Your email is not yet verified. Please check your inbox for the verification link." });
+
             if (status == "Deactivated" || status == "Locked" || status == "On Leave" || employee.Account.FailedLoginAttempts >= 3)
             {
                 var fullName = string.Join(" ", new[]

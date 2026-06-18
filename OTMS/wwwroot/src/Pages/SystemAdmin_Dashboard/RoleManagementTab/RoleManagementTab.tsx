@@ -243,7 +243,7 @@ const PermissionSelector: React.FC<PermSelectorProps> = ({ grouped, selected, se
                 p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
                 getFriendlyName(p.name).toLowerCase().includes(searchQuery.toLowerCase())
-              )
+            )
             : perms;
         if (filteredPerms.length > 0) acc[cat] = filteredPerms;
         return acc;
@@ -1176,7 +1176,8 @@ export default function RoleManagementTab() {
                     }}
                 >
                     <option value="">— Select a department —</option>
-                    <option value="__create__">➕ Create New Department</option>
+                    <option value="__create__">+ Create New Department</option>
+                    <option disabled>──────────</option>
                     {departments
                         .filter(d => d.status === 'Active' || d.isActive !== false)
                         .map(d => (
@@ -1376,9 +1377,8 @@ export default function RoleManagementTab() {
                     { key: 'overview', label: 'Overview & Logs', icon: <BarChart2 size={15} /> },
                 ]}
                 activeTab={subTab}
-                onTabChange={setSubTab}
+                onTabChange={(key: string) => setSubTab(key as SubTab)}
             />
-
             {/* ─────────────────────────────── ROLES TAB ────────────────────── */}
             {subTab === 'roles' && (
                 <>
