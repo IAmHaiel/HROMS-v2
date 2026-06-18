@@ -132,6 +132,32 @@ namespace OTMS.Data
                 }
             }
 
+            // Assign basic permissions to Encoder and Coordinator roles
+            var encoderRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == encoderRoleName);
+            var coordinatorRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == coordinatorRoleName);
+            var basicRolePermissionNames = new HashSet<string>
+            {
+                "Permissions.Tasks.View",
+                "Permissions.Tasks.Manage",
+                "Permissions.Dashboard.View",
+                "Permissions.Approvals.View",
+            };
+
+            foreach (var role in new[] { encoderRole, coordinatorRole })
+            {
+                if (role != null)
+                {
+                    var basicPerms = allDbPermissions.Where(p => basicRolePermissionNames.Contains(p.Name));
+                    foreach (var perm in basicPerms)
+                    {
+                        if (!await context.RolePermissions.AnyAsync(rp => rp.RoleId == role.RoleId && rp.PermissionId == perm.PermissionId))
+                        {
+                            context.RolePermissions.Add(new RolePermission { RoleId = role.RoleId, PermissionId = perm.PermissionId });
+                        }
+                    }
+                }
+            }
+
             await context.SaveChangesAsync();
 
             // 5. Seed default System Admin employee account (bypasses email verification)
