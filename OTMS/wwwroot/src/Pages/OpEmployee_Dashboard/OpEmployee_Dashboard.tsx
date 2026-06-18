@@ -1502,8 +1502,9 @@ export default function EmployeeDashboard() {
                 setTasks([]);
                 return;
             }
-            const data: TaskResponseDTO[] = await res.json();
-            setTasks(data.map(dtoToTask));
+            const json = await res.json();
+            const rawList: TaskResponseDTO[] = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+            setTasks(rawList.map(dtoToTask));
         } catch {
             setTasks([]);
         } finally {
