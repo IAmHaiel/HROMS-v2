@@ -12,8 +12,8 @@ using OTMS.Data;
 namespace OTMS.Migrations
 {
     [DbContext(typeof(OTMSDbContext))]
-    [Migration("20260618160543_FinalSchemaUpdate")]
-    partial class FinalSchemaUpdate
+    [Migration("20260618171448_AddMissingApplicantRecordColumns")]
+    partial class AddMissingApplicantRecordColumns
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
