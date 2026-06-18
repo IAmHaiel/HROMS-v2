@@ -275,6 +275,7 @@ export default function PublicApplicationPortal() {
             const year = parseInt(v, 10);
             if (!/^\d{4}$/.test(v)) return 'Year must be exactly 4 digits.';
             if (year < 1900) return 'Year must be 1900 or later.';
+            if (year > new Date().getFullYear()) return 'Year cannot be in the future.';
         }
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
@@ -683,6 +684,63 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
+                            <div style={{ ...s.sectionLabel, marginTop: 16 }}>Birthday</div>
+                            <div style={s.fieldRow4}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Month <span style={s.req}>*</span></label>
+                                    <select value={form.birthMonth}
+                                        onChange={e => { const val = e.target.value; setForm(p => ({ ...p, birthMonth: val })); const err = validateField('birthMonth', val); setErrors(p => ({ ...p, birthMonth: err || undefined })); if (form.birthDay && form.birthYear && val) { const bd = new Date(parseInt(form.birthYear), parseInt(val) - 1, parseInt(form.birthDay)); if (!isNaN(bd.getTime())) { const today = new Date(); let age = today.getFullYear() - bd.getFullYear(); if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--; setForm(p => ({ ...p, age: String(Math.max(0, age)) })); const ageErr = validateField('age', String(Math.max(0, age))); setErrors(p => ({ ...p, age: ageErr || undefined })); } } }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthMonth ? s.inputErr : {}) }}>
+                                        <option value="">Month</option>
+                                        {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                                    </select>
+                                    {errors.birthMonth && <span style={s.errMsg}><AlertIcon />{errors.birthMonth}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Day <span style={s.req}>*</span></label>
+                                    <select value={form.birthDay}
+                                        onChange={e => { const val = e.target.value; setForm(p => ({ ...p, birthDay: val })); const err = validateField('birthDay', val); setErrors(p => ({ ...p, birthDay: err || undefined })); if (form.birthMonth && form.birthYear && val) { const bd = new Date(parseInt(form.birthYear), parseInt(form.birthMonth) - 1, parseInt(val)); if (!isNaN(bd.getTime())) { const today = new Date(); let age = today.getFullYear() - bd.getFullYear(); if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--; setForm(p => ({ ...p, age: String(Math.max(0, age)) })); const ageErr = validateField('age', String(Math.max(0, age))); setErrors(p => ({ ...p, age: ageErr || undefined })); } } }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthDay ? s.inputErr : {}) }}>
+                                        <option value="">Day</option>
+                                        {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                                    </select>
+                                    {errors.birthDay && <span style={s.errMsg}><AlertIcon />{errors.birthDay}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Year <span style={s.req}>*</span></label>
+                                    <select value={form.birthYear}
+                                        onChange={e => { const val = e.target.value; setForm(p => ({ ...p, birthYear: val })); const err = validateField('birthYear', val); setErrors(p => ({ ...p, birthYear: err || undefined })); if (form.birthMonth && form.birthDay && val) { const bd = new Date(parseInt(val), parseInt(form.birthMonth) - 1, parseInt(form.birthDay)); if (!isNaN(bd.getTime())) { const today = new Date(); let age = today.getFullYear() - bd.getFullYear(); if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--; setForm(p => ({ ...p, age: String(Math.max(0, age)) })); const ageErr = validateField('age', String(Math.max(0, age))); setErrors(p => ({ ...p, age: ageErr || undefined })); } } }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthYear ? s.inputErr : {}) }}>
+                                        <option value="">Year</option>
+                                        {Array.from({ length: 100 }, (_, i) => <option key={i} value={new Date().getFullYear() - i}>{new Date().getFullYear() - i}</option>)}
+                                    </select>
+                                    {errors.birthYear && <span style={s.errMsg}><AlertIcon />{errors.birthYear}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Age <span style={s.req}>*</span></label>
+                                    <input type="number" placeholder="Auto" value={form.age} readOnly
+                                        style={{ ...s.input, ...s.inputReadonly, ...(errors.age ? s.inputErr : {}) }} />
+                                    {errors.age && <span style={s.errMsg}><AlertIcon />{errors.age}</span>}
+                                </div>
+                            </div>
+
+                            <div style={s.fieldRow2}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Nationality <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. Filipino" value={form.nationality}
+                                        onChange={handleTextChange('nationality')} maxLength={50}
+                                        style={{ ...s.input, ...(errors.nationality ? s.inputErr : {}) }} />
+                                    {errors.nationality && <span style={s.errMsg}><AlertIcon />{errors.nationality}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Citizenship <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. Filipino" value={form.citizenship}
+                                        onChange={handleTextChange('citizenship')} maxLength={50}
+                                        style={{ ...s.input, ...(errors.citizenship ? s.inputErr : {}) }} />
+                                    {errors.citizenship && <span style={s.errMsg}><AlertIcon />{errors.citizenship}</span>}
+                                </div>
+                            </div>
+
                             {/* -- Address ------------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Address</div>
                             <div style={s.fieldRow2}>
@@ -699,92 +757,6 @@ export default function PublicApplicationPortal() {
                                         onChange={handleTextChange('permanentAddress')} maxLength={256}
                                         style={{ ...s.textarea, ...(errors.permanentAddress ? s.textareaErr : {}) }} rows={2} />
                                     {errors.permanentAddress && <span style={s.errMsg}><AlertIcon />{errors.permanentAddress}</span>}
-                                </div>
-                            </div>
-
-                            {/* -- Birthday & Age -------------------------- */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Birthday &amp; Age</div>
-                            <div style={s.fieldRow4}>
-                                <div style={s.field}>
-                                    <label style={s.label}>Month <span style={s.req}>*</span></label>
-                                    <select value={form.birthMonth}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            setForm(p => ({ ...p, birthMonth: val }));
-                                            const err = validateField('birthMonth', val);
-                                            setErrors(p => ({ ...p, birthMonth: err || undefined }));
-                                            if (form.birthDay && form.birthYear && val) {
-                                                const bd = new Date(parseInt(form.birthYear), parseInt(val) - 1, parseInt(form.birthDay));
-                                                if (!isNaN(bd.getTime())) {
-                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
-                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
-                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
-                                                    const ageErr = validateField('age', String(Math.max(0, age)));
-                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
-                                                }
-                                            }
-                                        }}
-                                        style={{ ...s.input, ...s.select, ...(errors.birthMonth ? s.inputErr : {}) }}>
-                                        <option value="">Month</option>
-                                        {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
-                                    </select>
-                                    {errors.birthMonth && <span style={s.errMsg}><AlertIcon />{errors.birthMonth}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Day <span style={s.req}>*</span></label>
-                                    <select value={form.birthDay}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            setForm(p => ({ ...p, birthDay: val }));
-                                            const err = validateField('birthDay', val);
-                                            setErrors(p => ({ ...p, birthDay: err || undefined }));
-                                            if (form.birthMonth && form.birthYear && val) {
-                                                const bd = new Date(parseInt(form.birthYear), parseInt(form.birthMonth) - 1, parseInt(val));
-                                                if (!isNaN(bd.getTime())) {
-                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
-                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
-                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
-                                                    const ageErr = validateField('age', String(Math.max(0, age)));
-                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
-                                                }
-                                            }
-                                        }}
-                                        style={{ ...s.input, ...s.select, ...(errors.birthDay ? s.inputErr : {}) }}>
-                                        <option value="">Day</option>
-                                        {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
-                                    </select>
-                                    {errors.birthDay && <span style={s.errMsg}><AlertIcon />{errors.birthDay}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Year <span style={s.req}>*</span></label>
-                                    <select value={form.birthYear}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            setForm(p => ({ ...p, birthYear: val }));
-                                            const err = validateField('birthYear', val);
-                                            setErrors(p => ({ ...p, birthYear: err || undefined }));
-                                            if (form.birthMonth && form.birthDay && val) {
-                                                const bd = new Date(parseInt(val), parseInt(form.birthMonth) - 1, parseInt(form.birthDay));
-                                                if (!isNaN(bd.getTime())) {
-                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
-                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
-                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
-                                                    const ageErr = validateField('age', String(Math.max(0, age)));
-                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
-                                                }
-                                            }
-                                        }}
-                                        style={{ ...s.input, ...s.select, ...(errors.birthYear ? s.inputErr : {}) }}>
-                                        <option value="">Year</option>
-                                        {Array.from({ length: 100 }, (_, i) => <option key={i} value={new Date().getFullYear() - i}>{new Date().getFullYear() - i}</option>)}
-                                    </select>
-                                    {errors.birthYear && <span style={s.errMsg}><AlertIcon />{errors.birthYear}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Age <span style={s.req}>*</span></label>
-                                    <input type="number" placeholder="Auto" value={form.age} readOnly
-                                        style={{ ...s.input, ...s.inputReadonly, ...(errors.age ? s.inputErr : {}) }} />
-                                    {errors.age && <span style={s.errMsg}><AlertIcon />{errors.age}</span>}
                                 </div>
                             </div>
 
@@ -815,6 +787,68 @@ export default function PublicApplicationPortal() {
                                 {errors.resume && <span style={s.errMsg}><AlertIcon />{errors.resume}</span>}
                             </div>
 
+                            {/* -- Educational Background ------------------------ */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Educational Background</div>
+                            <div style={s.fieldRow2}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Highest Educational Attainment <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. Bachelor of Science in Information Technology" value={form.highestEducationalAttainment}
+                                        onChange={handleTextChange('highestEducationalAttainment')} maxLength={128}
+                                        style={{ ...s.input, ...(errors.highestEducationalAttainment ? s.inputErr : {}) }} />
+                                    {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
+                                </div>
+                                <div style={s.field}>
+                                    <label style={s.label}>Institution &amp; Year Graduated <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. University of the Philippines, 2020" value={form.institution}
+                                        onChange={handleTextChange('institution')} maxLength={128}
+                                        style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
+                                    {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
+                                </div>
+                            </div>
+                            <div style={s.fieldRow2}>
+                                <div style={s.field}>
+                                    <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
+                                        onChange={handleTextChange('yearGraduated')} maxLength={4}
+                                        style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
+                                    {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
+                                </div>
+                                <div style={s.field} />
+                            </div>
+
+                            <div style={{ marginTop: 16 }}>
+                                <label style={s.label}>Professional Licenses &amp; Certificates</label>
+                                <span style={s.hint}>Upload your professional licenses and certificates (PDF, JPG, PNG).</span>
+                                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {licenseFiles.map((file, i) => (
+                                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <div style={{ ...s.filePreviewSmall, flex: 1 }}>
+                                                <FileIcon />
+                                                <span style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{file.name}</span>
+                                                <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatBytes(file.size)}</span>
+                                            </div>
+                                            <button type="button" onClick={() => setLicenseFiles(prev => prev.filter((_, j) => j !== i))}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
+                                        </div>
+                                    ))}
+                                    <div style={{ ...s.fileBtnSmall, alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                        onClick={() => document.getElementById('lic-upload')?.click()}>
+                                        <input id="lic-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
+                                            onChange={e => {
+                                                const f = e.target.files?.[0];
+                                                if (!f) return;
+                                                const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+                                                if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) return;
+                                                if (f.size > 5 * 1024 * 1024) return;
+                                                setLicenseFiles(prev => [...prev, f]);
+                                                e.target.value = '';
+                                            }} />
+                                        <UploadIcon />
+                                        <span style={{ fontSize: 11 }}>+ Add License/Certificate</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* -- Position ---------------------------- */}
                             <div style={{ ...s.sectionLabel, marginTop: 24 }}>Position Applied For</div>
                             <div style={s.field}>
@@ -837,10 +871,10 @@ export default function PublicApplicationPortal() {
                             )}
 
                             <button
-                                style={{ ...s.submitBtn, ...(submitLoading ? { opacity: 0.8, cursor: 'not-allowed' } : {}) }}
+                                style={{ ...s.submitBtn, ...(submitLoading || Object.keys(errors).length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
                                 onClick={handleSubmit}
-                                disabled={submitLoading}
-                                onMouseEnter={e => { if (!submitLoading) e.currentTarget.style.background = '#3510d9'; }}
+                                disabled={submitLoading || Object.keys(errors).length > 0}
+                                onMouseEnter={e => { if (!submitLoading && Object.keys(errors).length === 0) e.currentTarget.style.background = '#3510d9'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = '#4318ff'; }}
                             >
                                 {submitLoading ? (
