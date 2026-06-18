@@ -97,7 +97,8 @@ namespace OTMS.Service.Services
                     IsEmailVerified = ar.IsEmailVerified,
                     JobPositionName = ar.JobPosition.Title,
                     Status = ar.Status,
-                    CreatedAt = ar.CreatedAt
+                    CreatedAt = ar.CreatedAt,
+                    UpdatedAt = ar.UpdatedAt
                 })
                 .ToListAsync();
 
@@ -182,6 +183,7 @@ namespace OTMS.Service.Services
 
             context.ApplicantStatusRecords.Add(statusRecord);
             applicant.Status = request.NewStatus;
+            applicant.UpdatedAt = DateTime.UtcNow;
 
             await context.SaveChangesAsync();
 
@@ -291,9 +293,6 @@ namespace OTMS.Service.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            context.InterviewSchedules.Add(interviewSchedule);
-            await context.SaveChangesAsync();
-
             var formattedTime = DateTime.TryParse(request.InterviewTime, out var parsedTime) ? parsedTime.ToString("hh:mm tt") : request.InterviewTime;
             var formattedDate = request.InterviewDate.ToString("dddd, MMMM dd, yyyy");
             var subject = $"Interview Schedule – {applicant.JobPosition.Title} at Speedex";
@@ -312,30 +311,48 @@ namespace OTMS.Service.Services
 
             var emailSent = await notificationService.SendEmailWithStatusAsync(applicant.EmailAddress, subject, body);
 
+            // Only save interview and update status if email was sent
+            if (!emailSent)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Failed to send interview email. Please check the email configuration and try again.",
+                    Data = null
+                };
+            }
+
+            context.InterviewSchedules.Add(interviewSchedule);
+
+            // Update applicant status to Interview Scheduled
+            var oldStatus = applicant.Status;
+            applicant.Status = "Interview Scheduled";
+            applicant.UpdatedAt = DateTime.UtcNow;
+            context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
+            {
+                ApplicantStatusRecordId = Guid.NewGuid(),
+                ApplicantRecordId = applicant.ApplicantRecordId,
+                OldStatus = oldStatus,
+                NewStatus = "Interview Scheduled",
+                Remarks = "Interview scheduled and email sent.",
+                UpdatedById = currentAccountId.Value,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await context.SaveChangesAsync();
+
             await activityLogService.LogActivityAsync(
                 currentAccountId.Value,
                 ActivityTypes.RecruitmentStatusUpdated,
                 $"Scheduled interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
             );
 
-            if (emailSent)
+            return new ApiResponseDTO<string>
             {
-                return new ApiResponseDTO<string>
-                {
-                    IsSuccess = true,
-                    Message = "Interview scheduled and email notification sent successfully.",
-                    Data = interviewSchedule.InterviewScheduleId.ToString()
-                };
-            }
-            else
-            {
-                return new ApiResponseDTO<string>
-                {
-                    IsSuccess = true,
-                    Message = "Interview scheduled. Email dispatch failed. Retrying...",
-                    Data = interviewSchedule.InterviewScheduleId.ToString()
-                };
-            }
+                IsSuccess = true,
+                Message = "Interview scheduled and email sent successfully.",
+                Data = interviewSchedule.InterviewScheduleId.ToString()
+            };
         }
 
         private Guid? GetCurrentAccountId()

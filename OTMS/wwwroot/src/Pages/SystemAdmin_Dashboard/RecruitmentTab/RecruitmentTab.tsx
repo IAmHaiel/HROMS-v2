@@ -398,7 +398,7 @@ We are pleased to inform you that you have been shortlisted for the position of 
 Your interview has been scheduled as follows:
   • Date & Time: ${dateStr}
   • Location / Meeting Link: ${details.location}
-  • Interviewer / Contact Person: ${details.interviewer}
+
 
 Please confirm your availability by replying to this email. If you need to reschedule, kindly notify us at least 24 hours in advance.
 
@@ -1313,6 +1313,10 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                             </div>
                         ))}
                     </div>
+                    <div style={{ marginTop: 12, padding: '10px 14px', background: '#fffbeb', border: '1px solid rgba(251,191,36,0.35)', borderRadius: 9, fontSize: 13, color: '#78350f' }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', display: 'block', marginBottom: 4 }}>Admin Remarks</span>
+                        {applicant.adminRemarks || '—'}
+                    </div>
 
                     {/* ── Collapsible personal info ── */}
                     <CollapsibleSection title="Personal Information">
@@ -1408,13 +1412,6 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                             }
                         })()}
                     </CollapsibleSection>
-
-                    {applicant.adminRemarks && (
-                        <div className="rec-remarks-strip">
-                            <span className="rec-remarks-label">Admin Remarks</span>
-                            <p className="rec-remarks-text">{applicant.adminRemarks}</p>
-                        </div>
-                    )}
 
                     {/* Interview card */}
                     {applicant.interviewDetails && (
@@ -1577,7 +1574,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     position: item.jobPositionName,
                     currentStatus: item.status as RecruitmentStatus,
                     submittedAt: item.createdAt,
-                    updatedAt: null,
+                    updatedAt: item.updatedAt || null,
                     adminRemarks: null,
                     resumeUrl: null,
                     statusHistory: [],
@@ -1615,19 +1612,18 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         if (!applicant) throw new Error('Applicant not found.');
         if (!STATUS_TRANSITIONS[applicant.currentStatus]?.includes(newStatus)) throw new Error('Invalid status transition.');
 
-        const res = await axios.put('/api/recruitment/status', {
-            applicantRecordId: applicantId,
-            newStatus,
-            remarks: remarks || null,
-        });
-        const apiResult = res.data as any;
-        if (!apiResult?.isSuccess) {
-            throw new Error(apiResult?.message || 'Failed to update status.');
-        }
-
-        await fetchApplicants(page);
-
+        // For Interview Scheduled, don't update status yet - wait for email to be sent
         if (newStatus !== 'Interview Scheduled') {
+            const res = await axios.put('/api/recruitment/status', {
+                applicantRecordId: applicantId,
+                newStatus,
+                remarks: remarks || null,
+            });
+            const apiResult = res.data as any;
+            if (!apiResult?.isSuccess) {
+                throw new Error(apiResult?.message || 'Failed to update status.');
+            }
+            await fetchApplicants(page);
             showToast('Applicant status updated successfully.');
         }
     };
@@ -1640,6 +1636,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                 a.applicantId === applicantId
                     ? {
                         ...a,
+                        currentStatus: 'Interview Scheduled',
                         interviewDetails: { ...details, emailSentAt: details.emailSentAt ?? now },
                         updatedAt: now,
                     }
@@ -1648,6 +1645,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
         );
         showToast('Interview scheduled and email notification sent successfully.');
         setScheduleApplicant(null);
+        fetchApplicants(page);
     };
 
     const positionNames: string[] = positions.map((p) => p.name).sort();
