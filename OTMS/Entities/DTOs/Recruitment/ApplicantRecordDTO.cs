@@ -17,6 +17,8 @@ namespace OTMS.Entities.DTOs.Recruitment
         public int? BirthDay { get; set; }
         public int? BirthYear { get; set; }
         public int? Age { get; set; }
+        public string? Nationality { get; set; }
+        public string? Citizenship { get; set; }
         public string EmailAddress { get; set; } = string.Empty;
         public string ContactNumber { get; set; } = string.Empty;
         public string? CurrentResidentialAddress { get; set; }

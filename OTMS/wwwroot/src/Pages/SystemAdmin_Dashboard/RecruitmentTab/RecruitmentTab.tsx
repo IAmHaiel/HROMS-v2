@@ -47,6 +47,12 @@ export interface ApplicantRecord {
     suffix: string;
     gender: string;
     civilStatus: string;
+    birthMonth: number;
+    birthDay: number;
+    birthYear: number;
+    age: number;
+    nationality: string;
+    citizenship: string;
     email: string;
     contactNumber: string;
     currentResidentialAddress: string;
@@ -1328,6 +1334,10 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                         <DetailRow label="Suffix" value={applicant.suffix} />
                         <DetailRow label="Gender" value={applicant.gender} />
                         <DetailRow label="Civil Status" value={applicant.civilStatus} />
+                        <DetailRow label="Birthday" value={applicant.birthMonth && applicant.birthDay && applicant.birthYear ? `${applicant.birthMonth}/${applicant.birthDay}/${applicant.birthYear}` : '—'} />
+                        <DetailRow label="Age" value={applicant.age ? String(applicant.age) : '—'} />
+                        <DetailRow label="Nationality" value={applicant.nationality || '—'} />
+                        <DetailRow label="Citizenship" value={applicant.citizenship || '—'} />
                         <DetailRow label="Email" value={applicant.email} />
                         <DetailRow label="Contact Number" value={applicant.contactNumber} />
                         <DetailRow label="Email Verified" value={applicant.isEmailVerified ? 'Yes' : 'No'} />
@@ -1339,52 +1349,15 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                         <DetailRow label="Permanent Address" value={applicant.permanentAddress} />
                     </CollapsibleSection>
 
-                    {/* ── Collapsible government IDs ── */}
-                    <CollapsibleSection title="Government Identifiers">
-                        <DetailRow label="SSS Number" value={applicant.sssNumber} />
-                        <DetailRow label="PhilHealth Number" value={applicant.philHealthNumber} />
-                        <DetailRow label="Pag-IBIG Number" value={applicant.pagIBIGNumber} />
-                        <DetailRow label="TIN" value={applicant.tin} />
-                    </CollapsibleSection>
-
-                    {/* ── Collapsible financial ── */}
-                    <CollapsibleSection title="Financial &amp; Payroll Data">
-                        <DetailRow label="Bank Name" value={applicant.bankName} />
-                        <DetailRow label="Account Name" value={applicant.bankAccountName} />
-                        <DetailRow label="Account Number" value={applicant.bankAccountNumber} />
-                    </CollapsibleSection>
-
-                    {/* ── Collapsible documents ── */}
-                    <CollapsibleSection title="Pre-Employment Documents">
-                        <DetailRow label="Resume/CV" value={applicant.resumeFilePath ? 'Uploaded' : '—'} link={applicant.resumeFilePath} />
-                        <DetailRow label="NBI Clearance" value={applicant.nbiClearanceFilePath ? 'Uploaded' : '—'} link={applicant.nbiClearanceFilePath} />
-                        <DetailRow label="Medical Clearance" value={applicant.medicalClearanceFilePath ? 'Uploaded' : '—'} link={applicant.medicalClearanceFilePath} />
-                        <DetailRow label="PSA Birth Certificate" value={applicant.psaBirthCertificateFilePath ? 'Uploaded' : '—'} link={applicant.psaBirthCertificateFilePath} />
-                        <DetailRow label="Employment Contract" value={applicant.signedEmploymentContractFilePath ? 'Uploaded' : '—'} link={applicant.signedEmploymentContractFilePath} />
-                    </CollapsibleSection>
-
-                    {/* ── Collapsible emergency ── */}
-                    <CollapsibleSection title="Emergency Contact &amp; Dependents">
-                        <DetailRow label="Contact Name" value={applicant.emergencyContactName} />
-                        <DetailRow label="Relationship" value={applicant.emergencyContactRelationship} />
-                        <DetailRow label="Mobile Number" value={applicant.emergencyContactMobileNumber} />
-                        <DetailRow label="Dependents" value={applicant.declaredDependents ? '(see details)' : 'None declared'} />
-                        {applicant.declaredDependents && (() => {
-                            try {
-                                const deps = JSON.parse(applicant.declaredDependents) as { name: string; dob?: string }[];
-                                return deps.length > 0 ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-                                        {deps.map((d, i) => (
-                                            <div key={i} style={{ fontSize: 12, color: '#334155', display: 'flex', gap: 8 }}>
-                                                <span style={{ fontWeight: 600 }}>{d.name}</span>
-                                                {d.dob && <span style={{ color: '#64748b' }}>({d.dob})</span>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : null;
-                            } catch { return null; }
-                        })()}
-                    </CollapsibleSection>
+                    {/* ── Resume/CV ── */}
+                    <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 9, fontSize: 13 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 4 }}>Resume / CV</span>
+                        {applicant.resumeFilePath ? (
+                            <a href={applicant.resumeFilePath} target="_blank" rel="noopener noreferrer" style={{ color: '#4318ff', fontWeight: 600, textDecoration: 'none' }}>View Uploaded Resume</a>
+                        ) : (
+                            <span style={{ color: '#94a3b8' }}>Not uploaded</span>
+                        )}
+                    </div>
 
                     {/* ── Collapsible education ── */}
                     <CollapsibleSection title="Educational &amp; Professional Background">
@@ -1548,6 +1521,12 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     suffix: item.suffix || '',
                     gender: item.gender || '',
                     civilStatus: item.civilStatus || '',
+                    birthMonth: item.birthMonth || 0,
+                    birthDay: item.birthDay || 0,
+                    birthYear: item.birthYear || 0,
+                    age: item.age || 0,
+                    nationality: item.nationality || '',
+                    citizenship: item.citizenship || '',
                     currentResidentialAddress: item.currentResidentialAddress || '',
                     permanentAddress: item.permanentAddress || '',
                     sssNumber: item.sssNumber || '',
