@@ -182,6 +182,7 @@ interface UpdateTaskDTO {
     priority: Priority;
     dueAt: string | null;
     assignedTo: string;
+    taskCategory?: string;
     taskRemarks?: string;
 }
 
@@ -539,8 +540,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         }
                     }
                 }
-            } catch (err) {
-                console.error('Failed to fetch smart routing recommendations:', err);
+            } catch {
             }
         };
         fetchRecommendations();
@@ -774,43 +774,59 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     {/* -- Supporting Document -- */}
                     <div className="field">
                         <label>Supporting Document <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
-                                onChange={e => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-                                        const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
-                                        if (!allowed.includes(ext)) {
-                                            setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
-                                            return;
-                                        }
-                                        if (file.size > 20 * 1024 * 1024) {
-                                            setFormError('File size must not exceed 20MB.');
-                                            return;
-                                        }
-                                        setFormError('');
-                                        setSupportingEvidence(file);
-                                    }
-                                }}
-                                style={{ flex: 1, fontSize: 13 }}
-                            />
-                            {supportingEvidence && (
+                        {initial.supportingEvidenceUrl && !supportingEvidence ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8 }}>
+                                <span style={{ fontSize: 12, color: 'var(--primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {initial.supportingEvidenceUrl.split('/').pop()}
+                                </span>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setSupportingEvidence(null);
-                                        if (fileInputRef.current) fileInputRef.current.value = '';
-                                    }}
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
+                                    onClick={() => window.open(initial.supportingEvidenceUrl, '_blank')}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, fontSize: 11, fontWeight: 600 }}
                                 >
-                                    <X size={14} />
+                                    View
                                 </button>
-                            )}
-                        </div>
+                            </div>
+                        ) : null}
+                        {(!initial.supportingEvidenceUrl || supportingEvidence) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                                    onChange={e => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+                                            const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
+                                            if (!allowed.includes(ext)) {
+                                                setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
+                                                return;
+                                            }
+                                            if (file.size > 20 * 1024 * 1024) {
+                                                setFormError('File size must not exceed 20MB.');
+                                                return;
+                                            }
+                                            setFormError('');
+                                            setSupportingEvidence(file);
+                                        }
+                                    }}
+                                    style={{ flex: 1, fontSize: 13 }}
+                                />
+                                {supportingEvidence && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSupportingEvidence(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = '';
+                                        }}
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         {supportingEvidence && (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
                                 ✓ {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
@@ -953,7 +969,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <FieldErr name="assignedTo" />
                         {!errors.assignedTo && form.assignedTo && (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                ? {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
+                                ✓ {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
                             </span>
                         )}
                     </div>
@@ -1558,7 +1574,6 @@ const PRIORITY_WEIGHTS: Record<string, number> = { Critical: 4, High: 3, Medium:
 
 const TasksTab: React.FC<{
     tasks: Task[];
-    allTasks: Task[];
     binTasks: Task[];
     teamMembers: TeamMember[];
     loading: boolean;
@@ -1569,7 +1584,7 @@ const TasksTab: React.FC<{
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
     onNewTask: () => void;
-}> = ({ tasks, allTasks, binTasks, teamMembers, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
+}> = ({ tasks, binTasks, teamMembers, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [filterEmployee, setFilterEmployee] = useState('');
@@ -1686,57 +1701,54 @@ const TasksTab: React.FC<{
                         onClick: onEmptyBin
                     } : undefined
                 )}
-                headers={subTab === 'bin' ? ['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE', 'ACTIONS'] : undefined}
+                headers={['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE'].concat(subTab === 'bin' ? ['ACTIONS'] : [])}
                 loading={loading}
                 emptyIcon={subTab === 'bin' ? <Trash2 size={24} /> : <Package size={20} />}
                 emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No matching task records found.'}
             >
                 {searchError && (
-                    <div style={{ padding: '8px 20px 0' }}>
+                    <tr><td colSpan={subTab === 'bin' ? 5 : 4} style={{ padding: '8px 20px 0', border: 'none' }}>
                         <span style={{ fontSize: 12, color: 'var(--status-failed)' }}>{searchError}</span>
-                    </div>
+                    </td></tr>
                 )}
-                {subTab === 'active' ? (
-                    <div style={{ padding: '0 20px 20px' }}>
-                        {sorted.map(t => (
-                            <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
-                        ))}
-                    </div>
-                ) : (
-                    deletedTasks.map(t => (
-                        <tr key={t.taskId} style={{ opacity: 0.75 }}>
-                            <td>
-                                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
-                                    {t.taskTitle}
+                {subTab === 'active' && sorted.length > 0 && sorted.map(t => (
+                    <tr key={t.taskId}><td colSpan={4} style={{ padding: 0, border: 'none' }}>
+                        <TaskRow task={t} onView={onView} onEdit={onEdit} showEditBtn />
+                    </td></tr>
+                ))}
+                {subTab !== 'active' && deletedTasks.map((t, binIdx) => (
+                    <tr key={t.taskId ?? binIdx} style={{ opacity: 0.75 }}>
+                        <td>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
+                                {t.taskTitle}
+                            </div>
+                            {t.taskDescription && (
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.taskDescription}
                                 </div>
-                                {t.taskDescription && (
-                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {t.taskDescription}
-                                    </div>
-                                )}
-                            </td>
-                            <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                {t.assignedEmployee || '�'}
-                            </td>
-                            <td><PrioBadge p={t.priority} /></td>
-                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                {t.dueAt ? fmtDate(t.dueAt) : '�'}
-                            </td>
-                            <td>
-                                <ActionsDropdown
-                                    actions={[
-                                        {
-                                            label: 'Restore',
-                                            icon: <CheckCircle2 size={12} />,
-                                            onClick: () => onRestore(t.taskId),
-                                            variant: 'success'
-                                        }
-                                    ]}
-                                />
-                            </td>
-                        </tr>
-                    ))
-                )}
+                            )}
+                        </td>
+                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                            {t.assignedEmployee || '—'}
+                        </td>
+                        <td><PrioBadge p={t.priority} /></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            {t.dueAt ? fmtDate(t.dueAt) : '—'}
+                        </td>
+                        <td>
+                            <ActionsDropdown
+                                actions={[
+                                    {
+                                        label: 'Restore',
+                                        icon: <CheckCircle2 size={12} />,
+                                        onClick: () => onRestore(t.taskId),
+                                        variant: 'success'
+                                    }
+                                ]}
+                            />
+                        </td>
+                    </tr>
+                ))}
             </DataTable>
         </div>
     );
@@ -3559,9 +3571,10 @@ export default function OpsAdminDashboard() {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: any[] = await res.json();
+            const json = await res.json();
+            const rawList: any[] = Array.isArray(json) ? json : (Array.isArray(json?.data?.data) ? json.data.data : (Array.isArray(json?.data) ? json.data : []));
 
-            const normalized: Task[] = data.map(t => ({
+            const normalized: Task[] = rawList.map(t => ({
                 ...t,
                 deleted: deletedTaskIds.has(t.taskId),
             }));
@@ -4168,7 +4181,6 @@ export default function OpsAdminDashboard() {
                 {activeTab === 'tasks' && (
                     <TasksTab
                         tasks={tasks}
-                        allTasks={allTasks}
                         binTasks={binTasks}
                         teamMembers={teamMembers}
                         loading={loadingTasks}
@@ -4210,6 +4222,7 @@ export default function OpsAdminDashboard() {
             {/* -- Modals -- */}
             {showNew && (
                 <TaskModal
+                    key="new-task"
                     mode="new"
                     teamMembers={teamMembers}
                     tasks={tasks}
@@ -4220,6 +4233,7 @@ export default function OpsAdminDashboard() {
             )}
             {editingTask && (
                 <TaskModal
+                    key={`edit-${editingTask.taskId}`}
                     mode="edit"
                     initial={editingTask}
                     teamMembers={teamMembers}
