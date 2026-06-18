@@ -22,7 +22,7 @@ namespace OTMS.Controllers
         [HttpPost("api/onboarding/complete")]
         public async Task<IActionResult> CompleteOnboarding([FromBody] ValidateOnboardingTokenDTO request)
         {
-            var result = await onboardingService.CompleteOnboardingAsync(request.Token);
+            var result = await onboardingService.CompleteOnboardingAsync(request.Token, request.Password);
 
             if (!result.IsSuccess)
                 return BadRequest(result);

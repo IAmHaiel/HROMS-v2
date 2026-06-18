@@ -149,7 +149,7 @@ namespace OTMS.Data
                     ContactNumber = "09170000000",
                     EmploymentStatus = "Active",
                     CreatedAt = DateTime.UtcNow,
-                    Email = "hroms-admin@gmail.com",
+                    Email = "hroms_admin@gmail.com",
                     IsEmailVerified = true
                 };
 
@@ -161,7 +161,7 @@ namespace OTMS.Data
                     Role = sysAdminRole,
                     AccountStatus = "Active",
                     CreatedAt = DateTime.UtcNow,
-                    IsPasswordChanged = true
+                    IsPasswordChanged = false
                 };
                 sysAdminAccount.PasswordHash = new PasswordHasher<Account>().HashPassword(sysAdminAccount, "SystemAdmin1001!");
 

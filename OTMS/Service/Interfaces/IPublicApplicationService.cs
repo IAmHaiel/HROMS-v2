@@ -7,5 +7,6 @@ namespace OTMS.Service.Interfaces
     {
         Task<ApiResponseDTO<string>> SubmitApplicationAsync(ApplicantSubmissionDTO request);
         Task<ApiResponseDTO<IEnumerable<JobPositionDTO>>> GetActiveJobPositionsAsync();
+        Task<ApiResponseDTO<string>> VerifyEmailAsync(string token);
     }
 }

@@ -51,6 +51,11 @@ namespace OTMS.Data
                 .HasForeignKey<Account>(a => a.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Unique index on Employee.Email to prevent duplicate account creation
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.Email)
+                .IsUnique();
+
             // Employee-EmployeeAttachment one-to-many relationship
             modelBuilder.Entity<EmployeeAttachment>()
                 .HasOne(ea => ea.Employee)

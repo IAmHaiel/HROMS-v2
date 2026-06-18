@@ -31,6 +31,17 @@ namespace OTMS.Controllers
             return Ok(result);
         }
 
+        [HttpGet("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
+        {
+            var result = await publicApplicationService.VerifyEmailAsync(token);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
         [HttpGet("config")]
         public IActionResult GetConfig()
         {

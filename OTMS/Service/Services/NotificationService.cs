@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using MimeKit;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -41,21 +40,17 @@ namespace OTMS.Service.Services
                 var senderEmail = configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
                 var account = configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
                 var password = configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
-                var useSsl = bool.TryParse(configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
 
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(senderName, senderEmail));
-                message.To.Add(new MailboxAddress("", toEmail));
-                message.Subject = subject;
-
-                message.Body = new TextPart("html")
-                {
-                    Text = body
-                };
-
-                using var client = new SmtpClient();
-                await client.ConnectAsync(smtpServer, smtpPort, useSsl);
+                using var client = new MailKit.Net.Smtp.SmtpClient();
+                await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(account, password);
+
+                var message = new MimeKit.MimeMessage();
+                message.From.Add(new MimeKit.MailboxAddress(senderName, senderEmail));
+                message.To.Add(new MimeKit.MailboxAddress("", toEmail));
+                message.Subject = subject;
+                message.Body = new MimeKit.TextPart("html") { Text = body };
+
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
                 return true;
