@@ -47,7 +47,7 @@ namespace OTMS.Entities.Models
         public string? BankName { get; set; }
         [MaxLength(128)]
         public string? BankAccountName { get; set; }
-        [MaxLength(34)]
+        [MaxLength(35)]
         public string? BankAccountNumber { get; set; }
 
         // Pre-Employment Clearances and Documents (file paths)

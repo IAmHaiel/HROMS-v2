@@ -175,9 +175,16 @@ export default function OnboardingPage() {
                 pagibig: info.pagIBIGNumber || prev.pagibig,
                 tin: info.tin || prev.tin,
                 bankName: matchedBank || '',
+                bankAccountName: info.bankAccountName || prev.bankAccountName,
                 bankAccount: matchedBank ? (info.bankAccountNumber || '') : '',
                 emergencyName: info.emergencyContactName || prev.emergencyName,
                 emergencyNumber: info.emergencyContactMobileNumber || prev.emergencyNumber,
+                motherFirstName: info.motherFirstName || prev.motherFirstName,
+                motherMiddleName: info.motherMiddleName || prev.motherMiddleName,
+                motherLastName: info.motherLastName || prev.motherLastName,
+                fatherFirstName: info.fatherFirstName || prev.fatherFirstName,
+                fatherMiddleName: info.fatherMiddleName || prev.fatherMiddleName,
+                fatherLastName: info.fatherLastName || prev.fatherLastName,
             }));
         }
     }, [applicantInfo]);
@@ -210,9 +217,13 @@ export default function OnboardingPage() {
     // ── 201 File state ──
     const [form201, setForm201] = useState({
         sss: '', philhealth: '', pagibig: '', tin: '',
-        bankName: '', bankAccount: '',
-        emergencyName: '', emergencyNumber: '',
+        bankName: '', bankAccountName: '', bankAccount: '',
+        emergencyName: '', emergencyRelationship: '', emergencyNumber: '',
+        motherFirstName: '', motherMiddleName: '', motherLastName: '',
+        fatherFirstName: '', fatherMiddleName: '', fatherLastName: '',
     });
+    const [relationshipCustom, setRelationshipCustom] = useState('');
+    const [bankCustom, setBankCustom] = useState('');
     const [errors201, setErrors201] = useState<Record<string, string>>({});
     const [saving201, setSaving201] = useState(false);
     const [api201Error, setApi201Error] = useState('');
@@ -320,10 +331,22 @@ export default function OnboardingPage() {
             case 'bankName':
                 if (!value.trim()) return 'Bank name is required.';
                 return '';
+            case 'bankAccountName':
+                if (!value.trim()) return 'Bank account name is required.';
+                if (value.length > 50) return 'Must not exceed 50 characters.';
+                const fullName = [profile.firstName, profile.middleName, profile.lastName, profile.suffix].filter(Boolean).join(' ').toLowerCase();
+                const entered = value.trim().toLowerCase();
+                if (fullName && entered) {
+                    const nameParts = fullName.split(/\s+/);
+                    const enteredParts = entered.split(/\s+/);
+                    const matchCount = nameParts.filter(p => enteredParts.some(e => e.includes(p) || p.includes(e))).length;
+                    if (matchCount < Math.min(2, nameParts.length)) return 'Bank account name must match your full name.';
+                }
+                return '';
             case 'bankAccount':
                 if (!value.trim()) return 'Bank account number is required.';
-                if (!/^\d+$/.test(value.trim())) return 'Account number must be numeric only.';
-                if (value.trim().length < 8) return 'Must be at least 8 digits.';
+                if (/[^a-zA-Z0-9\-]/.test(value.replace(/\s/g, ''))) return 'Only letters, numbers, and dashes allowed.';
+                if (value.replace(/\s/g, '').length > 35) return 'Must not exceed 35 characters.';
                 return '';
             case 'emergencyName':
                 if (!value.trim()) return 'Emergency contact name is required.';
@@ -590,7 +613,7 @@ export default function OnboardingPage() {
                                                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>{label}</div>
                                                 <div style={{ fontSize: 11, color: '#8a95b0', marginTop: 2 }}>{desc}</div>
                                             </div>
-                                            <div style={{ marginLeft: 'auto', width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <div style={{ marginLeft: 'auto', width: 22, height: 24, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <span style={{ fontSize: 11, fontWeight: 700, color: '#4318ff' }}>{i + 1}</span>
                                             </div>
                                         </div>
@@ -742,9 +765,7 @@ export default function OnboardingPage() {
                                 <div style={{ marginTop: 8 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <BackButton to="password" disabled={submittingDocs} />
-                                        <button onClick={() => setStep('documents201')} disabled={submittingDocs} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 700, cursor: submittingDocs ? 'not-allowed' : 'pointer', fontFamily: 'inherit', padding: '8px 4px', whiteSpace: 'nowrap' }} onMouseEnter={e => { if (!submittingDocs) e.currentTarget.style.color = '#334155'; }} onMouseLeave={e => { if (!submittingDocs) e.currentTarget.style.color = '#64748b'; }}>
-                                            Skip for now
-                                        </button>
+
                                         <button disabled={isSubmitDisabled || submittingDocs} onClick={handleSubmitAndFinish} style={{ flex: 1, height: 44, border: 'none', borderRadius: 10, background: (isSubmitDisabled || submittingDocs) ? '#cbd5e1' : 'linear-gradient(135deg, #4318ff, #6a5cff)', color: (isSubmitDisabled || submittingDocs) ? '#94a3b8' : 'white', fontSize: 13, fontWeight: 700, cursor: (isSubmitDisabled || submittingDocs) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', boxShadow: (isSubmitDisabled || submittingDocs) ? 'none' : '0 8px 20px rgba(67,24,255,0.25)', transition: 'all 0.2s ease' }}>
                                             {submittingDocs ? <><Loader2 size={14} className="spin-icon" /> Uploading…</> : <>Upload & Continue <ArrowRight size={14} /></>}
                                         </button>
@@ -779,10 +800,10 @@ export default function OnboardingPage() {
                                     </div>
                                 )}
 
-                                {/* ── Government IDs section ── */}
+                                {/* ── Statutory & Government Identifiers ── */}
                                 <div>
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid #f1f5f9' }}>
-                                        Government IDs
+                                        Statutory &amp; Government Identifiers
                                     </div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -857,6 +878,44 @@ export default function OnboardingPage() {
                                             />
                                             {errors201.tin ? <FieldError msg={errors201.tin} /> : <FieldHint hint="Format: XXX-XXX-XXX-XXX (e.g. 123-456-789-000)" />}
                                         </div>
+
+                                        {/* ── Mother's Maiden Name ── */}
+                                        <div style={{ marginTop: 4 }}>
+                                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Mother's Maiden Name</div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>First Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="First" value={form201.motherFirstName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherFirstName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>Middle Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="Middle name" value={form201.motherMiddleName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherMiddleName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>Maiden Last Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="Maiden last name" value={form201.motherLastName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherLastName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ── Father's Name ── */}
+                                        <div style={{ marginTop: 4 }}>
+                                            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Father's Name</div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>First Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="First" value={form201.fatherFirstName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherFirstName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>Middle Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="Middle name" value={form201.fatherMiddleName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherMiddleName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                    <span style={{fontSize:11,fontWeight:700,color:'#1a2332',textTransform:'uppercase',letterSpacing:'0.06em'}}>Last Name <span style={{fontSize:10,color:'#8a95b0',textTransform:'none',fontWeight:500}}>(optional)</span></span>
+                                                    <input type="text" placeholder="Last name" value={form201.fatherLastName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherLastName: e.target.value }))} style={inputStyle()} />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -876,13 +935,37 @@ export default function OnboardingPage() {
                                                     const val = e.target.value;
                                                     setForm201(p => ({ ...p, bankName: val }));
                                                     setErrors201(p => ({ ...p, bankName: validate201Field('bankName', val) }));
+                                                    if (val !== 'Other') setBankCustom('');
                                                 }}
                                                 style={{ ...inputStyle(errors201.bankName), cursor: 'pointer', color: form201.bankName ? '#1a2332' : '#9aa5b4' }}
                                             >
                                                 <option value="" disabled>Select your bank</option>
                                                 {BANK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
                                             </select>
+                                            {form201.bankName === 'Other' && (
+                                                <input type="text" placeholder="Please specify your bank" value={bankCustom} maxLength={128}
+                                                    onChange={e => setBankCustom(e.target.value)}
+                                                    style={inputStyle()} />
+                                            )}
                                             <FieldError msg={errors201.bankName} />
+                                        </div>
+
+                                        {/* Bank Account Name */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                            <FieldLabel label="Bank Account Name" required />
+                                            <input
+                                                type="text"
+                                                placeholder="Must match your full name"
+                                                value={form201.bankAccountName}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    setForm201(p => ({ ...p, bankAccountName: val }));
+                                                    setErrors201(p => ({ ...p, bankAccountName: validate201Field('bankAccountName', val) }));
+                                                }}
+                                                maxLength={50}
+                                                style={inputStyle(errors201.bankAccountName)}
+                                            />
+                                            {errors201.bankAccountName ? <FieldError msg={errors201.bankAccountName} /> : <FieldHint hint="Must match the name on your bank account" />}
                                         </div>
 
                                         {/* Bank Account Number */}
@@ -890,17 +973,17 @@ export default function OnboardingPage() {
                                             <FieldLabel label="Bank Account Number" required />
                                             <input
                                                 type="text"
-                                                placeholder="Numeric account number"
+                                                placeholder="Account number"
                                                 value={form201.bankAccount}
                                                 onChange={e => {
-                                                    const val = e.target.value.replace(/\D/g, '');
+                                                    const val = e.target.value.replace(/[^a-zA-Z0-9\-]/g, '').replace(/\s/g, '');
                                                     setForm201(p => ({ ...p, bankAccount: val }));
                                                     setErrors201(p => ({ ...p, bankAccount: validate201Field('bankAccount', val) }));
                                                 }}
-                                                maxLength={20}
+                                                maxLength={35}
                                                 style={inputStyle(errors201.bankAccount)}
                                             />
-                                            {errors201.bankAccount ? <FieldError msg={errors201.bankAccount} /> : <FieldHint hint="Numbers only — no spaces or dashes" />}
+                                            {errors201.bankAccount ? <FieldError msg={errors201.bankAccount} /> : <FieldHint hint="Letters, numbers, and dashes only — no spaces" />}
                                         </div>
                                     </div>
                                 </div>
@@ -928,6 +1011,40 @@ export default function OnboardingPage() {
                                                 style={inputStyle(errors201.emergencyName)}
                                             />
                                             <FieldError msg={errors201.emergencyName} />
+                                        </div>
+
+                                        {/* Emergency Contact Relationship */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                            <FieldLabel label="Contact Relationship" required />
+                                            <select
+                                                value={form201.emergencyRelationship}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    setForm201(p => ({ ...p, emergencyRelationship: val }));
+                                                    if (val !== 'Others') setRelationshipCustom('');
+                                                }}
+                                                style={{ ...inputStyle(errors201.emergencyRelationship), cursor: 'pointer' }}
+                                            >
+                                                <option value="">Select relationship…</option>
+                                                <option value="Mother">Mother</option>
+                                                <option value="Father">Father</option>
+                                                <option value="Spouse">Spouse</option>
+                                                <option value="Sibling">Sibling</option>
+                                                <option value="Relative">Relative</option>
+                                                <option value="Friend">Friend</option>
+                                                <option value="Others">Others</option>
+                                            </select>
+                                            {form201.emergencyRelationship === 'Others' && (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Please specify"
+                                                    value={relationshipCustom}
+                                                    onChange={e => setRelationshipCustom(e.target.value)}
+                                                    maxLength={50}
+                                                    style={inputStyle()}
+                                                />
+                                            )}
+                                            <FieldError msg={errors201.emergencyRelationship} />
                                         </div>
 
                                         {/* Emergency Contact Number */}
