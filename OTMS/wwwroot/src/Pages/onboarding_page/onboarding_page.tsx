@@ -11,7 +11,7 @@ type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'documents201' | 
 interface UploadedFile {
     name: string;
     size: string;
-    status: 'idle' | 'uploading' | 'done' | 'error';
+    status: 'idle' | 'selected' | 'uploading' | 'done' | 'error';
     error?: string;
 }
 
@@ -248,9 +248,9 @@ export default function OnboardingPage() {
         const validExtensionsMap: Record<string, string[]> = {
             biodata: ['pdf', 'docx'],
             medical: ['pdf', 'jpg', 'jpeg', 'png'],
-            govId: ['pdf', 'jpg', 'jpeg', 'png'],
+            govId: ['pdf'],
             nbi: ['pdf', 'jpg', 'jpeg', 'png'],
-            education: ['pdf', 'jpg', 'jpeg', 'png'],
+            education: ['pdf'],
             psa: ['pdf', 'jpg', 'jpeg', 'png'],
             bir2316: ['pdf', 'jpg', 'jpeg', 'png'],
         };
@@ -260,14 +260,12 @@ export default function OnboardingPage() {
             return;
         }
         if (!validExts.includes(ext)) {
-            setUploadedDocs(prev => ({ ...prev, [key]: { name: file.name, size: sizeStr, status: 'error', error: key === 'biodata' ? 'Upload a PDF or DOCX.' : 'Upload a PDF or image.' } }));
+            const errMsg = key === 'biodata' ? 'Upload a PDF or DOCX.' : (key === 'govId' || key === 'education') ? 'Upload a PDF.' : 'Upload a PDF or image.';
+            setUploadedDocs(prev => ({ ...prev, [key]: { name: file.name, size: sizeStr, status: 'error', error: errMsg } }));
             return;
         }
-        setUploadedDocs(prev => ({ ...prev, [key]: { name: file.name, size: sizeStr, status: 'uploading' } }));
+        setUploadedDocs(prev => ({ ...prev, [key]: { name: file.name, size: sizeStr, status: 'selected' } }));
         setFileObjects(prev => ({ ...prev, [key]: file }));
-        setTimeout(() => {
-            setUploadedDocs(prev => prev[key]?.status === 'uploading' ? { ...prev, [key]: { ...prev[key], status: 'done' } } : prev);
-        }, 1500);
     };
 
     const handleFileClear = (key: string) => {
@@ -276,7 +274,7 @@ export default function OnboardingPage() {
     };
 
     const requiredKeys = ['biodata', 'medical', 'govId', 'nbi', 'psa'];
-    const pendingRequiredCount = requiredKeys.filter(k => uploadedDocs[k]?.status !== 'done').length;
+    const pendingRequiredCount = requiredKeys.filter(k => uploadedDocs[k]?.status !== 'selected' && uploadedDocs[k]?.status !== 'done').length;
     const isSubmitDisabled = pendingRequiredCount > 0;
 
     // ── Validators ──
@@ -411,6 +409,52 @@ export default function OnboardingPage() {
     };
 
     const handleSubmitAndFinish = async () => {
+        setSubmittingDocs(true);
+        setDocsApiError('');
+
+        const keys = Object.keys(fileObjects).filter(k => uploadedDocs[k]?.status !== 'done');
+        if (keys.length === 0) {
+            setSubmittingDocs(false);
+            setStep('documents201');
+            return;
+        }
+
+        let hasError = false;
+
+        for (const key of keys) {
+            const file = fileObjects[key];
+            if (!file) continue;
+
+            setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'uploading' } }));
+
+            const formData = new FormData();
+            formData.append('token', onboardingToken ?? '');
+            formData.append('documentType', key);
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/onboarding/upload-document', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error((data as any).message || 'Upload failed.');
+                }
+                setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'done' } }));
+            } catch (err: any) {
+                setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'error', error: err.message || 'Upload failed.' } }));
+                hasError = true;
+            }
+        }
+
+        if (hasError) {
+            setDocsApiError('Some files failed to upload. You can retry or continue anyway.');
+            setSubmittingDocs(false);
+            return;
+        }
+
+        setSubmittingDocs(false);
         setStep('documents201');
     };
 
@@ -422,10 +466,31 @@ export default function OnboardingPage() {
         setSaving201(true); setApi201Error('');
         try {
             if (onboardingToken) {
+                const relationshipValue = form201.emergencyRelationship === 'Others' ? `Others: ${relationshipCustom}` : form201.emergencyRelationship;
+                const bankValue = form201.bankName === 'Other' ? `Other: ${bankCustom}` : form201.bankName;
                 const res = await fetch('/api/onboarding/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: onboardingToken, password: pw.next || null }),
+                    body: JSON.stringify({
+                        token: onboardingToken,
+                        password: pw.next || null,
+                        sssNumber: form201.sss || null,
+                        philHealthNumber: form201.philhealth || null,
+                        pagIBIGNumber: form201.pagibig || null,
+                        tin: form201.tin || null,
+                        bankName: bankValue || null,
+                        bankAccountName: form201.bankAccountName || null,
+                        bankAccountNumber: form201.bankAccount || null,
+                        emergencyContactName: form201.emergencyName || null,
+                        emergencyContactRelationship: relationshipValue || null,
+                        emergencyContactMobileNumber: form201.emergencyNumber || null,
+                        motherFirstName: form201.motherFirstName || null,
+                        motherMiddleName: form201.motherMiddleName || null,
+                        motherLastName: form201.motherLastName || null,
+                        fatherFirstName: form201.fatherFirstName || null,
+                        fatherMiddleName: form201.fatherMiddleName || null,
+                        fatherLastName: form201.fatherLastName || null,
+                    }),
                 });
                 const data = await res.json();
                 if (!res.ok) {
@@ -493,29 +558,32 @@ export default function OnboardingPage() {
         const status = fileState.status;
         let cardStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', padding: '12px 16px', borderRadius: 12, cursor: 'pointer', position: 'relative' };
         if (status === 'idle') cardStyle = { ...cardStyle, background: '#f8fafc', border: '1.5px dashed #cbd5e1' };
+        else if (status === 'selected') cardStyle = { ...cardStyle, background: '#f8fafc', border: '1.5px solid #4318ff' };
         else if (status === 'uploading') cardStyle = { ...cardStyle, background: '#f8fafc', border: '1.5px solid #cbd5e1', cursor: 'default' };
         else if (status === 'done') cardStyle = { ...cardStyle, background: 'rgba(5,205,153,0.03)', border: '1.5px solid rgba(5,205,153,0.18)', cursor: 'default' };
         else if (status === 'error') cardStyle = { ...cardStyle, background: 'rgba(238,93,80,0.03)', border: '1.5px solid rgba(238,93,80,0.18)' };
 
         return (
             <div key={key}>
-                <input type="file" id={`file-input-${key}`} style={{ display: 'none' }} onChange={e => { handleFileChange(key, e.target.files?.[0] || null); e.target.value = ''; }} accept={key === 'biodata' ? '.pdf,.docx' : '.pdf,.jpg,.jpeg,.png'} />
-                <div className={status === 'idle' || status === 'error' ? 'upload-slot-card' : ''} style={cardStyle} onClick={() => { if (status === 'idle' || status === 'error') document.getElementById(`file-input-${key}`)?.click(); }}>
+                <input type="file" id={`file-input-${key}`} style={{ display: 'none' }} onChange={e => { handleFileChange(key, e.target.files?.[0] || null); e.target.value = ''; }} accept={key === 'biodata' ? '.pdf,.docx' : (key === 'govId' || key === 'education') ? '.pdf' : '.pdf,.jpg,.jpeg,.png'} />
+                <div className={status === 'idle' || status === 'selected' || status === 'error' ? 'upload-slot-card' : ''} style={cardStyle} onClick={() => { if (status === 'idle' || status === 'selected' || status === 'error') document.getElementById(`file-input-${key}`)?.click(); }}>
                     <div style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 14, background: status === 'done' ? 'rgba(5,205,153,0.08)' : status === 'error' ? 'rgba(238,93,80,0.08)' : 'rgba(67,24,255,0.05)' }}>
                         {status === 'idle' && <Upload size={16} color="#4318ff" />}
+                        {status === 'selected' && <FileText size={16} color="#4318ff" />}
                         {status === 'uploading' && <Loader2 size={16} color="#4318ff" className="spin-icon" />}
                         {status === 'done' && <CheckCircle2 size={16} color="#05cd99" />}
                         {status === 'error' && <AlertCircle size={16} color="#ee5d50" />}
                     </div>
                     <div style={{ flexGrow: 1, minWidth: 0, marginRight: 12 }}>
                         {status === 'idle' && (<><div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332', display: 'flex', alignItems: 'center', gap: 3 }}>{label} {required && <span style={{ color: '#ee5d50' }}>*</span>}</div><div style={{ fontSize: 11, color: '#8a95b0', marginTop: 2 }}>{specs}</div></>)}
+                        {status === 'selected' && (<><div style={{ fontSize: 13, fontWeight: 700, color: '#4318ff' }}>{label} {required && <span style={{ color: '#ee5d50' }}>*</span>}</div><div style={{ fontSize: 11, color: '#4318ff', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} /> {fileState.name} ({fileState.size})</div></>)}
                         {status === 'uploading' && (<><div style={{ fontSize: 13, fontWeight: 700, color: '#4318ff' }}>Uploading...</div><div style={{ fontSize: 11, color: '#8a95b0', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileState.name} ({fileState.size})</div></>)}
                         {status === 'done' && (<><div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>{label} {required && <span style={{ color: '#ee5d50' }}>*</span>}</div><div style={{ fontSize: 11, color: '#05cd99', fontWeight: 600, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}><FileText size={12} /> {fileState.name} ({fileState.size})</div></>)}
                         {status === 'error' && (<><div style={{ fontSize: 13, fontWeight: 700, color: '#1a2332' }}>{label} {required && <span style={{ color: '#ee5d50' }}>*</span>}</div><div style={{ fontSize: 11, color: '#ee5d50', fontWeight: 600, marginTop: 2 }}>{fileState.error || 'Upload failed.'}</div></>)}
                     </div>
                     <div style={{ flexShrink: 0 }}>
                         {status === 'idle' && <span style={{ fontSize: 11, fontWeight: 700, color: '#4318ff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Browse</span>}
-                        {status === 'done' && (
+                        {(status === 'selected' || status === 'done') && (
                             <button type="button" onClick={e => { e.stopPropagation(); handleFileClear(key); }} style={{ background: 'none', border: 'none', padding: 6, cursor: 'pointer', color: '#8a95b0', display: 'flex', alignItems: 'center', borderRadius: 6 }} onMouseEnter={e => (e.currentTarget.style.color = '#ee5d50')} onMouseLeave={e => (e.currentTarget.style.color = '#8a95b0')}><Trash2 size={15} /></button>
                         )}
                         {status === 'error' && (
@@ -741,7 +809,7 @@ export default function OnboardingPage() {
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         {renderUploadSlot('biodata', 'Biodata / Resume', 'PDF or DOCX up to 10MB', true)}
                                         {renderUploadSlot('medical', 'Medical Certificate', 'PDF, JPG, or PNG up to 10MB', true)}
-                                        {renderUploadSlot('govId', 'Government-issued ID', 'JPG, PNG, or PDF up to 10MB', true)}
+                                        {renderUploadSlot('govId', 'Government-issued ID', 'PDF up to 10MB', true)}
                                         {renderUploadSlot('nbi', 'NBI / Police Clearance', 'JPG, PNG, or PDF up to 10MB', true)}
                                         {renderUploadSlot('psa', 'PSA Birth Certificate', 'JPG, PNG, or PDF up to 10MB', true)}
                                     </div>
@@ -750,7 +818,7 @@ export default function OnboardingPage() {
                                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Optional Documents</div>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                         {renderUploadSlot('bir2316', 'BIR Form 2316', 'JPG, PNG, or PDF up to 10MB', false)}
-                                        {renderUploadSlot('education', 'Educational Documents', 'PDF, JPG, or PNG up to 10MB', false)}
+                                        {renderUploadSlot('education', 'Educational Documents', 'PDF up to 10MB', false)}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: 'rgba(67,24,255,0.05)', border: '1px solid rgba(67,24,255,0.1)', borderRadius: 10, marginTop: 8, alignItems: 'flex-start' }}>

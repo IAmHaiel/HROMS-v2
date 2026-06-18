@@ -24,6 +24,7 @@ namespace OTMS.Service.Services
         INotificationService notificationService,
         IActivityLogService activityLogService,
         IHttpContextAccessor httpContextAccessor,
+        IFileService fileService,
         IEmployeeNumberGenerator employeeNumberGenerator
         ) : IOnboardingService
     {
@@ -267,7 +268,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token, string? password = null)
+        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token, string? password = null, ValidateOnboardingTokenDTO? formData = null)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -383,6 +384,28 @@ namespace OTMS.Service.Services
             var oldStatus = applicant.Status;
             applicant.Status = "Hired/Converted";
 
+            // Save 201 File data to ApplicantRecord
+            if (formData != null)
+            {
+                if (!string.IsNullOrWhiteSpace(formData.SSSNumber)) applicant.SSSNumber = formData.SSSNumber;
+                if (!string.IsNullOrWhiteSpace(formData.PhilHealthNumber)) applicant.PhilHealthNumber = formData.PhilHealthNumber;
+                if (!string.IsNullOrWhiteSpace(formData.PagIBIGNumber)) applicant.PagIBIGNumber = formData.PagIBIGNumber;
+                if (!string.IsNullOrWhiteSpace(formData.TIN)) applicant.TIN = formData.TIN;
+                if (!string.IsNullOrWhiteSpace(formData.BankName)) applicant.BankName = formData.BankName;
+                if (!string.IsNullOrWhiteSpace(formData.BankAccountName)) applicant.BankAccountName = formData.BankAccountName;
+                if (!string.IsNullOrWhiteSpace(formData.BankAccountNumber)) applicant.BankAccountNumber = formData.BankAccountNumber;
+                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactName)) applicant.EmergencyContactName = formData.EmergencyContactName;
+                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactRelationship)) applicant.EmergencyContactRelationship = formData.EmergencyContactRelationship;
+                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactMobileNumber)) applicant.EmergencyContactMobileNumber = formData.EmergencyContactMobileNumber;
+                if (!string.IsNullOrWhiteSpace(formData.MotherFirstName)) applicant.MotherFirstName = formData.MotherFirstName;
+                if (!string.IsNullOrWhiteSpace(formData.MotherMiddleName)) applicant.MotherMiddleName = formData.MotherMiddleName;
+                if (!string.IsNullOrWhiteSpace(formData.MotherLastName)) applicant.MotherLastName = formData.MotherLastName;
+                if (!string.IsNullOrWhiteSpace(formData.FatherFirstName)) applicant.FatherFirstName = formData.FatherFirstName;
+                if (!string.IsNullOrWhiteSpace(formData.FatherMiddleName)) applicant.FatherMiddleName = formData.FatherMiddleName;
+                if (!string.IsNullOrWhiteSpace(formData.FatherLastName)) applicant.FatherLastName = formData.FatherLastName;
+                applicant.UpdatedAt = DateTime.UtcNow;
+            }
+
             context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
             {
                 ApplicantStatusRecordId = Guid.NewGuid(),
@@ -427,6 +450,110 @@ namespace OTMS.Service.Services
                 IsSuccess = true,
                 Message = $"Onboarding completed successfully. Your Employee Number is {employeeNumber}.",
                 Data = onboardingToken.ApplicantRecordId.ToString()
+            };
+        }
+
+        public async Task<ApiResponseDTO<string>> UploadDocumentAsync(string token, string documentType, IFormFile file)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Token is required.", Data = null };
+            }
+
+            var tokenHash = ComputeSha256Hash(token);
+
+            var onboardingToken = await context.OnboardingTokens
+                .Include(ot => ot.ApplicantRecord)
+                .FirstOrDefaultAsync(ot => ot.TokenHash == tokenHash);
+
+            if (onboardingToken == null)
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid or expired link.", Data = null };
+            }
+
+            if (onboardingToken.Status != "Active")
+            {
+                var errorMsg = onboardingToken.Status switch
+                {
+                    "Used" => "This link has already been used.",
+                    "Expired" => "This link has expired.",
+                    _ => "Invalid or expired link."
+                };
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = errorMsg, Data = null };
+            }
+
+            if (onboardingToken.ExpiresAt < DateTime.UtcNow)
+            {
+                onboardingToken.Status = "Expired";
+                await context.SaveChangesAsync();
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "This link has expired.", Data = null };
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "No file provided.", Data = null };
+            }
+
+            if (file.Length > 10 * 1024 * 1024)
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "File size must not exceed 10MB.", Data = null };
+            }
+
+            var applicant = onboardingToken.ApplicantRecord;
+
+            var folderMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "biodata", "resumes" },
+                { "medical", "applicant-docs" },
+                { "nbi", "applicant-docs" },
+                { "psa", "applicant-docs" },
+                { "bir2316", "applicant-docs" },
+                { "govId", "applicant-docs" },
+                { "education", "applicant-docs" },
+            };
+
+            if (!folderMap.TryGetValue(documentType, out var subfolder))
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = $"Unknown document type: {documentType}", Data = null };
+            }
+
+            string fileUrl;
+            try
+            {
+                fileUrl = await fileService.UploadFileAsync(file, subfolder);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = $"Failed to save file: {ex.Message}", Data = null };
+            }
+
+            switch (documentType.ToLower())
+            {
+                case "biodata":
+                    applicant.ResumeFilePath = fileUrl;
+                    break;
+                case "medical":
+                    applicant.MedicalClearanceFilePath = fileUrl;
+                    break;
+                case "nbi":
+                    applicant.NBIClearanceFilePath = fileUrl;
+                    break;
+                case "psa":
+                    applicant.PSABirthCertificateFilePath = fileUrl;
+                    break;
+                case "bir2316":
+                    applicant.BIRForm2316FilePath = fileUrl;
+                    break;
+            }
+
+            applicant.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+
+            return new ApiResponseDTO<string>
+            {
+                IsSuccess = true,
+                Message = "Document uploaded successfully.",
+                Data = fileUrl
             };
         }
 
