@@ -506,7 +506,7 @@ export default function PublicApplicationPortal() {
                         </div>
                         <div>
                             <span style={s.logoName}>Speedex Courier</span>
-                            <span style={s.logoDivider}>�</span>
+                            <span style={s.logoDivider}>-</span>
                             <span style={s.logoSub}>Careers</span>
                         </div>
                     </div>
@@ -637,7 +637,7 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,169,157,0.15)'; }}
                             >
                                 {authLoading ? (
-                                    <><div style={s.spinner} /><span>Verifying�</span></>
+                                    <><div style={s.spinner} /><span>Verifying...</span></>
                                 ) : (
                                     <><GoogleIcon /><span>Continue with Google</span></>
                                 )}
@@ -901,7 +901,7 @@ export default function PublicApplicationPortal() {
                                             onChange={e => handleFileUpload('resume')(e.target.files?.[0])} />
                                         <UploadIcon />
                                         <span>Click to upload Resume</span>
-                                        <span style={s.fileBtnHint}>PDF or DOCX � Max 5MB</span>
+                                        <span style={s.fileBtnHint}>PDF or DOCX - Max 5MB</span>
                                     </div>
                                 ) : (
                                     <div style={s.filePreview}>
@@ -994,7 +994,7 @@ export default function PublicApplicationPortal() {
                                 <select value={form.positionId}
                                     onChange={e => { const val = e.target.value; setForm(p => ({ ...p, positionId: val })); const err = validateField('position', val); setErrors(p => ({ ...p, position: err || undefined })); }}
                                     style={{ ...s.input, ...s.select, ...(errors.position ? s.inputErr : {}), cursor: 'pointer' }}>
-                                    <option value="">Choose a position�</option>
+                                    <option value="">Choose a position...</option>
                                     {positions.length === 0 && <option value="" disabled>No positions available</option>}
                                     {positions.map(p => <option key={p.jobPositionId} value={p.jobPositionId}>{p.title}</option>)}
                                 </select>
@@ -1016,7 +1016,7 @@ export default function PublicApplicationPortal() {
                                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--primary)'; }}
                             >
                                 {submitLoading ? (
-                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application�</>
+                                    <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application...</>
                                 ) : (
                                     'Submit Application ?'
                                 )}
@@ -1172,7 +1172,7 @@ export default function PublicApplicationPortal() {
                                 <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                                     A verification email has been sent to your Google account. Please check your inbox and click the
                                     verification link to activate your application. Our recruitment team will then review it and
-                                    reach out within 3�5 business days. Check your spam folder if you don't see the email.
+                                    reach out within 3-5 business days. Check your spam folder if you don't see the email.
                                 </p>
                             </div>
                             <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 28 }}>
@@ -1191,8 +1191,8 @@ export default function PublicApplicationPortal() {
             </main>
 
             <footer style={s.footer}>
-                <span>� 2026 Speedex Courier Inc. � All rights reserved.</span>
-                <span style={s.footerRight}>Powered by OTMS � Recruitment Module</span>
+                <span>(c) 2026 Speedex Courier Inc. - All rights reserved.</span>
+                <span style={s.footerRight}>Powered by OTMS - Recruitment Module</span>
             </footer>
         </div>
     );
