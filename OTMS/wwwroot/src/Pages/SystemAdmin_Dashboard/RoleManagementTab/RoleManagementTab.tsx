@@ -1162,29 +1162,35 @@ export default function RoleManagementTab() {
                 <label className="rm2-form-label">
                     Department <span className="rm2-req">*</span>
                 </label>
-                <select
-                    className={`form-input${posFormErrors.departmentId ? ' rm2-input--error' : ''}`}
-                    value={showQuickDept ? '__create__' : posForm.departmentId}
-                    onChange={e => {
-                        if (e.target.value === '__create__') {
-                            setShowQuickDept(true);
-                            setPosField('departmentId', '');
-                        } else {
-                            setShowQuickDept(false);
-                            setPosField('departmentId', e.target.value);
+                <div className="rm2-dept-select-wrap">
+                    <select
+                        className={`form-input rm2-dept-select${posFormErrors.departmentId ? ' rm2-input--error' : ''}`}
+                        value={showQuickDept ? '__create__' : posForm.departmentId}
+                        onChange={e => {
+                            if (e.target.value === '__create__') {
+                                setShowQuickDept(true);
+                                setPosField('departmentId', '');
+                            } else {
+                                setShowQuickDept(false);
+                                setPosField('departmentId', e.target.value);
+                            }
+                        }}
+                    >
+                        <option value="">— Select a department —</option>
+                        {departments
+                            .filter(d => d.status === 'Active' || d.isActive !== false)
+                            .map(d => (
+                                <option key={d.departmentId} value={d.departmentId}>{d.name}</option>
+                            ))
                         }
-                    }}
-                >
-                    <option value="">— Select a department —</option>
-                    <option value="__create__">+ Create New Department</option>
-                    <option disabled>──────────</option>
-                    {departments
-                        .filter(d => d.status === 'Active' || d.isActive !== false)
-                        .map(d => (
-                            <option key={d.departmentId} value={d.departmentId}>{d.name}</option>
-                        ))
-                    }
-                </select>
+                        <option value="__create__" className="rm2-create-option">+ Create New Department</option>
+                    </select>
+                    {!showQuickDept && (
+                        <button type="button" className="rm2-dept-add-btn" onClick={() => setShowQuickDept(true)} title="Create new department">
+                            <Plus size={14} />
+                        </button>
+                    )}
+                </div>
                 {posFormErrors.departmentId && (
                     <span className="rm2-field-error"><AlertCircle size={11} /> {posFormErrors.departmentId}</span>
                 )}
