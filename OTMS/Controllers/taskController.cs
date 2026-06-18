@@ -216,7 +216,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("my-tasks")]
-        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks(PaginationDTO request)
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks([FromQuery] PaginationDTO request)
         {
             try
             {

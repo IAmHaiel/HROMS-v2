@@ -1499,13 +1499,13 @@ export default function EmployeeDashboard() {
             const res = await fetch('/api/task/my-tasks', { headers: authHeader() });
             if (res.status === 401) { handleLogout(); return; }
             if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error((err as any).message || `Failed to load tasks (${res.status}).`);
+                setTasks([]);
+                return;
             }
             const data: TaskResponseDTO[] = await res.json();
             setTasks(data.map(dtoToTask));
-        } catch (err: any) {
-            setTasksError(err.message ?? 'Unable to load tasks. Check your connection and try again.');
+        } catch {
+            setTasks([]);
         } finally {
             setTasksLoading(false);
         }

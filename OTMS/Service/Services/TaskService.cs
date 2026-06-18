@@ -742,25 +742,47 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var raw = await query
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                    t.CreatedAt,
+                    t.Deleted,
+                })
+                .ToListAsync();
 
-                    CreatedByEmployee = string.Join(" ", new[]
-                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt,
-                    IsDeleted = t.Deleted
-                }).ToListAsync();
+            var data = raw.Select(r => new TaskResponseDTO
+            {
+                TaskId = r.TaskId,
+                TaskTitle = r.TaskTitle,
+                TaskDescription = r.TaskDescription,
+                Priority = r.Priority,
+                DueAt = r.DueAt,
+                TaskStatus = r.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[]
+                    {r.AssigneeFirstName, r.AssigneeMiddleName, r.AssigneeLastName, r.AssigneeSuffix}
+                    .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                    {r.CreatorFirstName, r.CreatorMiddleName, r.CreatorLastName, r.CreatorSuffix}
+                    .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = r.CreatedAt,
+                IsDeleted = r.Deleted,
+            }).ToList();
 
             await LogSortActivity(loggedInAccountId, request);
 
