@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OTMS.Common.Constraints;
 using OTMS.Entities.Models;
@@ -98,8 +99,8 @@ namespace OTMS.Data
             if (operationAdminRole != null)
             {
                 // Operation Admin gets a subset (example: can manage tasks, users, but not roles)
-                var opPermissions = allDbPermissions.Where(p => 
-                    p.Name.StartsWith("Permissions.Tasks.") || 
+                var opPermissions = allDbPermissions.Where(p =>
+                    p.Name.StartsWith("Permissions.Tasks.") ||
                     p.Name.StartsWith("Permissions.Users.") ||
                     p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
@@ -132,6 +133,43 @@ namespace OTMS.Data
             }
 
             await context.SaveChangesAsync();
+
+            // 5. Seed default System Admin employee account (bypasses email verification)
+            var sysAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SystemAdmin");
+            if (sysAdminRole != null && !await context.Employees.AnyAsync(e => e.EmployeeNumber == "0000"))
+            {
+                var sysAdmin = new Employee
+                {
+                    EmployeeId = Guid.NewGuid(),
+                    EmployeeNumber = "0000",
+                    FirstName = "System",
+                    MiddleName = null,
+                    LastName = "Admin",
+                    Suffix = null,
+                    ContactNumber = "09170000000",
+                    EmploymentStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    Email = "hroms-admin@gmail.com",
+                    IsEmailVerified = true
+                };
+
+                var sysAdminAccount = new Account
+                {
+                    AccountId = Guid.NewGuid(),
+                    EmployeeId = sysAdmin.EmployeeId,
+                    RoleId = sysAdminRole.RoleId,
+                    Role = sysAdminRole,
+                    AccountStatus = "Active",
+                    CreatedAt = DateTime.UtcNow,
+                    IsPasswordChanged = true
+                };
+                sysAdminAccount.PasswordHash = new PasswordHasher<Account>().HashPassword(sysAdminAccount, "SystemAdmin1001!");
+
+                sysAdmin.Account = sysAdminAccount;
+                context.Employees.Add(sysAdmin);
+                context.Accounts.Add(sysAdminAccount);
+                await context.SaveChangesAsync();
+            }
 
             // 4. Seed Default Approval Routing Matrices
             await SeedApprovalRoutingMatricesAsync(context);
