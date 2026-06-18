@@ -34,6 +34,9 @@ namespace OTMS.Service.Services
         {
             var query = context.ApplicantRecords
                 .Include(ar => ar.JobPosition)
+                .Include(ar => ar.StatusHistory)
+                    .ThenInclude(sh => sh.Updater)
+                        .ThenInclude(u => u.Employee)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(filter.CurrentStatus))
@@ -98,7 +101,21 @@ namespace OTMS.Service.Services
                     JobPositionName = ar.JobPosition.Title,
                     Status = ar.Status,
                     CreatedAt = ar.CreatedAt,
-                    UpdatedAt = ar.UpdatedAt
+                    UpdatedAt = ar.UpdatedAt,
+                    AdminRemarks = ar.StatusHistory
+                        .OrderByDescending(sh => sh.UpdatedAt)
+                        .Select(sh => sh.Remarks)
+                        .FirstOrDefault() ?? string.Empty,
+                    StatusHistory = ar.StatusHistory
+                        .OrderByDescending(sh => sh.UpdatedAt)
+                        .Select(sh => new ApplicantStatusHistoryItem
+                        {
+                            Status = sh.NewStatus,
+                            ChangedAt = sh.UpdatedAt,
+                            ChangedBy = sh.Updater != null ? sh.Updater.Employee.FirstName + " " + sh.Updater.Employee.LastName : "System",
+                            Remarks = sh.Remarks
+                        })
+                        .ToList()
                 })
                 .ToListAsync();
 

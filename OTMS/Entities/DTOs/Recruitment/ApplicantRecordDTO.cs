@@ -56,5 +56,15 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public string? AdminRemarks { get; set; }
+        public List<ApplicantStatusHistoryItem>? StatusHistory { get; set; }
+    }
+
+    public class ApplicantStatusHistoryItem
+    {
+        public string Status { get; set; } = string.Empty;
+        public DateTime ChangedAt { get; set; }
+        public string ChangedBy { get; set; } = string.Empty;
+        public string? Remarks { get; set; }
     }
 }

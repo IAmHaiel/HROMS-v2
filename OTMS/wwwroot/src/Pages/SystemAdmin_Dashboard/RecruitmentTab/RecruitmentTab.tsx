@@ -1575,9 +1575,14 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     currentStatus: item.status as RecruitmentStatus,
                     submittedAt: item.createdAt,
                     updatedAt: item.updatedAt || null,
-                    adminRemarks: null,
+                    adminRemarks: item.adminRemarks || null,
                     resumeUrl: null,
-                    statusHistory: [],
+                    statusHistory: (item.statusHistory || []).map((h: any) => ({
+                        status: h.status,
+                        changedAt: h.changedAt,
+                        changedBy: h.changedBy,
+                        remarks: h.remarks,
+                    })),
                     interviewDetails: null,
                 }));
                 setApplicants(mapped);
