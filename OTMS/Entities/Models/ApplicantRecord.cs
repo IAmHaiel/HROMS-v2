@@ -21,12 +21,20 @@ namespace OTMS.Entities.Models
         [MaxLength(50)]
         public string? Gender { get; set; }
         public string? CivilStatus { get; set; }
+        public int? BirthMonth { get; set; }
+        public int? BirthDay { get; set; }
+        public int? BirthYear { get; set; }
+        public int? Age { get; set; }
+        public string? Nationality { get; set; }
+        public string? Citizenship { get; set; }
         public string EmailAddress { get; set; } = string.Empty;
         public string ContactNumber { get; set; } = string.Empty;
         [MaxLength(256)]
         public string? CurrentResidentialAddress { get; set; }
         [MaxLength(256)]
         public string? PermanentAddress { get; set; }
+
+        public string ResumeFilePath { get; set; } = string.Empty;
 
         // Statutory and Government Identifiers
         public string? SSSNumber { get; set; }
@@ -46,8 +54,7 @@ namespace OTMS.Entities.Models
         public string? NBIClearanceFilePath { get; set; }
         public string? MedicalClearanceFilePath { get; set; }
         public string? PSABirthCertificateFilePath { get; set; }
-        public string ResumeFilePath { get; set; } = string.Empty;
-        public string? SignedEmploymentContractFilePath { get; set; }
+        public string? BIRForm2316FilePath { get; set; }
 
         // Emergency and Dependent Information
         [MaxLength(100)]
@@ -56,6 +63,20 @@ namespace OTMS.Entities.Models
         public string? EmergencyContactMobileNumber { get; set; }
         [MaxLength(100)]
         public string? DeclaredDependents { get; set; }
+
+        // Family Background
+        [MaxLength(50)]
+        public string? MotherFirstName { get; set; }
+        [MaxLength(50)]
+        public string? MotherMiddleName { get; set; }
+        [MaxLength(50)]
+        public string? MotherLastName { get; set; }
+        [MaxLength(50)]
+        public string? FatherFirstName { get; set; }
+        [MaxLength(50)]
+        public string? FatherMiddleName { get; set; }
+        [MaxLength(50)]
+        public string? FatherLastName { get; set; }
 
         // Educational and Professional Background
         [MaxLength(128)]

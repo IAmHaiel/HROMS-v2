@@ -29,6 +29,17 @@ namespace OTMS.Entities.DTOs.Public
         [Required]
         public string CivilStatus { get; set; } = string.Empty;
 
+        public int? BirthMonth { get; set; }
+        public int? BirthDay { get; set; }
+        public int? BirthYear { get; set; }
+        public int? Age { get; set; }
+
+        [MaxLength(50)]
+        public string? Nationality { get; set; }
+
+        [MaxLength(50)]
+        public string? Citizenship { get; set; }
+
         [Required]
         [RegularExpression(@"^\d{11}$", ErrorMessage = "Contact number must be exactly 11 digits.")]
         public string ContactNumber { get; set; } = string.Empty;
@@ -41,53 +52,11 @@ namespace OTMS.Entities.DTOs.Public
         [MaxLength(256)]
         public string PermanentAddress { get; set; } = string.Empty;
 
-        // ─── Statutory and Government Identifiers ──────────────────────────
-        [Required]
-        public string SSSNumber { get; set; } = string.Empty;
-        [Required]
-        public string PhilHealthNumber { get; set; } = string.Empty;
-        [Required]
-        public string PagIBIGNumber { get; set; } = string.Empty;
-        [Required]
-        public string TIN { get; set; } = string.Empty;
-
-        // ─── Financial and Payroll Data ────────────────────────────────────
-        [Required]
-        [MaxLength(128)]
-        public string BankName { get; set; } = string.Empty;
-        [Required]
-        [MaxLength(128)]
-        public string BankAccountName { get; set; } = string.Empty;
-        [Required]
-        [MaxLength(34)]
-        public string BankAccountNumber { get; set; } = string.Empty;
-
-        // ─── Pre-Employment Documents ──────────────────────────────────────
-        public IFormFile? NBIClearance { get; set; }
-        public IFormFile? MedicalClearance { get; set; }
-        public IFormFile? PSABirthCertificate { get; set; }
-
+        // ─── Documents ─────────────────────────────────────────────────────
         [Required]
         public IFormFile Resume { get; set; } = null!;
 
-        public IFormFile? SignedEmploymentContract { get; set; }
-
-        // ─── Emergency and Dependent Information ──────────────────────────
-        [Required]
-        [MaxLength(100)]
-        public string EmergencyContactName { get; set; } = string.Empty;
-
-        [Required]
-        public string EmergencyContactRelationship { get; set; } = string.Empty;
-
-        [Required]
-        [RegularExpression(@"^\d{11}$", ErrorMessage = "Emergency contact number must be exactly 11 digits.")]
-        public string EmergencyContactMobileNumber { get; set; } = string.Empty;
-
-        [MaxLength(100)]
-        public string? DeclaredDependents { get; set; }
-
-        // ─── Educational and Professional Background ──────────────────────
+        // ─── Educational Background ──────────────────────────────────────
         [Required]
         [MaxLength(128)]
         public string HighestEducationalAttainment { get; set; } = string.Empty;
@@ -99,6 +68,7 @@ namespace OTMS.Entities.DTOs.Public
         [Required]
         public string YearGraduated { get; set; } = string.Empty;
 
+        // ─── Professional Licenses ───────────────────────────────────────
         public List<IFormFile>? ProfessionalLicenseFiles { get; set; }
 
         // ─── Position ─────────────────────────────────────────────────────

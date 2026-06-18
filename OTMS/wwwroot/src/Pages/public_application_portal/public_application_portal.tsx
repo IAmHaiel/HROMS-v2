@@ -29,13 +29,10 @@ type Stage = 'landing' | 'auth' | 'form' | 'success';
 type FormKey =
     | 'firstName' | 'middleName' | 'lastName' | 'suffix'
     | 'gender' | 'civilStatus'
-    | 'email' | 'contactNumber'
+    | 'email' | 'contactNumber' | 'birthMonth' | 'birthDay' | 'birthYear' | 'age' | 'nationality' | 'citizenship'
     | 'currentResidentialAddress' | 'permanentAddress'
-    | 'sssNumber' | 'philHealthNumber' | 'pagIBIGNumber' | 'tin'
-    | 'bankName' | 'bankAccountName' | 'bankAccountNumber'
-    | 'nbiClearance' | 'medicalClearance' | 'psaBirthCertificate' | 'resume' | 'signedEmploymentContract'
-    | 'emergencyContactName' | 'emergencyContactRelationship' | 'emergencyContactMobileNumber' | 'declaredDependents'
-    | 'highestEducationalAttainment' | 'institution' | 'yearGraduated' | 'professionalLicensesCertifications'
+    | 'resume'
+    | 'highestEducationalAttainment' | 'institution' | 'yearGraduated'
     | 'position';
 
 interface ApplicationForm {
@@ -47,28 +44,18 @@ interface ApplicationForm {
     civilStatus: string;
     email: string;
     contactNumber: string;
+    birthMonth: string;
+    birthDay: string;
+    birthYear: string;
+    age: string;
+    nationality: string;
+    citizenship: string;
     currentResidentialAddress: string;
     permanentAddress: string;
-    sssNumber: string;
-    philHealthNumber: string;
-    pagIBIGNumber: string;
-    tin: string;
-    bankName: string;
-    bankAccountName: string;
-    bankAccountNumber: string;
-    nbiClearance: File | null;
-    medicalClearance: File | null;
-    psaBirthCertificate: File | null;
     resume: File | null;
-    signedEmploymentContract: File | null;
-    emergencyContactName: string;
-    emergencyContactRelationship: string;
-    emergencyContactMobileNumber: string;
-    declaredDependents: string;
     highestEducationalAttainment: string;
     institution: string;
     yearGraduated: string;
-    professionalLicensesCertifications: string;
     positionId: string;
 }
 
@@ -132,12 +119,10 @@ const EMPTY_FORM: ApplicationForm = {
     firstName: '', middleName: '', lastName: '', suffix: '',
     gender: '', civilStatus: '',
     email: '', contactNumber: '',
+    birthMonth: '', birthDay: '', birthYear: '', age: '', nationality: '', citizenship: '',
     currentResidentialAddress: '', permanentAddress: '',
-    sssNumber: '', philHealthNumber: '', pagIBIGNumber: '', tin: '',
-    bankName: '', bankAccountName: '', bankAccountNumber: '',
-    nbiClearance: null, medicalClearance: null, psaBirthCertificate: null, resume: null, signedEmploymentContract: null,
-    emergencyContactName: '', emergencyContactRelationship: '', emergencyContactMobileNumber: '', declaredDependents: '',
-    highestEducationalAttainment: '', institution: '', yearGraduated: '', professionalLicensesCertifications: '',
+    resume: null,
+    highestEducationalAttainment: '', institution: '', yearGraduated: '',
     positionId: '',
 };
 
@@ -242,25 +227,10 @@ export default function PublicApplicationPortal() {
         window.google.accounts.id.prompt();
     };
 
-    const applySSS = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 10); if (d.length <= 2) return d; if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 9)}-${d.slice(9)}`; };
-    const applyPhilHealth = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 2) return d; if (d.length <= 11) return `${d.slice(0, 2)}-${d.slice(2)}`; return `${d.slice(0, 2)}-${d.slice(2, 11)}-${d.slice(11)}`; };
-    const applyPagIBIG = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 4) return d; if (d.length <= 8) return `${d.slice(0, 4)}-${d.slice(4)}`; return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`; };
-    const applyTIN = (raw: string): string => { const d = raw.replace(/\D/g, '').slice(0, 12); if (d.length <= 3) return d; if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`; if (d.length <= 9) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`; return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}-${d.slice(9)}`; };
-
-    const formatStatutory = (key: 'sssNumber' | 'philHealthNumber' | 'pagIBIGNumber' | 'tin', raw: string) => {
-        const formatted = key === 'sssNumber' ? applySSS(raw) : key === 'philHealthNumber' ? applyPhilHealth(raw) : key === 'pagIBIGNumber' ? applyPagIBIG(raw) : applyTIN(raw);
-        setForm(p => ({ ...p, [key]: formatted }));
-        const err = validateField(key, formatted);
-        setErrors(p => ({ ...p, [key]: err || undefined }));
-    };
-
     const fieldMaxLengths: Partial<Record<FormKey, number>> = {
         firstName: 50, middleName: 50, lastName: 50, suffix: 50,
         currentResidentialAddress: 256, permanentAddress: 256,
-        bankName: 128, bankAccountName: 128, bankAccountNumber: 34,
-        emergencyContactName: 100, declaredDependents: 100,
         highestEducationalAttainment: 128, institution: 128,
-        professionalLicensesCertifications: 512,
     };
 
     const validateField = (key: FormKey, value: string | File | null): string => {
@@ -283,21 +253,6 @@ export default function PublicApplicationPortal() {
         if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
         if (key === 'currentResidentialAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
-        if (key === 'permanentAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
-        if (key === 'sssNumber') { if (!(value as string)?.trim()) return 'SSS Number is required.'; if (!/^\d{2}-\d{7}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXX-X'; }
-        if (key === 'philHealthNumber') { if (!(value as string)?.trim()) return 'PhilHealth Number is required.'; if (!/^\d{2}-\d{9}-\d{1}$/.test(value as string)) return 'Format: XX-XXXXXXXXX-X'; }
-        if (key === 'pagIBIGNumber') { if (!(value as string)?.trim()) return 'Pag-IBIG Number is required.'; if (!/^\d{4}-\d{4}-\d{4}$/.test(value as string)) return 'Format: XXXX-XXXX-XXXX'; }
-        if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
-        if (key === 'bankName') { if (!(value as string)?.trim()) return 'Bank name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
-        if (key === 'bankAccountName') { if (!(value as string)?.trim()) return 'Bank account name is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
-        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 34) return 'Must not exceed 34 characters.'; }
-        if (key === 'emergencyContactName') { if (!(value as string)?.trim()) return 'Emergency contact name is required.'; if ((value as string).length > 100) return 'Must not exceed 100 characters.'; }
-        if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
-        if (key === 'emergencyContactMobileNumber') {
-            const v = (value as string).trim();
-            if (!v) return 'Emergency contact number is required.';
-            if (!/^\d{11}$/.test(v)) return 'Enter a valid 11-digit emergency contact number.';
-        }
         if (key === 'highestEducationalAttainment') { if (!(value as string)?.trim()) return 'Highest educational attainment is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'institution') { if (!(value as string)?.trim()) return 'Institution is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
@@ -307,13 +262,8 @@ export default function PublicApplicationPortal() {
             if (!/^\d{4}$/.test(v)) return 'Year must be exactly 4 digits.';
             if (year < 1900) return 'Year must be 1900 or later.';
         }
-        if (key === 'professionalLicensesCertifications' && (value as string).length > 512) return 'Must not exceed 512 characters.';
         if (key === 'position' && !value) return 'Please select a position.';
         if (key === 'resume' && !value) return 'Please upload your Resume/CV.';
-        if ((key === 'nbiClearance' || key === 'medicalClearance' || key === 'psaBirthCertificate' || key === 'signedEmploymentContract') && !value) {
-            const labels: Record<string, string> = { nbiClearance: 'NBI Clearance', medicalClearance: 'Medical Clearance', psaBirthCertificate: 'PSA Birth Certificate', signedEmploymentContract: 'Employment Contract' };
-            return `Please upload your ${labels[key] || key}.`;
-        }
         return '';
     };
 
@@ -333,7 +283,7 @@ export default function PublicApplicationPortal() {
             setErrors(p => ({ ...p, [key]: err || undefined }));
         };
 
-    const handleFileUpload = (key: 'resume' | 'nbiClearance' | 'medicalClearance' | 'psaBirthCertificate' | 'signedEmploymentContract') =>
+    const handleFileUpload = (key: 'resume') =>
         (file: File | undefined) => {
             if (!file) return;
             const allowed = [
@@ -362,10 +312,8 @@ export default function PublicApplicationPortal() {
     const validateForm = (): FormErrors => {
         const requiredText: FormKey[] = [
             'firstName', 'lastName', 'gender', 'civilStatus', 'contactNumber',
-            'currentResidentialAddress', 'permanentAddress',
-            'sssNumber', 'philHealthNumber', 'pagIBIGNumber', 'tin',
-            'bankName', 'bankAccountName', 'bankAccountNumber',
-            'emergencyContactName', 'emergencyContactRelationship', 'emergencyContactMobileNumber',
+            'currentResidentialAddress', 'permanentAddress', 'birthMonth', 'birthDay', 'birthYear', 'age',
+            'nationality', 'citizenship',
             'highestEducationalAttainment', 'institution', 'yearGraduated',
             'position'
         ];
@@ -375,7 +323,7 @@ export default function PublicApplicationPortal() {
             const e = validateField(k, val);
             if (e) errs[k] = e;
         });
-        const docKeys: FormKey[] = ['resume', 'nbiClearance', 'medicalClearance', 'psaBirthCertificate', 'signedEmploymentContract'];
+        const docKeys: FormKey[] = ['resume'];
         docKeys.forEach(k => {
             const e = validateField(k, (form as any)[k] as File | null);
             if (e) errs[k] = e;
@@ -402,22 +350,13 @@ export default function PublicApplicationPortal() {
             formData.append('ContactNumber', form.contactNumber.trim());
             formData.append('CurrentResidentialAddress', form.currentResidentialAddress.trim());
             formData.append('PermanentAddress', form.permanentAddress.trim());
-            if (form.sssNumber.trim()) formData.append('SSSNumber', form.sssNumber.trim());
-            if (form.philHealthNumber.trim()) formData.append('PhilHealthNumber', form.philHealthNumber.trim());
-            if (form.pagIBIGNumber.trim()) formData.append('PagIBIGNumber', form.pagIBIGNumber.trim());
-            if (form.tin.trim()) formData.append('TIN', form.tin.trim());
-            if (form.bankName.trim()) formData.append('BankName', form.bankName.trim());
-            if (form.bankAccountName.trim()) formData.append('BankAccountName', form.bankAccountName.trim());
-            if (form.bankAccountNumber.trim()) formData.append('BankAccountNumber', form.bankAccountNumber.trim());
-            if (form.nbiClearance) formData.append('NBIClearance', form.nbiClearance);
-            if (form.medicalClearance) formData.append('MedicalClearance', form.medicalClearance);
-            if (form.psaBirthCertificate) formData.append('PSABirthCertificate', form.psaBirthCertificate);
+            if (form.birthMonth) formData.append('BirthMonth', form.birthMonth);
+            if (form.birthDay) formData.append('BirthDay', form.birthDay);
+            if (form.birthYear) formData.append('BirthYear', form.birthYear);
+            if (form.age) formData.append('Age', form.age);
+            if (form.nationality.trim()) formData.append('Nationality', form.nationality.trim());
+            if (form.citizenship.trim()) formData.append('Citizenship', form.citizenship.trim());
             if (form.resume) formData.append('Resume', form.resume);
-            if (form.signedEmploymentContract) formData.append('SignedEmploymentContract', form.signedEmploymentContract);
-            formData.append('EmergencyContactName', form.emergencyContactName.trim());
-            formData.append('EmergencyContactRelationship', form.emergencyContactRelationship.trim());
-            formData.append('EmergencyContactMobileNumber', form.emergencyContactMobileNumber.trim());
-            if (form.declaredDependents.trim()) formData.append('DeclaredDependents', form.declaredDependents.trim());
             formData.append('HighestEducationalAttainment', form.highestEducationalAttainment.trim());
             formData.append('Institution', form.institution.trim());
             formData.append('YearGraduated', form.yearGraduated.trim());
@@ -749,67 +688,94 @@ export default function PublicApplicationPortal() {
                                 </div>
                             </div>
 
-                            {/* -- Statutory & Gov ID -------------------- */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Statutory &amp; Government Identifiers</div>
+                            {/* -- Birthday & Age -------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Birthday &amp; Age</div>
                             <div style={s.fieldRow4}>
                                 <div style={s.field}>
-                                    <label style={s.label}>SSS Number <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="XX-XXXXXXX-X" value={form.sssNumber}
-                                        onChange={e => formatStatutory('sssNumber', e.target.value)}
-                                        style={{ ...s.input, ...(errors.sssNumber ? s.inputErr : {}) }} />
-                                    {errors.sssNumber && <span style={s.errMsg}><AlertIcon />{errors.sssNumber}</span>}
+                                    <label style={s.label}>Month <span style={s.req}>*</span></label>
+                                    <select value={form.birthMonth}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setForm(p => ({ ...p, birthMonth: val }));
+                                            const err = validateField('birthMonth', val);
+                                            setErrors(p => ({ ...p, birthMonth: err || undefined }));
+                                            if (form.birthDay && form.birthYear && val) {
+                                                const bd = new Date(parseInt(form.birthYear), parseInt(val) - 1, parseInt(form.birthDay));
+                                                if (!isNaN(bd.getTime())) {
+                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
+                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
+                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                }
+                                            }
+                                        }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthMonth ? s.inputErr : {}) }}>
+                                        <option value="">Month</option>
+                                        {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                                    </select>
+                                    {errors.birthMonth && <span style={s.errMsg}><AlertIcon />{errors.birthMonth}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>PhilHealth Number <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="XX-XXXXXXXXX-X" value={form.philHealthNumber}
-                                        onChange={e => formatStatutory('philHealthNumber', e.target.value)}
-                                        style={{ ...s.input, ...(errors.philHealthNumber ? s.inputErr : {}) }} />
-                                    {errors.philHealthNumber && <span style={s.errMsg}><AlertIcon />{errors.philHealthNumber}</span>}
+                                    <label style={s.label}>Day <span style={s.req}>*</span></label>
+                                    <select value={form.birthDay}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setForm(p => ({ ...p, birthDay: val }));
+                                            const err = validateField('birthDay', val);
+                                            setErrors(p => ({ ...p, birthDay: err || undefined }));
+                                            if (form.birthMonth && form.birthYear && val) {
+                                                const bd = new Date(parseInt(form.birthYear), parseInt(form.birthMonth) - 1, parseInt(val));
+                                                if (!isNaN(bd.getTime())) {
+                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
+                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
+                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                }
+                                            }
+                                        }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthDay ? s.inputErr : {}) }}>
+                                        <option value="">Day</option>
+                                        {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                                    </select>
+                                    {errors.birthDay && <span style={s.errMsg}><AlertIcon />{errors.birthDay}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Pag-IBIG Number <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="XXXX-XXXX-XXXX" value={form.pagIBIGNumber}
-                                        onChange={e => formatStatutory('pagIBIGNumber', e.target.value)}
-                                        style={{ ...s.input, ...(errors.pagIBIGNumber ? s.inputErr : {}) }} />
-                                    {errors.pagIBIGNumber && <span style={s.errMsg}><AlertIcon />{errors.pagIBIGNumber}</span>}
+                                    <label style={s.label}>Year <span style={s.req}>*</span></label>
+                                    <select value={form.birthYear}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setForm(p => ({ ...p, birthYear: val }));
+                                            const err = validateField('birthYear', val);
+                                            setErrors(p => ({ ...p, birthYear: err || undefined }));
+                                            if (form.birthMonth && form.birthDay && val) {
+                                                const bd = new Date(parseInt(val), parseInt(form.birthMonth) - 1, parseInt(form.birthDay));
+                                                if (!isNaN(bd.getTime())) {
+                                                    const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
+                                                    if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
+                                                    setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                }
+                                            }
+                                        }}
+                                        style={{ ...s.input, ...s.select, ...(errors.birthYear ? s.inputErr : {}) }}>
+                                        <option value="">Year</option>
+                                        {Array.from({ length: 100 }, (_, i) => <option key={i} value={new Date().getFullYear() - i}>{new Date().getFullYear() - i}</option>)}
+                                    </select>
+                                    {errors.birthYear && <span style={s.errMsg}><AlertIcon />{errors.birthYear}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>TIN <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="XXX-XXX-XXX-XXX" value={form.tin}
-                                        onChange={e => formatStatutory('tin', e.target.value)}
-                                        style={{ ...s.input, ...(errors.tin ? s.inputErr : {}) }} />
-                                    {errors.tin && <span style={s.errMsg}><AlertIcon />{errors.tin}</span>}
+                                    <label style={s.label}>Age <span style={s.req}>*</span></label>
+                                    <input type="number" placeholder="Auto" value={form.age}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setForm(p => ({ ...p, age: val }));
+                                            const err = validateField('age', val);
+                                            setErrors(p => ({ ...p, age: err || undefined }));
+                                        }}
+                                        style={{ ...s.input, ...(errors.age ? s.inputErr : {}) }} />
+                                    {errors.age && <span style={s.errMsg}><AlertIcon />{errors.age}</span>}
                                 </div>
                             </div>
 
-                            {/* -- Financial ----------------------------- */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Financial &amp; Payroll Data</div>
-                            <div style={s.fieldRow3}>
-                                <div style={s.field}>
-                                    <label style={s.label}>Bank Name <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="e.g. BPI, BDO" value={form.bankName}
-                                        onChange={handleTextChange('bankName')} maxLength={128}
-                                        style={{ ...s.input, ...(errors.bankName ? s.inputErr : {}) }} />
-                                    {errors.bankName && <span style={s.errMsg}><AlertIcon />{errors.bankName}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Bank Account Name <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="Account holder name" value={form.bankAccountName}
-                                        onChange={handleTextChange('bankAccountName')} maxLength={128}
-                                        style={{ ...s.input, ...(errors.bankAccountName ? s.inputErr : {}) }} />
-                                    {errors.bankAccountName && <span style={s.errMsg}><AlertIcon />{errors.bankAccountName}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Bank Account No. <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="Account number" value={form.bankAccountNumber}
-                                        onChange={handleTextChange('bankAccountNumber')} maxLength={34}
-                                        style={{ ...s.input, ...(errors.bankAccountNumber ? s.inputErr : {}) }} />
-                                    {errors.bankAccountNumber && <span style={s.errMsg}><AlertIcon />{errors.bankAccountNumber}</span>}
-                                </div>
-                            </div>
-
-                            {/* -- Documents ----------------------------- */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Pre-Employment Documents</div>
+                            {/* -- Resume / CV ----------------------------- */}
+                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Resume / CV</div>
 
                             <label style={s.label}>Resume / CV <span style={s.req}>*</span></label>
                             <div style={{ marginBottom: 12 }}>
@@ -833,179 +799,6 @@ export default function PublicApplicationPortal() {
                                     </div>
                                 )}
                                 {errors.resume && <span style={s.errMsg}><AlertIcon />{errors.resume}</span>}
-                            </div>
-
-                            {([
-                                { k: 'nbiClearance' as const, label: 'NBI Clearance', required: true },
-                                { k: 'medicalClearance' as const, label: 'Medical Clearance', required: true },
-                                { k: 'psaBirthCertificate' as const, label: 'PSA Birth Certificate', required: true },
-                                { k: 'signedEmploymentContract' as const, label: 'Employment Contract', required: true },
-                            ]).map(({ k, label, required }) => {
-                                const file = (form as any)[k] as File | null;
-                                const err = (errors as any)[k] as string | undefined;
-                                return (
-                                    <div key={k} style={{ marginBottom: 10 }}>
-                                        <label style={s.label}>{label} {required && <span style={s.req}>*</span>}</label>
-                                        <div style={{ marginTop: 6 }}>
-                                            {!file ? (
-                                                <div style={{ ...s.fileBtn, ...(err ? s.fileBtnErr : {}) }}
-                                                    onClick={() => document.getElementById(`doc-${k}`)?.click()}>
-                                                    <input id={`doc-${k}`} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                                                        onChange={e => handleFileUpload(k)(e.target.files?.[0])} />
-                                                    <UploadIcon />
-                                                    <span>Click to upload {label}</span>
-                                                    <span style={s.fileBtnHint}>PDF or DOCX · Max 5MB</span>
-                                                </div>
-                                            ) : (
-                                                <div style={s.filePreview}>
-                                                    <div style={s.fileIcon}><FileIcon /></div>
-                                                    <div style={s.fileMeta}>
-                                                        <div style={s.fileName}>{file.name}</div>
-                                                        <div style={s.fileSize}>{formatBytes(file.size)}</div>
-                                                    </div>
-                                                    <button style={s.fileRemove} onClick={() => setForm(p => ({ ...p, [k]: null }))}><XIcon /></button>
-                                                </div>
-                                            )}
-                                            {err && <span style={s.errMsg}><AlertIcon />{err}</span>}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-
-                            {/* -- Emergency ------------------------------ */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Emergency Contact &amp; Dependents</div>
-                            <div style={s.fieldRow3}>
-                                <div style={s.field}>
-                                    <label style={s.label}>Contact Name <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="Full name" value={form.emergencyContactName}
-                                        onChange={handleTextChange('emergencyContactName')} maxLength={100}
-                                        style={{ ...s.input, ...(errors.emergencyContactName ? s.inputErr : {}) }} />
-                                    {errors.emergencyContactName && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactName}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Relationship <span style={s.req}>*</span></label>
-                                    <select value={form.emergencyContactRelationship}
-                                        onChange={handleSelectChange('emergencyContactRelationship')}
-                                        style={{ ...s.input, ...s.select, ...(errors.emergencyContactRelationship ? s.inputErr : {}) }}>
-                                        <option value="">Select</option>
-                                        <option value="Mother">Mother</option>
-                                        <option value="Father">Father</option>
-                                        <option value="Spouse">Spouse</option>
-                                        <option value="Sibling">Sibling</option>
-                                        <option value="Relative">Relative</option>
-                                        <option value="Friend">Friend</option>
-                                    </select>
-                                    {errors.emergencyContactRelationship && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactRelationship}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Mobile No. <span style={s.req}>*</span></label>
-                                    <input type="tel" placeholder="09170000000" value={form.emergencyContactMobileNumber}
-                                        onChange={handleTextChange('emergencyContactMobileNumber')} maxLength={11}
-                                        style={{ ...s.input, ...(errors.emergencyContactMobileNumber ? s.inputErr : {}) }} />
-                                    {errors.emergencyContactMobileNumber && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactMobileNumber}</span>}
-                                </div>
-                            </div>
-                            <div style={s.field}>
-                                <label style={s.label}>Declared Dependents</label>
-                                <span style={s.hint}>Optional. Add dependents for HMO/benefits enrollment.</span>
-                                {(() => {
-                                    const deps: { name: string; dob?: string }[] = form.declaredDependents ? JSON.parse(form.declaredDependents) : [];
-                                    return (
-                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                            {deps.map((dep, i) => (
-                                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                    <input type="text" value={dep.name}
-                                                        onChange={e => {
-                                                            const updated = [...deps];
-                                                            updated[i] = { ...updated[i], name: e.target.value };
-                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
-                                                        }}
-                                                        placeholder="Full name"
-                                                        style={{ ...s.input, flex: 1 }} />
-                                                    <input type="date" value={dep.dob || ''}
-                                                        onChange={e => {
-                                                            const updated = [...deps];
-                                                            updated[i] = { ...updated[i], dob: e.target.value };
-                                                            setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
-                                                        }}
-                                                        style={{ ...s.input, width: 160 }} />
-                                                    <button type="button" onClick={() => {
-                                                        const updated = deps.filter((_, j) => j !== i);
-                                                        setForm(p => ({ ...p, declaredDependents: updated.length > 0 ? JSON.stringify(updated) : '' }));
-                                                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
-                                                </div>
-                                            ))}
-                                            <button type="button" onClick={() => {
-                                                const updated = [...deps, { name: '', dob: '' }];
-                                                setForm(p => ({ ...p, declaredDependents: JSON.stringify(updated) }));
-                                            }} style={{
-                                                display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-                                                background: '#f1f5f9', border: '1px dashed #cbd5e1', borderRadius: 8,
-                                                padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#4318ff',
-                                                fontWeight: 600, fontFamily: 'inherit'
-                                            }}>+ Add Dependent</button>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-
-                            {/* -- Education ---------------------------- */}
-                            <div style={{ ...s.sectionLabel, marginTop: 24 }}>Educational &amp; Professional Background</div>
-                            <div style={s.fieldRow2}>
-                                <div style={s.field}>
-                                    <label style={s.label}>Highest Educational Attainment <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="e.g. Bachelor of Science in Information Technology" value={form.highestEducationalAttainment}
-                                        onChange={handleTextChange('highestEducationalAttainment')} maxLength={128}
-                                        style={{ ...s.input, ...(errors.highestEducationalAttainment ? s.inputErr : {}) }} />
-                                    {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Institution <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="e.g. University of the Philippines" value={form.institution}
-                                        onChange={handleTextChange('institution')} maxLength={128}
-                                        style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
-                                    {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
-                                </div>
-                                <div style={s.field}>
-                                    <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
-                                        onChange={handleTextChange('yearGraduated')} maxLength={4}
-                                        style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
-                                    {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
-                                </div>
-                            </div>
-                            <div style={s.field}>
-                                <label style={s.label}>Professional Licenses &amp; Certifications</label>
-                                <span style={s.hint}>Upload your professional licenses and certificates (PDF, JPG, PNG).</span>
-                                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {licenseFiles.map((file, i) => (
-                                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                            <div style={{ ...s.filePreviewSmall, flex: 1 }}>
-                                                <FileIcon />
-                                                <span style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{file.name}</span>
-                                                <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatBytes(file.size)}</span>
-                                            </div>
-                                            <button type="button" onClick={() => {
-                                                setLicenseFiles(prev => prev.filter((_, j) => j !== i));
-                                            }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
-                                        </div>
-                                    ))}
-                                    <div style={{ ...s.fileBtnSmall, alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-                                        onClick={() => document.getElementById('lic-upload')?.click()}>
-                                        <input id="lic-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
-                                            onChange={e => {
-                                                const f = e.target.files?.[0];
-                                                if (!f) return;
-                                                const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-                                                if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) return;
-                                                if (f.size > 5 * 1024 * 1024) return;
-                                                setLicenseFiles(prev => [...prev, f]);
-                                                e.target.value = '';
-                                            }} />
-                                        <UploadIcon />
-                                        <span style={{ fontSize: 11 }}>+ Add License/Certificate</span>
-                                    </div>
-                                </div>
                             </div>
 
                             {/* -- Position ---------------------------- */}

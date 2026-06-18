@@ -92,34 +92,6 @@ namespace OTMS.Service.Services
                 };
             }
 
-            string? nbiPath = null;
-            if (request.NBIClearance != null)
-            {
-                try { nbiPath = await fileService.UploadFileAsync(request.NBIClearance, "applicant-docs"); }
-                catch { /* optional file, continue */ }
-            }
-
-            string? medicalPath = null;
-            if (request.MedicalClearance != null)
-            {
-                try { medicalPath = await fileService.UploadFileAsync(request.MedicalClearance, "applicant-docs"); }
-                catch { /* optional file, continue */ }
-            }
-
-            string? psaPath = null;
-            if (request.PSABirthCertificate != null)
-            {
-                try { psaPath = await fileService.UploadFileAsync(request.PSABirthCertificate, "applicant-docs"); }
-                catch { /* optional file, continue */ }
-            }
-
-            string? contractPath = null;
-            if (request.SignedEmploymentContract != null)
-            {
-                try { contractPath = await fileService.UploadFileAsync(request.SignedEmploymentContract, "applicant-docs"); }
-                catch { /* optional file, continue */ }
-            }
-
             // 5. Generate email verification token
             var verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
             var fullName = BuildFullName(request.FirstName, request.MiddleName, request.LastName, request.Suffix);
@@ -130,18 +102,14 @@ namespace OTMS.Service.Services
             {
                 foreach (var file in request.ProfessionalLicenseFiles)
                 {
-                    try
-                    {
-                        var path = await fileService.UploadFileAsync(file, "license-docs");
-                        licensePaths.Add(path);
-                    }
+                    try { var path = await fileService.UploadFileAsync(file, "license-docs"); licensePaths.Add(path); }
                     catch { }
                 }
             }
             var licensePathsJson = licensePaths.Count > 0 ? System.Text.Json.JsonSerializer.Serialize(licensePaths) : null;
 
             // 7. Collect uploaded file paths for cleanup on failure
-            var uploadedFiles = new[] { resumeFilePath, nbiPath, medicalPath, psaPath, contractPath }.Where(f => f != null).Cast<string>().ToList();
+            var uploadedFiles = new[] { resumeFilePath }.Where(f => f != null).Cast<string>().ToList();
             uploadedFiles.AddRange(licensePaths);
 
             try
@@ -149,7 +117,22 @@ namespace OTMS.Service.Services
             // 8. Generate unique reference number
             var referenceNumber = await GenerateReferenceNumberAsync();
 
-            // 8. Create ApplicantRecord
+            // 9. Calculate age from birthday
+            int? calculatedAge = null;
+            if (request.BirthYear.HasValue && request.BirthMonth.HasValue && request.BirthDay.HasValue)
+            {
+                try
+                {
+                    var bd = new DateTime(request.BirthYear.Value, request.BirthMonth.Value, request.BirthDay.Value);
+                    var today = DateTime.UtcNow;
+                    var age = today.Year - bd.Year;
+                    if (bd.Date > today.AddYears(-age)) age--;
+                    calculatedAge = age;
+                }
+                catch { }
+            }
+
+            // 10. Create ApplicantRecord
             var applicantRecord = new ApplicantRecord
             {
                 ApplicantRecordId = Guid.NewGuid(),
@@ -160,26 +143,17 @@ namespace OTMS.Service.Services
                 FullName = fullName,
                 Gender = request.Gender.Trim(),
                 CivilStatus = request.CivilStatus.Trim(),
+                BirthMonth = request.BirthMonth,
+                BirthDay = request.BirthDay,
+                BirthYear = request.BirthYear,
+                Age = (request.Age.HasValue && request.Age.Value > 0) ? request.Age : calculatedAge,
+                Nationality = request.Nationality?.Trim(),
+                Citizenship = request.Citizenship?.Trim(),
                 EmailAddress = emailAddress,
                 ContactNumber = request.ContactNumber.Trim(),
                 CurrentResidentialAddress = request.CurrentResidentialAddress.Trim(),
                 PermanentAddress = request.PermanentAddress.Trim(),
-                SSSNumber = request.SSSNumber?.Trim(),
-                PhilHealthNumber = request.PhilHealthNumber?.Trim(),
-                PagIBIGNumber = request.PagIBIGNumber?.Trim(),
-                TIN = request.TIN?.Trim(),
-                BankName = request.BankName?.Trim(),
-                BankAccountName = request.BankAccountName?.Trim(),
-                BankAccountNumber = request.BankAccountNumber?.Trim(),
-                NBIClearanceFilePath = nbiPath,
-                MedicalClearanceFilePath = medicalPath,
-                PSABirthCertificateFilePath = psaPath,
                 ResumeFilePath = resumeFilePath,
-                SignedEmploymentContractFilePath = contractPath,
-                EmergencyContactName = request.EmergencyContactName.Trim(),
-                EmergencyContactRelationship = request.EmergencyContactRelationship.Trim(),
-                EmergencyContactMobileNumber = request.EmergencyContactMobileNumber.Trim(),
-                DeclaredDependents = request.DeclaredDependents?.Trim(),
                 HighestEducationalAttainment = request.HighestEducationalAttainment.Trim(),
                 Institution = request.Institution.Trim(),
                 YearGraduated = request.YearGraduated.Trim(),
@@ -298,7 +272,6 @@ namespace OTMS.Service.Services
 
         private ApiResponseDTO<string>? ValidateUploadedFiles(ApplicantSubmissionDTO request)
         {
-            // Resume (Required)
             var resumeExt = Path.GetExtension(request.Resume.FileName).ToLowerInvariant();
             if (!AllowedDocExtensions.Contains(resumeExt))
             {
@@ -318,47 +291,6 @@ namespace OTMS.Service.Services
                     Data = null
                 };
             }
-
-            // NBI Clearance (optional)
-            if (request.NBIClearance != null)
-            {
-                var ext = Path.GetExtension(request.NBIClearance.FileName).ToLowerInvariant();
-                if (!AllowedDocExtensions.Contains(ext))
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid file format for NBI Clearance. Please upload a PDF or DOCX file.", Data = null };
-                if (request.NBIClearance.Length > MaxFileSize)
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "NBI Clearance file size must not exceed 5MB.", Data = null };
-            }
-
-            // Medical Clearance (optional)
-            if (request.MedicalClearance != null)
-            {
-                var ext = Path.GetExtension(request.MedicalClearance.FileName).ToLowerInvariant();
-                if (!AllowedDocExtensions.Contains(ext))
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid file format for Medical Clearance. Please upload a PDF or DOCX file.", Data = null };
-                if (request.MedicalClearance.Length > MaxFileSize)
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Medical Clearance file size must not exceed 5MB.", Data = null };
-            }
-
-            // PSA Birth Certificate (optional)
-            if (request.PSABirthCertificate != null)
-            {
-                var ext = Path.GetExtension(request.PSABirthCertificate.FileName).ToLowerInvariant();
-                if (!AllowedDocExtensions.Contains(ext))
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid file format for PSA Birth Certificate. Please upload a PDF or DOCX file.", Data = null };
-                if (request.PSABirthCertificate.Length > MaxFileSize)
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "PSA Birth Certificate file size must not exceed 5MB.", Data = null };
-            }
-
-            // Signed Employment Contract (optional)
-            if (request.SignedEmploymentContract != null)
-            {
-                var ext = Path.GetExtension(request.SignedEmploymentContract.FileName).ToLowerInvariant();
-                if (!AllowedDocExtensions.Contains(ext))
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid file format for Employment Contract. Please upload a PDF or DOCX file.", Data = null };
-                if (request.SignedEmploymentContract.Length > MaxFileSize)
-                    return new ApiResponseDTO<string> { IsSuccess = false, Message = "Employment Contract file size must not exceed 5MB.", Data = null };
-            }
-
             return null;
         }
 

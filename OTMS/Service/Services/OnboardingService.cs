@@ -224,17 +224,12 @@ namespace OTMS.Service.Services
                         EmailAddress = onboardingToken.ApplicantRecord.EmailAddress,
                         JobPositionName = onboardingToken.ApplicantRecord.JobPosition?.Title ?? "",
                         ResumeFilePath = onboardingToken.ApplicantRecord.ResumeFilePath,
-                        MedicalClearanceFilePath = onboardingToken.ApplicantRecord.MedicalClearanceFilePath,
-                        SSSNumber = onboardingToken.ApplicantRecord.SSSNumber,
-                        PhilHealthNumber = onboardingToken.ApplicantRecord.PhilHealthNumber,
-                        PagIBIGNumber = onboardingToken.ApplicantRecord.PagIBIGNumber,
-                        TIN = onboardingToken.ApplicantRecord.TIN,
-                        BankName = onboardingToken.ApplicantRecord.BankName,
-                        BankAccountName = onboardingToken.ApplicantRecord.BankAccountName,
-                        BankAccountNumber = onboardingToken.ApplicantRecord.BankAccountNumber,
-                        EmergencyContactName = onboardingToken.ApplicantRecord.EmergencyContactName,
-                        EmergencyContactRelationship = onboardingToken.ApplicantRecord.EmergencyContactRelationship,
-                        EmergencyContactMobileNumber = onboardingToken.ApplicantRecord.EmergencyContactMobileNumber
+                        Gender = onboardingToken.ApplicantRecord.Gender,
+                        CivilStatus = onboardingToken.ApplicantRecord.CivilStatus,
+                        BirthMonth = onboardingToken.ApplicantRecord.BirthMonth,
+                        BirthDay = onboardingToken.ApplicantRecord.BirthDay,
+                        BirthYear = onboardingToken.ApplicantRecord.BirthYear,
+                        Age = onboardingToken.ApplicantRecord.Age
                     }
                 };
             }
@@ -262,17 +257,12 @@ namespace OTMS.Service.Services
                     EmailAddress = applicant.EmailAddress,
                     JobPositionName = applicant.JobPosition?.Title ?? "",
                     ResumeFilePath = applicant.ResumeFilePath,
-                    MedicalClearanceFilePath = applicant.MedicalClearanceFilePath,
-                    SSSNumber = applicant.SSSNumber,
-                    PhilHealthNumber = applicant.PhilHealthNumber,
-                    PagIBIGNumber = applicant.PagIBIGNumber,
-                    TIN = applicant.TIN,
-                    BankName = applicant.BankName,
-                    BankAccountName = applicant.BankAccountName,
-                    BankAccountNumber = applicant.BankAccountNumber,
-                    EmergencyContactName = applicant.EmergencyContactName,
-                    EmergencyContactRelationship = applicant.EmergencyContactRelationship,
-                    EmergencyContactMobileNumber = applicant.EmergencyContactMobileNumber
+                    Gender = applicant.Gender,
+                    CivilStatus = applicant.CivilStatus,
+                    BirthMonth = applicant.BirthMonth,
+                    BirthDay = applicant.BirthDay,
+                    BirthYear = applicant.BirthYear,
+                    Age = applicant.Age
                 }
             };
         }

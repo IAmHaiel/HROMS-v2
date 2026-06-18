@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OTMS.Data;
 
@@ -11,9 +12,11 @@ using OTMS.Data;
 namespace OTMS.Migrations
 {
     [DbContext(typeof(OTMSDbContext))]
-    partial class OTMSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260618064716_AddApplicantRecordFieldsAndOnboarding")]
+    partial class AddApplicantRecordFieldsAndOnboarding
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -200,14 +203,8 @@ namespace OTMS.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<int?>("BirthDay")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("BirthMonth")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("BirthYear")
-                        .HasColumnType("int");
+                    b.Property<DateTime?>("Birthday")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Citizenship")
                         .HasColumnType("nvarchar(max)");
