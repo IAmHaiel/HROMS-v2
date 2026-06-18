@@ -631,20 +631,20 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>First Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Juan" value={form.firstName}
-                                        onChange={handleTextChange('firstName')} maxLength={128}
+                                        onChange={handleTextChange('firstName')} maxLength={50}
                                         style={{ ...s.input, ...(errors.firstName ? s.inputErr : {}) }} />
                                     {errors.firstName && <span style={s.errMsg}><AlertIcon />{errors.firstName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Middle Name</label>
                                     <input type="text" placeholder="M." value={form.middleName}
-                                        onChange={handleTextChange('middleName')} maxLength={128}
+                                        onChange={handleTextChange('middleName')} maxLength={50}
                                         style={s.input} />
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Last Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Dela Cruz" value={form.lastName}
-                                        onChange={handleTextChange('lastName')} maxLength={128}
+                                        onChange={handleTextChange('lastName')} maxLength={50}
                                         style={{ ...s.input, ...(errors.lastName ? s.inputErr : {}) }} />
                                     {errors.lastName && <span style={s.errMsg}><AlertIcon />{errors.lastName}</span>}
                                 </div>
@@ -653,7 +653,7 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Suffix</label>
                                     <input type="text" placeholder="Jr., III" value={form.suffix}
-                                        onChange={handleTextChange('suffix')} maxLength={20}
+                                        onChange={handleTextChange('suffix')} maxLength={50}
                                         style={s.input} />
                                 </div>
                                 <div style={s.field}>
@@ -669,7 +669,8 @@ export default function PublicApplicationPortal() {
                                     </select>
                                     {form.gender === 'Other' && (
                                         <input type="text" placeholder="Please specify" value={genderCustom}
-                                            onChange={e => { setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }}
+                                            onChange={e => { if (e.target.value.length <= 50) setGenderCustom(e.target.value); setErrors(p => ({ ...p, gender: undefined })); }}
+                                            maxLength={50}
                                             style={{ ...s.input, marginTop: 6 }} />
                                     )}
                                     {errors.gender && <span style={s.errMsg}><AlertIcon />{errors.gender}</span>}
@@ -719,14 +720,14 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Current Residential Address <span style={s.req}>*</span></label>
                                     <textarea placeholder="Street, Barangay, City, Province" value={form.currentResidentialAddress}
-                                        onChange={handleTextChange('currentResidentialAddress')}
+                                        onChange={e => { if (e.target.value.length <= 256) handleTextChange('currentResidentialAddress')(e); }}
                                         style={{ ...s.textarea, ...(errors.currentResidentialAddress ? s.textareaErr : {}) }} rows={2} />
                                     {errors.currentResidentialAddress && <span style={s.errMsg}><AlertIcon />{errors.currentResidentialAddress}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Permanent Address <span style={s.req}>*</span></label>
                                     <textarea placeholder="Street, Barangay, City, Province" value={form.permanentAddress}
-                                        onChange={handleTextChange('permanentAddress')}
+                                        onChange={e => { if (e.target.value.length <= 256) handleTextChange('permanentAddress')(e); }}
                                         style={{ ...s.textarea, ...(errors.permanentAddress ? s.textareaErr : {}) }} rows={2} />
                                     {errors.permanentAddress && <span style={s.errMsg}><AlertIcon />{errors.permanentAddress}</span>}
                                 </div>
@@ -771,21 +772,21 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. BPI, BDO" value={form.bankName}
-                                        onChange={handleTextChange('bankName')}
+                                        onChange={handleTextChange('bankName')} maxLength={128}
                                         style={{ ...s.input, ...(errors.bankName ? s.inputErr : {}) }} />
                                     {errors.bankName && <span style={s.errMsg}><AlertIcon />{errors.bankName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Account Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account holder name" value={form.bankAccountName}
-                                        onChange={handleTextChange('bankAccountName')}
+                                        onChange={handleTextChange('bankAccountName')} maxLength={128}
                                         style={{ ...s.input, ...(errors.bankAccountName ? s.inputErr : {}) }} />
                                     {errors.bankAccountName && <span style={s.errMsg}><AlertIcon />{errors.bankAccountName}</span>}
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Bank Account No. <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Account number" value={form.bankAccountNumber}
-                                        onChange={handleTextChange('bankAccountNumber')}
+                                        onChange={handleTextChange('bankAccountNumber')} maxLength={34}
                                         style={{ ...s.input, ...(errors.bankAccountNumber ? s.inputErr : {}) }} />
                                     {errors.bankAccountNumber && <span style={s.errMsg}><AlertIcon />{errors.bankAccountNumber}</span>}
                                 </div>
@@ -861,7 +862,7 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Contact Name <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="Full name" value={form.emergencyContactName}
-                                        onChange={handleTextChange('emergencyContactName')}
+                                        onChange={handleTextChange('emergencyContactName')} maxLength={100}
                                         style={{ ...s.input, ...(errors.emergencyContactName ? s.inputErr : {}) }} />
                                     {errors.emergencyContactName && <span style={s.errMsg}><AlertIcon />{errors.emergencyContactName}</span>}
                                 </div>
@@ -952,7 +953,7 @@ export default function PublicApplicationPortal() {
                                 <div style={s.field}>
                                     <label style={s.label}>Year Graduated <span style={s.req}>*</span></label>
                                     <input type="text" placeholder="e.g. 2020" value={form.yearGraduated}
-                                        onChange={handleTextChange('yearGraduated')}
+                                        onChange={handleTextChange('yearGraduated')} maxLength={4}
                                         style={{ ...s.input, ...(errors.yearGraduated ? s.inputErr : {}) }} />
                                     {errors.yearGraduated && <span style={s.errMsg}><AlertIcon />{errors.yearGraduated}</span>}
                                 </div>
@@ -960,7 +961,7 @@ export default function PublicApplicationPortal() {
                             <div style={s.field}>
                                 <label style={s.label}>Professional Licenses &amp; Certifications</label>
                                 <textarea placeholder="e.g. PRC License No. 12345, Certified Public Accountant" value={form.professionalLicensesCertifications}
-                                    onChange={handleTextChange('professionalLicensesCertifications')}
+                                    onChange={e => { if (e.target.value.length <= 512) handleTextChange('professionalLicensesCertifications')(e); }}
                                     style={s.textarea} rows={2} />
                             </div>
 
