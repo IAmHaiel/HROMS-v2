@@ -287,7 +287,7 @@ namespace OTMS.Service.Services
                 InterviewDate = request.InterviewDate,
                 InterviewTime = request.InterviewTime,
                 LocationOrLink = request.LocationOrLink,
-                InterviewerName = request.InterviewerName,
+                InterviewerName = string.Empty,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -304,7 +304,7 @@ namespace OTMS.Service.Services
                 <ul>
                     <li><strong>Date & Time:</strong> {formattedDate} at {formattedTime}</li>
                     <li><strong>Location / Meeting Link:</strong> {request.LocationOrLink}</li>
-                    <li><strong>Interviewer / Contact Person:</strong> {request.InterviewerName}</li>
+    
                 </ul>
                 <p>Please confirm your availability by replying to this email. If you need to reschedule, kindly notify us at least 24 hours in advance.</p>
                 <p>We look forward to speaking with you.</p>

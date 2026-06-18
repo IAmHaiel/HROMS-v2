@@ -1395,7 +1395,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                     </div>
                 </div>
                 <div className="card activity-card">
-                    <div className="card-header-layout"><button className="text-link">Recent Activity</button><a href="/activity-logs" className="view-all-link">View all →</a></div>
+                    <div className="card-header-layout"><button className="text-link">Recent Activity</button></div>
                     <div className="activity-feed-list">
                         {loading
                             ? <div className="empty-state"><Loader2 size={22} className="spin" /><p>Loading...</p></div>
@@ -2872,6 +2872,26 @@ export default function Dashboard() {
 
     // ── Activity Logs ──
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+    const [activityLogPage, setActivityLogPage] = useState(1);
+    const [activityLogTotalPages, setActivityLogTotalPages] = useState(1);
+
+    const fetchActivityLogs = (page: number) => {
+        const token = localStorage.getItem('authToken');
+        fetch(`/api/activity-logs/recent?page=${page}&pageSize=20`, { headers: { 'Authorization': 'Bearer ' + token }, cache: 'no-store' })
+            .then(res => { if (!res.ok) return null; return res.json(); })
+            .then(data => {
+                if (data && Array.isArray(data.data)) {
+                    setActivityLogs(data.data);
+                    setActivityLogPage(data.pageNumber || page);
+                    setActivityLogTotalPages(data.totalPages || 1);
+                } else if (Array.isArray(data)) {
+                    setActivityLogs(data);
+                } else {
+                    setActivityLogs([]);
+                }
+            })
+            .catch(() => setActivityLogs([]));
+    };
 
     // ── Employment Contracts / Documents ──
     const [contracts, setContracts] = useState<EmploymentContract[]>([]);
@@ -3038,6 +3058,7 @@ export default function Dashboard() {
         fetchLeaveRequests(1, { status: 'pending', role: '', search: '' });
         fetchOverrides(1, { status: 'Pending', search: '' });
         fetchContracts(1, { search: '', isArchived: false });
+        fetchActivityLogs(1);
         const token = localStorage.getItem('authToken');
 
         // Fetch profile to sync name/contact info to localStorage
@@ -3284,6 +3305,9 @@ export default function Dashboard() {
                                     })}
                                 </div>
                             )}
+                            {activityLogs.length > 0 && (
+                                <PaginationBar page={activityLogPage} totalPages={activityLogTotalPages} onPageChange={fetchActivityLogs} />
+                            )}
                         </div>
                     </div>
                 )}
@@ -3293,16 +3317,7 @@ export default function Dashboard() {
                 <AddEmployeeModal onClose={() => setShowAddModal(false)} onSuccess={newEmp => {
                     setEmployees(prev => [newEmp, ...prev]);
                     setRecentEmployees(prev => [newEmp, ...prev]);
-                    const token = localStorage.getItem('authToken');
-                    fetch('/api/activity-logs/recent', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' })
-                        .then(res => { if (!res.ok) return []; return res.json(); })
-                        .then(data => {
-                            if (Array.isArray(data)) setActivityLogs(data);
-                            else if (data && Array.isArray(data.data)) setActivityLogs(data.data);
-                            else if (data && Array.isArray(data.$values)) setActivityLogs(data.$values);
-                            else setActivityLogs([]);
-                        })
-                        .catch((err) => { console.error('Activity logs fetch error:', err); });
+                    fetchActivityLogs(1);
                 }} />
             )}
 
@@ -3374,6 +3389,36 @@ export default function Dashboard() {
                 onConfirm={doLogout}
                 onCancel={() => setLogoutConfirm(false)}
             />
+        </div>
+    );
+}
+// ─── PaginationBar ─────────────────────────────────────────────────────────
+function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+    if (totalPages <= 1) return null;
+    const pages: (number | string)[] = [];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    if (start > 1) { pages.push(1); if (start > 2) pages.push('...'); }
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages) { if (end < totalPages - 1) pages.push('...'); pages.push(totalPages); }
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24, paddingBottom: 32 }}>
+            <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: page <= 1 ? '#f1f5f9' : 'white', color: page <= 1 ? '#94a3b8' : '#334155', cursor: page <= 1 ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                ‹ Prev
+            </button>
+            {pages.map((p, i) =>
+                typeof p === 'string'
+                    ? <span key={`e${i}`} style={{ fontSize: 12, color: '#94a3b8' }}>…</span>
+                    : <button key={p} onClick={() => onPageChange(p)}
+                        style={{ width: 32, height: 32, borderRadius: 6, border: p === page ? 'none' : '1px solid #e2e8f0', background: p === page ? '#4318ff' : 'white', color: p === page ? 'white' : '#334155', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                        {p}
+                    </button>
+            )}
+            <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: page >= totalPages ? '#f1f5f9' : 'white', color: page >= totalPages ? '#94a3b8' : '#334155', cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                Next ›
+            </button>
         </div>
     );
 }

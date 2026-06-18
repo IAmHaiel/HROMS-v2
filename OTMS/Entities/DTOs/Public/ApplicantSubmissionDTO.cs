@@ -54,6 +54,7 @@ namespace OTMS.Entities.DTOs.Public
         [Required]
         public string BankAccountName { get; set; } = string.Empty;
         [Required]
+        [MaxLength(64)]
         public string BankAccountNumber { get; set; } = string.Empty;
 
         // ─── Pre-Employment Documents ──────────────────────────────────────

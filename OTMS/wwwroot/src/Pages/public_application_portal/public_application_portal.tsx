@@ -273,7 +273,7 @@ export default function PublicApplicationPortal() {
         if (key === 'tin') { if (!(value as string)?.trim()) return 'TIN is required.'; if (!/^\d{3}-\d{3}-\d{3}-\d{3}$/.test(value as string)) return 'Format: XXX-XXX-XXX-XXX'; }
         if (key === 'bankName' && !(value as string)?.trim()) return 'Bank name is required.';
         if (key === 'bankAccountName' && !(value as string)?.trim()) return 'Bank account name is required.';
-        if (key === 'bankAccountNumber' && !(value as string)?.trim()) return 'Bank account number is required.';
+        if (key === 'bankAccountNumber') { if (!(value as string)?.trim()) return 'Bank account number is required.'; if ((value as string).length > 64) return 'Must not exceed 64 characters.'; }
         if (key === 'emergencyContactName' && !(value as string)?.trim()) return 'Emergency contact name is required.';
         if (key === 'emergencyContactRelationship' && !(value as string)?.trim()) return 'Emergency contact relationship is required.';
         if (key === 'emergencyContactMobileNumber') {

@@ -776,7 +776,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
     const [date, setDate] = useState<string>('');
     const [time, setTime] = useState<string>('');
     const [location, setLocation] = useState<string>('');
-    const [interviewer, setInterviewer] = useState<string>('');
 
     // Field errors
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -794,7 +793,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
         if (!time) errs.time = 'Interview time is required.';
         if (!location.trim()) errs.location = 'Location or meeting link is required.';
         else if (location.trim().length > 255) errs.location = 'Maximum 255 characters.';
-        if (!interviewer) errs.interviewer = 'Interviewer / contact person is required.';
         setErrors(errs);
         return Object.keys(errs).length === 0;
     }
@@ -806,7 +804,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
     async function handleSend(): Promise<void> {
         setStep('sending');
         const details: InterviewDetails = {
-            date, time, location: location.trim(), interviewer,
+            date, time, location: location.trim(), interviewer: '',
         };
 
         setEmailStatus('sending');
@@ -818,7 +816,6 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 interviewDate: date,
                 interviewTime: time,
                 locationOrLink: location.trim(),
-                interviewerName: interviewer,
             };
             const res = await axios.post('/api/recruitment/schedule-interview', payload);
             const apiResult = res.data as any;
@@ -963,23 +960,7 @@ Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.app
                                     </div>
                                 </div>
 
-                                {/* Interviewer */}
-                                <div className="rec-form-field rec-form-field--full">
-                                    <label className="rec-field-label">Interviewer / Contact Person <span>*</span></label>
-                                    <div className="rec-input-icon-wrap">
-                                        <User size={13} className="rec-input-icon" />
-                                        <select
-                                            className={`rec-input${errors.interviewer ? ' rec-input--error' : ''}`}
-                                            value={interviewer}
-                                            onChange={(e) => { setInterviewer(e.target.value); setErrors((p) => ({ ...p, interviewer: '' })); }}
-                                            style={{ paddingLeft: 30 }}
-                                        >
-                                            <option value="">Select interviewer…</option>
-                                            {INTERVIEWERS.map((iv) => <option key={iv} value={iv}>{iv}</option>)}
-                                        </select>
-                                    </div>
-                                    {errors.interviewer && <span className="rec-field-error">{errors.interviewer}</span>}
-                                </div>
+
                             </div>
 
                             <div className="rec-modal-actions">
@@ -1009,7 +990,7 @@ Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.app
                                     </div>
                                 </div>
                                 <div className="rec-email-body">
-                                    {buildEmailBody(applicant, { date, time, location: location.trim(), interviewer })}
+                                    {buildEmailBody(applicant, { date, time, location: location.trim(), interviewer: '' })}
                                 </div>
                             </div>
 
@@ -1033,7 +1014,7 @@ Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.app
                                 <div>
                                     <strong>Interview schedule saved to database.</strong><br />
                                     <span style={{ fontWeight: 400 }}>
-                                        {fmtDateTime(date, time)} · {location.trim()} · {interviewer}
+                                        {fmtDateTime(date, time)} · {location.trim()}
                                     </span>
                                 </div>
                             </div>

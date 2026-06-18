@@ -99,8 +99,8 @@ namespace OTMS.Data
             if (operationAdminRole != null)
             {
                 // Operation Admin gets a subset (example: can manage tasks, users, but not roles)
-                var opPermissions = allDbPermissions.Where(p => 
-                    p.Name.StartsWith("Permissions.Tasks.") || 
+                var opPermissions = allDbPermissions.Where(p =>
+                    p.Name.StartsWith("Permissions.Tasks.") ||
                     p.Name.StartsWith("Permissions.Users.") ||
                     p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
@@ -149,7 +149,7 @@ namespace OTMS.Data
                     ContactNumber = "09170000000",
                     EmploymentStatus = "Active",
                     CreatedAt = DateTime.UtcNow,
-                    Email = "operationalmanagementsystemoms@gmail.com",
+                    Email = "hroms_admin@gmail.com",
                     IsEmailVerified = true
                 };
 
