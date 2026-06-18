@@ -12,8 +12,10 @@
         public string TaskStatus { get; set; } = string.Empty;
         public string AssignedEmployee { get; set; } = string.Empty;
         public string CreatedByEmployee { get; set; } = string.Empty;
+        public Guid? AssignedTo { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsDeleted { get; set; }
+        public string? TaskRemarks { get; set; }
         public string? SupportingEvidenceUrl { get; set; }
     }
 }
