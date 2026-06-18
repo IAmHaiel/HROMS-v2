@@ -253,6 +253,20 @@ export default function PublicApplicationPortal() {
         if (key === 'currentResidentialAddress' && !(value as string)?.trim()) return 'Current address is required.';
         if (key === 'currentResidentialAddress' && (value as string).length > 256) return 'Address must not exceed 256 characters.';
         if (key === 'permanentAddress' && !(value as string)?.trim()) return 'Permanent address is required.';
+        if (key === 'birthMonth' && !(value as string)?.trim()) return 'Birth month is required.';
+        if (key === 'birthDay' && !(value as string)?.trim()) return 'Birth day is required.';
+        if (key === 'birthYear' && !(value as string)?.trim()) return 'Birth year is required.';
+        if (key === 'birthYear') {
+            const y = parseInt(value as string, 10);
+            if (isNaN(y) || y < 1900 || y > new Date().getFullYear()) return 'Enter a valid year (1900-' + new Date().getFullYear() + ').';
+        }
+        if (key === 'age') {
+            const v = parseInt(value as string, 10);
+            if (isNaN(v) || v < 1 || v > 150) return 'Enter a valid age (1-150).';
+            if (v < 18) return 'You must be at least 18 years old to apply.';
+        }
+        if (key === 'nationality' && !(value as string)?.trim()) return 'Nationality is required.';
+        if (key === 'citizenship' && !(value as string)?.trim()) return 'Citizenship is required.';
         if (key === 'highestEducationalAttainment') { if (!(value as string)?.trim()) return 'Highest educational attainment is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'institution') { if (!(value as string)?.trim()) return 'Institution is required.'; if ((value as string).length > 128) return 'Must not exceed 128 characters.'; }
         if (key === 'yearGraduated' && !(value as string)?.trim()) return 'Year graduated is required.';
@@ -312,7 +326,7 @@ export default function PublicApplicationPortal() {
     const validateForm = (): FormErrors => {
         const requiredText: FormKey[] = [
             'firstName', 'lastName', 'gender', 'civilStatus', 'contactNumber',
-            'currentResidentialAddress', 'permanentAddress', 'birthMonth', 'birthDay', 'birthYear', 'age',
+            'currentResidentialAddress', 'permanentAddress', 'birthMonth', 'birthDay', 'birthYear',
             'nationality', 'citizenship',
             'highestEducationalAttainment', 'institution', 'yearGraduated',
             'position'
@@ -705,6 +719,8 @@ export default function PublicApplicationPortal() {
                                                     const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
                                                     if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
                                                     setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                    const ageErr = validateField('age', String(Math.max(0, age)));
+                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
                                                 }
                                             }
                                         }}
@@ -728,6 +744,8 @@ export default function PublicApplicationPortal() {
                                                     const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
                                                     if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
                                                     setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                    const ageErr = validateField('age', String(Math.max(0, age)));
+                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
                                                 }
                                             }
                                         }}
@@ -751,6 +769,8 @@ export default function PublicApplicationPortal() {
                                                     const today = new Date(); let age = today.getFullYear() - bd.getFullYear();
                                                     if (bd > new Date(today.getFullYear(), bd.getMonth(), bd.getDate())) age--;
                                                     setForm(p => ({ ...p, age: String(Math.max(0, age)) }));
+                                                    const ageErr = validateField('age', String(Math.max(0, age)));
+                                                    setErrors(p => ({ ...p, age: ageErr || undefined }));
                                                 }
                                             }
                                         }}
@@ -762,14 +782,8 @@ export default function PublicApplicationPortal() {
                                 </div>
                                 <div style={s.field}>
                                     <label style={s.label}>Age <span style={s.req}>*</span></label>
-                                    <input type="number" placeholder="Auto" value={form.age}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            setForm(p => ({ ...p, age: val }));
-                                            const err = validateField('age', val);
-                                            setErrors(p => ({ ...p, age: err || undefined }));
-                                        }}
-                                        style={{ ...s.input, ...(errors.age ? s.inputErr : {}) }} />
+                                    <input type="number" placeholder="Auto" value={form.age} readOnly
+                                        style={{ ...s.input, ...s.inputReadonly, ...(errors.age ? s.inputErr : {}) }} />
                                     {errors.age && <span style={s.errMsg}><AlertIcon />{errors.age}</span>}
                                 </div>
                             </div>

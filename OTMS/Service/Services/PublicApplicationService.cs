@@ -146,7 +146,7 @@ namespace OTMS.Service.Services
                 BirthMonth = request.BirthMonth,
                 BirthDay = request.BirthDay,
                 BirthYear = request.BirthYear,
-                Age = (request.Age.HasValue && request.Age.Value > 0) ? request.Age : calculatedAge,
+                Age = (request.Age.HasValue && request.Age.Value >= 18) ? request.Age : calculatedAge,
                 Nationality = request.Nationality?.Trim(),
                 Citizenship = request.Citizenship?.Trim(),
                 EmailAddress = emailAddress,
