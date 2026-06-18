@@ -288,6 +288,8 @@ namespace OTMS.Service.Services
         {
             var query = context.Employees
                  .Include(e => e.Account)
+                     .ThenInclude(a => a.Role)
+                 .Include(e => e.Account)
                      .ThenInclude(a => a.ActivityLogs)
                  .Include(e => e.Attachments)
                  .AsQueryable();

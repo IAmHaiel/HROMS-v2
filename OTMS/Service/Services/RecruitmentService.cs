@@ -34,6 +34,9 @@ namespace OTMS.Service.Services
         {
             var query = context.ApplicantRecords
                 .Include(ar => ar.JobPosition)
+                .Include(ar => ar.StatusHistory)
+                    .ThenInclude(sh => sh.Updater)
+                        .ThenInclude(u => u.Employee)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(filter.CurrentStatus))
@@ -62,32 +65,48 @@ namespace OTMS.Service.Services
                 .Select(ar => new ApplicantRecordDTO
                 {
                     ApplicantRecordId = ar.ApplicantRecordId,
+                    ReferenceNumber = ar.ReferenceNumber,
                     FullName = ar.FullName,
+                    FirstName = ar.FirstName,
+                    MiddleName = ar.MiddleName,
+                    LastName = ar.LastName,
+                    Suffix = ar.Suffix,
+                    Gender = ar.Gender,
+                    CivilStatus = ar.CivilStatus,
+                    BirthMonth = ar.BirthMonth,
+                    BirthDay = ar.BirthDay,
+                    BirthYear = ar.BirthYear,
+                    Age = ar.Age,
+                    Nationality = ar.Nationality,
+                    Citizenship = ar.Citizenship,
                     EmailAddress = ar.EmailAddress,
                     ContactNumber = ar.ContactNumber,
+                    CurrentResidentialAddress = ar.CurrentResidentialAddress,
+                    PermanentAddress = ar.PermanentAddress,
+                    ResumeFilePath = ar.ResumeFilePath,
+                    HighestEducationalAttainment = ar.HighestEducationalAttainment,
+                    Institution = ar.Institution,
+                    YearGraduated = ar.YearGraduated,
+                    ProfessionalLicensesCertifications = ar.ProfessionalLicensesCertifications,
+                    IsEmailVerified = ar.IsEmailVerified,
                     JobPositionName = ar.JobPosition.Title,
                     Status = ar.Status,
                     CreatedAt = ar.CreatedAt,
-                    HighestEducationalAttainment = ar.HighestEducationalAttainment,
-                    Institution = ar.Institution,
-                    Degree = ar.Degree,
-                    YearGraduated = ar.YearGraduated,
-                    InterviewDate = ar.InterviewSchedules
-                        .OrderByDescending(s => s.CreatedAt)
-                        .Select(s => (DateTime?)s.InterviewDate)
-                        .FirstOrDefault(),
-                    InterviewTime = ar.InterviewSchedules
-                        .OrderByDescending(s => s.CreatedAt)
-                        .Select(s => s.InterviewTime)
-                        .FirstOrDefault(),
-                    LocationOrLink = ar.InterviewSchedules
-                        .OrderByDescending(s => s.CreatedAt)
-                        .Select(s => s.LocationOrLink)
-                        .FirstOrDefault(),
-                    InterviewerName = ar.InterviewSchedules
-                        .OrderByDescending(s => s.CreatedAt)
-                        .Select(s => s.InterviewerName)
-                        .FirstOrDefault()
+                    UpdatedAt = ar.UpdatedAt,
+                    AdminRemarks = ar.StatusHistory
+                        .OrderByDescending(sh => sh.UpdatedAt)
+                        .Select(sh => sh.Remarks)
+                        .FirstOrDefault() ?? string.Empty,
+                    StatusHistory = ar.StatusHistory
+                        .OrderByDescending(sh => sh.UpdatedAt)
+                        .Select(sh => new ApplicantStatusHistoryItem
+                        {
+                            Status = sh.NewStatus,
+                            ChangedAt = sh.UpdatedAt,
+                            ChangedBy = sh.Updater != null ? sh.Updater.Employee.FirstName + " " + sh.Updater.Employee.LastName : "System",
+                            Remarks = sh.Remarks
+                        })
+                        .ToList()
                 })
                 .ToListAsync();
 
@@ -172,6 +191,19 @@ namespace OTMS.Service.Services
 
             context.ApplicantStatusRecords.Add(statusRecord);
             applicant.Status = request.NewStatus;
+            applicant.UpdatedAt = DateTime.UtcNow;
+
+            // Expire any active onboarding tokens if status is no longer "Job Offered" or becomes "Rejected"
+            if (request.NewStatus == "Rejected" || oldStatus == "Job Offered")
+            {
+                var activeTokens = await context.OnboardingTokens
+                    .Where(ot => ot.ApplicantRecordId == applicant.ApplicantRecordId && ot.Status == "Active")
+                    .ToListAsync();
+                foreach (var t in activeTokens)
+                {
+                    t.Status = "Expired";
+                }
+            }
 
             await context.SaveChangesAsync();
 
@@ -270,67 +302,82 @@ namespace OTMS.Service.Services
                 };
             }
 
-            var existingSchedule = await context.InterviewSchedules
-                .FirstOrDefaultAsync(s => s.ApplicantRecordId == request.ApplicantRecordId);
-
-            var isReschedule = existingSchedule != null;
-
-            if (isReschedule)
+            var interviewSchedule = new InterviewSchedule
             {
-                existingSchedule.InterviewDate = request.InterviewDate;
-                existingSchedule.InterviewTime = request.InterviewTime;
-                existingSchedule.LocationOrLink = request.LocationOrLink;
-                existingSchedule.InterviewerName = request.InterviewerName;
-                existingSchedule.UpdatedAt = DateTime.UtcNow;
-            }
-            else
-            {
-                existingSchedule = new InterviewSchedule
-                {
-                    InterviewScheduleId = Guid.NewGuid(),
-                    ApplicantRecordId = request.ApplicantRecordId,
-                    InterviewDate = request.InterviewDate,
-                    InterviewTime = request.InterviewTime,
-                    LocationOrLink = request.LocationOrLink,
-                    InterviewerName = request.InterviewerName,
-                    CreatedAt = DateTime.UtcNow
-                };
-                context.InterviewSchedules.Add(existingSchedule);
-            }
+                InterviewScheduleId = Guid.NewGuid(),
+                ApplicantRecordId = request.ApplicantRecordId,
+                InterviewDate = request.InterviewDate,
+                InterviewTime = request.InterviewTime,
+                LocationOrLink = request.LocationOrLink,
+                InterviewerName = string.Empty,
+                CreatedAt = DateTime.UtcNow
+            };
 
-            await context.SaveChangesAsync();
-
-            var actionLabel = isReschedule ? "Rescheduled" : "Scheduled";
-            var subject = $"Interview {actionLabel}: {applicant.JobPosition.Title} Position";
+            var formattedTime = DateTime.TryParse(request.InterviewTime, out var parsedTime) ? parsedTime.ToString("hh:mm tt") : request.InterviewTime;
+            var formattedDate = request.InterviewDate.ToString("dddd, MMMM dd, yyyy");
+            var subject = $"Interview Schedule – {applicant.JobPosition.Title} at Speedex";
             var body = $@"
-                <h2>Interview {(isReschedule ? "Rescheduled" : "Invitation")}</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                <p>Your interview for the <strong>{applicant.JobPosition.Title}</strong> position has been {(isReschedule ? "rescheduled" : "scheduled")}.</p>
-                <p><strong>Date:</strong> {request.InterviewDate:MMMM dd, yyyy}</p>
-                <p><strong>Time:</strong> {request.InterviewTime}</p>
-                <p><strong>Location/Link:</strong> {request.LocationOrLink}</p>
-                <p><strong>Interviewer:</strong> {request.InterviewerName}</p>
-                <p>Please confirm your availability by replying to this email.</p>
-                <hr>
-                <p><small>This is an automated notification from the Operational Task Management System.</small></p>";
+                <p>We are pleased to inform you that you have been shortlisted for the position of <strong>{applicant.JobPosition.Title}</strong>.</p>
+                <p>Your interview has been scheduled as follows:</p>
+                <ul>
+                    <li><strong>Date & Time:</strong> {formattedDate} at {formattedTime}</li>
+                    <li><strong>Location / Meeting Link:</strong> {request.LocationOrLink}</li>
+    
+                </ul>
+                <p>Please confirm your availability by replying to this email. If you need to reschedule, kindly notify us at least 24 hours in advance.</p>
+                <p>We look forward to speaking with you.</p>
+                <p><strong>Best regards,</strong><br />Recruitment Team</p>";
 
             var emailSent = await notificationService.SendEmailWithStatusAsync(applicant.EmailAddress, subject, body);
+
+            // Only save interview and update status if email was sent
+            if (!emailSent)
+            {
+                return new ApiResponseDTO<string>
+                {
+                    IsSuccess = false,
+                    Message = "Failed to send interview email. Please check the email configuration and try again.",
+                    Data = null
+                };
+            }
+
+            context.InterviewSchedules.Add(interviewSchedule);
+
+            // Expire any active onboarding tokens
+            var activeTokens = await context.OnboardingTokens
+                .Where(ot => ot.ApplicantRecordId == applicant.ApplicantRecordId && ot.Status == "Active")
+                .ToListAsync();
+            foreach (var t in activeTokens) { t.Status = "Expired"; }
+
+            // Update applicant status to Interview Scheduled
+            var oldStatus = applicant.Status;
+            applicant.Status = "Interview Scheduled";
+            applicant.UpdatedAt = DateTime.UtcNow;
+            context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
+            {
+                ApplicantStatusRecordId = Guid.NewGuid(),
+                ApplicantRecordId = applicant.ApplicantRecordId,
+                OldStatus = oldStatus,
+                NewStatus = "Interview Scheduled",
+                Remarks = string.IsNullOrWhiteSpace(request.Remarks) ? "Interview scheduled and email sent." : request.Remarks.Trim(),
+                UpdatedById = currentAccountId.Value,
+                UpdatedAt = DateTime.UtcNow
+            });
+
+            await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(
                 currentAccountId.Value,
                 ActivityTypes.RecruitmentStatusUpdated,
-                $"{(isReschedule ? "Rescheduled" : "Scheduled")} interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
+                $"Scheduled interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
             );
-
-            var message = emailSent
-                ? $"Interview {actionLabel.ToLower()} and email notification sent successfully."
-                : $"Interview {actionLabel.ToLower()}. Email dispatch failed. Retrying...";
 
             return new ApiResponseDTO<string>
             {
                 IsSuccess = true,
-                Message = message,
-                Data = existingSchedule.InterviewScheduleId.ToString()
+                Message = "Interview scheduled and email sent successfully.",
+                Data = interviewSchedule.InterviewScheduleId.ToString()
             };
         }
 

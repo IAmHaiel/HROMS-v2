@@ -30,15 +30,14 @@ namespace OTMS.Entities.Models
         public Guid? JobPositionId { get; set; }
         public JobPosition? JobPosition { get; set; }
 
+        // Resignation / Offboarding
+        public DateTime? ResignationDate { get; set; }
+        public DateTime? OffboardingDate { get; set; }
+        public DateTime? NTEDate { get; set; }
+        public string? OffboardingRemarks { get; set; }
+
         public Account? Account { get; set; }
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
-
-        // Education
-        public string? EducationLevel { get; set; }
-        public string? EducationInstitution { get; set; }
-        public string? EducationDegree { get; set; }
-        public int? EducationYearGraduated { get; set; }
-        public bool EducationIsCurrentlyEnrolled { get; set; }
         public ICollection<EmployeeAttachment> Attachments { get; set; } = new List<EmployeeAttachment>();
     }
 }

@@ -1,9 +1,7 @@
 using System;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,19 +20,16 @@ namespace OTMS.Service.Services
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailRetryBackgroundService> _logger;
-        private readonly IWebHostEnvironment _env;
         private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
 
         public EmailRetryBackgroundService(
             IServiceScopeFactory scopeFactory,
             IConfiguration configuration,
-            ILogger<EmailRetryBackgroundService> logger,
-            IWebHostEnvironment env)
+            ILogger<EmailRetryBackgroundService> logger)
         {
             _scopeFactory = scopeFactory;
             _configuration = configuration;
             _logger = logger;
-            _env = env;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -129,17 +124,6 @@ namespace OTMS.Service.Services
 
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body)
         {
-            if (_env.IsDevelopment())
-            {
-                var logsDir = Path.Combine(_env.ContentRootPath, "email_logs");
-                Directory.CreateDirectory(logsDir);
-                var fileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.html";
-                var html = $@"<h2>To: {toEmail}</h2><h3>Subject: {subject}</h3><hr>{body}";
-                await File.WriteAllTextAsync(Path.Combine(logsDir, fileName), html);
-                _logger.LogInformation("DEV MODE: Email saved to email_logs/{File} for {Email}", fileName, toEmail);
-                return true;
-            }
-
             try
             {
                 var smtpServer = _configuration["MailKitOptions:Server"] ?? "smtp.gmail.com";
@@ -148,7 +132,6 @@ namespace OTMS.Service.Services
                 var senderEmail = _configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
                 var account = _configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
                 var password = _configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
-                var useSsl = bool.TryParse(_configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
@@ -157,7 +140,7 @@ namespace OTMS.Service.Services
                 message.Body = new TextPart("html") { Text = body };
 
                 using var client = new SmtpClient();
-                await client.ConnectAsync(smtpServer, smtpPort, useSsl);
+                await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(account, password);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);

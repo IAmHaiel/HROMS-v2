@@ -20,9 +20,20 @@ namespace OTMS.Controllers
         }
 
         [HttpPost("api/onboarding/complete")]
-        public async Task<IActionResult> CompleteOnboarding([FromBody] CompleteOnboardingDTO request)
+        public async Task<IActionResult> CompleteOnboarding([FromBody] ValidateOnboardingTokenDTO request)
         {
-            var result = await onboardingService.CompleteOnboardingAsync(request.Token, request);
+            var result = await onboardingService.CompleteOnboardingAsync(request.Token, request.Password, request);
+
+            if (!result.IsSuccess)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        [HttpPost("api/onboarding/upload-document")]
+        public async Task<IActionResult> UploadDocument([FromForm] UploadDocumentRequestDTO request)
+        {
+            var result = await onboardingService.UploadDocumentAsync(request.Token, request.DocumentType, request.File);
 
             if (!result.IsSuccess)
                 return BadRequest(result);

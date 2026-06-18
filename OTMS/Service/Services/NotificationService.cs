@@ -1,11 +1,8 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using MimeKit;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -20,9 +17,7 @@ namespace OTMS.Service.Services
     public class NotificationService(
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        IConfiguration configuration,
-        IWebHostEnvironment env,
-        ILogger<NotificationService> logger
+        IConfiguration configuration
         ) : INotificationService
     {
         private async Task<string> GetEmployeeEmailAsync(Guid accountId)
@@ -37,17 +32,6 @@ namespace OTMS.Service.Services
         {
             if (string.IsNullOrWhiteSpace(toEmail)) return false;
 
-            if (env.IsDevelopment())
-            {
-                var logsDir = Path.Combine(env.ContentRootPath, "email_logs");
-                Directory.CreateDirectory(logsDir);
-                var fileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.html";
-                var html = $@"<h2>To: {toEmail}</h2><h3>Subject: {subject}</h3><hr>{body}";
-                await System.IO.File.WriteAllTextAsync(Path.Combine(logsDir, fileName), html);
-                logger.LogInformation("DEV MODE: Email saved to email_logs/{File} for {Email}", fileName, toEmail);
-                return true;
-            }
-
             try
             {
                 var smtpServer = configuration["MailKitOptions:Server"] ?? "smtp.gmail.com";
@@ -56,24 +40,23 @@ namespace OTMS.Service.Services
                 var senderEmail = configuration["MailKitOptions:SenderEmail"] ?? "operationalmanagementsystemoms@gmail.com";
                 var account = configuration["MailKitOptions:Account"] ?? "operationalmanagementsystemoms@gmail.com";
                 var password = configuration["MailKitOptions:Password"] ?? "fmda mprv nlga haxq";
-                var useSsl = bool.TryParse(configuration["MailKitOptions:Security"], out var ssl) ? ssl : true;
 
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(senderName, senderEmail));
-                message.To.Add(new MailboxAddress("", toEmail));
-                message.Subject = subject;
-                message.Body = new TextPart("html") { Text = body };
-
-                using var client = new SmtpClient();
-                await client.ConnectAsync(smtpServer, smtpPort, useSsl);
+                using var client = new MailKit.Net.Smtp.SmtpClient();
+                await client.ConnectAsync(smtpServer, smtpPort, MailKit.Security.SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(account, password);
+
+                var message = new MimeKit.MimeMessage();
+                message.From.Add(new MimeKit.MailboxAddress(senderName, senderEmail));
+                message.To.Add(new MimeKit.MailboxAddress("", toEmail));
+                message.Subject = subject;
+                message.Body = new MimeKit.TextPart("html") { Text = body };
+
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
-                logger.LogWarning(ex, "SMTP send failed for {Email}.", toEmail);
                 return false;
             }
         }
@@ -422,6 +405,9 @@ namespace OTMS.Service.Services
                     CreatedAt = n.CreatedAt
                 }).ToListAsync();
 
+            var totalUnread = await context.Notifications
+                .CountAsync(n => n.EmployeeId == accountId && !n.IsRead);
+
             return new PaginationResponseDTO<NotificationResponseDTO>
             {
                 IsSuccess = true,
@@ -430,7 +416,8 @@ namespace OTMS.Service.Services
                 PageNumber = request.PageNumber,
                 PageSize = request.PageSize,
                 TotalRecords = totalItems,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)request.PageSize)
+                TotalPages = (int)Math.Ceiling(totalItems / (double)request.PageSize),
+                TotalUnread = totalUnread
             };
 
         }

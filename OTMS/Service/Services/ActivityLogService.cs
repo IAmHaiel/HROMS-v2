@@ -120,9 +120,38 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
-                    createdAt = al.CreatedAt
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
+        }
+
+        public async Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20)
+        {
+            var totalRecords = await context.ActivityLogs.CountAsync();
+            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
+            var logs = await context.ActivityLogs
+                .OrderByDescending(al => al.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+
+            return new
+            {
+                IsSuccess = true,
+                Message = "Activity logs retrieved successfully.",
+                Data = logs,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
         }
 
         // [Code Addition] Dedicated method to fetch activity logs for a specific employee number, primarily utilized by EmployeeDetailPanel.
@@ -139,7 +168,7 @@ namespace OTMS.Service.Services
                     activityLogId = al.ActivityLogId,
                     activityType = al.ActivityType,
                     description = al.Description,
-                    createdAt = al.CreatedAt
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
                 })
                 .ToListAsync();
         }

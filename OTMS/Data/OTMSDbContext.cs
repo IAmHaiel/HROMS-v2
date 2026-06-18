@@ -38,6 +38,7 @@ namespace OTMS.Data
         public DbSet<OnboardingToken> OnboardingTokens { get; set; }
         public DbSet<Employee201FileData> Employee201FileDatas { get; set; }
         public DbSet<StatutorySyncRecord> StatutorySyncRecords { get; set; }
+        public DbSet<AssetAllocation> AssetAllocations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -50,11 +51,23 @@ namespace OTMS.Data
                 .HasForeignKey<Account>(a => a.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Unique index on Employee.Email to prevent duplicate account creation
+            modelBuilder.Entity<Employee>()
+                .HasIndex(e => e.Email)
+                .IsUnique();
+
             // Employee-EmployeeAttachment one-to-many relationship
             modelBuilder.Entity<EmployeeAttachment>()
                 .HasOne(ea => ea.Employee)
                 .WithMany(e => e.Attachments)
                 .HasForeignKey(ea => ea.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Employee-AssetAllocation one-to-many relationship
+            modelBuilder.Entity<AssetAllocation>()
+                .HasOne(a => a.Employee)
+                .WithMany()
+                .HasForeignKey(a => a.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Department Relationships
@@ -312,7 +325,7 @@ namespace OTMS.Data
             // InterviewSchedule -> ApplicantRecord
             modelBuilder.Entity<InterviewSchedule>()
                 .HasOne(i => i.ApplicantRecord)
-                .WithMany(ar => ar.InterviewSchedules)
+                .WithMany()
                 .HasForeignKey(i => i.ApplicantRecordId)
                 .OnDelete(DeleteBehavior.Cascade);
 

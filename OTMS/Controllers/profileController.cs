@@ -85,5 +85,28 @@ namespace OTMS.Controllers
             }
             return Ok(new ApiResponseDTO<ChangePasswordResponseDTO> { IsSuccess = true, Message = "Password changed successfully.", Data = result });
         }
+
+        /// <summary>
+        /// Sets the initial password for a new account (no current password required).
+        /// </summary>
+        [Authorize]
+        [HttpPost("set-initial-password")]
+        public async Task<IActionResult> SetInitialPassword(SetInitialPasswordDTO request)
+        {
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                return BadRequest(new ApiResponseDTO<object> { IsSuccess = false, Message = "Passwords do not match.", Data = null });
+            }
+            var result = await profileService.SetInitialPassword(request);
+            if (result is null)
+            {
+                return NotFound(new ApiResponseDTO<object> { IsSuccess = false, Message = "Employee not found.", Data = null });
+            }
+            if (!result.Success)
+            {
+                return BadRequest(new ApiResponseDTO<object> { IsSuccess = false, Message = "Password must be 15 to 64 characters long.", Data = null });
+            }
+            return Ok(new ApiResponseDTO<ChangePasswordResponseDTO> { IsSuccess = true, Message = "Password set successfully.", Data = result });
+        }
     }
 }

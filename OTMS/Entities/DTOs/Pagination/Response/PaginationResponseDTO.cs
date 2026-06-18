@@ -13,5 +13,6 @@
         public int? TotalPending { get; set; }
         public int? TotalApproved { get; set; }
         public int? TotalRejected { get; set; }
+        public int? TotalUnread { get; set; }
     }
 }

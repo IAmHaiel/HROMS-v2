@@ -495,12 +495,17 @@ namespace OTMS.Service.Services
                 case "Leave":
                     await ExecuteLeaveFinalActionAsync(approvalRequest);
                     break;
-
                 case "Asset":
+                    await ExecuteAssetFinalActionAsync(approvalRequest);
+                    break;
                 case "Resignation":
+                    await ExecuteResignationFinalActionAsync(approvalRequest);
+                    break;
                 case "e-NTE":
+                    await ExecuteNTEFinalActionAsync(approvalRequest);
+                    break;
                 case "Offboarding":
-                    await System.Threading.Tasks.Task.CompletedTask;
+                    await ExecuteOffboardingFinalActionAsync(approvalRequest);
                     break;
             }
         }
@@ -524,6 +529,95 @@ namespace OTMS.Service.Services
             var account = leaveRequest.Account;
             account.AccountStatus = "On Leave";
             await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                approvalRequest.Decisions.OrderByDescending(d => d.TierLevel).First().ApproverAccountId,
+                ActivityTypes.LeaveStatusUpdated,
+                $"Leave request approved. Employee {GetEmployeeName(account)} set to On Leave.");
+        }
+
+        private async System.Threading.Tasks.Task ExecuteAssetFinalActionAsync(ApprovalRequest approvalRequest)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == approvalRequest.RequesterAccountId);
+
+            if (account?.Employee == null) return;
+
+            var allocation = new AssetAllocation
+            {
+                AssetAllocationId = Guid.NewGuid(),
+                EmployeeId = account.Employee.EmployeeId,
+                AssetType = approvalRequest.SourceEntityType,
+                AssetDescription = $"Asset allocated via approval {approvalRequest.ApprovalRequestId}",
+                Status = "Allocated",
+                AllocatedAt = DateTime.UtcNow,
+                ApprovedByRequestId = approvalRequest.ApprovalRequestId
+            };
+
+            context.AssetAllocations.Add(allocation);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                approvalRequest.Decisions.OrderByDescending(d => d.TierLevel).First().ApproverAccountId,
+                ActivityTypes.AssetAllocated,
+                $"Asset allocated to {GetEmployeeName(account)} via approval {approvalRequest.ApprovalRequestId}.");
+        }
+
+        private async System.Threading.Tasks.Task ExecuteResignationFinalActionAsync(ApprovalRequest approvalRequest)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == approvalRequest.RequesterAccountId);
+
+            if (account?.Employee == null) return;
+
+            account.Employee.EmploymentStatus = "Resigned";
+            account.Employee.ResignationDate = DateTime.UtcNow;
+            account.AccountStatus = "Inactive";
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                approvalRequest.Decisions.OrderByDescending(d => d.TierLevel).First().ApproverAccountId,
+                ActivityTypes.ResignationProcessed,
+                $"Resignation processed for {GetEmployeeName(account)}.");
+        }
+
+        private async System.Threading.Tasks.Task ExecuteNTEFinalActionAsync(ApprovalRequest approvalRequest)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == approvalRequest.RequesterAccountId);
+
+            if (account?.Employee == null) return;
+
+            account.Employee.NTEDate = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                approvalRequest.Decisions.OrderByDescending(d => d.TierLevel).First().ApproverAccountId,
+                ActivityTypes.NTEProcessed,
+                $"NTE processed for {GetEmployeeName(account)}.");
+        }
+
+        private async System.Threading.Tasks.Task ExecuteOffboardingFinalActionAsync(ApprovalRequest approvalRequest)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == approvalRequest.RequesterAccountId);
+
+            if (account?.Employee == null) return;
+
+            account.Employee.EmploymentStatus = "Offboarded";
+            account.Employee.OffboardingDate = DateTime.UtcNow;
+            account.Employee.OffboardingRemarks = "Offboarding completed via approval workflow.";
+            account.AccountStatus = "Inactive";
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                approvalRequest.Decisions.OrderByDescending(d => d.TierLevel).First().ApproverAccountId,
+                ActivityTypes.OffboardingProcessed,
+                $"Offboarding processed for {GetEmployeeName(account)}.");
         }
 
         private async Task<Account?> GetLoggedInAccountAsync()
@@ -657,6 +751,39 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<RecentTrackersResponseDTO>> GetMyRecentTrackersAsync(Guid requesterAccountId)
+        {
+            var requests = await context.ApprovalRequests
+                .Include(ar => ar.Decisions)
+                    .ThenInclude(d => d.Approver)
+                        .ThenInclude(a => a.Employee)
+                .Include(ar => ar.Requester)
+                    .ThenInclude(a => a.Employee)
+                .Include(ar => ar.CurrentApprover)
+                    .ThenInclude(a => a.Employee)
+                .Where(ar => ar.RequesterAccountId == requesterAccountId)
+                .OrderByDescending(ar => ar.CreatedAt)
+                .ToListAsync();
+
+            var activeCount = requests.Count(r => r.Status == "Pending");
+            var recentTrackers = new List<WorkflowTrackerDTO>();
+            foreach (var request in requests.Take(5))
+            {
+                recentTrackers.Add(await MapToTrackerDTOAsync(request));
+            }
+
+            return new ApiResponseDTO<RecentTrackersResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Recent trackers retrieved.",
+                Data = new RecentTrackersResponseDTO
+                {
+                    ActiveCount = activeCount,
+                    RecentTrackers = recentTrackers
+                }
+            };
+        }
+
         private async Task<WorkflowTrackerDTO> MapToTrackerDTOAsync(ApprovalRequest approvalRequest)
         {
             var requesterEmp = approvalRequest.Requester?.Employee;
@@ -735,6 +862,247 @@ namespace OTMS.Service.Services
             var emp = account.Employee;
             return string.Join(" ", new[] { emp.FirstName, emp.MiddleName, emp.LastName, emp.Suffix }
                 .Where(n => !string.IsNullOrEmpty(n)));
+        }
+
+        // ── Cancel Request ──
+        public async Task<ApiResponseDTO<ApprovalRequestResponseDTO>> CancelRequestAsync(Guid approvalRequestId, CancelApprovalRequestDTO dto)
+        {
+            var user = await GetLoggedInAccountAsync();
+            if (user == null)
+                return new ApiResponseDTO<ApprovalRequestResponseDTO> { IsSuccess = false, Message = "User not authenticated." };
+
+            var request = await context.ApprovalRequests
+                .Include(ar => ar.Requester).ThenInclude(a => a.Employee)
+                .FirstOrDefaultAsync(ar => ar.ApprovalRequestId == approvalRequestId);
+
+            if (request == null)
+                return new ApiResponseDTO<ApprovalRequestResponseDTO> { IsSuccess = false, Message = "Approval request not found." };
+            if (request.RequesterAccountId != user.AccountId)
+                return new ApiResponseDTO<ApprovalRequestResponseDTO> { IsSuccess = false, Message = "You can only cancel your own requests." };
+            if (request.Status != "Pending")
+                return new ApiResponseDTO<ApprovalRequestResponseDTO> { IsSuccess = false, Message = "Only pending requests can be cancelled." };
+
+            request.Status = "Cancelled";
+            request.StatusTrackingText = $"Cancelled by requester. Reason: {dto?.Reason ?? "No reason provided"}";
+            request.UpdatedAt = DateTime.UtcNow;
+            request.CurrentApproverAccountId = null;
+
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.ApprovalRequestCancelled,
+                $"Approval request {approvalRequestId} ({request.RequestType}) was cancelled by the requester.");
+
+            await NotifyTrackerUpdateAsync(request);
+
+            return new ApiResponseDTO<ApprovalRequestResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Request cancelled successfully.",
+                Data = await MapToResponseAsync(request)
+            };
+        }
+
+        // ── Matrix CRUD ──
+        public async Task<ApiResponseDTO<List<RoutingMatrixResponseDTO>>> GetAllMatricesAsync()
+        {
+            var matrices = await context.ApprovalRoutingMatrices
+                .Include(m => m.Tiers)
+                .OrderBy(m => m.RequestType)
+                .Select(m => new RoutingMatrixResponseDTO
+                {
+                    RoutingMatrixId = m.RoutingMatrixId,
+                    RequestType = m.RequestType,
+                    IsActive = m.IsActive,
+                    CreatedAt = m.CreatedAt,
+                    UpdatedAt = m.UpdatedAt,
+                    Tiers = m.Tiers.OrderBy(t => t.TierLevel).Select(t => new TierResponseDTO
+                    {
+                        TierId = t.TierId,
+                        TierLevel = t.TierLevel,
+                        ApproverRole = t.ApproverRole,
+                        FallbackApproverRole = t.FallbackApproverRole,
+                        IsFinalTier = t.IsFinalTier
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            return new ApiResponseDTO<List<RoutingMatrixResponseDTO>>
+            {
+                IsSuccess = true,
+                Message = matrices.Any() ? "Routing matrices retrieved." : "No routing matrices found.",
+                Data = matrices
+            };
+        }
+
+        public async Task<ApiResponseDTO<RoutingMatrixResponseDTO>> GetMatrixByIdAsync(Guid matrixId)
+        {
+            var matrix = await context.ApprovalRoutingMatrices
+                .Include(m => m.Tiers)
+                .FirstOrDefaultAsync(m => m.RoutingMatrixId == matrixId);
+
+            if (matrix == null)
+                return new ApiResponseDTO<RoutingMatrixResponseDTO> { IsSuccess = false, Message = "Routing matrix not found." };
+
+            return new ApiResponseDTO<RoutingMatrixResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Routing matrix retrieved.",
+                Data = MapMatrixToDTO(matrix)
+            };
+        }
+
+        public async Task<ApiResponseDTO<RoutingMatrixResponseDTO>> CreateMatrixAsync(CreateRoutingMatrixDTO dto)
+        {
+            var user = await GetLoggedInAccountAsync();
+            if (user == null)
+                return new ApiResponseDTO<RoutingMatrixResponseDTO> { IsSuccess = false, Message = "User not authenticated." };
+
+            if (await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == dto.RequestType))
+                return new ApiResponseDTO<RoutingMatrixResponseDTO> { IsSuccess = false, Message = $"A matrix for '{dto.RequestType}' already exists." };
+
+            var matrix = new ApprovalRoutingMatrix
+            {
+                RoutingMatrixId = Guid.NewGuid(),
+                RequestType = dto.RequestType,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                Tiers = dto.Tiers.Select(t => new ApprovalTier
+                {
+                    TierId = Guid.NewGuid(),
+                    TierLevel = t.TierLevel,
+                    ApproverRole = t.ApproverRole,
+                    FallbackApproverRole = t.FallbackApproverRole,
+                    IsFinalTier = t.IsFinalTier,
+                    CreatedAt = DateTime.UtcNow
+                }).ToList()
+            };
+
+            context.ApprovalRoutingMatrices.Add(matrix);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.RoutingMatrixCreated,
+                $"Created routing matrix for '{dto.RequestType}' with {dto.Tiers.Count} tier(s).");
+
+            return new ApiResponseDTO<RoutingMatrixResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Routing matrix created successfully.",
+                Data = MapMatrixToDTO(matrix)
+            };
+        }
+
+        public async Task<ApiResponseDTO<RoutingMatrixResponseDTO>> UpdateMatrixAsync(Guid matrixId, CreateRoutingMatrixDTO dto)
+        {
+            var user = await GetLoggedInAccountAsync();
+            if (user == null)
+                return new ApiResponseDTO<RoutingMatrixResponseDTO> { IsSuccess = false, Message = "User not authenticated." };
+
+            var matrix = await context.ApprovalRoutingMatrices
+                .Include(m => m.Tiers)
+                .FirstOrDefaultAsync(m => m.RoutingMatrixId == matrixId);
+
+            if (matrix == null)
+                return new ApiResponseDTO<RoutingMatrixResponseDTO> { IsSuccess = false, Message = "Routing matrix not found." };
+
+            matrix.RequestType = dto.RequestType;
+            matrix.UpdatedAt = DateTime.UtcNow;
+
+            context.ApprovalTiers.RemoveRange(matrix.Tiers);
+            matrix.Tiers = dto.Tiers.Select(t => new ApprovalTier
+            {
+                TierId = Guid.NewGuid(),
+                TierLevel = t.TierLevel,
+                ApproverRole = t.ApproverRole,
+                FallbackApproverRole = t.FallbackApproverRole,
+                IsFinalTier = t.IsFinalTier,
+                CreatedAt = DateTime.UtcNow
+            }).ToList();
+
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.RoutingMatrixUpdated,
+                $"Updated routing matrix for '{dto.RequestType}'.");
+
+            return new ApiResponseDTO<RoutingMatrixResponseDTO>
+            {
+                IsSuccess = true,
+                Message = "Routing matrix updated successfully.",
+                Data = MapMatrixToDTO(matrix)
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ToggleMatrixActiveAsync(Guid matrixId)
+        {
+            var user = await GetLoggedInAccountAsync();
+            if (user == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "User not authenticated." };
+
+            var matrix = await context.ApprovalRoutingMatrices.FindAsync(matrixId);
+            if (matrix == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "Routing matrix not found." };
+
+            matrix.IsActive = !matrix.IsActive;
+            matrix.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.RoutingMatrixToggled,
+                $"Toggled routing matrix '{matrix.RequestType}' to {(matrix.IsActive ? "Active" : "Inactive")}.");
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = $"Routing matrix {(matrix.IsActive ? "activated" : "deactivated")} successfully.",
+                Data = null
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> DeleteMatrixAsync(Guid matrixId)
+        {
+            var user = await GetLoggedInAccountAsync();
+            if (user == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "User not authenticated." };
+
+            var matrix = await context.ApprovalRoutingMatrices
+                .Include(m => m.Tiers)
+                .FirstOrDefaultAsync(m => m.RoutingMatrixId == matrixId);
+
+            if (matrix == null)
+                return new ApiResponseDTO<object> { IsSuccess = false, Message = "Routing matrix not found." };
+
+            var requestType = matrix.RequestType;
+            context.ApprovalTiers.RemoveRange(matrix.Tiers);
+            context.ApprovalRoutingMatrices.Remove(matrix);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.RoutingMatrixDeleted,
+                $"Deleted routing matrix for '{requestType}'.");
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Routing matrix deleted successfully.",
+                Data = null
+            };
+        }
+
+        private static RoutingMatrixResponseDTO MapMatrixToDTO(ApprovalRoutingMatrix matrix)
+        {
+            return new RoutingMatrixResponseDTO
+            {
+                RoutingMatrixId = matrix.RoutingMatrixId,
+                RequestType = matrix.RequestType,
+                IsActive = matrix.IsActive,
+                CreatedAt = matrix.CreatedAt,
+                UpdatedAt = matrix.UpdatedAt,
+                Tiers = matrix.Tiers.OrderBy(t => t.TierLevel).Select(t => new TierResponseDTO
+                {
+                    TierId = t.TierId,
+                    TierLevel = t.TierLevel,
+                    ApproverRole = t.ApproverRole,
+                    FallbackApproverRole = t.FallbackApproverRole,
+                    IsFinalTier = t.IsFinalTier
+                }).ToList()
+            };
         }
     }
 }

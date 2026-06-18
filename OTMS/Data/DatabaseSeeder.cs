@@ -99,8 +99,8 @@ namespace OTMS.Data
             if (operationAdminRole != null)
             {
                 // Operation Admin gets a subset (example: can manage tasks, users, but not roles)
-                var opPermissions = allDbPermissions.Where(p => 
-                    p.Name.StartsWith("Permissions.Tasks.") || 
+                var opPermissions = allDbPermissions.Where(p =>
+                    p.Name.StartsWith("Permissions.Tasks.") ||
                     p.Name.StartsWith("Permissions.Users.") ||
                     p.Name.StartsWith("Permissions.Approvals.") ||
                     p.Name.StartsWith("Permissions.Departments.View") ||
@@ -134,15 +134,11 @@ namespace OTMS.Data
 
             await context.SaveChangesAsync();
 
-            // 4. Seed Default System Admin Account
-            var sysAdminAccount = await context.Accounts
-                .Include(a => a.Role)
-                .Include(a => a.Employee)
-                .FirstOrDefaultAsync(a => a.Role != null && a.Role.Name == systemAdminRoleName);
-
-            if (sysAdminAccount == null && systemAdminRole != null)
+            // 5. Seed default System Admin employee account (bypasses email verification)
+            var sysAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "SystemAdmin");
+            if (sysAdminRole != null && !await context.Employees.AnyAsync(e => e.EmployeeNumber == "0000"))
             {
-                var employee = new Employee
+                var sysAdmin = new Employee
                 {
                     EmployeeId = Guid.NewGuid(),
                     EmployeeNumber = "0000",
@@ -151,45 +147,31 @@ namespace OTMS.Data
                     LastName = "Admin",
                     Suffix = null,
                     ContactNumber = "09170000000",
-                    Email = "system.admin@otms.com",
-                    IsEmailVerified = true,
-                    EmailVerificationToken = null,
-                    EmailVerificationTokenExpiry = null,
                     EmploymentStatus = "Active",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    Email = "hroms_admin@gmail.com",
+                    IsEmailVerified = true
                 };
 
-                var account = new Account
+                var sysAdminAccount = new Account
                 {
                     AccountId = Guid.NewGuid(),
-                    EmployeeId = employee.EmployeeId,
-                    RoleId = systemAdminRole.RoleId,
+                    EmployeeId = sysAdmin.EmployeeId,
+                    RoleId = sysAdminRole.RoleId,
+                    Role = sysAdminRole,
                     AccountStatus = "Active",
                     CreatedAt = DateTime.UtcNow,
-                    IsPasswordChanged = true
+                    IsPasswordChanged = false
                 };
+                sysAdminAccount.PasswordHash = new PasswordHasher<Account>().HashPassword(sysAdminAccount, "SystemAdmin1001!");
 
-                account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, "SystemAdmin1001");
-
-                employee.Account = account;
-                context.Employees.Add(employee);
-                context.Accounts.Add(account);
-                await context.SaveChangesAsync();
-            }
-            else if (sysAdminAccount != null)
-            {
-                // Ensure the default system admin has the correct settings
-                sysAdminAccount.IsPasswordChanged = true;
-                sysAdminAccount.AccountStatus = "Active";
-                if (sysAdminAccount.Employee != null)
-                {
-                    sysAdminAccount.Employee.IsEmailVerified = true;
-                    sysAdminAccount.Employee.Email = sysAdminAccount.Employee.Email ?? "system.admin@otms.com";
-                }
+                sysAdmin.Account = sysAdminAccount;
+                context.Employees.Add(sysAdmin);
+                context.Accounts.Add(sysAdminAccount);
                 await context.SaveChangesAsync();
             }
 
-            // 5. Seed Default Approval Routing Matrices
+            // 4. Seed Default Approval Routing Matrices
             await SeedApprovalRoutingMatricesAsync(context);
         }
 
@@ -304,6 +286,72 @@ namespace OTMS.Data
                 };
 
                 context.ApprovalRoutingMatrices.Add(resignMatrix);
+            }
+
+            // e-NTE (Notice to Explain) Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "e-NTE"))
+            {
+                var nteMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "e-NTE",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Tiers = new List<ApprovalTier>
+                    {
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 1,
+                            ApproverRole = "Supervisor",
+                            FallbackApproverRole = "OperationAdmin",
+                            IsFinalTier = false,
+                            CreatedAt = DateTime.UtcNow
+                        },
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 2,
+                            ApproverRole = "OperationAdmin",
+                            IsFinalTier = true,
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    }
+                };
+                context.ApprovalRoutingMatrices.Add(nteMatrix);
+            }
+
+            // Offboarding Routing Matrix
+            if (!await context.ApprovalRoutingMatrices.AnyAsync(m => m.RequestType == "Offboarding"))
+            {
+                var offboardMatrix = new ApprovalRoutingMatrix
+                {
+                    RoutingMatrixId = Guid.NewGuid(),
+                    RequestType = "Offboarding",
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    Tiers = new List<ApprovalTier>
+                    {
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 1,
+                            ApproverRole = "Supervisor",
+                            FallbackApproverRole = "OperationAdmin",
+                            IsFinalTier = false,
+                            CreatedAt = DateTime.UtcNow
+                        },
+                        new ApprovalTier
+                        {
+                            TierId = Guid.NewGuid(),
+                            TierLevel = 2,
+                            ApproverRole = "OperationAdmin",
+                            IsFinalTier = true,
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    }
+                };
+                context.ApprovalRoutingMatrices.Add(offboardMatrix);
             }
 
             await context.SaveChangesAsync();
