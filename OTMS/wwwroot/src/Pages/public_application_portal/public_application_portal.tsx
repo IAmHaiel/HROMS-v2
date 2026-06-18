@@ -165,6 +165,7 @@ export default function PublicApplicationPortal() {
     const [googleToken, setGoogleToken] = useState('');
     const [submitError, setSubmitError] = useState('');
     const [genderCustom, setGenderCustom] = useState('');
+    const [licenseFiles, setLicenseFiles] = useState<File[]>([]);
     const gsiInitialized = useRef(false);
 
     useEffect(() => {
@@ -420,14 +421,7 @@ export default function PublicApplicationPortal() {
             formData.append('HighestEducationalAttainment', form.highestEducationalAttainment.trim());
             formData.append('Institution', form.institution.trim());
             formData.append('YearGraduated', form.yearGraduated.trim());
-            if (form.professionalLicensesCertifications) {
-                try {
-                    const certFiles = JSON.parse(form.professionalLicensesCertifications) as { file?: any; name?: string }[];
-                    certFiles.forEach((entry) => {
-                        if (entry.file) formData.append('ProfessionalLicenseFiles', entry.file);
-                    });
-                } catch { }
-            }
+            licenseFiles.forEach(f => formData.append('ProfessionalLicenseFiles', f));
             formData.append('JobPositionId', form.positionId);
 
             await axios.post('/api/public/apply/submit', formData, {
@@ -459,6 +453,7 @@ export default function PublicApplicationPortal() {
         setErrors({});
         setGoogleToken('');
         setSubmitError('');
+        setLicenseFiles([]);
     };
 
     const openPositionsCount = positions.length;
@@ -982,54 +977,35 @@ export default function PublicApplicationPortal() {
                             <div style={s.field}>
                                 <label style={s.label}>Professional Licenses &amp; Certifications</label>
                                 <span style={s.hint}>Upload your professional licenses and certificates (PDF, JPG, PNG).</span>
-                                {(() => {
-                                    const files: { file: File | null; name: string }[] = (form.professionalLicensesCertifications ? JSON.parse(form.professionalLicensesCertifications) : []) as any;
-                                    return (
-                                        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                            {files.map((entry: any, i: number) => (
-                                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                                    {entry.file ? (
-                                                        <div style={{ ...s.filePreviewSmall, flex: 1 }}>
-                                                            <FileIcon />
-                                                            <span style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{entry.file.name}</span>
-                                                            <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatBytes(entry.file.size)}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ ...s.fileBtnSmall, flex: 1, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', border: '1px dashed #d0d5dd', borderRadius: 8, padding: '8px 10px', background: '#fafbff', minHeight: 36 }}
-                                                            onClick={() => document.getElementById(`lic-${i}`)?.click()}>
-                                                            <input id={`lic-${i}`} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
-                                                                onChange={e => {
-                                                                    const f = e.target.files?.[0];
-                                                                    if (!f) return;
-                                                                    const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
-                                                                    if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) return;
-                                                                    if (f.size > 5 * 1024 * 1024) return;
-                                                                    const updated = [...files];
-                                                                    updated[i] = { file: f, name: f.name };
-                                                                    setForm(p => ({ ...p, professionalLicensesCertifications: JSON.stringify(updated) }));
-                                                                }} />
-                                                            <UploadIcon />
-                                                            <span style={{ fontSize: 11 }}>Click to upload</span>
-                                                        </div>
-                                                    )}
-                                                    <button type="button" onClick={() => {
-                                                        const updated = files.filter((_: any, j: number) => j !== i);
-                                                        setForm(p => ({ ...p, professionalLicensesCertifications: updated.length > 0 ? JSON.stringify(updated) : '' }));
-                                                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
-                                                </div>
-                                            ))}
+                                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {licenseFiles.map((file, i) => (
+                                        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                            <div style={{ ...s.filePreviewSmall, flex: 1 }}>
+                                                <FileIcon />
+                                                <span style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{file.name}</span>
+                                                <span style={{ fontSize: 10, color: '#94a3b8' }}>{formatBytes(file.size)}</span>
+                                            </div>
                                             <button type="button" onClick={() => {
-                                                const updated = [...files, { file: null, name: '' }];
-                                                setForm(p => ({ ...p, professionalLicensesCertifications: JSON.stringify(updated) }));
-                                            }} style={{
-                                                display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-                                                background: '#f1f5f9', border: '1px dashed #cbd5e1', borderRadius: 8,
-                                                padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#4318ff',
-                                                fontWeight: 600, fontFamily: 'inherit'
-                                            }}>+ Add License/Certificate</button>
+                                                setLicenseFiles(prev => prev.filter((_, j) => j !== i));
+                                            }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 6 }}><XIcon /></button>
                                         </div>
-                                    );
-                                })()}
+                                    ))}
+                                    <div style={{ ...s.fileBtnSmall, alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                        onClick={() => document.getElementById('lic-upload')?.click()}>
+                                        <input id="lic-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: 'none' }}
+                                            onChange={e => {
+                                                const f = e.target.files?.[0];
+                                                if (!f) return;
+                                                const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
+                                                if (!['pdf', 'jpg', 'jpeg', 'png'].includes(ext)) return;
+                                                if (f.size > 5 * 1024 * 1024) return;
+                                                setLicenseFiles(prev => [...prev, f]);
+                                                e.target.value = '';
+                                            }} />
+                                        <UploadIcon />
+                                        <span style={{ fontSize: 11 }}>+ Add License/Certificate</span>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* -- Position ---------------------------- */}
