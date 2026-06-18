@@ -592,7 +592,7 @@ body {
 
 .dashboard-bottom-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--gap);
     margin-top: var(--gap);
 }
@@ -1528,10 +1528,6 @@ body {
     .dashboard-bottom-row {
         grid-template-columns: 1fr 1fr;
     }
-
-    .dashboard-bottom-row .card:last-child {
-        grid-column: 1 / -1;
-    }
 }
 
 @media (max-width: 960px) {
@@ -1545,10 +1541,6 @@ body {
 
     .dashboard-bottom-row {
         grid-template-columns: 1fr;
-    }
-
-    .dashboard-bottom-row .card:last-child {
-        grid-column: auto;
     }
 }
 
@@ -1707,16 +1699,6 @@ body {
     margin-top: 4px;
 }
 
-.badge-system {
-    background: rgba(27, 37, 75, 0.08);
-    color: var(--primary-dark);
-}
-
-.badge-custom {
-    background: var(--primary-light);
-    color: var(--primary);
-}
-
 .role-card-actions {
     display: flex;
     gap: 6px;
@@ -1859,15 +1841,6 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
-}
-
-.perms-selected-badge {
-    background: var(--primary-light);
-    color: var(--primary);
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: var(--radius-full);
 }
 
 .permissions-groups-grid {

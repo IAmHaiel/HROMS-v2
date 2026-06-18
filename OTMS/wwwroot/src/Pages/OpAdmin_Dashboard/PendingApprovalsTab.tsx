@@ -3,6 +3,7 @@ import { Eye, X, Shield, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
 import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import { useToast } from '../../components/Toast/Toast';
+import EmptyState from '../../components/ui/EmptyState';
 
 const authHeaders = (): HeadersInit => ({
     'Content-Type': 'application/json',
@@ -115,12 +116,9 @@ const PendingApprovalsTab: React.FC = () => {
                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pending.length} pending</span>
                 </div>
                 {loading ? (
-                    <div className="empty-state" style={{ padding: '32px 0' }}><Loader2 size={20} className="spin" /><p>Loading pending approvals...</p></div>
+                    <EmptyState icon={<Loader2 size={20} className="spin" />} title="Loading pending approvals..." />
                 ) : pending.length === 0 ? (
-                    <div className="empty-state" style={{ padding: '32px 0' }}>
-                        <Shield size={24} /><p>No pending approvals.</p>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>All requests have been processed.</span>
-                    </div>
+                    <EmptyState icon={<Shield size={24} />} title="No pending approvals." description="All requests have been processed." />
                 ) : (
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

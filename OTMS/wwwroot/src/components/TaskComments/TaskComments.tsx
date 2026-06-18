@@ -3,6 +3,7 @@ import {
     Send, X, Paperclip, Loader2, AlertCircle, CheckCircle2,
     Pencil, Trash2, FileText, XCircle,
 } from 'lucide-react';
+import EmptyState from '../ui/EmptyState';
 import './TaskComments.css';
 
 interface CommentDTO {
@@ -208,11 +209,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                 {loading ? (
                     <div className="tc-loading"><Loader2 size={18} className="tc-spin" /> Loading comments...</div>
                 ) : comments.length === 0 ? (
-                    <div className="tc-empty">
-                        <FileText size={22} strokeWidth={1.5} />
-                        <p>No comments yet.</p>
-                        <span>Start the conversation below.</span>
-                    </div>
+                    <EmptyState icon={<FileText size={22} strokeWidth={1.5} />} title="No comments yet." description="Start the conversation below." />
                 ) : comments.map(c => {
                     const isMe = isOwnComment(c);
                     const isEditing = editingId === c.taskCommentId;

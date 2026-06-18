@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
+import StatusBadge from '../ui/StatusBadge';
 import './FormModal.css';
 
 export interface FormModalProps {
@@ -74,10 +75,6 @@ const FormModal: React.FC<FormModalProps> = ({
 
     if (!isOpen) return null;
 
-    const formattedBadgeStatus = infoCard?.badgeStatus
-        ? infoCard.badgeStatus.toLowerCase().replace(/\s+/g, '-')
-        : '';
-
     const content = (
         <div className="fm-modal-form-container">
             {infoCard && (
@@ -89,12 +86,7 @@ const FormModal: React.FC<FormModalProps> = ({
                         <h4 className="fm-info-name">{infoCard.title}</h4>
                         <span className="fm-info-subtext">{infoCard.subtitle}</span>
                     </div>
-                    <div className="fm-info-badge-container">
-                        <span className={`fm-info-badge ${formattedBadgeStatus}`}>
-                            <span className="fm-badge-dot" />
-                            {infoCard.badgeText}
-                        </span>
-                    </div>
+                    <StatusBadge status={infoCard.badgeText} />
                 </div>
             )}
 
@@ -150,6 +142,7 @@ const FormModal: React.FC<FormModalProps> = ({
                         <h3 className="fm-title">{title}</h3>
                         {subtitle && <p className="fm-subtitle">{subtitle}</p>}
                     </div>
+                    <button className="icon-btn" onClick={onClose}><X size={16} /></button>
                 </div>
 
                 {apiError && (

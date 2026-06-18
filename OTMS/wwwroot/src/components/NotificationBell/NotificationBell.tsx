@@ -1,6 +1,8 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
+import StatusBadge from '../ui/StatusBadge';
+import EmptyState from '../ui/EmptyState';
 import './NotificationBell.css';
 
 export interface NotificationItem {
@@ -232,9 +234,7 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                                 <Loader2 size={16} className="spin" /> Loading…
                             </div>
                         ) : visibleNotifs.length === 0 ? (
-                            <div className="notif-empty">
-                                {activeTab === 'unread' ? 'No unread notifications' : 'No notifications'}
-                            </div>
+                            <EmptyState title={activeTab === 'unread' ? 'No unread notifications' : 'No notifications'} />
                         ) : visibleNotifs.map(n => {
                             const badge = getTypeBadge(n.notificationType);
                             return (
@@ -247,9 +247,7 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
                                     <div className={`notif-dot ${n.isRead ? 'read' : 'unread'}`} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                                            <span className={`notif-type-badge ${badge.cls}`}>
-                                                {badge.label}
-                                            </span>
+                                            <StatusBadge status={badge.label} size="sm" />
                                             {n.isRead && (
                                                 <span style={{ fontSize: 10, color: 'var(--text-muted, #a3aed0)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                                                     ✓ Read

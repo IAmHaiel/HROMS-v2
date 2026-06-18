@@ -70,7 +70,6 @@ interface MockFetchResult {
 }
 
 interface StatusMeta {
-    badgeCls: string;
     icon: ReactNode;
     color: string;
     bg: string;
@@ -402,22 +401,18 @@ const PAGE_SIZE = 5;
 
 const STATUS_META: Record<RecruitmentStatus, StatusMeta> = {
     'Pending Review': {
-        badgeCls: 'rec-badge rec-badge--pending',
         icon: <Clock size={11} />,
         color: '#b45309', bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.35)',
     },
     'Interview Scheduled': {
-        badgeCls: 'rec-badge rec-badge--interview',
         icon: <CalendarCheck size={11} />,
         color: '#1d4ed8', bg: 'rgba(67,24,255,0.10)', border: 'rgba(67,24,255,0.25)',
     },
     'Job Offered': {
-        badgeCls: 'rec-badge rec-badge--offered',
         icon: <Briefcase size={11} />,
         color: '#065f46', bg: 'rgba(5,205,153,0.12)', border: 'rgba(5,205,153,0.30)',
     },
     'Rejected': {
-        badgeCls: 'rec-badge rec-badge--rejected',
         icon: <XCircle size={11} />,
         color: '#b91c1c', bg: 'rgba(238,93,80,0.10)', border: 'rgba(238,93,80,0.28)',
     },
@@ -505,11 +500,6 @@ const css = `
   .rec-action-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
   .rec-action-btn--primary { background: #4318ff; color: #fff; border-color: #4318ff; }
   .rec-action-btn--primary:hover { background: #3311cc; }
-  .rec-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-  .rec-badge--pending { background: rgba(251,191,36,0.12); color: #b45309; border: 1px solid rgba(251,191,36,0.35); }
-  .rec-badge--interview { background: rgba(67,24,255,0.10); color: #1d4ed8; border: 1px solid rgba(67,24,255,0.25); }
-  .rec-badge--offered { background: rgba(5,205,153,0.12); color: #065f46; border: 1px solid rgba(5,205,153,0.30); }
-  .rec-badge--rejected { background: rgba(238,93,80,0.10); color: #b91c1c; border: 1px solid rgba(238,93,80,0.28); }
   .rec-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 48px; color: #94a3b8; font-size: 13px; }
   .rec-pagination { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 14px; border-top: 1px solid #f1f5f9; }
   .rec-page-btn { border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 7px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
@@ -631,9 +621,9 @@ const css = `
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
-export function StatusBadge({ status }: { status: RecruitmentStatus }) {
+export function RecruitmentStatusBadge({ status }: { status: RecruitmentStatus }) {
     const m = STATUS_META[status];
-    return <span className={m.badgeCls}>{m.icon}{status}</span>;
+    return <StatusBadge status={status} size="sm" icon={m?.icon} />;
 }
 
 // ─── ApplicantTimeline ────────────────────────────────────────────────────────
@@ -686,7 +676,7 @@ function ApplicantTimeline({ history, currentStatus }: ApplicantTimelineProps) {
                     <span className="rec-history-label">Status History</span>
                     {[...history].reverse().map((h, idx) => (
                         <div key={idx} className="rec-history-entry">
-                            <StatusBadge status={h.status} />
+                            <RecruitmentStatusBadge status={h.status} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div className="rec-history-meta">{fmtDate(h.changedAt)} · by <strong>{h.changedBy}</strong></div>
                                 {h.remarks && <div className="rec-history-remarks">"{h.remarks}"</div>}

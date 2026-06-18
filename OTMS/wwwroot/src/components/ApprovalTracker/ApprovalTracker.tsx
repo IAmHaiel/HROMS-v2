@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2, XCircle, Clock, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
+import StatusBadge from '../ui/StatusBadge';
 import './ApprovalTracker.css';
 
 interface TierDecision {
@@ -86,11 +87,13 @@ const ApprovalTracker: React.FC<ApprovalTrackerProps> = ({ tracker, compact }) =
         <div className={`at-container${compact ? ' at-compact' : ''}`}>
             <div className="at-header">
                 <span className="at-title">{tracker.requestType} Request</span>
-                <span className={`at-badge at-${finalStatus}`}>
-                    {finalStatus === 'approved' ? 'Fully Approved' :
-                        finalStatus === 'rejected' ? 'Rejected' :
-                        tracker.statusTrackingText || 'In Progress'}
-                </span>
+                <StatusBadge status={
+                    tracker.status === 'Approved' || tracker.status === 'Completed'
+                        ? 'Approved'
+                        : tracker.status === 'Rejected'
+                            ? 'Rejected'
+                            : tracker.statusTrackingText || 'In Progress'
+                } />
             </div>
 
             {tracker.status === 'Rejected' && (

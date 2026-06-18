@@ -144,52 +144,6 @@
 }
 
 /* ── Badges ─────────────────────────────────────────────────────── */
-.rm2-type-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 10px;
-    border-radius: var(--radius-full, 9999px);
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-}
-
-.rm2-type-badge--system {
-    background: rgba(0, 169, 157, 0.1);
-    color: var(--primary, #00A99D);
-    border: 1px solid rgba(0, 169, 157, 0.2);
-}
-
-.rm2-type-badge--custom {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
-    border: 1px solid rgba(245, 158, 11, 0.25);
-}
-
-.rm2-status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: var(--radius-full, 9999px);
-    font-size: 0.72rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.rm2-status-badge--active {
-    background: rgba(1, 181, 116, 0.1);
-    color: var(--status-active, #01B574);
-    border: 1px solid rgba(1, 181, 116, 0.2);
-}
-
-.rm2-status-badge--inactive {
-    background: rgba(163, 174, 208, 0.12);
-    color: var(--text-secondary, #A3AED0);
-    border: 1px solid rgba(163, 174, 208, 0.25);
-}
-
 .rm2-perm-pill {
     display: inline-flex;
     align-items: center;
@@ -200,20 +154,6 @@
     background: rgba(67, 24, 255, 0.07);
     color: #4318ff;
     white-space: nowrap;
-}
-
-.rm2-code-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    background: var(--bg-main, #F4F7FE);
-    color: var(--text-primary, #1B254B);
-    border: 1px solid var(--border, #E9EDF7);
-    letter-spacing: 0.05em;
 }
 
 .rm2-dept-tag {

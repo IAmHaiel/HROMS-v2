@@ -30,6 +30,7 @@ import DataTable, { ActionsDropdown } from '../../../components/ui/DataTable';
 import SubTabNav from '../../../components/ui/SubTabNav';
 import FormModal from '../../../components/FormModal/FormModal';
 import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
+import StatusBadge from '../../../components/ui/StatusBadge';
 import './RoleManagementTab.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -215,16 +216,14 @@ function formatRelativeTime(isoString: string): string {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const RoleTypeBadge = ({ isSystem }: { isSystem: boolean }) => (
-    <span className={`rm2-type-badge ${isSystem ? 'rm2-type-badge--system' : 'rm2-type-badge--custom'}`}>
-        {isSystem ? 'System' : 'Custom'}
-    </span>
+    <StatusBadge status={isSystem ? 'System' : 'Custom'} />
 );
 
-const StatusBadge = ({ isActive = true }: { isActive?: boolean }) => (
-    <span className={`rm2-status-badge ${isActive ? 'rm2-status-badge--active' : 'rm2-status-badge--inactive'}`}>
-        {isActive ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
-        {isActive ? 'Active' : 'Inactive'}
-    </span>
+const ActiveStatusBadge = ({ isActive = true }: { isActive?: boolean }) => (
+    <StatusBadge
+        status={isActive ? 'Active' : 'Inactive'}
+        icon={isActive ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+    />
 );
 
 interface PermSelectorProps {
@@ -1424,9 +1423,9 @@ export default function RoleManagementTab() {
                                         </div>
                                     </div>
                                 </td>
-                                <td>{dept.code ? <span className="rm2-code-badge">{dept.code}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td>{dept.code ? <StatusBadge status={dept.code} size="sm" /> : <span className="rm2-no-desc">—</span>}</td>
                                 <td>{dept.headEmployeeName ? <span className="rm2-reports-to">{dept.headEmployeeName}</span> : <span className="rm2-no-desc">—</span>}</td>
-                                <td><StatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
+                                <td><ActiveStatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
                                 <td>
                                     {dept.effectiveDate
                                         ? <span className="rm2-date-text">{new Date(dept.effectiveDate).toLocaleDateString()}</span>
@@ -1482,11 +1481,11 @@ export default function RoleManagementTab() {
                                         </div>
                                     </div>
                                 </td>
-                                <td>{pos.code ? <span className="rm2-code-badge">{pos.code}</span> : <span className="rm2-no-desc">—</span>}</td>
+                                <td>{pos.code ? <StatusBadge status={pos.code} size="sm" /> : <span className="rm2-no-desc">—</span>}</td>
                                 <td><span className="rm2-dept-tag">{pos.departmentName}</span></td>
                                 <td>{pos.employmentType ? <span className="rm2-type-pill">{pos.employmentType}</span> : <span className="rm2-no-desc">—</span>}</td>
                                 <td>{pos.positionLevel ? <span className="rm2-level-pill">{pos.positionLevel}</span> : <span className="rm2-no-desc">—</span>}</td>
-                                <td><StatusBadge isActive={pos.status === 'Active' || pos.isActive !== false} /></td>
+                                <td><ActiveStatusBadge isActive={pos.status === 'Active' || pos.isActive !== false} /></td>
                                 <td>
                                     {pos.effectiveDate
                                         ? <span className="rm2-date-text">{new Date(pos.effectiveDate).toLocaleDateString()}</span>
@@ -1772,7 +1771,7 @@ export default function RoleManagementTab() {
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td><StatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
+                                                        <td><ActiveStatusBadge isActive={dept.status === 'Active' || dept.isActive !== false} /></td>
                                                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{posCount}</td>
                                                         <td style={{ textAlign: 'center' }}>{activePosCount}</td>
                                                         <td style={{ textAlign: 'center' }}>{dept.employeeCount ?? 0}</td>

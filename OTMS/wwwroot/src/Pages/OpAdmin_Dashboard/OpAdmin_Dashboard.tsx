@@ -61,6 +61,8 @@ import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
 import Modal from '../../components/ui/Modal';
 import ActionButton from '../../components/ActionButton/ActionButton';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import StatusBadge from '../../components/ui/StatusBadge';
+import EmptyState from '../../components/ui/EmptyState';
 
 interface ConfirmModalState {
     isOpen: boolean;
@@ -392,7 +394,7 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
 );
 
 const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`badge ${p === 'Critical' ? 'badge-critical' : p === 'High' ? 'badge-red' : p === 'Medium' ? 'badge-amber' : 'badge-green'}`}>{p}</span>
+    <StatusBadge status={p} size="sm" />
 );
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
@@ -1274,10 +1276,7 @@ const DashboardTab: React.FC<{
     return (
         <div className="dashboard-content">
             {dashboardLoading ? (
-                <div className="empty-state" style={{ padding: '40px 0' }}>
-                    <Loader2 size={24} className="spin" />
-                    <p style={{ fontWeight: 600 }}>Loading workload data...</p>
-                </div>
+                <EmptyState icon={<Loader2 size={24} className="spin" />} title="Loading workload data..." />
             ) : (
                 <>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
@@ -1367,7 +1366,7 @@ const DashboardTab: React.FC<{
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{total} total</span>
                             </div>
                             {statusChartData.length === 0 ? (
-                                <div className="empty-state" style={{ padding: '20px 0' }}><p>No data to display.</p></div>
+                                <EmptyState title="No data to display." />
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <ResponsiveContainer width={180} height={180}>
@@ -1764,7 +1763,7 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                         <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtTemplateDate(t.nextGenerationDate)}</td>
                         <td style={{ fontSize: 13 }}>{t.assignedEmployeeName || 'Auto-assign'}</td>
                         <td>
-                            <span className={`badge ${t.templateStatus === 'Active' ? 'badge-green' : 'badge-gray'}`}>{t.templateStatus}</span>
+                            <StatusBadge status={t.templateStatus} size="sm" />
                         </td>
                         <td>
                             <ActionsDropdown
@@ -1953,7 +1952,7 @@ const TeamTab: React.FC<{
                 <div className="card">
                     <div className="card-header-layout"><h3>Team Members</h3></div>
                     {teamMembers.length === 0 ? (
-                        <div className="empty-state"><Users size={20} /><p>No team members found</p></div>
+                        <EmptyState icon={<Users size={20} />} title="No team members found" />
                     ) : teamMembers.map(m => {
                         const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
                         const mc = mt.filter(t => t.taskStatus === 'Completed').length;
@@ -1997,7 +1996,7 @@ const TeamTab: React.FC<{
                     <h3>{teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName}'s Tasks</h3>
                 </div>
                 {tasks.filter(t => t.assignedEmployee === teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName).length === 0
-                    ? <div className="empty-state"><Package size={20} /><p>No tasks assigned</p></div>
+                    ? <EmptyState icon={<Package size={20} />} title="No tasks assigned" />
                     : tasks
                         .filter(t => t.assignedEmployee === teamMembers.find(m => m.accountId === selectedMemberId)?.employeeName)
                         .map(t => <TaskRow key={t.taskId} task={t} onView={onView} />)
@@ -2593,7 +2592,7 @@ function ProfileTab() {
                         </div>
                         <div style={{ textAlign: 'center' }}>
                             <h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</h4>
-                            <span className="status-badge active" style={{ marginTop: 6, display: 'inline-block' }}>Active</span>
+                            <StatusBadge status="Active" />
                         </div>
                     </div>
 
@@ -3320,7 +3319,7 @@ const ReopenTab: React.FC<{
                                 <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
                                 <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                                 <td style={{ fontSize: 13 }}>{r.employeeName}</td>
-                                <td><span className={`badge ${r.status === 'Approved' ? 'badge-green' : 'badge-red'}`}>{r.status}</span></td>
+                                <td><StatusBadge status={r.status} size="sm" /></td>
                                 <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.adminRemarks || '—'}</td>
                                 <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.reviewedAt ? fmtDate(r.reviewedAt) : '—'}</td>
                             </tr>

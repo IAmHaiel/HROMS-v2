@@ -5,6 +5,7 @@ import {
     X, ChevronLeft, ChevronRight, Plus, Calendar,
     User, Hash, Tag, Info,
 } from 'lucide-react';
+import StatusBadge from '../../../components/ui/StatusBadge';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -40,10 +41,10 @@ const DOC_TYPES = [
     'Other',
 ];
 
-const STATUS_META: Record<string, { label: string; cls: string; icon: React.ReactElement }> = {
-    Active: { label: 'Active', cls: 'doc-badge doc-badge--active', icon: <CheckCircle2 size={11} /> },
-    Archived: { label: 'Archived', cls: 'doc-badge doc-badge--archived', icon: <Archive size={11} /> },
-    'Pending Activation': { label: 'Pending Activation', cls: 'doc-badge doc-badge--pending', icon: <Clock size={11} /> },
+const STATUS_META: Record<string, { label: string; icon: React.ReactElement }> = {
+    Active: { label: 'Active', icon: <CheckCircle2 size={11} /> },
+    Archived: { label: 'Archived', icon: <Archive size={11} /> },
+    'Pending Activation': { label: 'Pending Activation', icon: <Clock size={11} /> },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -596,31 +597,6 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
     return (
         <>
             <style>{`
-        .doc-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 3px 9px;
-          border-radius: 999px;
-          font-size: 11px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-        .doc-badge--active {
-          background: rgba(5,205,153,0.1);
-          color: #059669;
-          border: 1px solid rgba(5,205,153,0.25);
-        }
-        .doc-badge--archived {
-          background: rgba(100,116,139,0.1);
-          color: #64748b;
-          border: 1px solid rgba(100,116,139,0.2);
-        }
-        .doc-badge--pending {
-          background: rgba(245,158,11,0.1);
-          color: #d97706;
-          border: 1px solid rgba(245,158,11,0.2);
-        }
         .doc-type-pill {
           display: inline-block;
           padding: 2px 8px;
@@ -909,10 +885,7 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
 
                                         {/* Status from server-calculated contractStatus */}
                                         <td>
-                                            <span className={statusMeta.cls}>
-                                                {statusMeta.icon}
-                                                {statusMeta.label}
-                                            </span>
+                                            <StatusBadge status={statusMeta.label} size="sm" icon={statusMeta.icon} />
                                         </td>
 
                                         {/* Actions */}

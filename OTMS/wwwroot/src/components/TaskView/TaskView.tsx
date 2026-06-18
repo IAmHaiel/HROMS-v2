@@ -4,6 +4,7 @@ import {
     XCircle, Clock, AlertTriangle, ThumbsUp, RotateCcw,
 } from 'lucide-react';
 import TaskComments from '../TaskComments/TaskComments';
+import StatusBadge from '../ui/StatusBadge';
 import './TaskView.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -71,24 +72,12 @@ const fmtDateTime = (d: string): string => {
     });
 };
 
-const statusBadgeClass = (s: string): string =>
-({
-    'Pending': 'tv-badge tv-badge-blue',
-    'In Progress': 'tv-badge tv-badge-amber',
-    'Completed': 'tv-badge tv-badge-green',
-    'Overdue': 'tv-badge tv-badge-red',
-    'Pending Review': 'tv-badge tv-badge-purple',
-    'Pending Admin Review': 'tv-badge tv-badge-purple',
-}[s] ?? 'tv-badge tv-badge-blue');
+const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
+    <StatusBadge status={p} size="sm" />
+);
 
 const priorityDotClass = (p: Priority): string =>
     ({ Critical: 'tv-prio-dot high', High: 'tv-prio-dot high', Medium: 'tv-prio-dot medium', Low: 'tv-prio-dot low' }[p]);
-
-const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <span className={`tv-badge ${p === 'Critical' || p === 'High' ? 'tv-badge-red' : p === 'Medium' ? 'tv-badge-amber' : 'tv-badge-green'}`}>
-        {p}
-    </span>
-);
 
 // ─── Reject Modal ─────────────────────────────────────────────────────────────
 
@@ -325,11 +314,7 @@ const TaskView: React.FC<TaskViewProps> = ({
                         <div className="tv-meta-grid">
                             <div className="tv-meta-chip">
                                 <span className="tv-meta-label">Status</span>
-                                <span className={statusBadgeClass(
-                                    reviewState === 'pending_review' ? 'Pending Review' : effectiveStatus
-                                )}>
-                                    {reviewState === 'pending_review' ? 'Pending Review' : effectiveStatus}
-                                </span>
+                                <StatusBadge status={reviewState === 'pending_review' ? 'Pending Review' : effectiveStatus} size="sm" />
                             </div>
                             <div className="tv-meta-chip">
                                 <span className="tv-meta-label">Priority</span>

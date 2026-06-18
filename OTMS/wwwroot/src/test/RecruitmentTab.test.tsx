@@ -7,7 +7,7 @@ import {
     getPageNumbers,
     fmtDate,
     fmtDateTime,
-    StatusBadge,
+    RecruitmentStatusBadge,
     type RecruitmentStatus,
 } from "../Pages/SystemAdmin_Dashboard/RecruitmentTab/RecruitmentTab";
 
@@ -191,24 +191,24 @@ describe("fmtDateTime", () => {
 
 // ─── Components ─────────────────────────────────────────────────────────────
 
-describe("StatusBadge", () => {
+describe("RecruitmentStatusBadge", () => {
     it("renders Pending Review badge", () => {
-        const { container } = render(<StatusBadge status={"Pending Review"} />);
+        const { container } = render(<RecruitmentStatusBadge status={"Pending Review"} />);
         expect(container.textContent).toContain("Pending Review");
     });
 
     it("renders Interview Scheduled badge", () => {
-        const { container } = render(<StatusBadge status={"Interview Scheduled"} />);
+        const { container } = render(<RecruitmentStatusBadge status={"Interview Scheduled"} />);
         expect(container.textContent).toContain("Interview Scheduled");
     });
 
     it("renders Job Offered badge", () => {
-        const { container } = render(<StatusBadge status={"Job Offered"} />);
+        const { container } = render(<RecruitmentStatusBadge status={"Job Offered"} />);
         expect(container.textContent).toContain("Job Offered");
     });
 
     it("renders Rejected badge", () => {
-        const { container } = render(<StatusBadge status={"Rejected"} />);
+        const { container } = render(<RecruitmentStatusBadge status={"Rejected"} />);
         expect(container.textContent).toContain("Rejected");
     });
 });

@@ -37,6 +37,7 @@ import {
     RotateCcw,
     ThumbsUp,
 } from 'lucide-react';
+import EmptyState from '../../components/ui/EmptyState';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
 import LeaveRequestModal, {
@@ -51,6 +52,7 @@ import DashboardHeader from '../../components/DashboardHeader/DashboardHeader';
 import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
 import TaskComments from '../../components/TaskComments/TaskComments';
+import StatusBadge from '../../components/ui/StatusBadge';
 import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import { useToast } from '../../components/Toast/Toast';
 import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
@@ -322,9 +324,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onSubmitForRevi
                         />
                         <div>
                             <h3 style={{ margin: 0 }}>{task.name}</h3>
-                            <span className={`badge ${sm.cls}`} style={{ marginTop: 4 }}>
-                                {sm.icon}{sm.label}
-                            </span>
+                            <StatusBadge status={sm.label} size="sm" icon={sm.icon} />
                         </div>
                     </div>
                     <button className="icon-btn" onClick={onClose}><X size={16} /></button>
@@ -744,7 +744,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onView, onUpdate }) => {
                 <span className={`prio-strip ${pm.cls}`} />
                 <div className="tc-header">
                     <h4 className="tc-name">{task.name}</h4>
-                    <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
+                    <StatusBadge status={sm.label} size="sm" icon={sm.icon} />
                 </div>
             </div>
             <p className="tc-desc">{task.description}</p>
@@ -846,7 +846,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                         <button className="link-btn" onClick={onGoTasks}>All tasks <ChevronRight size={13} /></button>
                     </div>
                     {urgent.length === 0 ? (
-                        <div className="empty-state"><CheckCircle2 size={22} /><p>No urgent tasks — great work!</p></div>
+                        <EmptyState icon={<CheckCircle2 size={22} />} title="No urgent tasks — great work!" />
                     ) : urgent.map(t => (
                         <div key={t.id} className="dash-task-row" onClick={() => onView(t.id)}>
                             <div className="dtr-left">
@@ -857,9 +857,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                                 </div>
                             </div>
                             <div className="dtr-right">
-                                <span className={`badge ${statusMeta[effectiveStatus(t)].cls}`}>
-                                    {statusMeta[effectiveStatus(t)].label}
-                                </span>
+                                <StatusBadge status={statusMeta[effectiveStatus(t)].label} size="sm" />
                                 {t.status !== 'completed' && (
                                     <button
                                         className="btn btn-xs btn-primary"
@@ -943,10 +941,7 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
         return (
             <div className="tab-content">
                 <div className="card">
-                    <div className="empty-state">
-                        <Loader2 size={22} className="spin" />
-                        <p>Loading your tasks…</p>
-                    </div>
+                    <EmptyState icon={<Loader2 size={22} className="spin" />} title="Loading your tasks…" />
                 </div>
             </div>
         );
@@ -998,7 +993,7 @@ const MyTasksTab: React.FC<MyTasksTabProps> = ({ tasks, loading, error, onView, 
             </div>
             {sorted.length === 0 ? (
                 <div className="card">
-                    <div className="empty-state"><ClipboardList size={22} /><p>No tasks available</p></div>
+                    <EmptyState icon={<ClipboardList size={22} />} title="No tasks available" />
                 </div>
             ) : (
                 <div className="task-grid">
@@ -1072,7 +1067,7 @@ const LeaveRecordCard: React.FC<{ record: LeaveRecord }> = ({ record }) => {
                     </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span className={`badge ${sm.cls}`}>{sm.icon}{sm.label}</span>
+                    <StatusBadge status={sm.label} size="sm" icon={sm.icon} />
                     <button
                         className="icon-btn"
                         onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
@@ -1227,28 +1222,9 @@ const LeaveTab: React.FC<{
                 {/* Records list */}
                 <div style={{ padding: '0 20px' }}>
                     {loading ? (
-                        <div className="empty-state" style={{ padding: '32px 0' }}>
-                            <Loader2 size={20} className="spin" /><p>Loading leave records…</p>
-                        </div>
+                        <EmptyState icon={<Loader2 size={20} className="spin" />} title="Loading leave records…" />
                     ) : paginatedRecords.length === 0 ? (
-                        <div className="empty-state" style={{ padding: '36px 0' }}>
-                            <div style={{
-                                width: 56, height: 56, borderRadius: '50%',
-                                background: 'rgba(67,24,255,0.07)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                marginBottom: 8,
-                            }}>
-                                <CalendarDays size={26} color="var(--primary)" />
-                            </div>
-                            <p style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                {histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`}
-                            </p>
-                            {histFilter === 'all' && (
-                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                    Click "Request Leave" to submit your first request.
-                                </span>
-                            )}
-                        </div>
+                        <EmptyState icon={<CalendarDays size={24} />} title={histFilter === 'all' ? 'No leave requests yet' : `No ${histFilter} requests`} />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 }}>
                             {paginatedRecords.map(r => <LeaveRecordCard key={r.id} record={r} />)}
@@ -1419,12 +1395,9 @@ const ApprovalsTab: React.FC = () => {
                     <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{myRequests.length} request{myRequests.length !== 1 ? 's' : ''}</span>
                 </div>
                 {loading ? (
-                    <div className="empty-state" style={{ padding: '32px 0' }}><Loader2 size={20} className="spin" /><p>Loading requests...</p></div>
+                    <EmptyState icon={<Loader2 size={20} className="spin" />} title="Loading requests..." />
                 ) : myRequests.length === 0 ? (
-                    <div className="empty-state" style={{ padding: '32px 0' }}>
-                        <FileText size={24} /><p>No approval requests yet.</p>
-                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Click "Submit Request" to start a new approval workflow.</span>
-                    </div>
+                    <EmptyState icon={<FileText size={24} />} title="No approval requests yet." description='Click "Submit Request" to start a new approval workflow.' />
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         {myRequests.map(r => (
@@ -1729,9 +1702,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                     <p className="ph-role">{toDisplayRole(user.role)}</p>
                     <div className="ph-badges">
                         <span className="badge badge-blue">{user.employeeId}</span>
-                        <span className={`badge ${user.accountStatus === 'Active' ? 'badge-green' : 'badge-red'}`}>
-                            {user.accountStatus}
-                        </span>
+                        <StatusBadge status={user.accountStatus} size="sm" />
                         <span
                             className={`badge ${user.presenceStatus === 'Online' ? 'badge-green' : 'badge-gray'}`}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
@@ -1870,9 +1841,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                         <div className="info-field">
                             <label>Account Status</label>
                             <div className="if-value">
-                                <span className={`status-badge ${(user.accountStatus ?? 'active').toLowerCase()}`}>
-                                    {user.accountStatus ?? 'Active'}
-                                </span>
+                                <StatusBadge status={user.accountStatus ?? 'Active'} />
                             </div>
                         </div>
                     </div>
