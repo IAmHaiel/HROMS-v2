@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using OTMS.Common;
 using OTMS.Common.Constraints;
 using OTMS.Data;
 using OTMS.Entities.DTOs;
@@ -276,7 +277,7 @@ namespace OTMS.Service.Services
             };
         }
 
-        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token)
+        public async Task<ApiResponseDTO<string>> CompleteOnboardingAsync(string token, string? password = null)
         {
             if (string.IsNullOrWhiteSpace(token))
             {
@@ -349,7 +350,8 @@ namespace OTMS.Service.Services
                 };
             }
 
-            var tempPassword = PasswordGenerator.Generate();
+            var useProvidedPassword = !string.IsNullOrEmpty(password) && password.Length >= PasswordLength.MinimumLength;
+            var tempPassword = useProvidedPassword ? password! : PasswordGenerator.Generate();
 
             var employee = new Employee
             {
@@ -376,7 +378,7 @@ namespace OTMS.Service.Services
                 Role = targetRole,
                 AccountStatus = "Active",
                 CreatedAt = DateTime.UtcNow,
-                IsPasswordChanged = false
+                IsPasswordChanged = true
             };
 
             account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, tempPassword);
@@ -410,10 +412,9 @@ namespace OTMS.Service.Services
             var body = $@"
                 <h2>Welcome to the Team!</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                <p>Your employee account has been created. You can now log in with the temporary password that was set during the onboarding process.</p>
+                <p>Your employee account has been created and is now active. You can log in using the password you set during onboarding.</p>
                 <p><strong>Employee Number:</strong> {employeeNumber}</p>
                 <p><strong>Login URL:</strong> <a href='{frontendBaseUrl}'>{frontendBaseUrl}</a></p>
-                <p>Please change your password after your first login.</p>
                 <hr>
                 <p><small>This is an automated message from the Operational Task Management System.</small></p>";
 
@@ -434,7 +435,7 @@ namespace OTMS.Service.Services
             return new ApiResponseDTO<string>
             {
                 IsSuccess = true,
-                Message = "Onboarding completed successfully. Employee account has been activated.",
+                Message = $"Onboarding completed successfully. Your Employee Number is {employeeNumber}.",
                 Data = onboardingToken.ApplicantRecordId.ToString()
             };
         }

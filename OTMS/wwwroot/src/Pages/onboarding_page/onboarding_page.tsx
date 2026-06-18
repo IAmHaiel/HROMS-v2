@@ -369,90 +369,42 @@ export default function OnboardingPage() {
         }
     };
 
-    // ── API calls ──
+    // ── Wizard steps (local only — no API calls until completion) ──
     const handleProfileSave = async () => {
         const errs = validateProfile();
         if (Object.keys(errs).length > 0) { setProfileErrors(errs); return; }
-        setProfileSaving(true); setProfileApiError('');
-        try {
-            const employeeNumber = localStorage.getItem('employeeId') ?? '';
-            const formData = new FormData();
-            formData.append('firstName', profile.firstName.trim());
-            formData.append('middleName', profile.middleName.trim());
-            formData.append('lastName', profile.lastName.trim());
-            formData.append('suffix', profile.suffix.trim());
-            formData.append('contactNumber', profile.contactNumber.trim());
-            const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeNumber)}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Profile update failed.'); }
-            ['firstName', 'middleName', 'lastName', 'suffix', 'contactNumber'].forEach(k => localStorage.setItem(k, profile[k as keyof typeof profile].trim()));
-            setStep('password');
-        } catch (err: any) {
-            const errMsg = err.message ?? 'Something went wrong.';
-            if (errMsg.toLowerCase().includes('contact number')) setProfileErrors(prev => ({ ...prev, contactNumber: errMsg }));
-            else setProfileApiError(errMsg);
-        } finally { setProfileSaving(false); }
+        setStep('password');
     };
 
     const handlePasswordSave = async () => {
         const errs: Record<string, string> = {};
         ['next', 'confirm'].forEach(k => { const err = validatePwField(k, pw[k as keyof typeof pw]); if (err) errs[k] = err; });
         if (Object.keys(errs).length > 0) { setPwErrors(errs); return; }
-        setPwSaving(true); setPwApiError('');
-        try {
-            const res = await fetch('/api/profile/set-initial-password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ newPassword: pw.next, confirmPassword: pw.confirm }) });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Password update failed.'); }
-            localStorage.setItem('isPasswordChanged', 'true');
-            setStep('documents');
-        } catch (err: any) { setPwApiError(err.message ?? 'Something went wrong.'); }
-        finally { setPwSaving(false); }
+        setStep('documents');
     };
 
     const handleSubmitAndFinish = async () => {
-        const files = Object.values(fileObjects);
-        if (files.length === 0) { setStep('documents201'); return; }
-        setSubmittingDocs(true); setDocsApiError('');
-        try {
-            const employeeNumber = localStorage.getItem('employeeId') ?? '';
-            const formData = new FormData();
-            formData.append('employeeNumber', employeeNumber);
-            files.forEach(file => formData.append('Attachments', file));
-            const res = await fetch(`/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeNumber)}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` }, body: formData });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Failed to upload documents.'); }
-            setStep('documents201');
-        } catch (err: any) { setDocsApiError(err.message ?? 'Failed to upload documents.'); }
-        finally { setSubmittingDocs(false); }
+        setStep('documents201');
     };
+
+    const [completedCredentials, setCompletedCredentials] = useState<string>('');
 
     const handle201Submit = async () => {
         const errs = validate201();
         if (Object.keys(errs).length > 0) { setErrors201(errs); return; }
         setSaving201(true); setApi201Error('');
         try {
-            const employeeNumber = localStorage.getItem('employeeId') ?? '';
-            const payload = {
-                employeeNumber,
-                sssNumber: form201.sss.trim(),
-                philhealthNumber: form201.philhealth.trim(),
-                pagibigNumber: form201.pagibig.trim(),
-                tinNumber: form201.tin.trim() || null,
-                bankName: form201.bankName.trim(),
-                bankAccountNumber: form201.bankAccount.trim(),
-                emergencyContactName: form201.emergencyName.trim(),
-                emergencyContactNumber: form201.emergencyNumber.trim(),
-            };
-            const res = await fetch('/api/profile/submit-201-file', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(payload),
-            });
-            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error((err as any).message || 'Failed to submit 201 File.'); }
-            // Mark onboarding token as used
             if (onboardingToken) {
-                await fetch('/api/onboarding/complete', {
+                const res = await fetch('/api/onboarding/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: onboardingToken }),
+                    body: JSON.stringify({ token: onboardingToken, password: pw.next || null }),
                 });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error((data as any).message || 'Failed to complete onboarding.');
+                }
+                setCompletedCredentials((data as any).message || '');
             }
             setStep('done');
         } catch (err: any) { setApi201Error(err.message ?? 'Something went wrong. Please try again.'); }
@@ -1025,14 +977,17 @@ export default function OnboardingPage() {
                                 <CheckCircle2 size={32} color="#05cd99" />
                             </div>
                             <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 8px', letterSpacing: '-0.02em' }}>You're all set!</h2>
-                            <p style={{ fontSize: 13, color: '#8a95b0', margin: '0 0 8px', lineHeight: 1.6 }}>Form submitted successfully. Welcome aboard!</p>
-                            <p style={{ fontSize: 12, color: '#c3cad9', margin: '0 0 28px', lineHeight: 1.6 }}>Your 201 File has been securely encrypted and submitted to HR. This onboarding link has been permanently deactivated.</p>
+                            <p style={{ fontSize: 13, color: '#8a95b0', margin: '0 0 8px', lineHeight: 1.6 }}>Your employee account has been created.</p>
+                            {completedCredentials && (
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 18px', marginBottom: 24, textAlign: 'left', fontSize: 12, color: '#334155', lineHeight: 1.6 }}>
+                                    {completedCredentials}
+                                </div>
+                            )}
                             <button onClick={() => {
-                                const role = localStorage.getItem('userRole');
-                                const routes: Record<string, string> = { 'System Admin': '/SystemAdmin_Dashboard', 'SuperAdmin': '/SystemAdmin_Dashboard', 'Operation Admin': '/OpAdmin_Dashboard', 'OpAdmin': '/OpAdmin_Dashboard', 'Coordinator': '/OpEmployee_Dashboard', 'Encoder': '/OpEmployee_Dashboard' };
-                                navigate(routes[role ?? ''] ?? '/');
+                                localStorage.setItem('userRole', 'Encoder');
+                                navigate('/OpEmployee_Dashboard');
                             }} style={{ width: '100%', height: 46, border: 'none', borderRadius: 12, background: 'linear-gradient(135deg, #0c1527, #1e293b)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(15,23,42,0.2)' }}>
-                                Go to Dashboard <ArrowRight size={16} />
+                                Continue to Login <ArrowRight size={16} />
                             </button>
                         </div>
                     )}

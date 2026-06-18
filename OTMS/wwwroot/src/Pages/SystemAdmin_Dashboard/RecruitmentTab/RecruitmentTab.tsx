@@ -659,8 +659,8 @@ const css = `
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 
 export function StatusBadge({ status }: { status: RecruitmentStatus }) {
-    const m = STATUS_META[status];
-    return <span className={m.badgeCls}>{m.icon}{status}</span>;
+    const m = STATUS_META[status] ?? STATUS_META['Pending Review'];
+    return <span className={m.badgeCls}>{m.icon}{status || 'Unknown'}</span>;
 }
 
 // ─── ApplicantTimeline ────────────────────────────────────────────────────────
@@ -1107,7 +1107,7 @@ interface UpdateStatusModalProps {
 }
 
 function UpdateStatusModal({ applicant, onClose, onConfirm, onNeedsSchedule }: UpdateStatusModalProps) {
-    const available: RecruitmentStatus[] = STATUS_TRANSITIONS[applicant.currentStatus];
+    const available: RecruitmentStatus[] = STATUS_TRANSITIONS[applicant.currentStatus] ?? [];
     const [newStatus, setNewStatus] = useState<RecruitmentStatus | ''>('');
     const [remarks, setRemarks] = useState<string>('');
     const [submitting, setSubmitting] = useState<boolean>(false);
@@ -1224,7 +1224,7 @@ interface ApplicantDetailModalProps {
 }
 
 function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantDetailModalProps) {
-    const hasTransitions = STATUS_TRANSITIONS[applicant.currentStatus].length > 0;
+    const hasTransitions = (STATUS_TRANSITIONS[applicant.currentStatus]?.length ?? 0) > 0;
     const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
 
     function CollapsibleSection({ title, children, defaultOpen }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -1580,7 +1580,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     ): Promise<void> => {
         const applicant = applicants.find((a) => a.applicantId === applicantId);
         if (!applicant) throw new Error('Applicant not found.');
-        if (!STATUS_TRANSITIONS[applicant.currentStatus].includes(newStatus)) throw new Error('Invalid status transition.');
+        if (!STATUS_TRANSITIONS[applicant.currentStatus]?.includes(newStatus)) throw new Error('Invalid status transition.');
 
         const res = await axios.put('/api/recruitment/status', {
             applicantRecordId: applicantId,
@@ -1727,7 +1727,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                                                 <button className="rec-action-btn" onClick={() => setDetailApplicant(a)}>
                                                     <Eye size={12} /> View
                                                 </button>
-                                                {STATUS_TRANSITIONS[a.currentStatus].length > 0 && a.currentStatus !== 'Job Offered' && (
+                                                {(STATUS_TRANSITIONS[a.currentStatus]?.length ?? 0) > 0 && a.currentStatus !== 'Job Offered' && (
                                                     <button className="rec-action-btn rec-action-btn--primary"
                                                         onClick={() => setUpdateApplicant(a)}>
                                                         <RefreshCw size={12} /> Update
