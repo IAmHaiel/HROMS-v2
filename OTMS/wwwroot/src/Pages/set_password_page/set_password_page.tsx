@@ -75,7 +75,7 @@ export default function SetPasswordPage() {
     return (
         <div style={{
             minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: '#f4f7fe', fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", padding: 24
+            background: '#f4f7fe', fontFamily: "'Montserrat', 'Inter', sans-serif", padding: 24
         }}>
             <div style={{
                 background: 'white', border: '1px solid #e2e8f0', borderRadius: 24, padding: '40px 36px',

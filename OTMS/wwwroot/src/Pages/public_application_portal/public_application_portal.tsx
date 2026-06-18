@@ -1088,7 +1088,7 @@ const s: Record<string, CSSProperties> = {
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-main)',
-        fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+        fontFamily: "'Montserrat', 'Inter', sans-serif",
         position: 'relative',
         overflow: 'hidden',
     },

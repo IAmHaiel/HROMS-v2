@@ -989,7 +989,7 @@ interface ProfileTabProps {
 }
 
 const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
-    const { success } = useToast();
+    const { success, error } = useToast();
     const [passwordGate, setPasswordGate] = useState(false);
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
@@ -1006,7 +1006,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         email: localStorage.getItem('email') ?? ''
     });
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-    const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
 
     const [pwd, setPwd] = useState({ current: '', next: '', confirm: '' });
@@ -1025,19 +1024,18 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     }, [user.fullName, user.phone]);
 
     const requestSave = () => {
-        if (!form.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.firstName.trim())) { setProfileError('Given Name must contain letters only and be up to 50 characters.'); return; }
-        if (form.middleName.trim() && !/^[A-Za-z\s]{1,50}$/.test(form.middleName.trim())) { setProfileError('Middle Name must contain letters only and be up to 50 characters.'); return; }
-        if (!form.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.lastName.trim())) { setProfileError('Last Name must contain letters only and be up to 50 characters.'); return; }
+        if (!form.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.firstName.trim())) { error('Given Name must contain letters only and be up to 50 characters.'); return; }
+        if (form.middleName.trim() && !/^[A-Za-z\s]{1,50}$/.test(form.middleName.trim())) { error('Middle Name must contain letters only and be up to 50 characters.'); return; }
+        if (!form.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(form.lastName.trim())) { error('Last Name must contain letters only and be up to 50 characters.'); return; }
 
         const email = form.email.trim();
         if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
-            setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).'); return;
+            error('Enter a valid Email Address (12-64 characters, local-part@domain).'); return;
         }
 
         if (!form.contactNumber.trim() || !/^[0-9]{11}$/.test(form.contactNumber.trim())) {
-            setProfileError('Contact Number must be exactly 11 digits.'); return;
+            error('Contact Number must be exactly 11 digits.'); return;
         }
-        setProfileError('');
         setGatePassword('');
         setGateError('');
         setShowGatePassword(false);
@@ -1071,7 +1069,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
 
     const performSave = async () => {
         setProfileSaving(true);
-        setProfileError('');
         try {
             const employeeId = localStorage.getItem('employeeId') ?? '';
             const firstName = form.firstName.trim();
@@ -1108,7 +1105,7 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
             success('Profile updated successfully.');
             setEditMode(false);
         } catch (err: any) {
-            setProfileError(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Something went wrong.');
         } finally {
             setProfileSaving(false);
         }
@@ -1117,7 +1114,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
     const handleCancelEdit = () => {
         setEditMode(false);
         setPwdMode(false);
-        setProfileError('');
         setForm({
             firstName: localStorage.getItem('firstName') ?? '',
             middleName: localStorage.getItem('middleName') ?? '',
@@ -1149,7 +1145,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
         const val = e.target.value;
         setForm(prev => ({ ...prev, [k]: val }));
         validateField(k, val);
-        setProfileError('');
     };
 
     const handleChangePwd = async () => {
@@ -1272,11 +1267,6 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                             </button>
                         )}
                     </div>
-                    {profileError && (
-                        <div className="form-api-error" style={{ marginBottom: 10 }}>
-                            <AlertCircle size={14} /><span>{profileError}</span>
-                        </div>
-                    )}
                     <div className="info-fields">
                         <div className="info-field">
                             <label>Employee ID</label>

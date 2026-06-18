@@ -2316,7 +2316,6 @@ function ProfileTab() {
         email: storedEmail,
     });
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-    const [profileError, setProfileError] = useState('');
     const [profileSaving, setProfileSaving] = useState(false);
 
     // -- Password Gate state --------------------------------------------------
@@ -2379,27 +2378,26 @@ function ProfileTab() {
     // -- "Save Changes" clicked: validate first, then open gate ---------------
     const requestSave = () => {
         if (!profileForm.firstName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.firstName.trim())) {
-            setProfileError('Given Name must contain letters only and be up to 50 characters.');
+            error('Given Name must contain letters only and be up to 50 characters.');
             return;
         }
         if (profileForm.middleName?.trim() && !/^[A-Za-z\s]{1,50}$/.test(profileForm.middleName.trim())) {
-            setProfileError('Middle Name must contain letters only and be up to 50 characters.');
+            error('Middle Name must contain letters only and be up to 50 characters.');
             return;
         }
         if (!profileForm.lastName.trim() || !/^[A-Za-z\s]{1,50}$/.test(profileForm.lastName.trim())) {
-            setProfileError('Last Name must contain letters only and be up to 50 characters.');
+            error('Last Name must contain letters only and be up to 50 characters.');
             return;
         }
         const email = profileForm.email.trim();
         if (!email || email.length < 12 || email.length > 64 || !/^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
-            setProfileError('Enter a valid Email Address (12-64 characters, local-part@domain).');
+            error('Enter a valid Email Address (12-64 characters, local-part@domain).');
             return;
         }
         if (!profileForm.contactNumber.trim() || !/^[0-9]{11}$/.test(profileForm.contactNumber.trim())) {
-            setProfileError('Contact Number must be exactly 11 digits.');
+            error('Contact Number must be exactly 11 digits.');
             return;
         }
-        setProfileError('');
         setGatePassword('');
         setGateError('');
         setShowGatePassword(false);
@@ -2437,7 +2435,6 @@ function ProfileTab() {
     // -- Actual save (only called after password verified) --------------------
     const performSave = async () => {
         setProfileSaving(true);
-        setProfileError('');
         try {
             const res = await fetch(
                 `/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeId)}`,
@@ -2466,7 +2463,7 @@ function ProfileTab() {
             setEditingProfile(false);
             success('Profile updated successfully.');
         } catch (err: any) {
-            setProfileError(err.message ?? 'Something went wrong.');
+            error(err.message ?? 'Something went wrong.');
         } finally {
             setProfileSaving(false);
         }
@@ -2501,7 +2498,6 @@ function ProfileTab() {
             const val = e.target.value;
             setProfileForm(prev => ({ ...prev, [key]: val }));
             validateField(key, val);
-            setProfileError('');
         };
 
     const handlePwSave = async () => {
@@ -2615,11 +2611,6 @@ function ProfileTab() {
 
                     {editingProfile ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                            {profileError && (
-                                <div className="form-api-error">
-                                    <AlertCircle size={14} /><span>{profileError}</span>
-                                </div>
-                            )}
                             <div className="field">
                                 <label>First Name <span style={{ color: 'var(--status-failed)' }}>*</span></label>
                                 <input
@@ -2693,7 +2684,6 @@ function ProfileTab() {
                                     className="btn"
                                     onClick={() => {
                                         setEditingProfile(false);
-                                        setProfileError('');
                                         setProfileForm({
                                             firstName: localStorage.getItem('firstName') ?? '',
                                             middleName: localStorage.getItem('middleName') ?? '',
