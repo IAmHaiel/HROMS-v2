@@ -798,8 +798,8 @@ export default function PublicApplicationPortal() {
                                     {errors.highestEducationalAttainment && <span style={s.errMsg}><AlertIcon />{errors.highestEducationalAttainment}</span>}
                                 </div>
                                 <div style={s.field}>
-                                    <label style={s.label}>Institution &amp; Year Graduated <span style={s.req}>*</span></label>
-                                    <input type="text" placeholder="e.g. University of the Philippines, 2020" value={form.institution}
+                                    <label style={s.label}>Institution <span style={s.req}>*</span></label>
+                                    <input type="text" placeholder="e.g. University of the Philippines" value={form.institution}
                                         onChange={handleTextChange('institution')} maxLength={128}
                                         style={{ ...s.input, ...(errors.institution ? s.inputErr : {}) }} />
                                     {errors.institution && <span style={s.errMsg}><AlertIcon />{errors.institution}</span>}
@@ -871,10 +871,10 @@ export default function PublicApplicationPortal() {
                             )}
 
                             <button
-                                style={{ ...s.submitBtn, ...(submitLoading || Object.keys(errors).length > 0 ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                                style={{ ...s.submitBtn, ...(submitLoading || Object.values(errors).some(v => v) ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
                                 onClick={handleSubmit}
-                                disabled={submitLoading || Object.keys(errors).length > 0}
-                                onMouseEnter={e => { if (!submitLoading && Object.keys(errors).length === 0) e.currentTarget.style.background = '#3510d9'; }}
+                                disabled={submitLoading || Object.values(errors).some(v => v)}
+                                onMouseEnter={e => { if (!submitLoading && !Object.values(errors).some(v => v)) e.currentTarget.style.background = '#3510d9'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = '#4318ff'; }}
                             >
                                 {submitLoading ? (
