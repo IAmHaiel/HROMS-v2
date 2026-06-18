@@ -58,9 +58,9 @@ namespace OTMS.Service.Services
             {
                 return new ApiResponseDTO<DashboardResponseDTO>
                 {
-                    IsSuccess = false,
+                    IsSuccess = true,
                     Message = "No workload data available.",
-                    Data = null
+                    Data = new DashboardResponseDTO()
                 };
             }
 

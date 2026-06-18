@@ -345,7 +345,7 @@ namespace OTMS.Controllers
 
         [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("bin-records/{employeeId}")]
-        public async Task<IActionResult> BinRecords(string employeeId, PaginationDTO pagination)
+        public async Task<IActionResult> BinRecords(string employeeId, [FromQuery] PaginationDTO pagination)
         {
             try
             {

@@ -814,34 +814,53 @@ namespace OTMS.Service.Services
 
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
-            var query = context.Tasks
-                .Include(t => t.Assignee)
-                    .ThenInclude(a => a.Employee)
-                .Include(t => t.Creator)
-                    .ThenInclude(c => c.Employee)
+            var baseQuery = context.Tasks
+                .IgnoreAutoIncludes()
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted);
 
-            query = ApplySorting(query, pagination);
+            baseQuery = ApplySorting(baseQuery, pagination);
 
-            var totalRecords = await query.CountAsync();
+            var totalRecords = await baseQuery.CountAsync();
 
-            var data = await query
+            var pagedTasks = await baseQuery
                 .Skip((pagination.PageNumber - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                        {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedByEmployee = string.Join(" ", new[]
-                        {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt
-                }).ToListAsync();
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.CreatedAt,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
+
+            var data = pagedTasks.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[]
+                    { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }
+                        .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                    { t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix }
+                        .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt
+            }).ToList();
 
             await LogSortActivity(loggedInAccountId, pagination);
 
@@ -986,10 +1005,6 @@ namespace OTMS.Service.Services
                 throw new Exception("Employee not found.");
 
             var query = context.Tasks
-                .Include(t => t.Assignee)
-                    .ThenInclude(a => a.Employee)
-                .Include(t => t.Creator)
-                    .ThenInclude(a => a.Employee)
                 .Where(t =>
                     (
                         t.AssignedTo == employee.Account.AccountId
@@ -1001,25 +1016,45 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var pagedData = await query
                 .Skip((pagination.PageNumber - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.CreatedAt,
+                    t.Deleted,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
 
-                    CreatedByEmployee = string.Join(" ", new[]
-                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt,
-                    IsDeleted = t.Deleted
-                }).ToListAsync();
+            var data = pagedData.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[]
+                                {t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix}.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                                {t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix}.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt,
+                IsDeleted = t.Deleted
+            }).ToList();
 
             return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
             {
@@ -1164,8 +1199,6 @@ namespace OTMS.Service.Services
         public async Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> SearchTasksAsync(TaskSearchDTO request)
         {
             var query = context.Tasks
-                .Include(t => t.Assignee).ThenInclude(a => a.Employee)
-                .Include(t => t.Creator).ThenInclude(c => c.Employee)
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted)
                 .AsQueryable();
 
@@ -1254,21 +1287,41 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var pagedData = await query
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[] { t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedByEmployee = string.Join(" ", new[] { t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt
-                }).ToListAsync();
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.CreatedAt,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
+
+            var data = pagedData.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                AssignedEmployee = string.Join(" ", new[] { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt
+            }).ToList();
 
             if (!data.Any())
             {
@@ -1386,28 +1439,43 @@ namespace OTMS.Service.Services
             }
 
             var requests = await context.TaskReopenRequests
-                .Include(r => r.Task)
-                .Include(r => r.RequestedBy)
-                    .ThenInclude(a => a.Employee)
                 .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new ReopenRequestListDTO
+                .Select(r => new
                 {
-                    RequestId = r.RequestId,
-                    TaskId = r.TaskId,
-                    TaskTitle = r.Task.TaskTitle,
-                    EmployeeName = string.Join(" ", new[] { r.RequestedBy.Employee.FirstName, r.RequestedBy.Employee.MiddleName, r.RequestedBy.Employee.LastName, r.RequestedBy.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    EmployeeId = r.RequestedBy.Employee.EmployeeNumber,
-                    Reason = r.Reason,
-                    SupportingEvidence = r.EvidenceUrl,
-                    CurrentStatus = r.Task.TaskStatus,
-                    Status = r.Status,
-                    SubmittedAt = r.CreatedAt,
-                    ReviewedAt = null,
-                    AdminRemarks = r.AdminRemarks
+                    r.RequestId,
+                    r.TaskId,
+                    r.Task.TaskTitle,
+                    EmpFirstName = r.RequestedBy.Employee.FirstName,
+                    EmpMiddleName = r.RequestedBy.Employee.MiddleName,
+                    EmpLastName = r.RequestedBy.Employee.LastName,
+                    EmpSuffix = r.RequestedBy.Employee.Suffix,
+                    r.RequestedBy.Employee.EmployeeNumber,
+                    r.Reason,
+                    r.EvidenceUrl,
+                    r.Task.TaskStatus,
+                    r.Status,
+                    r.CreatedAt,
+                    r.AdminRemarks
                 })
                 .ToListAsync();
 
-            return requests;
+            var result = requests.Select(r => new ReopenRequestListDTO
+            {
+                RequestId = r.RequestId,
+                TaskId = r.TaskId,
+                TaskTitle = r.TaskTitle,
+                EmployeeName = string.Join(" ", new[] { r.EmpFirstName, r.EmpMiddleName, r.EmpLastName, r.EmpSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                EmployeeId = r.EmployeeNumber,
+                Reason = r.Reason,
+                SupportingEvidence = r.EvidenceUrl,
+                CurrentStatus = r.TaskStatus,
+                Status = r.Status,
+                SubmittedAt = r.CreatedAt,
+                ReviewedAt = null,
+                AdminRemarks = r.AdminRemarks
+            }).ToList();
+
+            return result;
         }
 
         public async Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request)
