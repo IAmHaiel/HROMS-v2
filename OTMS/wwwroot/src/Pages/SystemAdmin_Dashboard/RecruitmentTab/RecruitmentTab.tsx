@@ -759,6 +759,37 @@ function InterviewCard({ details }: { details: InterviewDetails }) {
     );
 }
 
+// ─── PaginationBar ─────────────────────────────────────────────────────────
+function PaginationBar({ page, totalPages, onPageChange }: { page: number; totalPages: number; onPageChange: (p: number) => void }) {
+    if (totalPages <= 1) return null;
+    const pages: (number | string)[] = [];
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    if (start > 1) { pages.push(1); if (start > 2) pages.push('...'); }
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages) { if (end < totalPages - 1) pages.push('...'); pages.push(totalPages); }
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24, paddingBottom: 32 }}>
+            <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: page <= 1 ? '#f1f5f9' : 'white', color: page <= 1 ? '#94a3b8' : '#334155', cursor: page <= 1 ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                ‹ Prev
+            </button>
+            {pages.map((p, i) =>
+                typeof p === 'string'
+                    ? <span key={`e${i}`} style={{ fontSize: 12, color: '#94a3b8' }}>…</span>
+                    : <button key={p} onClick={() => onPageChange(p)}
+                        style={{ width: 32, height: 32, borderRadius: 6, border: p === page ? 'none' : '1px solid #e2e8f0', background: p === page ? '#4318ff' : 'white', color: p === page ? 'white' : '#334155', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit' }}>
+                        {p}
+                    </button>
+            )}
+            <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}
+                style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: page >= totalPages ? '#f1f5f9' : 'white', color: page >= totalPages ? '#94a3b8' : '#334155', cursor: page >= totalPages ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}>
+                Next ›
+            </button>
+        </div>
+    );
+}
+
 // ─── InterviewSchedulingModal ─────────────────────────────────────────────────
 
 type ScheduleStep = 'form' | 'preview' | 'sending' | 'done';
@@ -1741,20 +1772,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     </div>
 
                     {totalPages > 1 && (
-                        <div className="rec-pagination">
-                            <button className="rec-page-btn" onClick={() => fetchApplicants(page - 1)} disabled={page === 1}>
-                                <ChevronLeft size={15} />
-                            </button>
-                            {getPageNumbers(totalPages, page).map((p, i) =>
-                                p === '...'
-                                    ? <span key={`e${i}`} className="rec-page-ellipsis">…</span>
-                                    : <button key={p} className={`rec-page-btn${page === p ? ' rec-page-btn--active' : ''}`}
-                                        onClick={() => fetchApplicants(p as number)}>{p}</button>
-                            )}
-                            <button className="rec-page-btn" onClick={() => fetchApplicants(page + 1)} disabled={page === totalPages}>
-                                <ChevronRight size={15} />
-                            </button>
-                        </div>
+                        <PaginationBar page={page} totalPages={totalPages} onPageChange={fetchApplicants} />
                     )}
                 </div>
             </div>
