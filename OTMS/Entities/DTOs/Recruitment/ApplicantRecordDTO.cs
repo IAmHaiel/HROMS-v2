@@ -13,5 +13,9 @@ namespace OTMS.Entities.DTOs.Recruitment
         public string? Institution { get; set; }
         public string? Degree { get; set; }
         public string? YearGraduated { get; set; }
+        public DateTime? InterviewDate { get; set; }
+        public string? InterviewTime { get; set; }
+        public string? LocationOrLink { get; set; }
+        public string? InterviewerName { get; set; }
     }
 }

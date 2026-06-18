@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,16 +22,19 @@ namespace OTMS.Service.Services
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailRetryBackgroundService> _logger;
+        private readonly IWebHostEnvironment _env;
         private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
 
         public EmailRetryBackgroundService(
             IServiceScopeFactory scopeFactory,
             IConfiguration configuration,
-            ILogger<EmailRetryBackgroundService> logger)
+            ILogger<EmailRetryBackgroundService> logger,
+            IWebHostEnvironment env)
         {
             _scopeFactory = scopeFactory;
             _configuration = configuration;
             _logger = logger;
+            _env = env;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -124,6 +129,17 @@ namespace OTMS.Service.Services
 
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body)
         {
+            if (_env.IsDevelopment())
+            {
+                var logsDir = Path.Combine(_env.ContentRootPath, "email_logs");
+                Directory.CreateDirectory(logsDir);
+                var fileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.html";
+                var html = $@"<h2>To: {toEmail}</h2><h3>Subject: {subject}</h3><hr>{body}";
+                await File.WriteAllTextAsync(Path.Combine(logsDir, fileName), html);
+                _logger.LogInformation("DEV MODE: Email saved to email_logs/{File} for {Email}", fileName, toEmail);
+                return true;
+            }
+
             try
             {
                 var smtpServer = _configuration["MailKitOptions:Server"] ?? "smtp.gmail.com";

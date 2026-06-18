@@ -18,5 +18,6 @@ namespace OTMS.Entities.Models
         public string? YearGraduated { get; set; }
 
         public ICollection<ApplicantStatusRecord> StatusHistory { get; set; } = new List<ApplicantStatusRecord>();
+        public ICollection<InterviewSchedule> InterviewSchedules { get; set; } = new List<InterviewSchedule>();
     }
 }

@@ -71,7 +71,23 @@ namespace OTMS.Service.Services
                     HighestEducationalAttainment = ar.HighestEducationalAttainment,
                     Institution = ar.Institution,
                     Degree = ar.Degree,
-                    YearGraduated = ar.YearGraduated
+                    YearGraduated = ar.YearGraduated,
+                    InterviewDate = ar.InterviewSchedules
+                        .OrderByDescending(s => s.CreatedAt)
+                        .Select(s => (DateTime?)s.InterviewDate)
+                        .FirstOrDefault(),
+                    InterviewTime = ar.InterviewSchedules
+                        .OrderByDescending(s => s.CreatedAt)
+                        .Select(s => s.InterviewTime)
+                        .FirstOrDefault(),
+                    LocationOrLink = ar.InterviewSchedules
+                        .OrderByDescending(s => s.CreatedAt)
+                        .Select(s => s.LocationOrLink)
+                        .FirstOrDefault(),
+                    InterviewerName = ar.InterviewSchedules
+                        .OrderByDescending(s => s.CreatedAt)
+                        .Select(s => s.InterviewerName)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
 
@@ -231,6 +247,7 @@ namespace OTMS.Service.Services
             }
 
             var applicant = await context.ApplicantRecords
+                .Include(ar => ar.JobPosition)
                 .FirstOrDefaultAsync(ar => ar.ApplicantRecordId == request.ApplicantRecordId);
 
             if (applicant == null)
@@ -253,25 +270,42 @@ namespace OTMS.Service.Services
                 };
             }
 
-            var interviewSchedule = new InterviewSchedule
-            {
-                InterviewScheduleId = Guid.NewGuid(),
-                ApplicantRecordId = request.ApplicantRecordId,
-                InterviewDate = request.InterviewDate,
-                InterviewTime = request.InterviewTime,
-                LocationOrLink = request.LocationOrLink,
-                InterviewerName = request.InterviewerName,
-                CreatedAt = DateTime.UtcNow
-            };
+            var existingSchedule = await context.InterviewSchedules
+                .FirstOrDefaultAsync(s => s.ApplicantRecordId == request.ApplicantRecordId);
 
-            context.InterviewSchedules.Add(interviewSchedule);
+            var isReschedule = existingSchedule != null;
+
+            if (isReschedule)
+            {
+                existingSchedule.InterviewDate = request.InterviewDate;
+                existingSchedule.InterviewTime = request.InterviewTime;
+                existingSchedule.LocationOrLink = request.LocationOrLink;
+                existingSchedule.InterviewerName = request.InterviewerName;
+                existingSchedule.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                existingSchedule = new InterviewSchedule
+                {
+                    InterviewScheduleId = Guid.NewGuid(),
+                    ApplicantRecordId = request.ApplicantRecordId,
+                    InterviewDate = request.InterviewDate,
+                    InterviewTime = request.InterviewTime,
+                    LocationOrLink = request.LocationOrLink,
+                    InterviewerName = request.InterviewerName,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.InterviewSchedules.Add(existingSchedule);
+            }
+
             await context.SaveChangesAsync();
 
-            var subject = $"Interview Scheduled: {applicant.JobPosition.Title} Position";
+            var actionLabel = isReschedule ? "Rescheduled" : "Scheduled";
+            var subject = $"Interview {actionLabel}: {applicant.JobPosition.Title} Position";
             var body = $@"
-                <h2>Interview Invitation</h2>
+                <h2>Interview {(isReschedule ? "Rescheduled" : "Invitation")}</h2>
                 <p>Dear <strong>{applicant.FullName}</strong>,</p>
-                <p>You have been invited for an interview for the <strong>{applicant.JobPosition.Title}</strong> position.</p>
+                <p>Your interview for the <strong>{applicant.JobPosition.Title}</strong> position has been {(isReschedule ? "rescheduled" : "scheduled")}.</p>
                 <p><strong>Date:</strong> {request.InterviewDate:MMMM dd, yyyy}</p>
                 <p><strong>Time:</strong> {request.InterviewTime}</p>
                 <p><strong>Location/Link:</strong> {request.LocationOrLink}</p>
@@ -285,27 +319,19 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 currentAccountId.Value,
                 ActivityTypes.RecruitmentStatusUpdated,
-                $"Scheduled interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
+                $"{(isReschedule ? "Rescheduled" : "Scheduled")} interview for applicant '{applicant.FullName}' on {request.InterviewDate:MM/dd/yyyy}."
             );
 
-            if (emailSent)
+            var message = emailSent
+                ? $"Interview {actionLabel.ToLower()} and email notification sent successfully."
+                : $"Interview {actionLabel.ToLower()}. Email dispatch failed. Retrying...";
+
+            return new ApiResponseDTO<string>
             {
-                return new ApiResponseDTO<string>
-                {
-                    IsSuccess = true,
-                    Message = "Interview scheduled and email notification sent successfully.",
-                    Data = interviewSchedule.InterviewScheduleId.ToString()
-                };
-            }
-            else
-            {
-                return new ApiResponseDTO<string>
-                {
-                    IsSuccess = true,
-                    Message = "Interview scheduled. Email dispatch failed. Retrying...",
-                    Data = interviewSchedule.InterviewScheduleId.ToString()
-                };
-            }
+                IsSuccess = true,
+                Message = message,
+                Data = existingSchedule.InterviewScheduleId.ToString()
+            };
         }
 
         private Guid? GetCurrentAccountId()

@@ -312,7 +312,7 @@ namespace OTMS.Data
             // InterviewSchedule -> ApplicantRecord
             modelBuilder.Entity<InterviewSchedule>()
                 .HasOne(i => i.ApplicantRecord)
-                .WithMany()
+                .WithMany(ar => ar.InterviewSchedules)
                 .HasForeignKey(i => i.ApplicantRecordId)
                 .OnDelete(DeleteBehavior.Cascade);
 

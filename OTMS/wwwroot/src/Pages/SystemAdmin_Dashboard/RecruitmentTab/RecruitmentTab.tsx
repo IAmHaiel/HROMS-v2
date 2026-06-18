@@ -758,15 +758,16 @@ interface InterviewSchedulingModalProps {
     applicant: ApplicantRecord;
     onClose: () => void;
     onScheduled: (applicantId: string, details: InterviewDetails) => void;
+    initialInterview?: InterviewDetails | null;
 }
 
-function InterviewSchedulingModal({ applicant, onClose, onScheduled }: InterviewSchedulingModalProps) {
+function InterviewSchedulingModal({ applicant, onClose, onScheduled, initialInterview }: InterviewSchedulingModalProps) {
     const [step, setStep] = useState<ScheduleStep>('form');
 
     // Form fields
-    const [date, setDate] = useState<string>('');
-    const [time, setTime] = useState<string>('');
-    const [location, setLocation] = useState<string>('');
+    const [date, setDate] = useState<string>(initialInterview?.date ?? '');
+    const [time, setTime] = useState<string>(initialInterview?.time ?? '');
+    const [location, setLocation] = useState<string>(initialInterview?.location ?? '');
 
     // Field errors
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -807,6 +808,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 interviewDate: date,
                 interviewTime: time,
                 locationOrLink: location.trim(),
+                interviewerName: adminName || 'Scheduler',
             };
             const res = await axios.post('/api/recruitment/schedule-interview', payload);
             const apiResult = res.data as any;
@@ -855,7 +857,7 @@ function InterviewSchedulingModal({ applicant, onClose, onScheduled }: Interview
                 {/* Header */}
                 <div className="rec-modal-header rec-modal-header--sticky">
                     <div>
-                        <h3 className="rec-modal-title">Schedule Interview</h3>
+                        <h3 className="rec-modal-title">{initialInterview ? 'Reschedule Interview' : 'Schedule Interview'}</h3>
                         <p className="rec-modal-subtitle">
                             Ref: <code className="rec-modal-ref">{applicant.referenceNumber || applicant.applicantId}</code>
                         </p>
@@ -1192,9 +1194,10 @@ interface ApplicantDetailModalProps {
     applicant: ApplicantRecord;
     onClose: () => void;
     onUpdateStatus: (applicant: ApplicantRecord) => void;
+    onReschedule: (applicant: ApplicantRecord) => void;
 }
 
-function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantDetailModalProps) {
+function ApplicantDetailModal({ applicant, onClose, onUpdateStatus, onReschedule }: ApplicantDetailModalProps) {
     const hasTransitions = (STATUS_TRANSITIONS[applicant.currentStatus]?.length ?? 0) > 0;
     const [onboardingStatus, setOnboardingStatus] = useState<string | null>(null);
 
@@ -1342,6 +1345,10 @@ function ApplicantDetailModal({ applicant, onClose, onUpdateStatus }: ApplicantD
                         <>
                             <span className="rec-section-label">Interview Scheduled</span>
                             <InterviewCard details={applicant.interviewDetails} />
+                            <button className="rec-btn rec-btn--outline" style={{ marginTop: 8 }}
+                                onClick={() => { onClose(); onReschedule(applicant); }}>
+                                <RefreshCw size={13} /> Reschedule
+                            </button>
                         </>
                     )}
 
@@ -1461,7 +1468,9 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     adminRemarks: null,
                     resumeUrl: null,
                     statusHistory: [],
-                    interviewDetails: null,
+                    interviewDetails: item.interviewDate
+                        ? { date: item.interviewDate.slice(0, 10), time: item.interviewTime || '', location: item.locationOrLink || '', interviewer: item.interviewerName || '' }
+                        : null,
                     highestEducationalAttainment: item.highestEducationalAttainment || '',
                     institution: item.institution || '',
                     degree: item.degree || '',
@@ -1519,6 +1528,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
     // Called by InterviewSchedulingModal when scheduling is complete
     const handleInterviewScheduled = (applicantId: string, details: InterviewDetails): void => {
         const now = new Date().toISOString();
+        const wasReschedule = applicants.some(a => a.applicantId === applicantId && !!a.interviewDetails);
         setApplicants((prev) =>
             prev.map((a) =>
                 a.applicantId === applicantId
@@ -1530,7 +1540,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     : a,
             ),
         );
-        success('Interview scheduled and email notification sent successfully.');
+        success(wasReschedule ? 'Interview rescheduled and email notification sent successfully.' : 'Interview scheduled and email notification sent successfully.');
         setScheduleApplicant(null);
     };
 
@@ -1629,6 +1639,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     applicant={detailApplicant}
                     onClose={() => setDetailApplicant(null)}
                     onUpdateStatus={(a) => { setDetailApplicant(null); setUpdateApplicant(a); }}
+                    onReschedule={(a) => { setDetailApplicant(null); setScheduleApplicant(a); }}
                 />
             )}
 
@@ -1650,6 +1661,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     applicant={scheduleApplicant}
                     onClose={() => setScheduleApplicant(null)}
                     onScheduled={handleInterviewScheduled}
+                    initialInterview={scheduleApplicant.interviewDetails}
                 />
             )}
         </>

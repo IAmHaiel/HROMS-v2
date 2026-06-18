@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using MimeKit;
 using OTMS.Common.Constraints;
 using OTMS.Data;
@@ -18,7 +20,9 @@ namespace OTMS.Service.Services
     public class NotificationService(
         OTMSDbContext context,
         IHttpContextAccessor httpContextAccessor,
-        IConfiguration configuration
+        IConfiguration configuration,
+        IWebHostEnvironment env,
+        ILogger<NotificationService> logger
         ) : INotificationService
     {
         private async Task<string> GetEmployeeEmailAsync(Guid accountId)
@@ -32,6 +36,17 @@ namespace OTMS.Service.Services
         private async System.Threading.Tasks.Task<bool> SendEmailAsync(string toEmail, string subject, string body)
         {
             if (string.IsNullOrWhiteSpace(toEmail)) return false;
+
+            if (env.IsDevelopment())
+            {
+                var logsDir = Path.Combine(env.ContentRootPath, "email_logs");
+                Directory.CreateDirectory(logsDir);
+                var fileName = $"{DateTime.UtcNow:yyyyMMddHHmmssfff}_{Guid.NewGuid():N}.html";
+                var html = $@"<h2>To: {toEmail}</h2><h3>Subject: {subject}</h3><hr>{body}";
+                await System.IO.File.WriteAllTextAsync(Path.Combine(logsDir, fileName), html);
+                logger.LogInformation("DEV MODE: Email saved to email_logs/{File} for {Email}", fileName, toEmail);
+                return true;
+            }
 
             try
             {
@@ -47,11 +62,7 @@ namespace OTMS.Service.Services
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
                 message.To.Add(new MailboxAddress("", toEmail));
                 message.Subject = subject;
-
-                message.Body = new TextPart("html")
-                {
-                    Text = body
-                };
+                message.Body = new TextPart("html") { Text = body };
 
                 using var client = new SmtpClient();
                 await client.ConnectAsync(smtpServer, smtpPort, useSsl);
@@ -60,8 +71,9 @@ namespace OTMS.Service.Services
                 await client.DisconnectAsync(true);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogWarning(ex, "SMTP send failed for {Email}.", toEmail);
                 return false;
             }
         }

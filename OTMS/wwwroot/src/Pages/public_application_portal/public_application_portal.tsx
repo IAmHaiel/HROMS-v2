@@ -409,6 +409,8 @@ export default function PublicApplicationPortal() {
         try {
             const formData = new FormData();
             formData.append('GoogleToken', googleToken);
+            const fullName = [form.firstName.trim(), form.middleName.trim(), form.lastName.trim(), form.suffix.trim()].filter(Boolean).join(' ');
+            formData.append('FullName', fullName);
             formData.append('FirstName', form.firstName.trim());
             if (form.middleName.trim()) formData.append('MiddleName', form.middleName.trim());
             formData.append('LastName', form.lastName.trim());
@@ -1174,15 +1176,7 @@ export default function PublicApplicationPortal() {
                             </div>
                             <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 28 }}>
                                 <button
-                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1 }}
-                                    onClick={resetPortal}
-                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-hover)')}
-                                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--primary)')}
-                                >
-                                    Submit Another Application
-                                </button>
-                                <button
-                                    style={{ ...s.submitBtn, marginTop: 0, flex: 1, background: 'var(--primary-dark)', boxShadow: 'var(--shadow-md)' }}
+                                    style={{ ...s.submitBtn, marginTop: 0, background: 'var(--primary-dark)', boxShadow: 'var(--shadow-md)' }}
                                     onClick={() => window.location.href = '/'}
                                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--primary-dark-hover)')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--primary-dark)')}

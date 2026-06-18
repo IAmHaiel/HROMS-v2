@@ -759,6 +759,9 @@ namespace OTMS.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("InterviewScheduleId");
 
                     b.HasIndex("ApplicantRecordId");
