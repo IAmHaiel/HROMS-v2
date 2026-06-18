@@ -149,6 +149,7 @@ interface Task {
     taskTitle: string;
     taskDescription: string;
     taskCategory?: string;
+    taskReferenceNumber?: string;
     priority: Priority;
     dueAt: string | null;
     taskStatus: TaskStatus;

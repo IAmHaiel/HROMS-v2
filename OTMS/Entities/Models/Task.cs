@@ -18,6 +18,9 @@ namespace OTMS.Entities.Models
         [MaxLength(2000)]
         public string? TaskDescription { get; set; }
 
+        [MaxLength(8)]
+        public string TaskReferenceNumber { get; set; } = string.Empty;
+
         [MaxLength(100)]
         public string? TaskCategory { get; set; }
 

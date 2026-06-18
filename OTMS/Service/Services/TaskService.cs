@@ -33,6 +33,12 @@ namespace OTMS.Service.Services
 
             var creatorId = Guid.Parse(accountIdClaim);
 
+            // Prevent self-assignment
+            if (request.AssignedTo == creatorId)
+            {
+                throw new Exception("You cannot assign a task to yourself.");
+            }
+
             // Validate deadline is in the future
             if (request.DueAt <= DateTime.UtcNow)
             {
@@ -127,6 +133,9 @@ namespace OTMS.Service.Services
                 }
             }
 
+            // Generate unique task reference number
+            var taskReferenceNumber = await GenerateTaskReferenceNumberAsync();
+
             // Create Task
             var task = new OTMS.Entities.Models.Task
             {
@@ -135,6 +144,7 @@ namespace OTMS.Service.Services
                 AssignedTo = request.AssignedTo,
                 TaskTitle = request.TaskTitle,
                 TaskDescription = request.TaskDescription,
+                TaskReferenceNumber = taskReferenceNumber,
                 TaskCategory = request.TaskCategory,
                 Priority = request.Priority,
                 DueAt = request.DueAt,
@@ -156,8 +166,8 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 creatorId,
                 ActivityTypes.TaskCreated,
-                $"{string.Join(" ", new[]
-                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created and assigned task '{request.TaskTitle}' to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}.");
+$"{string.Join(" ", new[]
+    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created and assigned task reference {taskReferenceNumber} '{request.TaskTitle}' to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}.");
 
             // Send notification to assigned employee
             await notificationService.CreateTaskAssignedNotificationAsync(task);
@@ -190,6 +200,7 @@ namespace OTMS.Service.Services
                 TaskTitle = task.TaskTitle,
                 TaskDescription = task.TaskDescription,
                 TaskCategory = task.TaskCategory,
+                TaskReferenceNumber = task.TaskReferenceNumber,
                 Priority = task.Priority,
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
@@ -758,6 +769,7 @@ namespace OTMS.Service.Services
                     t.TaskId,
                     t.TaskTitle,
                     t.TaskDescription,
+                    t.TaskReferenceNumber,
                     t.Priority,
                     t.DueAt,
                     t.TaskStatus,
@@ -779,6 +791,7 @@ namespace OTMS.Service.Services
                 TaskId = r.TaskId,
                 TaskTitle = r.TaskTitle,
                 TaskDescription = r.TaskDescription,
+                TaskReferenceNumber = r.TaskReferenceNumber,
                 Priority = r.Priority,
                 DueAt = r.DueAt,
                 TaskStatus = r.TaskStatus,
@@ -839,6 +852,7 @@ namespace OTMS.Service.Services
                     t.TaskTitle,
                     t.TaskDescription,
                     t.TaskCategory,
+                    t.TaskReferenceNumber,
                     t.Priority,
                     t.DueAt,
                     t.TaskStatus,
@@ -862,6 +876,7 @@ namespace OTMS.Service.Services
                 TaskTitle = t.TaskTitle,
                 TaskDescription = t.TaskDescription,
                 TaskCategory = t.TaskCategory,
+                TaskReferenceNumber = t.TaskReferenceNumber,
                 Priority = t.Priority,
                 DueAt = t.DueAt,
                 TaskStatus = t.TaskStatus,
@@ -1038,11 +1053,13 @@ namespace OTMS.Service.Services
                     t.TaskId,
                     t.TaskTitle,
                     t.TaskDescription,
+                    t.TaskReferenceNumber,
                     t.Priority,
                     t.DueAt,
                     t.TaskStatus,
                     t.CreatedAt,
                     t.Deleted,
+                    t.SupportingEvidenceUrl,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
                     AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
                     AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
@@ -1059,9 +1076,11 @@ namespace OTMS.Service.Services
                 TaskId = t.TaskId,
                 TaskTitle = t.TaskTitle,
                 TaskDescription = t.TaskDescription,
+                TaskReferenceNumber = t.TaskReferenceNumber,
                 Priority = t.Priority,
                 DueAt = t.DueAt,
                 TaskStatus = t.TaskStatus,
+                SupportingEvidenceUrl = t.SupportingEvidenceUrl,
                 AssignedEmployee = string.Join(" ", new[]
                                 {t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedByEmployee = string.Join(" ", new[]
@@ -1121,11 +1140,15 @@ namespace OTMS.Service.Services
 
         public async Task<ApiResponseDTO<PaginationResponseDTO<AssignableEmployeeDTO>>> GetAssignableEmployeesAsync(PaginationDTO pagination, string? nameFilter)
         {
+            var currentAccountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? currentAccountId = !string.IsNullOrEmpty(currentAccountIdClaim) ? Guid.Parse(currentAccountIdClaim) : null;
+
             var query = context.Accounts
                 .Include(a => a.Employee)
                 .Include(a => a.Role)
                 .Include(a => a.AssignedTasks)
-                .Where(a => a.Role != null && a.Role.Name != Roles.SystemAdmin && a.AccountStatus != "On Leave");
+                .Where(a => a.Role != null && a.Role.Name != Roles.SystemAdmin && a.AccountStatus != "On Leave")
+                .Where(a => !currentAccountId.HasValue || a.AccountId != currentAccountId.Value);
 
             if (!string.IsNullOrEmpty(nameFilter))
             {
@@ -1300,6 +1323,7 @@ namespace OTMS.Service.Services
                     t.TaskId,
                     t.TaskTitle,
                     t.TaskDescription,
+                    t.TaskReferenceNumber,
                     t.Priority,
                     t.DueAt,
                     t.TaskStatus,
@@ -1320,6 +1344,7 @@ namespace OTMS.Service.Services
                 TaskId = t.TaskId,
                 TaskTitle = t.TaskTitle,
                 TaskDescription = t.TaskDescription,
+                TaskReferenceNumber = t.TaskReferenceNumber,
                 Priority = t.Priority,
                 DueAt = t.DueAt,
                 TaskStatus = t.TaskStatus,
@@ -1576,6 +1601,19 @@ namespace OTMS.Service.Services
                 isSuccessful ? ActivityTypes.TaskStatusUpdated : ActivityTypes.TaskStatusUpdateFailed,
                 statusLogMsg
             );
+        }
+
+        private async Task<string> GenerateTaskReferenceNumberAsync()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            string refNo;
+            do
+            {
+                refNo = new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+            }
+            while (await context.Tasks.AnyAsync(t => t.TaskReferenceNumber == refNo));
+            return refNo;
         }
     }
 }
