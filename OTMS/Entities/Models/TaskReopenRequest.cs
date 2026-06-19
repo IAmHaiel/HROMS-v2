@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace OTMS.Entities.Models
 {
@@ -11,6 +12,9 @@ namespace OTMS.Entities.Models
 
         public Guid RequestedById { get; set; }
         public Account RequestedBy { get; set; } = null!;
+
+        [MaxLength(8)]
+        public string ReferenceNumber { get; set; } = string.Empty;
 
         public string Reason { get; set; } = string.Empty;
         public string? EvidenceUrl { get; set; }

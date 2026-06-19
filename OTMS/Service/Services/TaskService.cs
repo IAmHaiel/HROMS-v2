@@ -324,8 +324,6 @@ namespace OTMS.Service.Services
             task.AssignedTo = request.AssignedTo;
             task.TaskRemarks = request.TaskRemarks;
 
-            task.UpdatedAt = DateTime.UtcNow;
-
             await context.SaveChangesAsync();
 
             // Reload assignee if changed
@@ -435,17 +433,28 @@ namespace OTMS.Service.Services
                 }
             }
 
+            // Check for existing pending reopen request
+            var existingPending = await context.TaskReopenRequests
+                .AnyAsync(r => r.TaskId == taskId && r.Status == "Pending");
+            if (existingPending)
+            {
+                throw new Exception("A reopen request for this task is already pending review.");
+            }
+
             string? evidenceUrl = null;
             if (request.SupportingEvidence != null)
             {
                 evidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
+            var reopenRefNumber = await GenerateTaskReferenceNumberAsync();
+
             var reopenRequest = new TaskReopenRequest
             {
                 RequestId = Guid.NewGuid(),
                 TaskId = taskId,
                 RequestedById = loggedInAccountId,
+                ReferenceNumber = reopenRefNumber,
                 Reason = request.Reason,
                 EvidenceUrl = evidenceUrl,
                 Status = "Pending",
@@ -553,6 +562,12 @@ namespace OTMS.Service.Services
                 $"Reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed. Remarks: {request.AdminRemarks}");
 
             await notificationService.CreateGeneralNotificationAsync(reopenReq.RequestedById, "Task Reopen Decision", $"Your reopen request for Task '{reopenReq.Task.TaskTitle}' was {request.ApprovalDecision.ToLower()}ed.");
+
+            // Notify the reviewing admin of the approval outcome
+            if (request.ApprovalDecision == "Approve")
+            {
+                await notificationService.CreateGeneralNotificationAsync(loggedInAccountId, "Reopen Request Approved", $"Task '{reopenReq.Task.TaskTitle}' has been reopened and set to 'In Progress'.");
+            }
 
             await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
@@ -1557,6 +1572,7 @@ namespace OTMS.Service.Services
                 .Select(r => new
                 {
                     r.RequestId,
+                    r.ReferenceNumber,
                     r.TaskId,
                     r.Task.TaskTitle,
                     EmpFirstName = r.RequestedBy.Employee.FirstName,
@@ -1576,6 +1592,7 @@ namespace OTMS.Service.Services
             var result = requests.Select(r => new ReopenRequestListDTO
             {
                 RequestId = r.RequestId,
+                ReferenceNumber = r.ReferenceNumber,
                 TaskId = r.TaskId,
                 TaskTitle = r.TaskTitle,
                 EmployeeName = string.Join(" ", new[] { r.EmpFirstName, r.EmpMiddleName, r.EmpLastName, r.EmpSuffix }.Where(n => !string.IsNullOrEmpty(n))),
@@ -1696,7 +1713,8 @@ namespace OTMS.Service.Services
             {
                 refNo = new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
             }
-            while (await context.Tasks.AnyAsync(t => t.TaskReferenceNumber == refNo));
+            while (await context.Tasks.AnyAsync(t => t.TaskReferenceNumber == refNo)
+                || await context.TaskReopenRequests.AnyAsync(r => r.ReferenceNumber == refNo));
             return refNo;
         }
     }

@@ -29,8 +29,10 @@ import {
     ChevronUp,
     ChevronLeft,
     RefreshCw,
+    RotateCcw,
     LogOut,
     Mail,
+    MessageCircle,
     Activity,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
@@ -48,6 +50,7 @@ import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
 import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import FormModal from '../../components/FormModal/FormModal';
+import TaskComments from '../../components/TaskComments/TaskComments';
 import EmptyState from '../../components/ui/EmptyState';
 import DataTable from '../../components/ui/DataTable';
 
@@ -66,6 +69,10 @@ interface Task {
     status: TaskStatus;
     progress: number;
     assignedBy: string;
+    taskCategory?: string;
+    taskReferenceNumber?: string;
+    supportingEvidenceUrl?: string;
+    updatedAt?: string;
     remarks?: string;
 }
 
@@ -73,12 +80,16 @@ interface TaskResponseDTO {
     taskId: string;
     taskTitle: string;
     taskDescription?: string;
+    taskCategory?: string;
+    taskReferenceNumber?: string;
     priority: string;
     dueAt: string;
     taskStatus: string;
     assignedEmployee: string;
     createdByEmployee: string;
     createdAt: string;
+    updatedAt?: string;
+    supportingEvidenceUrl?: string;
 }
 
 interface UserProfile {
@@ -148,6 +159,10 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         status,
         progress: defaultProgress[status],
         assignedBy: dto.createdByEmployee,
+        taskCategory: dto.taskCategory,
+        taskReferenceNumber: dto.taskReferenceNumber,
+        supportingEvidenceUrl: dto.supportingEvidenceUrl,
+        updatedAt: dto.updatedAt,
     };
 };
 
@@ -158,6 +173,11 @@ const fmtDate = (d: string): string => {
     return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
     });
+};
+
+const fmtDateTime = (d: string): string => {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
@@ -239,13 +259,17 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
 interface TaskDetailProps {
     task: Task;
     onUpdate: () => void;
+    onReopen: () => void;
     onClose: () => void;
 }
 
-const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
+const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClose }) => {
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
+    const [showComments, setShowComments] = useState(false);
+
+    const refDisplay = task.taskReferenceNumber || task.id.slice(0, 8).toUpperCase();
 
     return (
         <FormModal isOpen onClose={onClose} title={task.name} subtitle={sm.label} size="md"
@@ -257,9 +281,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                             <Pencil size={13} /> Update Progress
                         </button>
                     )}
+                    {(task.status === 'completed' || task.status === 'done') && (
+                        <button className="btn btn-primary" onClick={onReopen} style={{ background: '#b45309', borderColor: '#b45309' }}>
+                            <RotateCcw size={13} /> Request Reopening
+                        </button>
+                    )}
                 </div>
             }
         >
+            <div style={{ marginBottom: 10 }}>
+                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                    #{refDisplay}
+                </span>
+            </div>
             {task.description && (
                 <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
@@ -272,6 +306,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
                     { label: 'Assigned by', value: task.assignedBy },
                     { label: 'Progress', value: `${task.progress}%` },
+                    ...(task.taskCategory ? [{ label: 'Category', value: task.taskCategory }] : []),
+                    ...(task.updatedAt ? [{ label: 'Last Updated', value: fmtDateTime(task.updatedAt) }] : []),
                 ].map(({ label, value, style }) => (
                     <div key={label}>
                         <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
@@ -282,12 +318,38 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
             <div className="tc-bar" style={{ height: 8, marginBottom: 12 }}>
                 <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
             </div>
+            {task.supportingEvidenceUrl && (
+                <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Supporting Document</label>
+                    <div style={{ marginTop: 4 }}>
+                        <a href={task.supportingEvidenceUrl} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <FileText size={14} /> View Attachment
+                        </a>
+                    </div>
+                </div>
+            )}
             {task.remarks && (
-                <div>
+                <div style={{ marginBottom: 12 }}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
                     <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
                 </div>
             )}
+
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+                <button
+                    className="btn btn-sm"
+                    onClick={() => setShowComments(v => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                >
+                    <MessageCircle size={14} /> {showComments ? 'Hide Comments' : 'Show Comments'}
+                </button>
+                {showComments && (
+                    <div style={{ marginTop: 8, maxHeight: 300, overflowY: 'auto' }}>
+                        <TaskComments taskId={task.id} currentEmployeeId="" />
+                    </div>
+                )}
+            </div>
         </FormModal>
     );
 };
@@ -414,6 +476,68 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     />
                     <div className="leave-char-count">{remarks.length} / 300</div>
                 </div>
+        </FormModal>
+    );
+};
+
+// ─── Reopen Request Modal ─────────────────────────────────────────────────────
+
+interface ReopenRequestModalProps {
+    task: Task;
+    onSave: (taskId: string, reason: string, evidence: File | null) => Promise<void>;
+    onClose: () => void;
+}
+
+const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onSave, onClose }) => {
+    const [reason, setReason] = useState('');
+    const [evidence, setEvidence] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSave = async () => {
+        if (!reason.trim()) { setError('Reopening reason is required.'); return; }
+        if (reason.trim().length > 500) { setError('Reason must not exceed 500 characters.'); return; }
+        setSaving(true); setError('');
+        try {
+            await onSave(task.id, reason.trim(), evidence);
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit reopen request.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <FormModal isOpen onClose={onClose} title="Request Task Reopening" subtitle={task.name} size="sm"
+            footer={
+                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving ? <><Loader2 size={13} className="spin" /> Submitting.</> : <><RotateCcw size={13} /> Submit Request</>}
+                    </button>
+                </div>
+            }
+        >
+            <div className="field">
+                <label>Reopening Reason <span style={{ color: 'red' }}>*</span></label>
+                <textarea className="leave-reason-textarea" rows={4} maxLength={500}
+                    placeholder="Explain why this task needs to be reopened…"
+                    value={reason} onChange={e => { setReason(e.target.value); setError(''); }} />
+                <div className="leave-char-count">{reason.length} / 500</div>
+                {error && <span style={{ fontSize: 11, color: 'var(--status-failed)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}><AlertCircle size={11} />{error}</span>}
+            </div>
+            <div className="field" style={{ marginTop: 12 }}>
+                <label>Supporting Evidence <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                <input type="file" accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) setEvidence(f); }}
+                    style={{ fontSize: 13, marginTop: 4 }} />
+                {evidence && (
+                    <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
+                        {evidence.name} ({(evidence.size / 1024).toFixed(0)} KB)
+                    </span>
+                )}
+            </div>
         </FormModal>
     );
 };
@@ -1469,6 +1593,7 @@ export default function EmployeeDashboard() {
     const [tasksError, setTasksError] = useState('');
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [reopeningId, setReopeningId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -1623,6 +1748,23 @@ export default function EmployeeDashboard() {
             progress: status === 'done' ? 100 : status === 'completed' ? 100 : progress,
             remarks: remarks.trim() || t.remarks,
         } : t));
+    };
+
+    const handleSubmitReopenRequest = async (taskId: string, reason: string, evidence: File | null) => {
+        const formData = new FormData();
+        formData.append('Reason', reason);
+        if (evidence) formData.append('SupportingEvidence', evidence);
+        const res = await fetch(`/api/task/${taskId}/reopen-request`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+            body: formData,
+        });
+        if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as any).message || 'Failed to submit reopen request.');
+        }
+        setReopeningId(null);
     };
 
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
@@ -1788,7 +1930,15 @@ export default function EmployeeDashboard() {
                 <TaskDetail
                     task={viewingTask}
                     onUpdate={() => { setUpdatingId(viewingTask.id); setViewingId(null); }}
+                    onReopen={() => { setReopeningId(viewingTask.id); setViewingId(null); }}
                     onClose={() => setViewingId(null)}
+                />
+            )}
+            {reopeningId && tasks.find(t => t.id === reopeningId) && (
+                <ReopenRequestModal
+                    task={tasks.find(t => t.id === reopeningId)!}
+                    onSave={handleSubmitReopenRequest}
+                    onClose={() => setReopeningId(null)}
                 />
             )}
             {updatingTask && (
