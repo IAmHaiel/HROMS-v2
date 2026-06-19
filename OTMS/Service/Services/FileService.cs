@@ -74,7 +74,7 @@ namespace OTMS.Service.Services
                 Directory.CreateDirectory(uploadsFolder);
             }
 
-            var uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
+            var uniqueFileName = Path.GetFileName(file.FileName);
             var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
             using (var stream = new FileStream(filePath, FileMode.Create))
