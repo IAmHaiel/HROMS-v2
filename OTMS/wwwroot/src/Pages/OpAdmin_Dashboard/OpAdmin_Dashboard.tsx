@@ -2123,8 +2123,6 @@ const TeamTab: React.FC<{
     onView: (id: string) => void;
 }> = ({ tasks, teamMembers, onView }) => {
     const [selectedMemberId, setSelectedMemberId] = useState(teamMembers[0]?.accountId ?? '');
-    const maxLoad = Math.max(...teamMembers.map(m =>
-        tasks.filter(t => t.assignedEmployee === m.employeeName).length), 1);
 
     return (
         <div className="dashboard-content">
@@ -2157,14 +2155,16 @@ const TeamTab: React.FC<{
                     <div className="card-header-layout"><h3>Workload Distribution</h3></div>
                     <div className="perf-bars">
                         {teamMembers.map(m => {
-                            const cnt = tasks.filter(t => t.assignedEmployee === m.employeeName).length;
+                            const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
+                            const mc = mt.filter(t => t.taskStatus === 'Completed').length;
+                            const pct = mt.length > 0 ? Math.round(mc / mt.length * 100) : 0;
                             return (
                                 <div key={m.accountId} className="perf-item">
                                     <span className="perf-label">{m.employeeName.split(' ')[0]}</span>
                                     <div className="perf-track">
-                                        <div className="perf-fill fill-primary" style={{ width: `${Math.round(cnt / maxLoad * 100)}%` }} />
+                                        <div className="perf-fill" style={{ width: `${pct}%`, background: pct >= 80 ? 'var(--status-active)' : pct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)', borderRadius: 3, height: '100%', transition: 'width 0.4s ease' }} />
                                     </div>
-                                    <span className="perf-pct">{cnt}</span>
+                                    <span className="perf-pct">{mc}/{mt.length}</span>
                                 </div>
                             );
                         })}
@@ -3803,7 +3803,7 @@ export default function OpsAdminDashboard() {
 
             setTeamMembers(rawList.map(e => ({
                 accountId: e.accountId ?? e.AccountId ?? e.id,
-                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').trim(),
+                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').replace(/-\s*Recommended\s*$/i, '').trim(),
                 role: e.role ?? '',
                 presenceStatus: e.availabilityStatus ?? 'Active',
             })));
