@@ -12,5 +12,6 @@ namespace OTMS.Service.Interfaces
         Task<TaskTemplateResponseDTO> UpdateTaskTemplateAsync(Guid templateId, TaskTemplateUpdateDTO request);
         Task<TaskTemplateResponseDTO> ToggleTemplateStatusAsync(Guid templateId);
         Task<PaginationResponseDTO<TaskTemplateResponseDTO>> GetTaskTemplatesAsync(PaginationDTO request);
+        System.Threading.Tasks.Task DeleteTaskTemplateAsync(Guid templateId);
     }
 }

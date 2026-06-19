@@ -1839,6 +1839,23 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
 
     useEffect(() => { fetchTemplates(); }, []);
 
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+    const handleDeleteTemplate = async (templateId: string) => {
+        try {
+            const res = await fetch(`/api/taskTemplate/${templateId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete template.'); }
+            success('Task template deleted successfully.');
+            setDeleteConfirm(null);
+            await fetchTemplates();
+        } catch (err: any) {
+            error(err.message ?? 'Failed to delete template.');
+        }
+    };
+
     const handleToggle = async (templateId: string) => {
         try {
             const res = await fetch(`/api/taskTemplate/${templateId}/toggle-status`, {
@@ -1855,11 +1872,10 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
 
     const handleSave = async (data: CreateTemplateDTO, templateId?: string) => {
         if (templateId) {
-            const { recurrenceStartDate: _, ...updateData } = data;
             const res = await fetch(`/api/taskTemplate/${templateId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-                body: JSON.stringify(updateData),
+                body: JSON.stringify(data),
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update template.'); }
             success('Task template updated successfully.');
@@ -1922,12 +1938,29 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                                         onClick: () => handleToggle(t.templateId),
                                         variant: 'default' as const,
                                     },
+                                    {
+                                        label: 'Delete',
+                                        icon: <Trash2 size={12} />,
+                                        onClick: () => setDeleteConfirm(t.templateId),
+                                        variant: 'danger' as const,
+                                    },
                                 ]}
                             />
                         </td>
                     </tr>
                 ))}
             </DataTable>
+
+            <ConfirmationModal
+                isOpen={deleteConfirm !== null}
+                variant="danger"
+                title="Delete Task Template"
+                description="Are you sure you want to delete this task template? This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                onConfirm={() => deleteConfirm && handleDeleteTemplate(deleteConfirm)}
+                onCancel={() => setDeleteConfirm(null)}
+            />
 
             {showModal && (
                 <TemplateModal
@@ -4181,6 +4214,12 @@ export default function OpsAdminDashboard() {
         fetchDashboardData();
         fetchActivityLogs(1);
     }, [fetchDashboardData]);
+
+    // -- Polling fallback: refresh tasks periodically regardless of SignalR --
+    useEffect(() => {
+        const interval = setInterval(() => fetchTasks(), 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // -- SignalR: Auto-refresh dashboard when task data changes --
     useEffect(() => {

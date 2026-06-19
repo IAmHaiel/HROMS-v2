@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace OTMS.Service.Services
 {
-    public class TaskTemplateService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService) : ITaskTemplateService
+    public class TaskTemplateService(OTMSDbContext context, IHttpContextAccessor httpContextAccessor, IActivityLogService activityLogService, INotificationService notificationService) : ITaskTemplateService
     {
         public async Task<TaskTemplateResponseDTO> CreateTaskTemplateAsync(TaskTemplateCreationDTO request)
         {
@@ -36,13 +36,22 @@ namespace OTMS.Service.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
-            // Calculate next generation date
-            template.NextGenerationDate = CalculateNextGenerationDate(template.RecurrenceStartDate, template.RecurrenceType);
+            // If the start date is in the past, trigger first generation immediately
+            if (template.RecurrenceStartDate <= DateTime.UtcNow)
+            {
+                template.NextGenerationDate = DateTime.UtcNow;
+            }
+            else
+            {
+                template.NextGenerationDate = CalculateNextGenerationDate(template.RecurrenceStartDate, template.RecurrenceType);
+            }
 
             await context.TaskTemplates.AddAsync(template);
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(loggedInAccountId, "Task Template Created", $"Operations Admin created task template '{template.TemplateName}'.");
+
+            await notificationService.CreateGeneralNotificationAsync(loggedInAccountId, "Task Template Created", $"Task template '{template.TemplateName}' was created successfully.");
 
             return await MapToResponseDTOAsync(template.TemplateId);
         }
@@ -60,10 +69,17 @@ namespace OTMS.Service.Services
             template.TemplateDescription = request.TemplateDescription;
             template.PriorityLevel = request.PriorityLevel;
 
-            if (template.RecurrenceType != request.RecurrenceType)
+            bool typeChanged = template.RecurrenceType != request.RecurrenceType;
+            bool startDateChanged = template.RecurrenceStartDate != request.RecurrenceStartDate;
+
+            if (typeChanged)
             {
                 template.RecurrenceType = request.RecurrenceType;
-                // If type changes, recalculate from LastGeneratedDate or RecurrenceStartDate
+            }
+
+            if (startDateChanged || typeChanged)
+            {
+                template.RecurrenceStartDate = request.RecurrenceStartDate;
                 DateTime baseDate = template.LastGeneratedDate ?? template.RecurrenceStartDate;
                 template.NextGenerationDate = CalculateNextGenerationDate(baseDate, template.RecurrenceType);
             }
@@ -75,6 +91,8 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(loggedInAccountId, "Task Template Updated", $"Operations Admin updated task template '{template.TemplateName}'.");
+
+            await notificationService.CreateGeneralNotificationAsync(loggedInAccountId, "Task Template Updated", $"Task template '{template.TemplateName}' was updated.");
 
             return await MapToResponseDTOAsync(template.TemplateId);
         }
@@ -95,38 +113,77 @@ namespace OTMS.Service.Services
 
             await activityLogService.LogActivityAsync(loggedInAccountId, "Task Template Status Toggled", $"Operations Admin changed template '{template.TemplateName}' status to {template.TemplateStatus}.");
 
+            await notificationService.CreateGeneralNotificationAsync(loggedInAccountId, "Task Template Status Changed", $"Task template '{template.TemplateName}' is now {template.TemplateStatus}.");
+
             return await MapToResponseDTOAsync(template.TemplateId);
+        }
+
+        public async System.Threading.Tasks.Task DeleteTaskTemplateAsync(Guid templateId)
+        {
+            var accountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
+            var loggedInAccountId = Guid.Parse(accountIdClaim);
+
+            var template = await context.TaskTemplates.FindAsync(templateId);
+            if (template == null) throw new Exception("Task Template not found.");
+
+            context.TaskTemplates.Remove(template);
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(loggedInAccountId, "Task Template Deleted", $"Operations Admin deleted task template '{template.TemplateName}'.");
+            await notificationService.CreateGeneralNotificationAsync(loggedInAccountId, "Task Template Deleted", $"Task template '{template.TemplateName}' was deleted.");
         }
 
         public async Task<PaginationResponseDTO<TaskTemplateResponseDTO>> GetTaskTemplatesAsync(PaginationDTO request)
         {
             var query = context.TaskTemplates
-                .Include(tt => tt.Creator).ThenInclude(a => a.Employee)
-                .Include(tt => tt.Assignee).ThenInclude(a => a.Employee)
                 .OrderByDescending(tt => tt.CreatedAt);
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var rawData = await query
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(tt => new TaskTemplateResponseDTO
+                .Select(tt => new
                 {
-                    TemplateId = tt.TemplateId,
-                    TemplateName = tt.TemplateName,
-                    TemplateDescription = tt.TemplateDescription,
-                    PriorityLevel = tt.PriorityLevel,
-                    RecurrenceType = tt.RecurrenceType,
-                    RecurrenceStartDate = tt.RecurrenceStartDate,
-                    AssignedEmployeeId = tt.AssignedEmployee,
-                    AssignedEmployeeName = tt.Assignee != null ? string.Join(" ", new[] { tt.Assignee.Employee.FirstName, tt.Assignee.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))) : null,
-                    TemplateStatus = tt.TemplateStatus,
-                    NextGenerationDate = tt.NextGenerationDate,
-                    LastGeneratedDate = tt.LastGeneratedDate,
-                    CreatedBy = tt.CreatedBy,
-                    CreatedByName = string.Join(" ", new[] { tt.Creator.Employee.FirstName, tt.Creator.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = tt.CreatedAt
-                }).ToListAsync();
+                    tt.TemplateId,
+                    tt.TemplateName,
+                    tt.TemplateDescription,
+                    tt.PriorityLevel,
+                    tt.RecurrenceType,
+                    tt.RecurrenceStartDate,
+                    tt.AssignedEmployee,
+                    tt.TemplateStatus,
+                    tt.NextGenerationDate,
+                    tt.LastGeneratedDate,
+                    tt.CreatedBy,
+                    tt.CreatedAt,
+                    AssigneeFirstName = tt.Assignee != null ? tt.Assignee.Employee.FirstName : null,
+                    AssigneeLastName = tt.Assignee != null ? tt.Assignee.Employee.LastName : null,
+                    CreatorFirstName = tt.Creator.Employee.FirstName,
+                    CreatorLastName = tt.Creator.Employee.LastName,
+                })
+                .ToListAsync();
+
+            var data = rawData.Select(tt => new TaskTemplateResponseDTO
+            {
+                TemplateId = tt.TemplateId,
+                TemplateName = tt.TemplateName,
+                TemplateDescription = tt.TemplateDescription,
+                PriorityLevel = tt.PriorityLevel,
+                RecurrenceType = tt.RecurrenceType,
+                RecurrenceStartDate = tt.RecurrenceStartDate,
+                AssignedEmployeeId = tt.AssignedEmployee,
+                AssignedEmployeeName = tt.AssigneeFirstName != null
+                    ? string.Join(" ", new[] { tt.AssigneeFirstName, tt.AssigneeLastName }.Where(n => !string.IsNullOrEmpty(n)))
+                    : null,
+                TemplateStatus = tt.TemplateStatus,
+                NextGenerationDate = tt.NextGenerationDate,
+                LastGeneratedDate = tt.LastGeneratedDate,
+                CreatedBy = tt.CreatedBy,
+                CreatedByName = string.Join(" ", new[] { tt.CreatorFirstName, tt.CreatorLastName }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = tt.CreatedAt
+            }).ToList();
 
             return new PaginationResponseDTO<TaskTemplateResponseDTO>
             {

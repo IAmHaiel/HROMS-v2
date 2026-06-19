@@ -107,6 +107,7 @@ namespace OTMS.Service.Services
 
             foreach (var group in employeeGroups)
             {
+                if (group.Key == null) continue;
                 var employee = group.Key.Employee;
                 var employeeName = string.Join(" ", new[] { employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)));
 
