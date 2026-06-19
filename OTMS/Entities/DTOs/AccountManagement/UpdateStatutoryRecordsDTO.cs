@@ -16,8 +16,7 @@ namespace OTMS.Entities.DTOs.AccountManagement
         [Required]
         public string PagibigNumber { get; set; } = string.Empty;
 
-        [Required]
-        public string TinNumber { get; set; } = string.Empty;
+        public string? TinNumber { get; set; }
 
         public string? BankName { get; set; }
         public string? BankAccountNumber { get; set; }

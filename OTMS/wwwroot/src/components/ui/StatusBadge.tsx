@@ -40,6 +40,10 @@ const BADGE_CLASSES: Record<string, string> = {
     High: 'badge badge-red',
     Medium: 'badge badge-amber',
     Low: 'badge badge-green',
+    Backlog: 'badge badge-gray',
+    'To do': 'badge badge-blue',
+    'In progress': 'badge badge-amber',
+    'In review': 'badge badge-purple',
 };
 
 export default function StatusBadge({ status, size = 'md', className = '', icon }: StatusBadgeProps) {

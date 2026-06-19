@@ -412,36 +412,16 @@ namespace OTMS.Service.Services
             onboardingToken.UsedAt = DateTime.UtcNow;
 
             var oldStatus = applicant.Status;
-            applicant.Status = "Hired/Converted";
+            applicant.Status = "Hired";
 
-            // Save 201 File data to ApplicantRecord
+            // Save profile data to ApplicantRecord
             if (formData != null)
             {
-                if (!string.IsNullOrWhiteSpace(formData.SSSNumber)) applicant.SSSNumber = formData.SSSNumber;
-                if (!string.IsNullOrWhiteSpace(formData.PhilHealthNumber)) applicant.PhilHealthNumber = formData.PhilHealthNumber;
-                if (!string.IsNullOrWhiteSpace(formData.PagIBIGNumber)) applicant.PagIBIGNumber = formData.PagIBIGNumber;
-                if (!string.IsNullOrWhiteSpace(formData.TIN)) applicant.TIN = formData.TIN;
-                if (!string.IsNullOrWhiteSpace(formData.BankName)) applicant.BankName = formData.BankName;
-                if (!string.IsNullOrWhiteSpace(formData.BankAccountName)) applicant.BankAccountName = formData.BankAccountName;
-                if (!string.IsNullOrWhiteSpace(formData.BankAccountNumber)) applicant.BankAccountNumber = formData.BankAccountNumber;
-                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactName)) applicant.EmergencyContactName = formData.EmergencyContactName;
-                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactRelationship)) applicant.EmergencyContactRelationship = formData.EmergencyContactRelationship;
-                if (!string.IsNullOrWhiteSpace(formData.EmergencyContactMobileNumber)) applicant.EmergencyContactMobileNumber = formData.EmergencyContactMobileNumber;
-                if (!string.IsNullOrWhiteSpace(formData.MotherFirstName)) applicant.MotherFirstName = formData.MotherFirstName;
-                if (!string.IsNullOrWhiteSpace(formData.MotherMiddleName)) applicant.MotherMiddleName = formData.MotherMiddleName;
-                if (!string.IsNullOrWhiteSpace(formData.MotherLastName)) applicant.MotherLastName = formData.MotherLastName;
-                if (!string.IsNullOrWhiteSpace(formData.FatherFirstName)) applicant.FatherFirstName = formData.FatherFirstName;
-                if (!string.IsNullOrWhiteSpace(formData.FatherMiddleName)) applicant.FatherMiddleName = formData.FatherMiddleName;
-                if (!string.IsNullOrWhiteSpace(formData.FatherLastName)) applicant.FatherLastName = formData.FatherLastName;
                 if (!string.IsNullOrWhiteSpace(formData.FirstName)) applicant.FirstName = formData.FirstName;
                 if (!string.IsNullOrWhiteSpace(formData.MiddleName)) applicant.MiddleName = formData.MiddleName;
                 if (!string.IsNullOrWhiteSpace(formData.LastName)) applicant.LastName = formData.LastName;
                 if (!string.IsNullOrWhiteSpace(formData.Suffix)) applicant.Suffix = formData.Suffix;
                 if (!string.IsNullOrWhiteSpace(formData.ContactNumber)) applicant.ContactNumber = formData.ContactNumber;
-                if (!string.IsNullOrWhiteSpace(formData.EducationLevel)) applicant.HighestEducationalAttainment = formData.EducationLevel;
-                if (!string.IsNullOrWhiteSpace(formData.EducationInstitution)) applicant.Institution = formData.EducationInstitution;
-                if (!string.IsNullOrWhiteSpace(formData.EducationDegree)) applicant.Degree = formData.EducationDegree;
-                if (formData.EducationYearGraduated.HasValue) applicant.YearGraduated = formData.EducationYearGraduated.Value.ToString();
                 applicant.UpdatedAt = DateTime.UtcNow;
             }
             context.ApplicantStatusRecords.Add(new ApplicantStatusRecord
@@ -449,7 +429,7 @@ namespace OTMS.Service.Services
                 ApplicantStatusRecordId = Guid.NewGuid(),
                 ApplicantRecordId = applicant.ApplicantRecordId,
                 OldStatus = oldStatus,
-                NewStatus = "Hired/Converted",
+                NewStatus = "Hired",
                 Remarks = "Automated account conversion upon onboarding completion.",
                 UpdatedById = onboardingToken.CreatedByAccountId,
                 UpdatedAt = DateTime.UtcNow
@@ -513,7 +493,7 @@ namespace OTMS.Service.Services
             await activityLogService.LogActivityAsync(
                 onboardingToken.CreatedByAccountId,
                 ActivityTypes.OnboardingCompleted,
-                $"Applicant '{applicant.FullName}' completed onboarding. Status updated to Hired/Converted."
+                $"Applicant '{applicant.FullName}' completed onboarding. Status updated to Hired."
             );
 
             return new ApiResponseDTO<string>

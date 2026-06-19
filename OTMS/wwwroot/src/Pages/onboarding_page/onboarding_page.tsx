@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ArrowRight, ArrowLeft,
-    User, Lock, Upload, FileText, Trash2, ShieldCheck, CreditCard, Phone, Mail
+    User, Lock, Upload, FileText, Trash2, ShieldCheck, Mail
 } from 'lucide-react';
 
 type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'done';
@@ -18,46 +18,7 @@ interface UploadedFile {
 const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'\-.]+$/;
 const SUFFIX_REGEX = /^[A-Za-z.\s]+$/;
 
-// ── PH Gov ID format validators ──
-const SSS_REGEX = /^\d{2}-\d{7}-\d{1}$/;           // XX-XXXXXXX-X
-const PHILHEALTH_REGEX = /^\d{2}-\d{9}-\d{1}$/;     // XX-XXXXXXXXX-X
-const PAGIBIG_REGEX = /^\d{4}-\d{4}-\d{4}$/;        // XXXX-XXXX-XXXX
-const TIN_REGEX = /^\d{3}-\d{3}-\d{3}-\d{3}$/;      // XXX-XXX-XXX-XXX
 const PH_MOBILE_REGEX = /^09\d{9}$/;
-
-const BANK_OPTIONS = [
-    'BDO Unibank', 'Bank of the Philippine Islands (BPI)', 'Metrobank',
-    'Land Bank of the Philippines', 'Philippine National Bank (PNB)',
-    'Security Bank', 'UnionBank', 'Chinabank', 'EastWest Bank',
-    'RCBC', 'PSBANK', 'Robinsons Bank', 'GCash (Maya/GCash Padala)',
-    'PayMaya / Maya Bank', 'Seabank', 'Other',
-];
-
-function applySSS(raw: string): string {
-    const d = raw.replace(/\D/g, '').slice(0, 10);
-    if (d.length <= 2) return d;
-    if (d.length <= 9) return `${d.slice(0, 2)}-${d.slice(2)}`;
-    return `${d.slice(0, 2)}-${d.slice(2, 9)}-${d.slice(9)}`;
-}
-function applyPhilHealth(raw: string): string {
-    const d = raw.replace(/\D/g, '').slice(0, 12);
-    if (d.length <= 2) return d;
-    if (d.length <= 11) return `${d.slice(0, 2)}-${d.slice(2)}`;
-    return `${d.slice(0, 2)}-${d.slice(2, 11)}-${d.slice(11)}`;
-}
-function applyPagIBIG(raw: string): string {
-    const d = raw.replace(/\D/g, '').slice(0, 12);
-    if (d.length <= 4) return d;
-    if (d.length <= 8) return `${d.slice(0, 4)}-${d.slice(4)}`;
-    return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
-}
-function applyTIN(raw: string): string {
-    const d = raw.replace(/\D/g, '').slice(0, 12);
-    if (d.length <= 3) return d;
-    if (d.length <= 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
-    if (d.length <= 9) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
-    return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6, 9)}-${d.slice(9)}`;
-}
 
 export default function OnboardingPage() {
     const navigate = useNavigate();
@@ -73,11 +34,6 @@ export default function OnboardingPage() {
         fullName: string; firstName: string; middleName: string; lastName: string; suffix: string;
         contactNumber: string; email: string; position: string;
         resumeFilePath: string; medicalClearanceFilePath: string;
-        sssNumber: string; philHealthNumber: string; pagIBIGNumber: string; tin: string;
-        bankName: string; bankAccountName: string; bankAccountNumber: string;
-        emergencyContactName: string; emergencyContactRelationship: string; emergencyContactMobileNumber: string;
-        educationLevel: string; educationInstitution: string; educationDegree: string;
-        educationYearGraduated: number | null; educationIsCurrentlyEnrolled: boolean;
     } | null>(null);
 
     useEffect(() => {
@@ -124,21 +80,6 @@ export default function OnboardingPage() {
                         position: data.data.jobPositionName,
                         resumeFilePath: data.data.resumeFilePath || '',
                         medicalClearanceFilePath: data.data.medicalClearanceFilePath || '',
-                        sssNumber: data.data.sssNumber || '',
-                        philHealthNumber: data.data.philHealthNumber || '',
-                        pagIBIGNumber: data.data.pagIBIGNumber || '',
-                        tin: data.data.tin || '',
-                        bankName: data.data.bankName || '',
-                        bankAccountName: data.data.bankAccountName || '',
-                        bankAccountNumber: data.data.bankAccountNumber || '',
-                        emergencyContactName: data.data.emergencyContactName || '',
-                        emergencyContactRelationship: data.data.emergencyContactRelationship || '',
-                        emergencyContactMobileNumber: data.data.emergencyContactMobileNumber || '',
-                        educationLevel: data.data.educationLevel || '',
-                        educationInstitution: data.data.educationInstitution || '',
-                        educationDegree: data.data.educationDegree || '',
-                        educationYearGraduated: data.data.educationYearGraduated || null,
-                        educationIsCurrentlyEnrolled: data.data.educationIsCurrentlyEnrolled || false,
                     });
                     setTokenValidating(false);
                 } else {
@@ -170,42 +111,14 @@ export default function OnboardingPage() {
                 contactNumber: applicantInfo.contactNumber || '',
             });
             // Pre-fill uploaded docs with existing files from application form
-            const info = applicantInfo as any;
             setUploadedDocs(prev => ({
                 ...prev,
-                biodata: info.resumeFilePath
+                biodata: applicantInfo.resumeFilePath
                     ? { name: 'Resume/CV (from application)', size: 'Uploaded', status: 'done' as const }
                     : prev.biodata,
-                medical: info.medicalClearanceFilePath
+                medical: applicantInfo.medicalClearanceFilePath
                     ? { name: 'Medical Clearance (from application)', size: 'Uploaded', status: 'done' as const }
                     : prev.medical,
-            }));
-            // Pre-fill 201 file fields from application form data
-            const applicantBankName = info.bankName || '';
-            const matchedBank = BANK_OPTIONS.find(opt => opt.toLowerCase() === applicantBankName.toLowerCase()) ||
-                BANK_OPTIONS.find(opt => applicantBankName.toLowerCase().includes(opt.toLowerCase().split('(')[0].trim().toLowerCase()) || opt.toLowerCase().includes(applicantBankName.toLowerCase()));
-            setForm201(prev => ({
-                ...prev,
-                sss: info.sssNumber || prev.sss,
-                philhealth: info.philHealthNumber || prev.philhealth,
-                pagibig: info.pagIBIGNumber || prev.pagibig,
-                tin: info.tin || prev.tin,
-                bankName: matchedBank || '',
-                bankAccountName: info.bankAccountName || prev.bankAccountName,
-                bankAccount: matchedBank ? (info.bankAccountNumber || '') : '',
-                emergencyName: info.emergencyContactName || prev.emergencyName,
-                emergencyNumber: info.emergencyContactMobileNumber || prev.emergencyNumber,
-                motherFirstName: info.motherFirstName || prev.motherFirstName,
-                motherMiddleName: info.motherMiddleName || prev.motherMiddleName,
-                motherLastName: info.motherLastName || prev.motherLastName,
-                fatherFirstName: info.fatherFirstName || prev.fatherFirstName,
-                fatherMiddleName: info.fatherMiddleName || prev.fatherMiddleName,
-                fatherLastName: info.fatherLastName || prev.fatherLastName,
-                educationLevel: info.educationLevel || prev.educationLevel,
-                educationInstitution: info.educationInstitution || prev.educationInstitution,
-                educationDegree: info.educationDegree || prev.educationDegree,
-                educationYear: info.educationYearGraduated ? String(info.educationYearGraduated) : prev.educationYear,
-                educationCurrentlyEnrolled: info.educationIsCurrentlyEnrolled ?? prev.educationCurrentlyEnrolled,
             }));
         }
     }, [applicantInfo]);
@@ -236,33 +149,7 @@ export default function OnboardingPage() {
         bir2316: { name: '', size: '', status: 'idle' },
     });
 
-    const EDUCATION_LEVELS = [
-        { value: 'none', label: 'None (no formal education)' },
-        { value: 'elementary', label: 'Elementary' },
-        { value: 'secondary', label: 'Secondary (High School)' },
-        { value: 'vocational', label: 'Vocational / Technical (TVET)' },
-        { value: 'associate', label: 'Associate (Degree/Diploma)' },
-        { value: 'bachelor', label: 'Bachelor\'s Degree' },
-        { value: 'postgrad_dip', label: 'Post-Graduate Diploma/Certificate' },
-        { value: 'master', label: 'Master\'s Degree' },
-        { value: 'doctorate', label: 'Doctorate' },
-    ];
 
-    // ── 201 File state ──
-    const [form201, setForm201] = useState({
-        sss: '', philhealth: '', pagibig: '', tin: '',
-        bankName: '', bankAccountName: '', bankAccount: '',
-        emergencyName: '', emergencyRelationship: '', emergencyNumber: '',
-        motherFirstName: '', motherMiddleName: '', motherLastName: '',
-        fatherFirstName: '', fatherMiddleName: '', fatherLastName: '',
-        educationLevel: '', educationInstitution: '', educationDegree: '',
-        educationYear: '', educationCurrentlyEnrolled: false,
-    });
-    const [relationshipCustom, setRelationshipCustom] = useState('');
-    const [bankCustom, setBankCustom] = useState('');
-    const [errors201, setErrors201] = useState<Record<string, string>>({});
-    const [saving201, setSaving201] = useState(false);
-    const [api201Error, setApi201Error] = useState('');
 
     const token = localStorage.getItem('authToken') ?? '';
     const steps: Step[] = ['welcome', 'profile', 'password', 'documents', 'done'];
@@ -344,66 +231,6 @@ export default function OnboardingPage() {
         }
     };
 
-    const validate201Field = (key: string, value: string): string => {
-        switch (key) {
-            case 'sss':
-                if (!value.trim()) return 'SSS Number is required.';
-                if (!SSS_REGEX.test(value.trim())) return 'Format must be XX-XXXXXXX-X (e.g. 34-5678901-2).';
-                return '';
-            case 'philhealth':
-                if (!value.trim()) return 'PhilHealth Number is required.';
-                if (!PHILHEALTH_REGEX.test(value.trim())) return 'Format must be XX-XXXXXXXXX-X (e.g. 01-234567890-1).';
-                return '';
-            case 'pagibig':
-                if (!value.trim()) return 'Pag-IBIG Number is required.';
-                if (!PAGIBIG_REGEX.test(value.trim())) return 'Format must be XXXX-XXXX-XXXX (e.g. 1234-5678-9012).';
-                return '';
-            case 'tin':
-                if (!value.trim()) return '';
-                if (!TIN_REGEX.test(value.trim())) return 'Format must be XXX-XXX-XXX-XXX (e.g. 123-456-789-000).';
-                return '';
-            case 'bankName':
-                if (!value.trim()) return 'Bank name is required.';
-                return '';
-            case 'bankAccountName':
-                if (!value.trim()) return 'Bank account name is required.';
-                if (value.length > 50) return 'Must not exceed 50 characters.';
-                const fullName = [profile.firstName, profile.middleName, profile.lastName, profile.suffix].filter(Boolean).join(' ').toLowerCase();
-                const entered = value.trim().toLowerCase();
-                if (fullName && entered) {
-                    const nameParts = fullName.split(/\s+/);
-                    const enteredParts = entered.split(/\s+/);
-                    const matchCount = nameParts.filter(p => enteredParts.some(e => e.includes(p) || p.includes(e))).length;
-                    if (matchCount < Math.min(2, nameParts.length)) return 'Bank account name must match your full name.';
-                }
-                return '';
-            case 'bankAccount':
-                if (!value.trim()) return 'Bank account number is required.';
-                if (/[^a-zA-Z0-9\-]/.test(value.replace(/\s/g, ''))) return 'Only letters, numbers, and dashes allowed.';
-                if (value.replace(/\s/g, '').length > 35) return 'Must not exceed 35 characters.';
-                return '';
-            case 'emergencyName':
-                if (!value.trim()) return 'Emergency contact name is required.';
-                if (value.trim().length < 2) return 'Must be at least 2 characters.';
-                return '';
-            case 'emergencyNumber':
-                if (!value.trim()) return 'Emergency contact number is required.';
-                if (!PH_MOBILE_REGEX.test(value.trim())) return 'Must be 11 digits starting with 09.';
-                return '';
-            case 'educationLevel':
-                if (!value.trim()) return 'Please select your highest educational attainment.';
-                return '';
-            case 'educationInstitution':
-                return '';
-            case 'educationDegree':
-                return '';
-            case 'educationYear':
-                return '';
-            default:
-                return '';
-        }
-    };
-
     const validateProfile = () => {
         const errs: Record<string, string> = {};
         Object.keys(profile).forEach(key => {
@@ -412,23 +239,6 @@ export default function OnboardingPage() {
         });
         if (!profile.firstName.trim()) errs.firstName = 'First name is required.';
         if (!profile.lastName.trim()) errs.lastName = 'Last name is required.';
-        return errs;
-    };
-
-    const validate201 = () => {
-        const errs: Record<string, string> = {};
-        (Object.keys(form201) as (keyof typeof form201)[]).forEach(key => {
-            if (key === 'educationCurrentlyEnrolled') return;
-            const val = form201[key];
-            const err = validate201Field(key, typeof val === 'boolean' ? '' : val);
-            if (err) errs[key] = err;
-        });
-        const level = form201.educationLevel;
-        if (level && level !== 'none') {
-            if (!form201.educationInstitution.trim()) errs.educationInstitution = 'Institution name is required.';
-            if (!form201.educationDegree.trim()) errs.educationDegree = 'Degree / field of study is required.';
-            if (!form201.educationCurrentlyEnrolled && !form201.educationYear.trim()) errs.educationYear = 'Year graduated is required.';
-        }
         return errs;
     };
 
@@ -957,423 +767,6 @@ export default function OnboardingPage() {
                                                     : <span style={{ fontSize: 11, color: 'var(--status-active)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}><CheckCircle2 size={12} /> All required documents uploaded</span>
                                                 }
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* ── 201 FILE FORM ── */}
-                            {step === 'done' && (
-                                <div>
-                                    <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid var(--border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                                            <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-sm)', background: 'rgba(0,169,157,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CreditCard size={16} color="var(--primary)" /></div>
-                                            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Official Employee 201 File</h3>
-                                        </div>
-                                        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', marginLeft: 42 }}>Provide your government IDs, bank details, and emergency contact. This information is strictly confidential.</p>
-                                    </div>
-
-                                    <div style={{ padding: '24px 32px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-                                        {api201Error && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--status-failed)' }}>
-                                                <AlertCircle size={14} />{api201Error}
-                                            </div>
-                                        )}
-
-                                        {/* ── Educational Attainment ── */}
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                                                Educational Attainment
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Highest Educational Attainment" required />
-                                                    <select
-                                                        value={form201.educationLevel}
-                                                        onChange={e => {
-                                                            const val = e.target.value;
-                                                            setForm201(p => ({ ...p, educationLevel: val }));
-                                                            setErrors201(p => ({ ...p, educationLevel: validate201Field('educationLevel', val) }));
-                                                        }}
-                                                        style={{ ...inputStyle(errors201.educationLevel), cursor: 'pointer', color: form201.educationLevel ? 'var(--text-primary)' : 'var(--text-muted)' }}
-                                                    >
-                                                        <option value="" disabled>Select your highest educational attainment…</option>
-                                                        {EDUCATION_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-                                                    </select>
-                                                    <FieldError msg={errors201.educationLevel} />
-                                                </div>
-
-                                                {form201.educationLevel && form201.educationLevel !== 'none' && (
-                                                    <>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                            <FieldLabel label="Institution Name" required />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="e.g. University of the Philippines"
-                                                                value={form201.educationInstitution}
-                                                                onChange={e => {
-                                                                    const val = e.target.value;
-                                                                    setForm201(p => ({ ...p, educationInstitution: val }));
-                                                                    setErrors201(p => ({ ...p, educationInstitution: '' }));
-                                                                }}
-                                                                maxLength={128}
-                                                                style={inputStyle(errors201.educationInstitution)}
-                                                            />
-                                                            <FieldError msg={errors201.educationInstitution} />
-                                                        </div>
-
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                            <FieldLabel label="Degree / Field of Study" required />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="e.g. Bachelor of Science in Information Technology"
-                                                                value={form201.educationDegree}
-                                                                onChange={e => {
-                                                                    const val = e.target.value;
-                                                                    setForm201(p => ({ ...p, educationDegree: val }));
-                                                                    setErrors201(p => ({ ...p, educationDegree: '' }));
-                                                                }}
-                                                                maxLength={128}
-                                                                style={inputStyle(errors201.educationDegree)}
-                                                            />
-                                                            <FieldError msg={errors201.educationDegree} />
-                                                        </div>
-
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    id="edu-currently-enrolled"
-                                                                    checked={form201.educationCurrentlyEnrolled}
-                                                                    onChange={e => {
-                                                                        const checked = e.target.checked;
-                                                                        setForm201(p => ({
-                                                                            ...p,
-                                                                            educationCurrentlyEnrolled: checked,
-                                                                            educationYear: checked ? '' : p.educationYear,
-                                                                        }));
-                                                                        setErrors201(p => ({ ...p, educationYear: '' }));
-                                                                    }}
-                                                                    style={{ width: 16, height: 16, accentColor: 'var(--primary)', cursor: 'pointer' }}
-                                                                />
-                                                                <label htmlFor="edu-currently-enrolled" style={{ fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer', userSelect: 'none' }}>
-                                                                    Currently enrolled
-                                                                </label>
-                                                            </div>
-                                                        </div>
-
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                            <FieldLabel label="Year Graduated" required={!form201.educationCurrentlyEnrolled} />
-                                                            <input
-                                                                type="number"
-                                                                placeholder={form201.educationCurrentlyEnrolled ? 'Currently enrolled' : 'e.g. 2020'}
-                                                                value={form201.educationYear}
-                                                                onChange={e => {
-                                                                    const val = e.target.value;
-                                                                    setForm201(p => ({ ...p, educationYear: val }));
-                                                                    setErrors201(p => ({ ...p, educationYear: '' }));
-                                                                }}
-                                                                min={1900}
-                                                                max={new Date().getFullYear()}
-                                                                disabled={form201.educationCurrentlyEnrolled}
-                                                                style={{ ...inputStyle(errors201.educationYear), ...(form201.educationCurrentlyEnrolled ? { background: 'var(--bg-input)', color: 'var(--text-muted)', cursor: 'not-allowed' } : {}) }}
-                                                            />
-                                                            <FieldError msg={errors201.educationYear} />
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* ── Statutory & Government Identifiers ── */}
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                                                Statutory &amp; Government Identifiers
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-                                                {/* SSS */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="SSS Number" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="XX-XXXXXXX-X"
-                                                        value={form201.sss}
-                                                        onChange={e => {
-                                                            const val = applySSS(e.target.value);
-                                                            setForm201(p => ({ ...p, sss: val }));
-                                                            setErrors201(p => ({ ...p, sss: validate201Field('sss', val) }));
-                                                        }}
-                                                        maxLength={12}
-                                                        style={inputStyle(errors201.sss)}
-                                                    />
-                                                    {errors201.sss ? <FieldError msg={errors201.sss} /> : <FieldHint hint="Format: XX-XXXXXXX-X (e.g. 34-5678901-2)" />}
-                                                </div>
-
-                                                {/* PhilHealth */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="PhilHealth Number" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="XX-XXXXXXXXX-X"
-                                                        value={form201.philhealth}
-                                                        onChange={e => {
-                                                            const val = applyPhilHealth(e.target.value);
-                                                            setForm201(p => ({ ...p, philhealth: val }));
-                                                            setErrors201(p => ({ ...p, philhealth: validate201Field('philhealth', val) }));
-                                                        }}
-                                                        maxLength={14}
-                                                        style={inputStyle(errors201.philhealth)}
-                                                    />
-                                                    {errors201.philhealth ? <FieldError msg={errors201.philhealth} /> : <FieldHint hint="Format: XX-XXXXXXXXX-X (e.g. 01-234567890-1)" />}
-                                                </div>
-
-                                                {/* Pag-IBIG */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Pag-IBIG Number (HDMF)" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="XXXX-XXXX-XXXX"
-                                                        value={form201.pagibig}
-                                                        onChange={e => {
-                                                            const val = applyPagIBIG(e.target.value);
-                                                            setForm201(p => ({ ...p, pagibig: val }));
-                                                            setErrors201(p => ({ ...p, pagibig: validate201Field('pagibig', val) }));
-                                                        }}
-                                                        maxLength={14}
-                                                        style={inputStyle(errors201.pagibig)}
-                                                    />
-                                                    {errors201.pagibig ? <FieldError msg={errors201.pagibig} /> : <FieldHint hint="Format: XXXX-XXXX-XXXX (e.g. 1234-5678-9012)" />}
-                                                </div>
-
-                                                {/* TIN (optional) */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Tax Identification Number (TIN)" optional />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="XXX-XXX-XXX-XXX"
-                                                        value={form201.tin}
-                                                        onChange={e => {
-                                                            const val = applyTIN(e.target.value);
-                                                            setForm201(p => ({ ...p, tin: val }));
-                                                            setErrors201(p => ({ ...p, tin: validate201Field('tin', val) }));
-                                                        }}
-                                                        maxLength={15}
-                                                        style={inputStyle(errors201.tin)}
-                                                    />
-                                                    {errors201.tin ? <FieldError msg={errors201.tin} /> : <FieldHint hint="Format: XXX-XXX-XXX-XXX (e.g. 123-456-789-000)" />}
-                                                </div>
-
-                                                {/* ── Mother's Maiden Name ── */}
-                                                <div style={{ marginTop: 4 }}>
-                                                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Mother's Maiden Name</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>First Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="First" value={form201.motherFirstName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherFirstName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="Middle name" value={form201.motherMiddleName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherMiddleName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Maiden Last Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="Maiden last name" value={form201.motherLastName} maxLength={50} onChange={e => setForm201(p => ({ ...p, motherLastName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* ── Father's Name ── */}
-                                                <div style={{ marginTop: 4 }}>
-                                                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Father's Name</div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>First Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="First" value={form201.fatherFirstName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherFirstName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="Middle name" value={form201.fatherMiddleName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherMiddleName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Last Name <span style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'none', fontWeight: 500 }}>(optional)</span></span>
-                                                            <input type="text" placeholder="Last name" value={form201.fatherLastName} maxLength={50} onChange={e => setForm201(p => ({ ...p, fatherLastName: e.target.value }))} style={inputStyle()} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* ── Bank Details section ── */}
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                                                Bank Account Details
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-                                                {/* Bank Name */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Bank Name" required />
-                                                    <select
-                                                        value={form201.bankName}
-                                                        onChange={e => {
-                                                            const val = e.target.value;
-                                                            setForm201(p => ({ ...p, bankName: val }));
-                                                            setErrors201(p => ({ ...p, bankName: validate201Field('bankName', val) }));
-                                                            if (val !== 'Other') setBankCustom('');
-                                                        }}
-                                                        style={{ ...inputStyle(errors201.bankName), cursor: 'pointer', color: form201.bankName ? 'var(--text-primary)' : 'var(--text-muted)' }}
-                                                    >
-                                                        <option value="" disabled>Select your bank</option>
-                                                        {BANK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
-                                                    </select>
-                                                    {form201.bankName === 'Other' && (
-                                                        <input type="text" placeholder="Please specify your bank" value={bankCustom} maxLength={128}
-                                                            onChange={e => setBankCustom(e.target.value)}
-                                                            style={inputStyle()} />
-                                                    )}
-                                                    <FieldError msg={errors201.bankName} />
-                                                </div>
-
-                                                {/* Bank Account Name */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Bank Account Name" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Must match your full name"
-                                                        value={form201.bankAccountName}
-                                                        onChange={e => {
-                                                            const val = e.target.value;
-                                                            setForm201(p => ({ ...p, bankAccountName: val }));
-                                                            setErrors201(p => ({ ...p, bankAccountName: validate201Field('bankAccountName', val) }));
-                                                        }}
-                                                        maxLength={50}
-                                                        style={inputStyle(errors201.bankAccountName)}
-                                                    />
-                                                    {errors201.bankAccountName ? <FieldError msg={errors201.bankAccountName} /> : <FieldHint hint="Must match the name on your bank account" />}
-                                                </div>
-
-                                                {/* Bank Account Number */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Bank Account Number" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Account number"
-                                                        value={form201.bankAccount}
-                                                        onChange={e => {
-                                                            const val = e.target.value.replace(/[^a-zA-Z0-9\-]/g, '').replace(/\s/g, '');
-                                                            setForm201(p => ({ ...p, bankAccount: val }));
-                                                            setErrors201(p => ({ ...p, bankAccount: validate201Field('bankAccount', val) }));
-                                                        }}
-                                                        maxLength={35}
-                                                        style={inputStyle(errors201.bankAccount)}
-                                                    />
-                                                    {errors201.bankAccount ? <FieldError msg={errors201.bankAccount} /> : <FieldHint hint="Letters, numbers, and dashes only — no spaces" />}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* ── Emergency Contact section ── */}
-                                        <div>
-                                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-                                                Emergency Contact
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-                                                {/* Emergency Contact Name */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Contact Name" required />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Full name of emergency contact"
-                                                        value={form201.emergencyName}
-                                                        onChange={e => {
-                                                            const val = e.target.value;
-                                                            setForm201(p => ({ ...p, emergencyName: val }));
-                                                            setErrors201(p => ({ ...p, emergencyName: validate201Field('emergencyName', val) }));
-                                                        }}
-                                                        maxLength={80}
-                                                        style={inputStyle(errors201.emergencyName)}
-                                                    />
-                                                    <FieldError msg={errors201.emergencyName} />
-                                                </div>
-
-                                                {/* Emergency Contact Relationship */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Contact Relationship" required />
-                                                    <select
-                                                        value={form201.emergencyRelationship}
-                                                        onChange={e => {
-                                                            const val = e.target.value;
-                                                            setForm201(p => ({ ...p, emergencyRelationship: val }));
-                                                            if (val !== 'Others') setRelationshipCustom('');
-                                                        }}
-                                                        style={{ ...inputStyle(errors201.emergencyRelationship), cursor: 'pointer' }}
-                                                    >
-                                                        <option value="">Select relationship…</option>
-                                                        <option value="Mother">Mother</option>
-                                                        <option value="Father">Father</option>
-                                                        <option value="Spouse">Spouse</option>
-                                                        <option value="Sibling">Sibling</option>
-                                                        <option value="Relative">Relative</option>
-                                                        <option value="Friend">Friend</option>
-                                                        <option value="Others">Others</option>
-                                                    </select>
-                                                    {form201.emergencyRelationship === 'Others' && (
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Please specify"
-                                                            value={relationshipCustom}
-                                                            onChange={e => setRelationshipCustom(e.target.value)}
-                                                            maxLength={50}
-                                                            style={inputStyle()}
-                                                        />
-                                                    )}
-                                                    <FieldError msg={errors201.emergencyRelationship} />
-                                                </div>
-
-                                                {/* Emergency Contact Number */}
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                                                    <FieldLabel label="Contact Number" required />
-                                                    <div style={{ position: 'relative' }}>
-                                                        <Phone size={14} color="var(--text-tertiary)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
-                                                        <input
-                                                            type="tel"
-                                                            placeholder="09XXXXXXXXX"
-                                                            value={form201.emergencyNumber}
-                                                            onChange={e => {
-                                                                const val = e.target.value.replace(/\D/g, '');
-                                                                setForm201(p => ({ ...p, emergencyNumber: val }));
-                                                                setErrors201(p => ({ ...p, emergencyNumber: validate201Field('emergencyNumber', val) }));
-                                                            }}
-                                                            maxLength={11}
-                                                            style={{ ...inputStyle(errors201.emergencyNumber), paddingLeft: 34 }}
-                                                        />
-                                                    </div>
-                                                    {errors201.emergencyNumber ? <FieldError msg={errors201.emergencyNumber} /> : <FieldHint hint="Format: 09XXXXXXXXX (11 digits)" />}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* ── Security notice ── */}
-                                        <div style={{ display: 'flex', gap: 10, padding: '12px 14px', background: 'rgba(5,150,105,0.05)', border: '1px solid rgba(5,150,105,0.15)', borderRadius: 'var(--radius-md)', alignItems: 'flex-start' }}>
-                                            <ShieldCheck size={18} color="var(--status-active)" style={{ flexShrink: 0, marginTop: 1 }} />
-                                            <span style={{ fontSize: 11, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                                                All sensitive data is <strong>end-to-end encrypted</strong> before storage. This form can only be submitted once — the link will be permanently deactivated after submission.
-                                            </span>
-                                        </div>
-
-                                        {/* ── Submit ── */}
-                                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                                            <BackButton to="documents" disabled={saving201} />
-                                            <button
-                                                onClick={() => setStep('done')}
-                                                disabled={saving201}
-                                                style={{ flex: 1, height: 46, border: 'none', borderRadius: 'var(--radius-md)', background: saving201 ? 'rgba(0,169,157,0.45)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saving201 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', boxShadow: saving201 ? 'none' : 'var(--shadow-md)' }}
-                                            >
-                                                {saving201 ? <><Loader2 size={14} className="spin-icon" /> Encrypting & Submitting…</> : <>Submit 201 File <ArrowRight size={14} /></>}
-                                            </button>
                                         </div>
                                     </div>
                                 </div>

@@ -232,10 +232,6 @@ namespace OTMS.Controllers
         public async Task<ActionResult<PasswordVerificationResponseDTO>> VerifyPassword(PasswordVerificationDTO request)
         {
             var result = await authService.VerifyPasswordAsync(request);
-            
-            if(result.isSuccess == false)
-                return Unauthorized(result);
-
             return Ok(result);
         }
 

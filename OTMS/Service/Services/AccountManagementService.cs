@@ -980,7 +980,7 @@ namespace OTMS.Service.Services
         private static readonly Regex SssRegex = new(@"^\d{2}-\d{7}-\d{1}$");
         private static readonly Regex PhilhealthRegex = new(@"^\d{2}-\d{9}-\d{1}$");
         private static readonly Regex PagibigRegex = new(@"^\d{4}-\d{4}-\d{4}$");
-        private static readonly Regex TinRegex = new(@"^\d{3}-\d{3}-\d{3}-\d{3}$");
+        private static readonly Regex TinRegex = new(@"^\d{3}-\d{3}-\d{3}(-\d{3})?$");
 
         public async Task<ApiResponseDTO<string>> UpdateStatutoryRecordsAsync(UpdateStatutoryRecordsDTO request)
         {
@@ -1017,8 +1017,8 @@ namespace OTMS.Service.Services
             if (!PagibigRegex.IsMatch(request.PagibigNumber))
                 return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid Pag-IBIG Number format detected. Expected format: XXXX-XXXX-XXXX.", Data = null };
 
-            if (!TinRegex.IsMatch(request.TinNumber))
-                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid TIN format detected. Expected format: XXX-XXX-XXX-XXX.", Data = null };
+            if (!string.IsNullOrWhiteSpace(request.TinNumber) && !TinRegex.IsMatch(request.TinNumber))
+                return new ApiResponseDTO<string> { IsSuccess = false, Message = "Invalid TIN format detected. Expected format: XXX-XXX-XXX or XXX-XXX-XXX-XXX.", Data = null };
 
             var existingData = await context.Employee201FileDatas
                 .FirstOrDefaultAsync(e => e.EmployeeId == employee.EmployeeId);
@@ -1028,7 +1028,7 @@ namespace OTMS.Service.Services
                 existingData.SssNumberEncrypted = DataEncryptionHelper.Encrypt(request.SssNumber, configuration);
                 existingData.PhilhealthNumberEncrypted = DataEncryptionHelper.Encrypt(request.PhilhealthNumber, configuration);
                 existingData.PagibigNumberEncrypted = DataEncryptionHelper.Encrypt(request.PagibigNumber, configuration);
-                existingData.TinNumberEncrypted = DataEncryptionHelper.Encrypt(request.TinNumber, configuration);
+                existingData.TinNumberEncrypted = !string.IsNullOrWhiteSpace(request.TinNumber) ? DataEncryptionHelper.Encrypt(request.TinNumber, configuration) : null;
                 existingData.UpdatedAt = DateTime.UtcNow;
             }
             else
@@ -1040,7 +1040,7 @@ namespace OTMS.Service.Services
                     SssNumberEncrypted = DataEncryptionHelper.Encrypt(request.SssNumber, configuration),
                     PhilhealthNumberEncrypted = DataEncryptionHelper.Encrypt(request.PhilhealthNumber, configuration),
                     PagibigNumberEncrypted = DataEncryptionHelper.Encrypt(request.PagibigNumber, configuration),
-                    TinNumberEncrypted = DataEncryptionHelper.Encrypt(request.TinNumber, configuration),
+                    TinNumberEncrypted = !string.IsNullOrWhiteSpace(request.TinNumber) ? DataEncryptionHelper.Encrypt(request.TinNumber, configuration) : null,
                     CreatedAt = DateTime.UtcNow
                 };
                 context.Employee201FileDatas.Add(newData);
@@ -1058,18 +1058,19 @@ namespace OTMS.Service.Services
 
             context.StatutorySyncRecords.Add(syncRecord);
 
-            // Update bank and emergency contact info on ApplicantRecord
-            if (!string.IsNullOrEmpty(request.BankName) || !string.IsNullOrEmpty(request.EmergencyContactName))
+            // Update ApplicantRecord with the submitted data so GetDigital201File returns the latest values
+            var applicant = await context.ApplicantRecords
+                .FirstOrDefaultAsync(ar => ar.EmailAddress == employee.Email);
+            if (applicant != null)
             {
-                var applicant = await context.ApplicantRecords
-                    .FirstOrDefaultAsync(ar => ar.EmailAddress == employee.Email);
-                if (applicant != null)
-                {
-                    if (!string.IsNullOrEmpty(request.BankName)) applicant.BankName = request.BankName;
-                    if (!string.IsNullOrEmpty(request.BankAccountNumber)) applicant.BankAccountNumber = request.BankAccountNumber;
-                    if (!string.IsNullOrEmpty(request.EmergencyContactName)) applicant.EmergencyContactName = request.EmergencyContactName;
-                    if (!string.IsNullOrEmpty(request.EmergencyContactNumber)) applicant.EmergencyContactMobileNumber = request.EmergencyContactNumber;
-                }
+                applicant.SSSNumber = request.SssNumber;
+                applicant.PhilHealthNumber = request.PhilhealthNumber;
+                applicant.PagIBIGNumber = request.PagibigNumber;
+                applicant.TIN = request.TinNumber;
+                if (!string.IsNullOrEmpty(request.BankName)) applicant.BankName = request.BankName;
+                if (!string.IsNullOrEmpty(request.BankAccountNumber)) applicant.BankAccountNumber = request.BankAccountNumber;
+                if (!string.IsNullOrEmpty(request.EmergencyContactName)) applicant.EmergencyContactName = request.EmergencyContactName;
+                if (!string.IsNullOrEmpty(request.EmergencyContactNumber)) applicant.EmergencyContactMobileNumber = request.EmergencyContactNumber;
             }
 
             await context.SaveChangesAsync();

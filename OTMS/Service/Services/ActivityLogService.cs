@@ -132,13 +132,36 @@ namespace OTMS.Service.Services
                 .ToListAsync();
         }
 
-        public async Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20)
+        public async Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20, string? search = null, string? employeeId = null, string? activityType = null, string? dateFrom = null, string? dateTo = null)
         {
-            var totalRecords = await context.ActivityLogs.CountAsync();
-            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
-            var logs = await context.ActivityLogs
+            var query = context.ActivityLogs
                 .Include(al => al.Account)
                     .ThenInclude(a => a.Employee)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(activityType))
+                query = query.Where(al => al.ActivityType == activityType);
+
+            if (!string.IsNullOrWhiteSpace(employeeId))
+                query = query.Where(al => al.Account.Employee.EmployeeNumber == employeeId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var q = search.ToLower();
+                query = query.Where(al => al.Description.ToLower().Contains(q)
+                    || al.ActivityType.ToLower().Contains(q)
+                    || (al.Account.Employee.FirstName + " " + al.Account.Employee.LastName).ToLower().Contains(q));
+            }
+
+            if (!string.IsNullOrWhiteSpace(dateFrom) && DateTime.TryParse(dateFrom, out var fromDate))
+                query = query.Where(al => al.CreatedAt >= fromDate.ToUniversalTime());
+
+            if (!string.IsNullOrWhiteSpace(dateTo) && DateTime.TryParse(dateTo, out var toDate))
+                query = query.Where(al => al.CreatedAt <= toDate.ToUniversalTime().AddDays(1));
+
+            var totalRecords = await query.CountAsync();
+            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
+            var logs = await query
                 .OrderByDescending(al => al.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)

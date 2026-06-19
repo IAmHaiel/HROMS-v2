@@ -37,6 +37,7 @@ import {
     FileText,
     Mail,
     Download,
+    RefreshCw,
 } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './SystemAdmin_Dashboard.css';
@@ -71,7 +72,7 @@ type NavTab =
     | 'employees'
     | 'recruitment'
     | 'delivery'
-    | 'analytics'
+    | 'finance'
     | 'settings'
     | 'roles'
     | 'reports'
@@ -264,7 +265,7 @@ const NAV_GROUPS = [
         label: 'INTEGRATION',
         items: [
             { tab: 'delivery' as NavTab, icon: FileText, label: 'Delivery Summary' },
-            { tab: 'analytics' as NavTab, icon: BarChart3, label: 'Analytics View' },
+            { tab: 'finance' as NavTab, icon: BarChart3, label: 'Finance' },
         ],
     },
     {
@@ -1087,10 +1088,8 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ employeeID: adminId, password: pw }),
                     });
-                    if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        throw new Error(err.message || 'Incorrect password. Please try again.');
-                    }
+                    const verifyData = await res.json().catch(() => ({}));
+                    if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password. Please try again.'); }
                     await doSave();
                 } catch (err: any) {
                     setGateError(err.message ?? 'Incorrect password. Please try again.');
@@ -1105,8 +1104,8 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
     const handleDelete = () => {
         setConfirmModal({
             isOpen: true,
-                variant: 'danger',
-                title: 'Archive employee account?',
+            variant: 'danger',
+            title: 'Archive employee account?',
             description: (
                 <>
                     This will permanently remove <strong>{displayName}</strong> and all associated
@@ -1391,6 +1390,7 @@ interface DashboardTabProps {
 }
 
 function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSelectEmployee, onViewAll, onAddEmployee, rolesCount, activityLogPage, activityLogTotalPages, onActivityLogPageChange }: DashboardTabProps) {
+    const [searchQuery, setSearchQuery] = useState('');
     const activeCount = employees.filter(e => e.accountStatus === 'Active').length;
     const deactivatedCount = employees.filter(e => e.accountStatus === 'Deactivated').length;
 
@@ -1437,7 +1437,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
                 <div className="header-search-wrap" style={{ margin: 0, width: 300 }}>
                     <Search size={14} className="header-search-icon" />
-                    <input type="text" className="header-search-input" placeholder="Search employee, task…" />
+                    <input type="text" className="header-search-input" placeholder="Search employee, task…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
                 <ActionButton icon={<Users size={18} />} onClick={onAddEmployee}>
                     Add Employee
@@ -1565,7 +1565,13 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                                 ? <tr><td colSpan={5}><EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." /></td></tr>
                                 : recentEmployees.length === 0
                                     ? <tr><td colSpan={5}><EmptyState message="No data available" /></td></tr>
-                                    : recentEmployees.slice(0, 7).map(emp => {
+                                    : recentEmployees.filter(emp => {
+                                        if (!searchQuery) return true;
+                                        const q = searchQuery.toLowerCase();
+                                        return getEmployeeDisplayName(emp).toLowerCase().includes(q)
+                                            || (emp.employeeNumber && emp.employeeNumber.toLowerCase().includes(q))
+                                            || (emp.role && emp.role.toLowerCase().includes(q));
+                                    }).slice(0, 7).map(emp => {
                                         const name = getEmployeeDisplayName(emp);
                                         return (
                                             <tr key={emp.employeeNumber}>
@@ -1594,7 +1600,12 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
                             ? <EmptyState icon={<Loader2 size={22} className="spin" />} message="Loading..." />
                             : activityLogs.length === 0
                                 ? <EmptyState icon={<ClipboardList size={22} />} message="No recent activity" />
-                                : activityLogs.slice(0, 8).map((log, index) => {
+                                : activityLogs.filter(log => {
+                                    if (!searchQuery) return true;
+                                    const q = searchQuery.toLowerCase();
+                                    return log.description.toLowerCase().includes(q)
+                                        || log.activityType.toLowerCase().includes(q);
+                                }).slice(0, 8).map((log, index) => {
                                     let dotColor = 'var(--primary)';
                                     let ringColor = 'rgba(0, 169, 157, 0.15)';
                                     if (log.activityType === 'Login') { dotColor = 'var(--status-active)'; ringColor = 'rgba(5, 150, 105, 0.15)'; }
@@ -2066,10 +2077,8 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ employeeID: employeeId, password: pw }),
                     });
-                    if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        throw new Error(err.message || 'Incorrect password. Please try again.');
-                    }
+                    const verifyData = await res.json().catch(() => ({}));
+                    if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password. Please try again.'); }
                     // Verified — now save
                     setProfileSaving(true);
                     const fd = new FormData();
@@ -2518,7 +2527,7 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
 const SSS_REGEX = /^\d{2}-\d{7}-\d{1}$/;
 const PHILHEALTH_REGEX = /^\d{2}-\d{9}-\d{1}$/;
 const PAGIBIG_REGEX = /^\d{4}-\d{4}-\d{4}$/;
-const TIN_REGEX = /^\d{3}-\d{3}-\d{3}-\d{3}$/;
+const TIN_REGEX = /^\d{3}-\d{3}-\d{3}(-\d{3})?$/;
 
 const FORMAT_LABELS: Record<string, string> = {
     sssNumber: 'XX-XXXXXXX-X',
@@ -2533,6 +2542,13 @@ const GovernmentRecordsTab: React.FC = () => {
     const [selectedEmployeeNumber, setSelectedEmployeeNumber] = useState('');
     const [saving, setSaving] = useState(false);
     const [fetchingData, setFetchingData] = useState(false);
+
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [showPasswordGate, setShowPasswordGate] = useState(false);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePw, setShowGatePw] = useState(false);
 
     const [form, setForm] = useState({
         sssNumber: '',
@@ -2554,18 +2570,28 @@ const GovernmentRecordsTab: React.FC = () => {
         setErrors({});
     };
 
+    const handleCancelEdit = () => {
+        const hasChanges = form.sssNumber || form.philhealthNumber || form.pagibigNumber || form.tinNumber;
+        if (hasChanges) {
+            setShowCancelConfirm(true);
+        } else {
+            resetToViewMode();
+        }
+    };
+
     useEffect(() => {
         const fetchEmployees = async () => {
             try {
                 const token = localStorage.getItem('authToken');
-                const res = await fetch('/api/systemadmin/recent?pageNumber=1&pageSize=200', {
+                const res = await fetch('/api/systemadmin/recent-employees?PageNumber=1&PageSize=200', {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 if (res.ok) {
                     const body = await res.json();
-                    setEmployees(body.data?.data ?? body.data ?? body ?? []);
+                    const list = body.data?.data ?? body.data ?? body ?? [];
+                    setEmployees(list);
                 }
-            } catch { /* ignore */ }
+            } catch (e) { console.error('GovRecords fetch employees error:', e); }
         };
         fetchEmployees();
     }, []);
@@ -2615,7 +2641,7 @@ const GovernmentRecordsTab: React.FC = () => {
         if (!SSS_REGEX.test(form.sssNumber)) e.sssNumber = `Invalid SSS Number format detected. Expected: ${FORMAT_LABELS.sssNumber}`;
         if (!PHILHEALTH_REGEX.test(form.philhealthNumber)) e.philhealthNumber = `Invalid PhilHealth Number format detected. Expected: ${FORMAT_LABELS.philhealthNumber}`;
         if (!PAGIBIG_REGEX.test(form.pagibigNumber)) e.pagibigNumber = `Invalid Pag-IBIG Number format detected. Expected: ${FORMAT_LABELS.pagibigNumber}`;
-        if (!TIN_REGEX.test(form.tinNumber)) e.tinNumber = `Invalid TIN format detected. Expected: ${FORMAT_LABELS.tinNumber}`;
+        if (form.tinNumber.trim() && !TIN_REGEX.test(form.tinNumber)) e.tinNumber = `Invalid TIN format detected. Expected: ${FORMAT_LABELS.tinNumber}`;
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -2668,8 +2694,7 @@ const GovernmentRecordsTab: React.FC = () => {
         finally { setSyncRecordsLoading(false); }
     };
 
-    const handleSubmit = async () => {
-        if (!validate()) return;
+    const doSubmit = async () => {
         setSaving(true);
         setApiError('');
         try {
@@ -2693,21 +2718,30 @@ const GovernmentRecordsTab: React.FC = () => {
                 throw new Error(body.message || 'Failed to save government records.');
             }
             success('Government records saved successfully. Statutory identifiers synchronized with FOMS.');
+            await loadEmployeeData(selectedEmployeeNumber);
             await loadSyncRecords(selectedEmployeeNumber);
-            resetToViewMode();
         } catch (err: any) {
             setApiError(err.message);
             error(err.message);
+            setShowPasswordGate(false);
+            throw err;
         } finally {
             setSaving(false);
         }
     };
 
+    const handleSubmit = () => {
+        if (!validate()) return;
+        setGatePassword('');
+        setGateError('');
+        setShowPasswordGate(true);
+    };
+
     return (
         <div className="dashboard-content">
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div className="card-header-layout" style={{ padding: '20px 22px', borderBottom: '1px solid var(--border)' }}>
-                    <div className="field" style={{ margin: 0, flex: 1 }}>
+                <div style={{ padding: '20px 22px', borderBottom: '1px solid var(--border)' }}>
+                    <div className="field" style={{ margin: 0 }}>
                         <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Select Employee</label>
                         <Select
                             value={selectedEmployeeNumber}
@@ -2715,7 +2749,7 @@ const GovernmentRecordsTab: React.FC = () => {
                             placeholder="— Choose an employee —"
                             options={employees.map(emp => ({
                                 value: emp.employeeNumber,
-                                label: `${(emp as any).employeeName ?? `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()} (${emp.employeeNumber})`,
+                                label: `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() + ` (${emp.employeeNumber})`,
                             }))}
                         />
                     </div>
@@ -2723,7 +2757,37 @@ const GovernmentRecordsTab: React.FC = () => {
 
                 <div style={{ padding: '20px 22px' }}>
                     {!selectedEmployeeNumber && (
-                        <EmptyState icon={<ShieldCheck size={32} />} message="Select an employee to view or update their government records." />
+                        <div>
+                            <h3 style={{ margin: '0 0 12px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <ShieldCheck size={18} /> All Employees
+                            </h3>
+                            <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>Select an employee from the dropdown above or click a row below to view or update their government records.</p>
+                            <div style={{ maxHeight: 400, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+                                <table className="data-table" style={{ margin: 0 }}>
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>ID</th>
+                                            <th>Department / Role</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {employees.map(emp => (
+                                            <tr key={emp.employeeNumber} onClick={() => setSelectedEmployeeNumber(emp.employeeNumber)} style={{ cursor: 'pointer' }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-input)')}
+                                                onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                                                <td style={{ fontWeight: 600 }}>{`${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() || emp.employeeNumber}</td>
+                                                <td style={{ color: 'var(--text-secondary)' }}>{emp.employeeNumber}</td>
+                                                <td style={{ color: 'var(--text-secondary)' }}>{emp.role || '—'}</td>
+                                            </tr>
+                                        ))}
+                                        {employees.length === 0 && (
+                                            <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>No employees found.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     )}
 
                     {selectedEmployeeNumber && fetchingData && (
@@ -2760,7 +2824,8 @@ const GovernmentRecordsTab: React.FC = () => {
                                         <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
                                             {field === 'sssNumber' ? 'SSS Number' :
                                                 field === 'philhealthNumber' ? 'PhilHealth Number' :
-                                                    field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
+                                                    field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} {field !== 'tinNumber' && <span style={{ color: 'var(--status-failed)' }}>*</span>}
+                                            {field === 'tinNumber' && <span style={{ fontWeight: 400, fontSize: 11, color: 'var(--text-muted)' }}> (optional)</span>}
                                         </label>
                                         {editMode ? (
                                             <>
@@ -2795,7 +2860,7 @@ const GovernmentRecordsTab: React.FC = () => {
 
                             {editMode && (
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
-                                    <button className="btn" onClick={resetToViewMode} disabled={saving} style={{ fontSize: 12, padding: '6px 14px' }}>Cancel</button>
+                                    <button className="btn" onClick={handleCancelEdit} disabled={saving} style={{ fontSize: 12, padding: '6px 14px' }}>Cancel</button>
                                     <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ fontSize: 12, padding: '6px 14px' }}>
                                         {saving
                                             ? <><Loader2 size={12} className="spin" /> Saving…</>
@@ -2843,6 +2908,58 @@ const GovernmentRecordsTab: React.FC = () => {
                     )}
                 </div>
             </div>
+            <ConfirmationModal
+                isOpen={showCancelConfirm}
+                variant="warning"
+                title="Discard changes?"
+                description="You have unsaved changes. Are you sure you want to discard them?"
+                confirmLabel="Discard"
+                onConfirm={() => { setShowCancelConfirm(false); setForm({ sssNumber: '', philhealthNumber: '', pagibigNumber: '', tinNumber: '' }); resetToViewMode(); }}
+                onCancel={() => setShowCancelConfirm(false)}
+            />
+            {showPasswordGate && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => { if (!saving) setShowPasswordGate(false); }}>
+                    <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 380, maxWidth: '90vw', boxShadow: '0 24px 64px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Confirm Your Identity</h3>
+                        <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b' }}>Enter your password to update government records.</p>
+                        <div style={{ position: 'relative' }}>
+                            <input type={showGatePw ? 'text' : 'password'} placeholder="Enter your current password" value={gatePassword} autoFocus
+                                onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                onKeyDown={e => { if (e.key === 'Enter' && !gateLoading) { (document.getElementById('gov-gate-confirm') as HTMLButtonElement)?.click(); } }}
+                                style={{ width: '100%', height: 42, borderRadius: 10, border: `1.5px solid ${gateError ? '#dc2626' : '#e2e8f0'}`, padding: '0 44px 0 14px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                            />
+                            <button type="button" onClick={() => setShowGatePw(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>
+                                {showGatePw ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        </div>
+                        {gateError && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626', marginTop: 8 }}><AlertCircle size={12} />{gateError}</div>}
+                        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                            <button className="btn" onClick={() => setShowPasswordGate(false)} disabled={gateLoading} style={{ padding: '9px 18px', borderRadius: 10 }}>Cancel</button>
+                            <button id="gov-gate-confirm" className="btn btn-primary" disabled={gateLoading} onClick={async () => {
+                                if (!gatePassword) { setGateError('Please enter your password.'); return; }
+                                setGateLoading(true);
+                                setGateError('');
+                                try {
+                                    const token = localStorage.getItem('authToken');
+                                    const adminId = localStorage.getItem('employeeId') ?? '';
+                                    const verifyRes = await fetch('/api/authentication/verify-password', {
+                                        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                        body: JSON.stringify({ employeeID: adminId, password: gatePassword }),
+                                    });
+                                    const verifyData = await verifyRes.json().catch(() => ({}));
+                                    if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password.'); }
+                                    await doSubmit();
+                                    setShowPasswordGate(false);
+                                } catch (err: any) {
+                                    setGateError(err.message || err.Message || 'Incorrect password.');
+                                } finally { setGateLoading(false); }
+                            }} style={{ padding: '9px 24px', borderRadius: 10 }}>
+                                {gateLoading ? <><Loader2 size={13} className="spin" /> Verifying…</> : <>Verify & Update</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -2900,11 +3017,24 @@ export default function Dashboard() {
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
     const [activityLogPage, setActivityLogPage] = useState(1);
     const [activityLogTotalPages, setActivityLogTotalPages] = useState(1);
+    const [activityLogLoading, setActivityLogLoading] = useState(false);
     const ACTIVITY_LOG_PAGE_SIZE = 15;
+    const [activityLogSearch, setActivityLogSearch] = useState('');
+    const [activityLogEmployee, setActivityLogEmployee] = useState('');
+    const [activityLogType, setActivityLogType] = useState('');
+    const [activityLogDateFrom, setActivityLogDateFrom] = useState('');
+    const [activityLogDateTo, setActivityLogDateTo] = useState('');
 
     const fetchActivityLogs = (page: number) => {
+        setActivityLogLoading(true);
         const token = localStorage.getItem('authToken');
-        fetch(`/api/activity-logs/recent?page=${page}&pageSize=${ACTIVITY_LOG_PAGE_SIZE}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const params = new URLSearchParams({ page: String(page), pageSize: String(ACTIVITY_LOG_PAGE_SIZE) });
+        if (activityLogSearch) params.append('search', activityLogSearch);
+        if (activityLogEmployee) params.append('employeeId', activityLogEmployee);
+        if (activityLogType) params.append('activityType', activityLogType);
+        if (activityLogDateFrom) params.append('dateFrom', activityLogDateFrom);
+        if (activityLogDateTo) params.append('dateTo', activityLogDateTo);
+        fetch(`/api/activity-logs/recent?${params}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
             .then(res => { if (!res.ok) return null; return res.json(); })
             .then(data => {
                 if (data && Array.isArray(data.data)) {
@@ -2919,8 +3049,17 @@ export default function Dashboard() {
                     setActivityLogs([]);
                 }
             })
-            .catch(() => setActivityLogs([]));
+            .catch(() => setActivityLogs([]))
+            .finally(() => setActivityLogLoading(false));
     };
+
+    // Re-fetch activity logs when the tab becomes active or any filter changes
+    useEffect(() => {
+        if (activeTab === 'activity_logs') {
+            const timer = setTimeout(() => fetchActivityLogs(1), 400);
+            return () => clearTimeout(timer);
+        }
+    }, [activeTab, activityLogSearch, activityLogEmployee, activityLogType, activityLogDateFrom, activityLogDateTo]);
 
     // ── Employment Contracts / Documents ──
     const [contracts, setContracts] = useState<EmploymentContract[]>([]);
@@ -3112,8 +3251,6 @@ export default function Dashboard() {
                 setEmployeeName(fullName);
             })
             .catch((err) => console.error('Profile fetch error:', err));
-
-        fetchActivityLogs(1);
     }, []);
 
     useEffect(() => {
@@ -3172,7 +3309,7 @@ export default function Dashboard() {
 
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
-        delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
+        delivery: 'Delivery Summary', finance: 'Financial Overview', settings: 'Settings',
         roles: 'Role Management', reports: 'Reports', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment',
         government_records: 'Government Records'
     };
@@ -3283,7 +3420,7 @@ export default function Dashboard() {
                 {activeTab === 'reports' && <ReportsTab teamMembers={[]} />}
 
                 {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><EmptyState icon={<Truck size={32} />} message="Delivery module coming soon." /></div></div>}
-                {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><EmptyState icon={<BarChart3 size={32} />} message="Analytics module coming soon." /></div></div>}
+                {activeTab === 'finance' && <div className="dashboard-content"><div className="card"><EmptyState icon={<BarChart3 size={32} />} message="Finance module coming soon." /></div></div>}
 
                 {activeTab === 'government_records' && <GovernmentRecordsTab />}
 
@@ -3298,11 +3435,49 @@ export default function Dashboard() {
                 )}
 
                 {activeTab === 'activity_logs' && (
-                    <div className="dashboard-content">
+                    <div className="dashboard-content" style={{ padding: 0 }}>
                         <DataTable
                             title="System Activity Logs"
                             headers={['Date & Time', 'Activity Type', 'Employee', 'Description']}
-                            loading={false}
+                            searchQuery={activityLogSearch}
+                            onSearchChange={val => setActivityLogSearch(val)}
+                            searchPlaceholder="Search description, employee…"
+                            filterElements={
+                                <>
+                                    <select value={activityLogEmployee} onChange={e => setActivityLogEmployee(e.target.value)}
+                                        style={{ height: 36, borderRadius: 8, border: '1.5px solid var(--border)', padding: '0 10px', fontSize: 13, minWidth: 150, boxSizing: 'border-box', outline: 'none', cursor: 'pointer', background: '#fff' }}>
+                                        <option value="">All Employees</option>
+                                        {recentEmployees.slice(0, 100).map(emp => (
+                                            <option key={emp.employeeNumber} value={emp.employeeNumber}>{getEmployeeDisplayName(emp)}</option>
+                                        ))}
+                                    </select>
+                                    <select value={activityLogType} onChange={e => setActivityLogType(e.target.value)}
+                                        style={{ height: 36, borderRadius: 8, border: '1.5px solid var(--border)', padding: '0 10px', fontSize: 13, minWidth: 130, boxSizing: 'border-box', outline: 'none', cursor: 'pointer', background: '#fff' }}>
+                                        <option value="">All Types</option>
+                                        <option value="Login">Login</option>
+                                        <option value="Logout">Logout</option>
+                                        <option value="Profile Update">Profile Update</option>
+                                        <option value="Task Created">Task Created</option>
+                                        <option value="Task Updated">Task Updated</option>
+                                        <option value="Task Status Updated">Task Status Updated</option>
+                                        <option value="Account Created">Account Created</option>
+                                        <option value="Approval Request Submitted">Approval Request Submitted</option>
+                                        <option value="Approval Tier Approved">Approval Tier Approved</option>
+                                        <option value="Approval Tier Rejected">Approval Tier Rejected</option>
+                                    </select>
+                                    <input type="date" value={activityLogDateFrom} onChange={e => setActivityLogDateFrom(e.target.value)}
+                                        style={{ height: 36, borderRadius: 8, border: '1.5px solid var(--border)', padding: '0 10px', fontSize: 13, minWidth: 130, boxSizing: 'border-box', outline: 'none' }} />
+                                    <input type="date" value={activityLogDateTo} onChange={e => setActivityLogDateTo(e.target.value)}
+                                        style={{ height: 36, borderRadius: 8, border: '1.5px solid var(--border)', padding: '0 10px', fontSize: 13, minWidth: 130, boxSizing: 'border-box', outline: 'none' }} />
+                                    {(activityLogSearch || activityLogEmployee || activityLogType || activityLogDateFrom || activityLogDateTo) && (
+                                        <button className="btn btn-sm" onClick={() => { setActivityLogSearch(''); setActivityLogEmployee(''); setActivityLogType(''); setActivityLogDateFrom(''); setActivityLogDateTo(''); }}
+                                            style={{ height: 36, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <X size={13} /> Clear
+                                        </button>
+                                    )}
+                                </>
+                            }
+                            loading={activityLogLoading}
                             emptyMessage="No activity logs found in the system."
                             emptyIcon={<Activity size={24} />}
                             totalRecords={activityLogs.length}

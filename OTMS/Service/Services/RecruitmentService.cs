@@ -19,15 +19,15 @@ namespace OTMS.Service.Services
         IOnboardingService onboardingService
         ) : IRecruitmentService
     {
-        private static readonly string[] AllowedStatuses = { "Pending Review", "Interview Scheduled", "Job Offered", "Rejected", "Hired/Converted" };
+        private static readonly string[] AllowedStatuses = { "Pending Review", "Interview Scheduled", "Job Offered", "Rejected", "Hired" };
 
         private static readonly Dictionary<string, string[]> ValidTransitions = new()
         {
             { "Pending Review", new[] { "Interview Scheduled", "Rejected" } },
             { "Interview Scheduled", new[] { "Job Offered", "Rejected" } },
-            { "Job Offered", new[] { "Rejected", "Hired/Converted" } },
+            { "Job Offered", new[] { "Rejected", "Hired" } },
             { "Rejected", Array.Empty<string>() },
-            { "Hired/Converted", Array.Empty<string>() }
+            { "Hired", Array.Empty<string>() }
         };
 
         public async Task<ApiResponseDTO<PaginationResponseDTO<ApplicantRecordDTO>>> GetDashboardApplicantsAsync(ApplicantDashboardFilterDTO filter)
@@ -84,8 +84,23 @@ namespace OTMS.Service.Services
                     CurrentResidentialAddress = ar.CurrentResidentialAddress,
                     PermanentAddress = ar.PermanentAddress,
                     ResumeFilePath = ar.ResumeFilePath,
+                    SSSNumber = ar.SSSNumber,
+                    PhilHealthNumber = ar.PhilHealthNumber,
+                    PagIBIGNumber = ar.PagIBIGNumber,
+                    TIN = ar.TIN,
+                    BankName = ar.BankName,
+                    BankAccountName = ar.BankAccountName,
+                    BankAccountNumber = ar.BankAccountNumber,
+                    NBIClearanceFilePath = ar.NBIClearanceFilePath,
+                    MedicalClearanceFilePath = ar.MedicalClearanceFilePath,
+                    PSABirthCertificateFilePath = ar.PSABirthCertificateFilePath,
+                    EmergencyContactName = ar.EmergencyContactName,
+                    EmergencyContactRelationship = ar.EmergencyContactRelationship,
+                    EmergencyContactMobileNumber = ar.EmergencyContactMobileNumber,
+                    DeclaredDependents = ar.DeclaredDependents,
                     HighestEducationalAttainment = ar.HighestEducationalAttainment,
                     Institution = ar.Institution,
+                    Degree = ar.Degree,
                     YearGraduated = ar.YearGraduated,
                     ProfessionalLicensesCertifications = ar.ProfessionalLicensesCertifications,
                     IsEmailVerified = ar.IsEmailVerified,

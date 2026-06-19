@@ -369,10 +369,8 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                                 body: JSON.stringify({ employeeID: adminId, password: pw }),
                             });
-                            if (!res.ok) {
-                                const err = await res.json().catch(() => ({}));
-                                throw new Error(err.message || 'Incorrect password. Please try again.');
-                            }
+                            const verifyData = await res.json().catch(() => ({}));
+                            if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password. Please try again.'); }
                             setConfirmModal(CONFIRM_CLOSED);
                             await doSave();
                         } catch (err: any) {
@@ -580,7 +578,8 @@ export default function EmployeeDetailPanel({
                         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                         body: JSON.stringify({ employeeID: adminId, password: pw }),
                     });
-                    if (!verifyRes.ok) { const err = await verifyRes.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password.'); }
+                    const verifyData = await verifyRes.json().catch(() => ({}));
+                    if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password.'); }
                     setConfirmModal(CONFIRM_CLOSED);
                     if (action.type === 'archive') {
                         setDeleting(true);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
@@ -65,6 +65,8 @@ import ActionButton from '../../components/ActionButton/ActionButton';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import EmptyState from '../../components/ui/EmptyState';
+import SubTabNav from '../../components/ui/SubTabNav';
+import TaskManager, { TMTask } from '../../components/TaskManager/TaskManager';
 
 interface ConfirmModalState {
     isOpen: boolean;
@@ -856,7 +858,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         {initial.supportingEvidenceUrl && !supportingEvidence && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8, marginBottom: 8 }}>
                                 <span style={{ fontSize: 12, color: 'var(--primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {initial.supportingEvidenceUrl.split('/').pop()}
+                                    {(initial.supportingEvidenceUrl.split('/').pop() || '').replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, '')}
                                 </span>
                                 <button
                                     type="button"
@@ -969,7 +971,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                             <span className={`sr-status-tag ${m.presenceStatus === 'Offline' ? 'offline' : 'leave'}`}>
                                                 {m.presenceStatus}
                                             </span>
-                                            <span className="sr-workload">�</span>
+                                            <span className="sr-workload">—</span>
                                             <span className="sr-excluded-tag">Excluded</span>
                                         </div>
                                     ))}
@@ -1420,6 +1422,7 @@ const DashboardTab: React.FC<{
     onClearFilters: () => void;
     onNewTask: () => void;
 }> = ({ dashboardData, dashboardEmployees, dashboardDepartments, dashboardLoading, dashboardError, filters, onFilterChange, onClearFilters, onNewTask }) => {
+    const [searchQuery, setSearchQuery] = useState('');
     const hasAnyFilter = filters.dateStart || filters.dateEnd || filters.employeeId || filters.departmentId || filters.taskStatus;
     const td = dashboardData;
 
@@ -1431,6 +1434,9 @@ const DashboardTab: React.FC<{
     const pct = total > 0 ? Math.round(completed / total * 100) : 0;
     const completionColor = pct >= 80 ? 'var(--status-active)' : pct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)';
     const workloads = td?.employeeWorkloadDistribution ?? [];
+    const filteredWorkloads = searchQuery
+        ? workloads.filter(w => w.employeeName.toLowerCase().includes(searchQuery.toLowerCase()))
+        : workloads;
     const taskDist = td?.taskAssignmentDistribution ?? {};
     const pendingReview = taskDist['Pending Admin Review'] ?? 0;
     const done = taskDist['Done'] ?? 0;
@@ -1460,7 +1466,7 @@ const DashboardTab: React.FC<{
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
                         <div style={{ position: 'relative', width: 300, margin: 0 }}>
                             <Search size={14} style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                            <input type="text" placeholder="Search employee�"
+                            <input type="text" placeholder="Search employee…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                                 style={{ width: '100%', height: 46, borderRadius: 999, border: '1px solid #dbe3f0', background: '#f8fafc', padding: '0 20px 0 42px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                                 onFocus={e => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#14b8a6'; e.target.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.08)'; }}
                                 onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#dbe3f0'; e.target.style.boxShadow = 'none'; }} />
@@ -1644,9 +1650,9 @@ const DashboardTab: React.FC<{
                         headers={['EMPLOYEE', 'TOTAL', 'ACTIVE', 'COMPLETED', 'OVERDUE', 'COMPLETION']}
                         loading={false}
                         emptyMessage="No workload data available."
-                        totalRecords={workloads.length}
+                        totalRecords={filteredWorkloads.length}
                     >
-                        {workloads.map((w, idx) => {
+                        {filteredWorkloads.map((w, idx) => {
                             const compPct = w.totalAssigned > 0 ? Math.round(w.completedTasks / w.totalAssigned * 100) : 0;
                             return (
                                 <tr key={w.employeeId}>
@@ -1822,11 +1828,35 @@ const TasksTab: React.FC<{
                         <span style={{ fontSize: 12, color: 'var(--status-failed)' }}>{searchError}</span>
                     </td></tr>
                 )}
-                {subTab === 'active' && sorted.length > 0 && sorted.map(t => (
-                    <tr key={t.taskId}><td colSpan={4} style={{ padding: 0, border: 'none' }}>
-                        <TaskRow task={t} onView={onView} onEdit={onEdit} showEditBtn />
-                    </td></tr>
-                ))}
+                {subTab === 'active' && sorted.length > 0 && sorted.map(t => {
+                    const od = isEffectivelyOverdue(t);
+                    const effectiveStatus = od ? 'Overdue' : t.taskStatus;
+                    const refDisplay = t.taskReferenceNumber || t.taskId.slice(0, 8).toUpperCase();
+                    return (
+                        <tr key={t.taskId} onClick={() => onView(t.taskId)} style={{ cursor: 'pointer' }}>
+                            <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className={priorityDotClass(t.priority)} />
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em' }}>#{refDisplay}</span>
+                                            {t.taskTitle}
+                                        </div>
+                                        <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span className={statusBadgeClass(effectiveStatus)} style={{ fontSize: 10, padding: '1px 8px' }}>{effectiveStatus}</span>
+                                            <div style={{ width: 100, height: 4, background: '#e8ecf4', borderRadius: 2, overflow: 'hidden' }}>
+                                                <div style={{ width: `${statusToProgress(effectiveStatus)}%`, height: '100%', background: statusToProgress(effectiveStatus) >= 100 ? '#05cd99' : statusToProgress(effectiveStatus) >= 75 ? '#4318ff' : statusToProgress(effectiveStatus) >= 45 ? '#ffb547' : '#94a3b8', borderRadius: 2 }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>{t.assignedEmployee || 'Unassigned'}</td>
+                            <td><PrioBadge p={t.priority} /></td>
+                            <td style={{ fontSize: 12, color: od ? 'var(--status-failed)' : 'var(--text-secondary)', fontWeight: od ? 700 : 400 }}>{t.dueAt ? fmtDate(t.dueAt) : '—'}</td>
+                        </tr>
+                    );
+                })}
                 {subTab !== 'active' && deletedTasks.map((t, binIdx) => (
                     <tr key={t.taskId ?? binIdx} style={{ opacity: 0.75 }}>
                         <td>
@@ -2476,16 +2506,14 @@ export const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMember
 
     return (
         <div className="dashboard-content">
-            <div className="report-subtabs">
-                <button className={`filter-pill${reportSubTab === 'task-completion' ? ' active' : ''}`}
-                    onClick={() => setReportSubTab('task-completion')}>
-                    <FileText size={14} /> Task Completion Report
-                </button>
-                <button className={`filter-pill${reportSubTab === 'operational-summary' ? ' active' : ''}`}
-                    onClick={() => setReportSubTab('operational-summary')}>
-                    <BarChart3 size={14} /> Operational Summary Report
-                </button>
-            </div>
+            <SubTabNav
+                tabs={[
+                    { key: 'task-completion', label: 'Task Completion Report', icon: <FileText size={14} /> },
+                    { key: 'operational-summary', label: 'Operational Summary Report', icon: <BarChart3 size={14} /> },
+                ]}
+                activeTab={reportSubTab}
+                onTabChange={key => setReportSubTab(key as 'task-completion' | 'operational-summary')}
+            />
 
             {reportSubTab === 'task-completion' && (
                 <>
@@ -2914,10 +2942,8 @@ function ProfileTab() {
                     password: gatePassword,
                 }),
             });
-            if (!verifyRes.ok) {
-                const err = await verifyRes.json().catch(() => ({}));
-                throw new Error((err as any).message || 'Incorrect password. Please try again.');
-            }
+            const verifyData = await verifyRes.json().catch(() => ({}));
+            if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password. Please try again.'); }
             setPasswordGate(false);
             setGatePassword('');
             await performSave();
@@ -3872,6 +3898,19 @@ export default function OpsAdminDashboard() {
 
     const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
     const [tasks, setTasks] = useState<Task[]>([]);
+    const tmTasks = useMemo(() => tasks.map(t => ({
+        id: t.taskId,
+        name: t.taskTitle,
+        referenceNumber: t.taskReferenceNumber,
+        project: t.taskCategory,
+        assignee: t.assignedTo ? { id: t.assignedTo, name: t.assignedEmployee || 'Unassigned' } : undefined,
+        priority: t.priority as TMTask['priority'],
+        status: ({ Draft: 'Backlog', Assigned: 'To do', Pending: 'To do', 'In Progress': 'In progress', 'Pending Admin Review': 'In review', Done: 'Done', Completed: 'Done', Overdue: 'In progress' } as Record<string, TMTask['status']>)[t.taskStatus] || 'Backlog',
+        dueDate: t.dueAt || undefined,
+        progress: t.taskStatus === 'Completed' || t.taskStatus === 'Done' ? 100 : t.taskStatus === 'In Progress' ? 50 : t.taskStatus === 'Pending Admin Review' ? 80 : t.taskStatus === 'Assigned' || t.taskStatus === 'Pending' ? 10 : 0,
+        isArchived: false,
+        isDeleted: t.deleted || t.Deleted || false,
+    })), [tasks]);
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loadingTasks, setLoadingTasks] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -4640,19 +4679,19 @@ export default function OpsAdminDashboard() {
                     />
                 )}
                 {activeTab === 'tasks' && (
-                    <TasksTab
-                        tasks={tasks}
-                        binTasks={binTasks}
-                        teamMembers={teamMembers}
-                        loading={loadingTasks}
-                        searchQuery={searchQuery}
-                        setSearchQuery={setSearchQuery}
-                        onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
-                        onEdit={id => setEditingTask(tasks.find(t => t.taskId === id) ?? null)}
-                        onRestore={handleRestoreTask}
-                        onEmptyBin={handleEmptyBin}
-                        onNewTask={() => setShowNew(true)}
-                    />
+                    <div className="dashboard-content">
+                        <TaskManager
+                            tasks={tmTasks}
+                            teamMembers={teamMembers.map(m => ({ accountId: m.accountId, employeeName: m.employeeName }))}
+                            onNewTask={() => setShowNew(true)}
+                            onEdit={id => setEditingTask(tasks.find(t => t.taskId === id) ?? null)}
+                            onView={id => setDetailTask(tasks.find(t => t.taskId === id) ?? null)}
+                            onArchive={ids => { ids.forEach(id => handleDeleteTask(id)); }}
+                            onRestore={ids => { ids.forEach(id => handleRestoreTask(id)); }}
+                            onDelete={ids => { ids.forEach(id => handleDeleteTask(id)); }}
+                            onMarkDone={ids => { ids.forEach(id => handleStatusTransition(id, 'Completed')); }}
+                        />
+                    </div>
                 )}
                 {activeTab === 'team' && (
                     <TeamTab

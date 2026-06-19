@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
     FileText, Download, Eye, Upload, Search,
     CheckCircle2, Clock, Archive, AlertCircle, Loader2,
-    Plus, Calendar, User, Tag, Info,
+    Plus, Calendar, User, Tag, Info, EyeOff,
 } from 'lucide-react';
+import { useToast } from '../../../components/Toast/Toast';
 import DataTable from '../../../components/ui/DataTable';
 import FormModal from '../../../components/FormModal/FormModal';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -62,6 +63,12 @@ function UploadDocumentModal({ employees, onClose, onUploaded }: { employees: an
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<any>({});
+    const [showPasswordGate, setShowPasswordGate] = useState(false);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePw, setShowGatePw] = useState(false);
+    const [uploadSuccess, setUploadSuccess] = useState(false);
     const fileRef = React.useRef<HTMLInputElement>(null);
 
     const filteredEmps = employees.filter((e: any) => {
@@ -101,8 +108,7 @@ function UploadDocumentModal({ employees, onClose, onUploaded }: { employees: an
         return Object.keys(errs).length === 0;
     };
 
-    const handleSubmit = async () => {
-        if (!validate()) return;
+    const doUpload = async () => {
         setSubmitting(true);
         setError('');
         try {
@@ -144,13 +150,25 @@ function UploadDocumentModal({ employees, onClose, onUploaded }: { employees: an
                 if (!result.isSuccess) throw new Error(result.message || 'Upload failed.');
             }
 
-            onUploaded();
-            onClose();
+            setUploadSuccess(true);
+            setShowPasswordGate(false);
+            setTimeout(() => {
+                onUploaded();
+                onClose();
+            }, 1500);
         } catch (err: any) {
             setError(err.message ?? 'Something went wrong.');
+            setShowPasswordGate(false);
         } finally {
             setSubmitting(false);
         }
+    };
+
+    const handleSubmit = () => {
+        if (!validate()) return;
+        setGatePassword('');
+        setGateError('');
+        setShowPasswordGate(true);
     };
 
     const inputStyle = (err?: string) => ({
@@ -409,6 +427,60 @@ function UploadDocumentModal({ employees, onClose, onUploaded }: { employees: an
                     </div>
                 </div>
             )}
+
+            {showPasswordGate && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => { if (!submitting) setShowPasswordGate(false); }}>
+                    <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 380, maxWidth: '90vw', boxShadow: '0 24px 64px rgba(0,0,0,0.3)' }} onClick={e => e.stopPropagation()}>
+                        {uploadSuccess ? (
+                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(5,150,105,0.1)', border: '2px solid rgba(5,150,105,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                    <CheckCircle2 size={28} color="#059669" />
+                                </div>
+                                <h3 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Upload Successful!</h3>
+                                <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Document has been uploaded successfully.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#0f172a' }}>Confirm Your Identity</h3>
+                                <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748b' }}>Enter your password to proceed with the upload.</p>
+                                <div style={{ position: 'relative' }}>
+                                    <input type={showGatePw ? 'text' : 'password'} placeholder="Enter your current password" value={gatePassword} autoFocus
+                                        onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                        onKeyDown={e => { if (e.key === 'Enter' && !gateLoading) { (document.getElementById('gate-upload-confirm') as HTMLButtonElement)?.click(); } }}
+                                        style={{ width: '100%', height: 42, borderRadius: 10, border: `1.5px solid ${gateError ? '#dc2626' : '#e2e8f0'}`, padding: '0 44px 0 14px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                    <button type="button" onClick={() => setShowGatePw(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>
+                                        {showGatePw ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                                {gateError && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626', marginTop: 8 }}><AlertCircle size={12} />{gateError}</div>}
+                                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                                    <button className="btn" onClick={() => setShowPasswordGate(false)} disabled={gateLoading} style={{ padding: '9px 18px', borderRadius: 10 }}>Cancel</button>
+                                    <button id="gate-upload-confirm" className="btn btn-primary" disabled={gateLoading} onClick={async () => {
+                                        if (!gatePassword) { setGateError('Please enter your password.'); return; }
+                                        setGateLoading(true);
+                                        setGateError('');
+                                        try {
+                                            const token = localStorage.getItem('authToken');
+                                            const adminId = localStorage.getItem('employeeId') ?? '';
+                                            const verifyRes = await fetch('/api/authentication/verify-password', {
+                                                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                body: JSON.stringify({ employeeID: adminId, password: gatePassword }),
+                                            });
+                                            const verifyData = await verifyRes.json().catch(() => ({}));
+                                            if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password.'); }
+                                            await doUpload();
+                                        } catch (err: any) { setGateError(err.message ?? 'Incorrect password.'); }
+                                        finally { setGateLoading(false); }
+                                    }} style={{ padding: '9px 24px', borderRadius: 10 }}>
+                                        {gateLoading ? <><Loader2 size={13} className="fm-spin" /> Verifying…</> : <>Verify & Upload</>}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </FormModal>
     );
 }
@@ -467,6 +539,7 @@ function DetailModal({ doc, onClose, onArchive }: { doc: any, onClose: () => voi
 // ─── Main Component ────────────────────────────────────────────────────────
 
 export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 }: { employees?: any[], onOpenDigital201: (emp: any) => void }) {
+    const { success, error } = useToast();
     const [docs, setDocs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -513,14 +586,18 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
         if (!archiveTarget) return;
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch(`/api/systemadmin/documents/${archiveTarget.employeeAttachmentId}/archive`, {
+            const res = await fetch(`/api/systemadmin/documents/${archiveTarget.employeeAttachmentId ?? archiveTarget.contractId}/archive`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${token}` },
             });
-            if (!res.ok) throw new Error('Archive failed.');
+            if (!res.ok) throw new Error('Failed to archive document.');
+            success('Document archived successfully.');
             setArchiveTarget(null);
             fetchDocs(page);
-        } catch { alert('Failed to archive document.'); }
+        } catch (err: any) {
+            error(err.message ?? 'Failed to archive document.');
+            setArchiveTarget(null);
+        }
     };
 
     const activeCount = docs.filter((d: any) => !d.isArchived).length;
@@ -587,7 +664,7 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
                                 </div>
                             </td>
                             <td><span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700, background: 'rgba(67,24,255,0.08)', color: '#4318ff' }}>{doc.documentType}</span></td>
-                            <td style={{ fontWeight: 600, fontSize: 13 }}>{doc.documentTitle || '—'}</td>
+                            <td style={{ fontWeight: 600, fontSize: 13 }}>{doc.documentTitle || doc.fileName || '—'}</td>
                             <td style={{ fontSize: 12, whiteSpace: 'nowrap', color: '#64748b' }}>
                                 <Calendar size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
                                 {fmtDate(doc.issueDate || doc.effectiveStartDate)}
@@ -628,7 +705,7 @@ export default function EmployeeDocumentsTab({ employees = [], onOpenDigital201 
                 <UploadDocumentModal
                     employees={employees}
                     onClose={() => setShowUploadModal(false)}
-                    onUploaded={() => fetchDocs(page)}
+                    onUploaded={() => { success('Document uploaded successfully.'); fetchDocs(page); }}
                 />
             )}
             {detailDoc && (

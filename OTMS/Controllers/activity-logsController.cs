@@ -49,11 +49,13 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]
         [HttpGet("recent")]
-        public async Task<IActionResult> GetRecentActivityLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetRecentActivityLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null, [FromQuery] string? employeeId = null, [FromQuery] string? activityType = null,
+            [FromQuery] string? dateFrom = null, [FromQuery] string? dateTo = null)
         {
             try
             {
-                var logs = await activityLogService.GetRecentActivityLogsPagedAsync(page, pageSize);
+                var logs = await activityLogService.GetRecentActivityLogsPagedAsync(page, pageSize, search, employeeId, activityType, dateFrom, dateTo);
                 return Ok(logs);
             }
             catch (Exception ex)

@@ -66,6 +66,10 @@ interface EmployeeAttachment {
     version: number;
     documentType: string;
     isArchived: boolean;
+    documentTitle?: string;
+    issueDate?: string;
+    expiryDate?: string;
+    remarks?: string;
 }
 
 interface ComplianceData {
@@ -95,6 +99,63 @@ interface Digital201FileData {
     attachments: EmployeeAttachment[];
     compliance?: ComplianceData | null;
 }
+
+const COMPLIANCE_SSS_REGEX = /^\d{2}-\d{7}-\d{1}$/;
+const COMPLIANCE_PHILHEALTH_REGEX = /^\d{2}-\d{9}-\d{1}$/;
+const COMPLIANCE_PAGIBIG_REGEX = /^\d{4}-\d{4}-\d{4}$/;
+const COMPLIANCE_TIN_REGEX = /^\d{3}-\d{3}-\d{3}-\d{3}$/;
+const COMPLIANCE_PH_MOBILE_REGEX = /^09\d{9}$/;
+
+const applyComplianceFormat = (field: string, value: string): string => {
+    const digits = value.replace(/\D/g, '');
+    if (field === 'sssNumber') {
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 9) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+        return `${digits.slice(0, 2)}-${digits.slice(2, 9)}-${digits.slice(9, 10)}`;
+    }
+    if (field === 'philhealthNumber') {
+        if (digits.length <= 2) return digits;
+        if (digits.length <= 11) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+        return `${digits.slice(0, 2)}-${digits.slice(2, 11)}-${digits.slice(11, 12)}`;
+    }
+    if (field === 'pagibigNumber') {
+        if (digits.length <= 4) return digits;
+        if (digits.length <= 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+        return `${digits.slice(0, 4)}-${digits.slice(4, 8)}-${digits.slice(8, 12)}`;
+    }
+    if (field === 'tinNumber') {
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+        if (digits.length <= 9) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+        return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}-${digits.slice(9, 12)}`;
+    }
+    return value;
+};
+
+const validateComplianceField = (field: string, value: string): string => {
+    switch (field) {
+        case 'sssNumber':
+            if (!value.trim()) return 'SSS Number is required.';
+            if (!COMPLIANCE_SSS_REGEX.test(value.trim())) return 'Format: XX-XXXXXXX-X';
+            return '';
+        case 'philhealthNumber':
+            if (!value.trim()) return 'PhilHealth Number is required.';
+            if (!COMPLIANCE_PHILHEALTH_REGEX.test(value.trim())) return 'Format: XX-XXXXXXXXX-X';
+            return '';
+        case 'pagibigNumber':
+            if (!value.trim()) return 'Pag-IBIG Number is required.';
+            if (!COMPLIANCE_PAGIBIG_REGEX.test(value.trim())) return 'Format: XXXX-XXXX-XXXX';
+            return '';
+        case 'tinNumber':
+            if (value.trim() && !COMPLIANCE_TIN_REGEX.test(value.trim())) return 'Format: XXX-XXX-XXX-XXX';
+            return '';
+        case 'emergencyContactNumber':
+            if (value.trim() && !COMPLIANCE_PH_MOBILE_REGEX.test(value.trim())) return 'Must be 11 digits starting with 09.';
+            return '';
+        default:
+            return '';
+    }
+};
 
 interface Digital201FileViewProps {
     employeeNumber: string;
@@ -189,8 +250,11 @@ export default function Digital201FileView({
         bankName: '', bankAccountNumber: '',
         emergencyContactName: '', emergencyContactNumber: ''
     });
+    const [complianceOriginal, setComplianceOriginal] = useState<typeof complianceForm | null>(null);
+    const [showComplianceCancelConfirm, setShowComplianceCancelConfirm] = useState(false);
     const [complianceSaving, setComplianceSaving] = useState(false);
     const [complianceError, setComplianceError] = useState('');
+    const [complianceErrors, setComplianceErrors] = useState<Record<string, string>>({});
     const [gatePassword, setGatePassword] = useState('');
     const [gateError, setGateError] = useState('');
     const [gateLoading, setGateLoading] = useState(false);
@@ -489,7 +553,7 @@ export default function Digital201FileView({
                             <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>Bio-Data & Compliance (Encrypted at Rest)</span>
                         </div>
                         {!editingCompliance && (
-                            <button className="btn btn-primary btn-sm" onClick={() => { setComplianceForm({ sssNumber: data.compliance!.sssNumber, philhealthNumber: data.compliance!.philhealthNumber, pagibigNumber: data.compliance!.pagibigNumber, tinNumber: data.compliance!.tinNumber || '', bankName: data.compliance!.bankName, bankAccountNumber: data.compliance!.bankAccountNumber, emergencyContactName: data.compliance!.emergencyContactName, emergencyContactNumber: data.compliance!.emergencyContactNumber }); setEditingCompliance(true); }}>
+                            <button className="btn btn-primary btn-sm" onClick={() => { const vals = { sssNumber: data.compliance!.sssNumber, philhealthNumber: data.compliance!.philhealthNumber, pagibigNumber: data.compliance!.pagibigNumber, tinNumber: data.compliance!.tinNumber || '', bankName: data.compliance!.bankName, bankAccountNumber: data.compliance!.bankAccountNumber, emergencyContactName: data.compliance!.emergencyContactName, emergencyContactNumber: data.compliance!.emergencyContactNumber }; setComplianceForm(vals); setComplianceOriginal(vals); setComplianceErrors({}); setEditingCompliance(true); }}>
                                 <Pencil size={11} /> Edit
                             </button>
                         )}
@@ -499,24 +563,49 @@ export default function Digital201FileView({
                             {complianceError && <div style={{ display: 'flex', gap: 8, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#dc2626' }}><AlertCircle size={14} /><span>{complianceError}</span></div>}
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                                 {[
-                                    { key: 'sssNumber', label: 'SSS Number', placeholder: 'XX-XXXXXXX-X' },
-                                    { key: 'philhealthNumber', label: 'PhilHealth Number', placeholder: 'XX-XXXXXXXXX-X' },
-                                    { key: 'pagibigNumber', label: 'Pag-IBIG Number', placeholder: 'XXXX-XXXX-XXXX' },
-                                    { key: 'tinNumber', label: 'TIN', placeholder: 'XXX-XXX-XXX-XXX' },
-                                    { key: 'bankName', label: 'Bank Name', placeholder: 'e.g. BDO' },
-                                    { key: 'bankAccountNumber', label: 'Bank Account', placeholder: 'Account number' },
-                                    { key: 'emergencyContactName', label: 'Emergency Contact', placeholder: 'Full name' },
-                                    { key: 'emergencyContactNumber', label: 'Emergency Number', placeholder: '09XXXXXXXXX' },
-                                ].map(({ key, label, placeholder }) => (
-                                    <div key={key}>
-                                        <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>{label}</label>
-                                        <input type="text" value={(complianceForm as any)[key]} onChange={e => setComplianceForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={{ height: 36, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
-                                    </div>
-                                ))}
+                                    { key: 'sssNumber', label: 'SSS Number', placeholder: 'XX-XXXXXXX-X', format: true },
+                                    { key: 'philhealthNumber', label: 'PhilHealth Number', placeholder: 'XX-XXXXXXXXX-X', format: true },
+                                    { key: 'pagibigNumber', label: 'Pag-IBIG Number', placeholder: 'XXXX-XXXX-XXXX', format: true },
+                                    { key: 'tinNumber', label: 'TIN', placeholder: 'XXX-XXX-XXX-XXX', format: true },
+                                    { key: 'bankName', label: 'Bank Name', placeholder: 'e.g. BDO', format: false },
+                                    { key: 'bankAccountNumber', label: 'Bank Account', placeholder: 'Account number', format: false },
+                                    { key: 'emergencyContactName', label: 'Emergency Contact', placeholder: 'Full name', format: false },
+                                    { key: 'emergencyContactNumber', label: 'Emergency Number', placeholder: '09XXXXXXXXX', format: false },
+                                ].map(({ key, label, placeholder, format }) => {
+                                    const fieldValue = (complianceForm as any)[key] || '';
+                                    const fieldErr = complianceErrors[key];
+                                    return (
+                                        <div key={key}>
+                                            <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>{label}</label>
+                                            <input type="text" value={fieldValue}
+                                                onChange={e => {
+                                                    const raw = e.target.value;
+                                                    const val = format ? applyComplianceFormat(key, raw) : raw;
+                                                    setComplianceForm(f => ({ ...f, [key]: val }));
+                                                    setComplianceErrors(prev => ({ ...prev, [key]: validateComplianceField(key, val) }));
+                                                    setComplianceError('');
+                                                }}
+                                                placeholder={placeholder}
+                                                style={{ height: 36, borderRadius: 8, border: `1.5px solid ${fieldErr ? '#dc2626' : '#e2e8f0'}`, padding: '0 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
+                                            {fieldErr && <span style={{ fontSize: 11, color: '#dc2626', marginTop: 2, display: 'block' }}>{fieldErr}</span>}
+                                        </div>
+                                    );
+                                })}
                             </div>
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-                                <button className="btn btn-sm" onClick={() => setEditingCompliance(false)} disabled={complianceSaving}>Cancel</button>
+                                <button className="btn btn-sm" onClick={() => {
+                                    if (!complianceOriginal) { setEditingCompliance(false); return; }
+                                    const hasChanges = (Object.keys(complianceForm) as (keyof typeof complianceForm)[]).some(k => complianceForm[k] !== complianceOriginal[k]);
+                                    if (hasChanges) { setShowComplianceCancelConfirm(true); } else { setEditingCompliance(false); }
+                                }} disabled={complianceSaving}>Cancel</button>
                                 <button className="btn btn-primary btn-sm" onClick={async () => {
+                                    const errs: Record<string, string> = {};
+                                    (['sssNumber', 'philhealthNumber', 'pagibigNumber', 'tinNumber', 'emergencyContactNumber'] as const).forEach(k => {
+                                        const val = (complianceForm as any)[k] || '';
+                                        const e = validateComplianceField(k, val);
+                                        if (e) errs[k] = e;
+                                    });
+                                    if (Object.keys(errs).length > 0) { setComplianceErrors(errs); return; }
                                     setGatePassword('');
                                     setGateError('');
                                     setShowGatePassword(false);
@@ -547,7 +636,8 @@ export default function Digital201FileView({
                                                     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                                                     body: JSON.stringify({ employeeID: adminId, password: pw }),
                                                 });
-                                                if (!verifyRes.ok) { const err = await verifyRes.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password.'); }
+                                                const verifyData = await verifyRes.json().catch(() => ({}));
+                                                if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password.'); }
                                                 setConfirmModal(CONFIRM_CLOSED);
                                                 setComplianceSaving(true);
                                                 setComplianceError('');
@@ -614,8 +704,11 @@ export default function Digital201FileView({
                                     <FileText size={18} />
                                 </div>
                                 <div className="d201-view-file-info">
-                                    <div className="d201-view-file-name" title={att.fileName}>
-                                        {att.fileName}
+                                    <div className="d201-view-file-name" title={att.documentTitle || att.fileName}>
+                                        {att.documentTitle || att.fileName}
+                                    </div>
+                                    <div className="d201-view-file-meta">
+                                        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500 }} title={att.fileName}>{att.fileName}</span>
                                     </div>
                                     <div className="d201-view-file-meta">
                                         <span className="d201-view-version-badge">v{att.version}</span>
@@ -861,6 +954,15 @@ export default function Digital201FileView({
                 isLoading={gateLoading}
                 onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
+            />
+            <ConfirmationModal
+                isOpen={showComplianceCancelConfirm}
+                variant="warning"
+                title="Discard changes?"
+                description="You have unsaved changes in the Bio-Data & Compliance form. Are you sure you want to discard them?"
+                confirmLabel="Discard"
+                onConfirm={() => { setShowComplianceCancelConfirm(false); setEditingCompliance(false); }}
+                onCancel={() => setShowComplianceCancelConfirm(false)}
             />
         </div>
     );

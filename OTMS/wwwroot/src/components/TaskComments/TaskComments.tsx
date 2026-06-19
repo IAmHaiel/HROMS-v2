@@ -199,9 +199,6 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
             <div className="tc-header">
                 <span className="tc-title">Comments</span>
                 <span className="tc-count">{comments.length}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                    {taskReferenceNumber ? `#${taskReferenceNumber}` : `Task: ${taskId.slice(0, 8)}...`}
-                </span>
             </div>
 
             {error && (

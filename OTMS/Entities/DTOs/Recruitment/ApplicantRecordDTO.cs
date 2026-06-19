@@ -51,6 +51,7 @@ namespace OTMS.Entities.DTOs.Recruitment
         // Education
         public string? HighestEducationalAttainment { get; set; }
         public string? Institution { get; set; }
+        public string? Degree { get; set; }
         public string? YearGraduated { get; set; }
         public string? ProfessionalLicensesCertifications { get; set; }
 

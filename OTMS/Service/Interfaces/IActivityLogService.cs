@@ -9,7 +9,7 @@ namespace OTMS.Service.Interfaces
         Task<PresenceResponseDTO> GetPresenceAsync(Guid employeeId);
         Task<string> GetOnlineActivityAsync(Guid employeeId);
         Task<IEnumerable<object>> GetRecentActivityLogsAsync(int count = 50);
-        Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20);
+        Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20, string? search = null, string? employeeId = null, string? activityType = null, string? dateFrom = null, string? dateTo = null);
 
         // [Code Addition] Fetch activity logs based on the employee number (used in employee details).
         Task<IEnumerable<object>> GetEmployeeActivityLogsAsync(string employeeNumber);

@@ -34,6 +34,7 @@ import {
     LogOut,
     Mail,
     Activity,
+    Search,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -542,15 +543,18 @@ interface DashboardTabProps {
 }
 
 const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpdate, onGoTasks }) => {
+    const [searchQuery, setSearchQuery] = useState('');
     const total = tasks.length;
     const done = tasks.filter(t => t.status === 'completed').length;
     const inProg = tasks.filter(t => t.status === 'in-progress').length;
     const overdue = tasks.filter(t => effectiveStatus(t) === 'overdue').length;
     const pct = total ? Math.round(done / total * 100) : 0;
-    const urgent = tasks.filter(t => t.priority === 'high' && t.status !== 'completed');
+    const filteredTasks = searchQuery
+        ? tasks.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        : tasks;
+    const urgent = filteredTasks.filter(t => t.priority === 'high' && t.status !== 'completed');
     const firstName = user.fullName ? user.fullName.split(' ')[0] : 'Employee';
     const initials = getInitials(user.fullName);
-
     const [recentTrackers, setRecentTrackers] = useState<TrackerData[]>([]);
     const [activeTrackerCount, setActiveTrackerCount] = useState(0);
     const [trackersLoading, setTrackersLoading] = useState(true);
@@ -632,6 +636,16 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                 </div>
             </div>
 
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <div style={{ position: 'relative', width: 300 }}>
+                    <Search size={14} style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input type="text" placeholder="Search task…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                        style={{ width: '100%', height: 46, borderRadius: 999, border: '1px solid #dbe3f0', background: '#f8fafc', padding: '0 20px 0 42px', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                        onFocus={e => { e.target.style.background = '#ffffff'; e.target.style.borderColor = '#14b8a6'; e.target.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.08)'; }}
+                        onBlur={e => { e.target.style.background = '#f8fafc'; e.target.style.borderColor = '#dbe3f0'; e.target.style.boxShadow = 'none'; }} />
+                </div>
+            </div>
+
             <div className="stats-row">
                 {[
                     { label: 'My Tasks', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary', subtext: 'Assigned to me' },
@@ -680,7 +694,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
                 <div className="card">
                     <div className="card-header-layout"><h3>My Progress</h3></div>
                     <div className="progress-summary">
-                        {tasks.map(t => (
+                        {filteredTasks.map(t => (
                             <div key={t.id} className="ps-item" onClick={() => onView(t.id)}>
                                 <div className="ps-info">
                                     <span className="ps-name">{t.name}</span>
@@ -1137,10 +1151,8 @@ const ProfileTab: React.FC<ProfileTabProps> = ({ user, onUpdateUser }) => {
                 headers: authHeader(),
                 body: JSON.stringify({ employeeID: employeeId, password: gatePassword }),
             });
-            if (!verifyRes.ok) {
-                const err = await verifyRes.json().catch(() => ({}));
-                throw new Error((err as any).message || 'Incorrect password. Please try again.');
-            }
+            const verifyData = await verifyRes.json().catch(() => ({}));
+            if (!verifyData.isSuccess) { throw new Error(verifyData.message || verifyData.Message || 'Incorrect password. Please try again.'); }
             setPasswordGate(false);
             setGatePassword('');
             await performSave();

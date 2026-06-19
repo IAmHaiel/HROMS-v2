@@ -17,7 +17,8 @@ export type RecruitmentStatus =
     | 'Pending Review'
     | 'Interview Scheduled'
     | 'Job Offered'
-    | 'Rejected';
+    | 'Rejected'
+    | 'Hired';
 
 export interface StatusHistoryEntry {
     status: RecruitmentStatus;
@@ -110,8 +111,44 @@ interface StatusMeta {
 
 // ─── Dummy Data ───────────────────────────────────────────────────────────────
 
+const DUMMY_APPLICANT_DEFAULTS = {
+    referenceNumber: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    suffix: '',
+    gender: '',
+    civilStatus: '',
+    currentResidentialAddress: '',
+    permanentAddress: '',
+    sssNumber: '',
+    philHealthNumber: '',
+    pagIBIGNumber: '',
+    tin: '',
+    bankName: '',
+    bankAccountName: '',
+    bankAccountNumber: '',
+    nbiClearanceFilePath: '',
+    medicalClearanceFilePath: '',
+    psaBirthCertificateFilePath: '',
+    resumeFilePath: '',
+    signedEmploymentContractFilePath: '',
+    emergencyContactName: '',
+    emergencyContactRelationship: '',
+    emergencyContactMobileNumber: '',
+    declaredDependents: '',
+    highestEducationalAttainment: '',
+    institution: '',
+    degree: '',
+    yearGraduated: '',
+    professionalLicensesCertifications: '',
+    isEmailVerified: false,
+    resumeUrl: null,
+};
+
 const DUMMY_APPLICANTS: ApplicantRecord[] = [
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0001',
         fullName: 'Maria Santos',
         email: 'maria.santos@email.com',
@@ -121,13 +158,13 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         submittedAt: '2025-06-01T08:30:00Z',
         updatedAt: null,
         adminRemarks: null,
-        resumeUrl: null,
         interviewDetails: null,
         statusHistory: [
             { status: 'Pending Review', changedAt: '2025-06-01T08:30:00Z', changedBy: 'System', remarks: 'Application received.' },
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0002',
         fullName: 'Jose Reyes',
         email: 'jose.reyes@email.com',
@@ -151,6 +188,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0003',
         fullName: 'Ana Villanueva',
         email: 'ana.villanueva@email.com',
@@ -169,6 +207,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0004',
         fullName: 'Carlos Mendoza',
         email: 'carlos.mendoza@email.com',
@@ -186,6 +225,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0005',
         fullName: 'Liza Ocampo',
         email: 'liza.ocampo@email.com',
@@ -209,6 +249,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0006',
         fullName: 'Ramon Gutierrez',
         email: 'ramon.gutierrez@email.com',
@@ -225,6 +266,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0007',
         fullName: 'Grace Dela Cruz',
         email: 'grace.delacruz@email.com',
@@ -241,6 +283,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0008',
         fullName: 'Mark Bautista',
         email: 'mark.bautista@email.com',
@@ -259,6 +302,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0009',
         fullName: 'Cynthia Flores',
         email: 'cynthia.flores@email.com',
@@ -277,6 +321,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0010',
         fullName: 'Dennis Aquino',
         email: 'dennis.aquino@email.com',
@@ -300,6 +345,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0011',
         fullName: 'Patricia Navarro',
         email: 'patricia.navarro@email.com',
@@ -323,6 +369,7 @@ const DUMMY_APPLICANTS: ApplicantRecord[] = [
         ],
     },
     {
+        ...DUMMY_APPLICANT_DEFAULTS,
         applicantId: 'APP-0012',
         fullName: 'Roberto Castillo',
         email: 'roberto.castillo@email.com',
@@ -415,14 +462,15 @@ Recruitment Team`;
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const ALL_STATUSES: RecruitmentStatus[] = [
-    'Pending Review', 'Interview Scheduled', 'Job Offered', 'Rejected',
+    'Pending Review', 'Interview Scheduled', 'Job Offered', 'Rejected', 'Hired',
 ];
 
 export const STATUS_TRANSITIONS: Record<RecruitmentStatus, RecruitmentStatus[]> = {
     'Pending Review': ['Interview Scheduled', 'Rejected'],
     'Interview Scheduled': ['Job Offered', 'Rejected'],
-    'Job Offered': ['Rejected'],
+    'Job Offered': ['Rejected', 'Hired'],
     'Rejected': [],
+    'Hired': [],
 };
 
 const INTERVIEWERS = ['Admin Cruz', 'Admin Lim', 'Admin Santos', 'Admin Reyes', 'Admin Dela Cruz'];
@@ -447,6 +495,10 @@ const STATUS_META: Record<RecruitmentStatus, StatusMeta> = {
     'Rejected': {
         icon: <XCircle size={11} />,
         color: '#b91c1c', bg: 'rgba(238,93,80,0.10)', border: 'rgba(238,93,80,0.28)',
+    },
+    'Hired': {
+        icon: <CheckCircle2 size={11} />,
+        color: '#059669', bg: 'rgba(5,150,105,0.12)', border: 'rgba(5,150,105,0.30)',
     },
 };
 
@@ -1460,22 +1512,53 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                     applicantId: item.applicantRecordId,
                     referenceNumber: item.referenceNumber,
                     fullName: item.fullName,
+                    firstName: item.firstName || '',
+                    middleName: item.middleName || '',
+                    lastName: item.lastName || '',
+                    suffix: item.suffix || '',
+                    gender: item.gender || '',
+                    civilStatus: item.civilStatus || '',
                     email: item.emailAddress,
                     contactNumber: item.contactNumber,
-                    position: item.jobPositionName,
-                    currentStatus: item.status as RecruitmentStatus,
-                    submittedAt: item.createdAt,
-                    updatedAt: null,
-                    adminRemarks: null,
-                    resumeUrl: null,
-                    statusHistory: [],
-                    interviewDetails: item.interviewDate
-                        ? { date: item.interviewDate.slice(0, 10), time: item.interviewTime || '', location: item.locationOrLink || '', interviewer: item.interviewerName || '' }
-                        : null,
+                    currentResidentialAddress: item.currentResidentialAddress || '',
+                    permanentAddress: item.permanentAddress || '',
+                    sssNumber: item.sssNumber || '',
+                    philHealthNumber: item.philHealthNumber || '',
+                    pagIBIGNumber: item.pagIBIGNumber || '',
+                    tin: item.tin || '',
+                    bankName: item.bankName || '',
+                    bankAccountName: item.bankAccountName || '',
+                    bankAccountNumber: item.bankAccountNumber || '',
+                    nbiClearanceFilePath: item.nbiClearanceFilePath || '',
+                    medicalClearanceFilePath: item.medicalClearanceFilePath || '',
+                    psaBirthCertificateFilePath: item.psaBirthCertificateFilePath || '',
+                    resumeFilePath: item.resumeFilePath || '',
+                    signedEmploymentContractFilePath: item.signedEmploymentContractFilePath || '',
+                    emergencyContactName: item.emergencyContactName || '',
+                    emergencyContactRelationship: item.emergencyContactRelationship || '',
+                    emergencyContactMobileNumber: item.emergencyContactMobileNumber || '',
+                    declaredDependents: item.declaredDependents || '',
                     highestEducationalAttainment: item.highestEducationalAttainment || '',
                     institution: item.institution || '',
                     degree: item.degree || '',
                     yearGraduated: item.yearGraduated || '',
+                    professionalLicensesCertifications: item.professionalLicensesCertifications || '',
+                    isEmailVerified: item.isEmailVerified ?? false,
+                    position: item.jobPositionName,
+                    currentStatus: item.status as RecruitmentStatus,
+                    submittedAt: item.createdAt,
+                    updatedAt: item.updatedAt || null,
+                    adminRemarks: item.adminRemarks || null,
+                    resumeUrl: item.resumeFilePath || null,
+                    statusHistory: (item.statusHistory || []).map((h: any) => ({
+                        status: h.status,
+                        changedAt: h.changedAt,
+                        changedBy: h.changedBy,
+                        remarks: h.remarks || '',
+                    })),
+                    interviewDetails: item.interviewDate
+                        ? { date: item.interviewDate.slice(0, 10), time: item.interviewTime || '', location: item.locationOrLink || '', interviewer: item.interviewerName || '' }
+                        : null,
                 }));
                 setApplicants(mapped);
                 setTotalPages(paginated.totalPages ?? 1);
@@ -1624,7 +1707,7 @@ export default function RecruitmentTab({ onSuccess, onError: _onError }: Recruit
                             <td onClick={(e) => e.stopPropagation()}>
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     <button className="action-icon-btn" onClick={() => setDetailApplicant(a)} title="View"><Eye size={13} /></button>
-                                    {(STATUS_TRANSITIONS[a.currentStatus]?.length ?? 0) > 0 && a.currentStatus !== 'Job Offered' && (
+                                    {(STATUS_TRANSITIONS[a.currentStatus]?.length ?? 0) > 0 && (
                                         <button className="action-icon-btn" onClick={() => setUpdateApplicant(a)} title="Update" style={{ background: 'var(--bg-input)', color: 'var(--primary)' }}><RefreshCw size={13} /></button>
                                     )}
                                 </div>
