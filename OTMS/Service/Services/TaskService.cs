@@ -136,6 +136,9 @@ namespace OTMS.Service.Services
                 }
             }
 
+            // Auto-rename duplicate task title: append incrementing number in parentheses
+            var resolvedTitle = await ResolveTaskTitleAsync(request.TaskTitle.Trim(), null);
+
             // Generate unique task reference number
             var taskReferenceNumber = await GenerateTaskReferenceNumberAsync();
 
@@ -145,7 +148,7 @@ namespace OTMS.Service.Services
                 TaskId = Guid.NewGuid(),
                 CreatedBy = creatorId,
                 AssignedTo = request.AssignedTo,
-                TaskTitle = request.TaskTitle,
+                TaskTitle = resolvedTitle,
                 TaskDescription = request.TaskDescription,
                 TaskReferenceNumber = taskReferenceNumber,
                 TaskCategory = request.TaskCategory,
@@ -315,8 +318,9 @@ namespace OTMS.Service.Services
                 task.SupportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
-            // Update Fields
-            task.TaskTitle = request.TaskTitle;
+            // Update Fields — auto-rename if the new title conflicts with another task
+            var resolvedEditTitle = await ResolveTaskTitleAsync(request.TaskTitle.Trim(), task.TaskId);
+            task.TaskTitle = resolvedEditTitle;
             task.TaskDescription = request.TaskDescription;
             task.TaskCategory = request.TaskCategory;
             task.Priority = request.Priority;
@@ -840,7 +844,9 @@ namespace OTMS.Service.Services
                     t.DueAt,
                     t.TaskStatus,
                     t.TaskRemarks,
+                    t.TaskCategory,
                     t.AssignedTo,
+                    t.SupportingEvidenceUrl,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
                     AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
                     AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
@@ -865,7 +871,9 @@ namespace OTMS.Service.Services
                 DueAt = r.DueAt,
                 TaskStatus = r.TaskStatus,
                 TaskRemarks = r.TaskRemarks,
+                TaskCategory = r.TaskCategory,
                 AssignedTo = r.AssignedTo,
+                SupportingEvidenceUrl = r.SupportingEvidenceUrl,
                 AssignedEmployee = string.Join(" ", new[]
                     {r.AssigneeFirstName, r.AssigneeMiddleName, r.AssigneeLastName, r.AssigneeSuffix}
                     .Where(n => !string.IsNullOrEmpty(n))),
@@ -1702,6 +1710,41 @@ namespace OTMS.Service.Services
                 isSuccessful ? ActivityTypes.TaskStatusUpdated : ActivityTypes.TaskStatusUpdateFailed,
                 statusLogMsg
             );
+        }
+
+        /// <summary>
+        /// Returns a unique task title by appending an incrementing number in parentheses
+        /// when a task with the same base title already exists.
+        /// Strips existing trailing "(N)" suffix to find the base name.
+        /// Pass <paramref name="excludeTaskId"/> to exclude the current task during edits.
+        /// </summary>
+        private async Task<string> ResolveTaskTitleAsync(string title, Guid? excludeTaskId)
+        {
+            // Strip existing trailing number suffix like " (1)", " (2)" etc.
+            var baseName = System.Text.RegularExpressions.Regex.Replace(title, @"\s*\(\d+\)\s*$", "").Trim();
+
+            var query = context.Tasks
+                .Where(t => !t.Deleted && !t.PermanentlyDeleted
+                    && (t.TaskTitle == title || t.TaskTitle.StartsWith(baseName + " (")));
+
+            if (excludeTaskId.HasValue)
+                query = query.Where(t => t.TaskId != excludeTaskId.Value);
+
+            var existingTitles = await query.Select(t => t.TaskTitle).ToListAsync();
+
+            if (!existingTitles.Any(t => t.Equals(title, StringComparison.OrdinalIgnoreCase)))
+                return title;
+
+            // Find the highest existing number suffix
+            int maxNum = 0;
+            foreach (var existing in existingTitles)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(existing, @"^" + System.Text.RegularExpressions.Regex.Escape(baseName) + @"\s*\((\d+)\)\s*$");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var num))
+                    maxNum = Math.Max(maxNum, num);
+            }
+
+            return $"{baseName} ({maxNum + 1})";
         }
 
         private async Task<string> GenerateTaskReferenceNumberAsync()

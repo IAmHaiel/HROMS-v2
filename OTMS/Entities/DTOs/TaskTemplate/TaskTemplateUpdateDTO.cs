@@ -21,6 +21,9 @@ namespace OTMS.Entities.DTOs.TaskTemplate
         [RegularExpression("^(Daily|Weekly|Monthly)$", ErrorMessage = "Recurrence Type must be Daily, Weekly, or Monthly")]
         public string RecurrenceType { get; set; } = "Daily";
 
+        [Required]
+        public DateTime RecurrenceStartDate { get; set; }
+
         public Guid? AssignedEmployee { get; set; }
 
         [Required]

@@ -1636,7 +1636,7 @@ export default function EmployeeDashboard() {
         leave: 'Leave Requests',
         profile: 'My Profile',
         digital_201: 'My Digital 201 File',
-        activity_logs: 'My Activity Logs'
+        activity_logs: 'Activity Logs',
     };
 
     const today = new Date().toLocaleDateString('en-US', {

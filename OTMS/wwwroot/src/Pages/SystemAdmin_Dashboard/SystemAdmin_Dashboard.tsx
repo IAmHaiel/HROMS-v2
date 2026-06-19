@@ -62,6 +62,7 @@ import DataTable, { ActionsDropdown } from '../../components/ui/DataTable';
 import SubTabNav from '../../components/ui/SubTabNav';
 import EmployeeDocumentsTab from './EmployeeDocumentsTab/EmployeeDocumentsTab';
 import RecruitmentTab from './RecruitmentTab/RecruitmentTab';
+import { ReportsTab } from '../OpAdmin_Dashboard/OpAdmin_Dashboard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ type NavTab =
     | 'analytics'
     | 'settings'
     | 'roles'
+    | 'reports'
     | 'activity_logs'
     | 'emergency_override'
     | 'government_records'
@@ -263,6 +265,12 @@ const NAV_GROUPS = [
         items: [
             { tab: 'delivery' as NavTab, icon: FileText, label: 'Delivery Summary' },
             { tab: 'analytics' as NavTab, icon: BarChart3, label: 'Analytics View' },
+        ],
+    },
+    {
+        label: 'REPORTS',
+        items: [
+            { tab: 'reports' as NavTab, icon: BarChart3, label: 'Reports' },
         ],
     },
     {
@@ -3157,7 +3165,7 @@ export default function Dashboard() {
     const pageTitles: Record<NavTab, string> = {
         dashboard: 'Dashboard', employees: 'Manage Employee', emergency_override: 'Emergency Override',
         delivery: 'Delivery Summary', analytics: 'Analytics View', settings: 'Settings',
-        roles: 'Role Management', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment',
+        roles: 'Role Management', reports: 'Reports', activity_logs: 'Activity Logs', profile: 'My Profile', recruitment: 'Recruitment',
         government_records: 'Government Records'
     };
 
@@ -3263,6 +3271,8 @@ export default function Dashboard() {
                 {(activeTab === 'profile' || activeTab === 'settings') && <ProfileTab onProfileUpdate={setEmployeeName} />}
 
                 {activeTab === 'roles' && <RoleManagementTab />}
+
+                {activeTab === 'reports' && <ReportsTab teamMembers={[]} />}
 
                 {activeTab === 'delivery' && <div className="dashboard-content"><div className="card"><EmptyState icon={<Truck size={32} />} message="Delivery module coming soon." /></div></div>}
                 {activeTab === 'analytics' && <div className="dashboard-content"><div className="card"><EmptyState icon={<BarChart3 size={32} />} message="Analytics module coming soon." /></div></div>}

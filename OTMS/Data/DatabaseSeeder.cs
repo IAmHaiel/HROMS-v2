@@ -381,6 +381,21 @@ namespace OTMS.Data
             }
 
             await context.SaveChangesAsync();
+
+            // Backfill employees with null DepartmentId but non-null JobPositionId
+            var employeesMissingDept = await context.Employees
+                .Where(e => e.DepartmentId == null && e.JobPositionId != null)
+                .Include(e => e.JobPosition)
+                .ToListAsync();
+
+            foreach (var emp in employeesMissingDept)
+            {
+                if (emp.JobPosition != null)
+                    emp.DepartmentId = emp.JobPosition.DepartmentId;
+            }
+
+            if (employeesMissingDept.Count > 0)
+                await context.SaveChangesAsync();
         }
     }
 }

@@ -489,22 +489,24 @@ namespace OTMS.Service.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            var assigneeNotification = new Notification
-            {
-                NotificationId = Guid.NewGuid(),
-                EmployeeId = task.AssignedTo.Value, // EmployeeId = Assignee's Account ID
-                TaskId = task.TaskId,
-                NotificationType =
-                    NotificationTypes.TaskUpdated,
-                Message =
-                    $"{string.Join(" ", new[]
-                        {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}' at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
-                IsRead = false,
-                CreatedAt = DateTime.UtcNow
-            };
-
             await context.Notifications.AddAsync(creatorNotification);
-            await context.Notifications.AddAsync(assigneeNotification);
+
+            if (task.AssignedTo.HasValue)
+            {
+                var assigneeNotification = new Notification
+                {
+                    NotificationId = Guid.NewGuid(),
+                    EmployeeId = task.AssignedTo.Value,
+                    TaskId = task.TaskId,
+                    NotificationType = NotificationTypes.TaskUpdated,
+                    Message =
+                        $"{string.Join(" ", new[]
+                            {task.Creator.Employee.FirstName, task.Creator.Employee.MiddleName, task.Creator.Employee.LastName, task.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the task: '{task.TaskTitle}' at {DateTime.UtcNow.ToString("MM/dd/yyyy hh:mm:ss tt")}.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await context.Notifications.AddAsync(assigneeNotification);
+            }
             await context.SaveChangesAsync();
         }
 

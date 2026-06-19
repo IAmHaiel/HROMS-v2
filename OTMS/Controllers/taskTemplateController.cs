@@ -59,6 +59,21 @@ namespace OTMS.Controllers
             }
         }
 
+        [HttpDelete("{templateId}")]
+        [Authorize(Policy = "Permissions.Tasks.Manage")]
+        public async Task<IActionResult> DeleteTaskTemplate(Guid templateId)
+        {
+            try
+            {
+                await taskTemplateService.DeleteTaskTemplateAsync(templateId);
+                return Ok(new { message = "Task template deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpGet]
         [Authorize(Policy = "Permissions.Tasks.Manage")]
         public async Task<IActionResult> GetTaskTemplates([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)

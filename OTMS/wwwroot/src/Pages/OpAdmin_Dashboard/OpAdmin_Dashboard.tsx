@@ -246,6 +246,45 @@ interface EmployeePerformance {
     averageCompletionTimeHours: number;
 }
 
+interface OperationalFilter {
+    dateRangeStart: string;
+    dateRangeEnd: string;
+    departmentId: string;
+    employeeId: string;
+    reportFormat: string;
+}
+
+interface OperationalSummaryReport {
+    totalTasks: number;
+    completedTasks: number;
+    pendingTasks: number;
+    overdueTasks: number;
+    taskCompletionRate: number;
+    employeePerformanceSummary: OperationalEmployeePerformance[];
+    workloadByCategory: WorkloadItem[];
+    workloadByDepartment: WorkloadItem[];
+    workloadByPriority: WorkloadItem[];
+}
+
+interface OperationalEmployeePerformance {
+    employeeName: string;
+    assigned: number;
+    completed: number;
+    overdue: number;
+    completionRate: number;
+}
+
+interface WorkloadItem {
+    categoryName: string;
+    taskCount: number;
+    percentage: number;
+}
+
+interface ReportFilterOption {
+    id: string;
+    name: string;
+}
+
 const TASK_CATEGORIES = [
     'Delivery',
     'Warehouse',
@@ -421,9 +460,25 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
     </div>
 );
 
-const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <StatusBadge status={p} size="sm" />
-);
+const PRIO_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+    Critical: { label: 'Critical', color: '#7c1d1d', bg: '#fef2f2', border: '#fecaca', icon: '🔴' },
+    High: { label: 'High', color: '#b91c1c', bg: '#fff7ed', border: '#fed7aa', icon: '🟠' },
+    Medium: { label: 'Medium', color: '#92400e', bg: '#fffbeb', border: '#fde68a', icon: '🟡' },
+    Low: { label: 'Low', color: '#065f46', bg: '#f0fdf4', border: '#bbf7d0', icon: '🟢' },
+};
+
+const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => {
+    const m = PRIO_META[p] ?? PRIO_META.Medium;
+    return (
+        <span style={{
+            fontSize: '0.65rem', padding: '1px 8px', borderRadius: 999, fontWeight: 700,
+            color: m.color, background: m.bg, border: `1px solid ${m.border}`,
+            display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+        }}>
+            {m.icon} {m.label}
+        </span>
+    );
+};
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
     <div className="progress-bar">
@@ -1119,18 +1174,18 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                {canTransition && task.taskStatus !== 'Pending Admin Review' && (
-                    <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
-                        title={`Transition to ${nextStatus}`}>
-                        {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
-                    </button>
-                )}
-                {task.taskStatus === 'Pending Admin Review' && (
-                    <button className="btn btn-primary" onClick={onReview}
-                        title="Review task submission">
-                        <Eye size={13} /> Review Task
-                    </button>
-                )}
+                    {canTransition && task.taskStatus !== 'Pending Admin Review' && (
+                        <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
+                            title={`Transition to ${nextStatus}`}>
+                            {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
+                        </button>
+                    )}
+                    {task.taskStatus === 'Pending Admin Review' && (
+                        <button className="btn btn-primary" onClick={onReview}
+                            title="Review task submission">
+                            <Eye size={13} /> Review Task
+                        </button>
+                    )}
                     {task.taskStatus === 'Completed' && (
                         <button className="btn btn-primary" onClick={() => onAdminOverride(task.taskId)}
                             title="Admin override for completed task">
@@ -1839,6 +1894,23 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
 
     useEffect(() => { fetchTemplates(); }, []);
 
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+    const handleDeleteTemplate = async (templateId: string) => {
+        try {
+            const res = await fetch(`/api/taskTemplate/${templateId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to delete template.'); }
+            success('Task template deleted successfully.');
+            setDeleteConfirm(null);
+            await fetchTemplates();
+        } catch (err: any) {
+            error(err.message ?? 'Failed to delete template.');
+        }
+    };
+
     const handleToggle = async (templateId: string) => {
         try {
             const res = await fetch(`/api/taskTemplate/${templateId}/toggle-status`, {
@@ -1855,11 +1927,10 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
 
     const handleSave = async (data: CreateTemplateDTO, templateId?: string) => {
         if (templateId) {
-            const { recurrenceStartDate: _, ...updateData } = data;
             const res = await fetch(`/api/taskTemplate/${templateId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('authToken')}` },
-                body: JSON.stringify(updateData),
+                body: JSON.stringify(data),
             });
             if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Failed to update template.'); }
             success('Task template updated successfully.');
@@ -1922,12 +1993,29 @@ const TemplateTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =
                                         onClick: () => handleToggle(t.templateId),
                                         variant: 'default' as const,
                                     },
+                                    {
+                                        label: 'Delete',
+                                        icon: <Trash2 size={12} />,
+                                        onClick: () => setDeleteConfirm(t.templateId),
+                                        variant: 'danger' as const,
+                                    },
                                 ]}
                             />
                         </td>
                     </tr>
                 ))}
             </DataTable>
+
+            <ConfirmationModal
+                isOpen={deleteConfirm !== null}
+                variant="danger"
+                title="Delete Task Template"
+                description="Are you sure you want to delete this task template? This action cannot be undone."
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                onConfirm={() => deleteConfirm && handleDeleteTemplate(deleteConfirm)}
+                onCancel={() => setDeleteConfirm(null)}
+            />
 
             {showModal && (
                 <TemplateModal
@@ -2090,8 +2178,6 @@ const TeamTab: React.FC<{
     onView: (id: string) => void;
 }> = ({ tasks, teamMembers, onView }) => {
     const [selectedMemberId, setSelectedMemberId] = useState(teamMembers[0]?.accountId ?? '');
-    const maxLoad = Math.max(...teamMembers.map(m =>
-        tasks.filter(t => t.assignedEmployee === m.employeeName).length), 1);
 
     return (
         <div className="dashboard-content">
@@ -2124,14 +2210,16 @@ const TeamTab: React.FC<{
                     <div className="card-header-layout"><h3>Workload Distribution</h3></div>
                     <div className="perf-bars">
                         {teamMembers.map(m => {
-                            const cnt = tasks.filter(t => t.assignedEmployee === m.employeeName).length;
+                            const mt = tasks.filter(t => t.assignedEmployee === m.employeeName);
+                            const mc = mt.filter(t => t.taskStatus === 'Completed').length;
+                            const pct = mt.length > 0 ? Math.round(mc / mt.length * 100) : 0;
                             return (
                                 <div key={m.accountId} className="perf-item">
                                     <span className="perf-label">{m.employeeName.split(' ')[0]}</span>
                                     <div className="perf-track">
-                                        <div className="perf-fill fill-primary" style={{ width: `${Math.round(cnt / maxLoad * 100)}%` }} />
+                                        <div className="perf-fill" style={{ width: `${pct}%`, background: pct >= 80 ? 'var(--status-active)' : pct >= 50 ? 'var(--status-pending)' : 'var(--status-failed)', borderRadius: 3, height: '100%', transition: 'width 0.4s ease' }} />
                                     </div>
-                                    <span className="perf-pct">{cnt}</span>
+                                    <span className="perf-pct">{mc}/{mt.length}</span>
                                 </div>
                             );
                         })}
@@ -2176,21 +2264,9 @@ const ApprovalsWrapper: React.FC = () => {
 
 // --- Reports Tab --------------------------------------------------------------
 
-const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
+export const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) => {
     const { success, error } = useToast();
-    const [filter, setFilter] = useState<ReportFilter>({
-        dateRangeStart: '',
-        dateRangeEnd: '',
-        employeeId: '',
-        taskPriorityLevel: '',
-        taskStatus: '',
-        taskCategory: '',
-    });
-    const [report, setReport] = useState<TaskCompletionReport | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [fetchError, setFetchError] = useState('');
-    const [noRecords, setNoRecords] = useState(false);
-    const [generatedAt, setGeneratedAt] = useState('');
+    const [reportSubTab, setReportSubTab] = useState<'task-completion' | 'operational-summary'>('task-completion');
 
     const DATE_PRESETS = [
         { label: '1 Month', months: 1 },
@@ -2199,253 +2275,515 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         { label: '12 Months', months: 12 },
     ] as const;
 
-    const applyPreset = (months: number) => {
+    // --- Task Completion State ---
+    const [tcFilter, setTcFilter] = useState<ReportFilter>({
+        dateRangeStart: '', dateRangeEnd: '', employeeId: '',
+        taskPriorityLevel: '', taskStatus: '', taskCategory: '',
+    });
+    const [tcReport, setTcReport] = useState<TaskCompletionReport | null>(null);
+    const [tcLoading, setTcLoading] = useState(false);
+    const [tcError, setTcError] = useState('');
+    const [tcNoRecords, setTcNoRecords] = useState(false);
+    const [tcGeneratedAt, setTcGeneratedAt] = useState('');
+
+    const applyTcPreset = (months: number) => {
         const end = new Date();
         const start = new Date();
         start.setMonth(start.getMonth() - months);
-        setFilter(p => ({
+        setTcFilter(p => ({
             ...p,
             dateRangeStart: start.toISOString().split('T')[0],
             dateRangeEnd: end.toISOString().split('T')[0],
         }));
     };
 
-    const handleGenerate = async () => {
-        if (!filter.dateRangeStart || !filter.dateRangeEnd) {
-            setFetchError('Please select a date range preset first.');
+    const handleTcGenerate = async () => {
+        if (!tcFilter.dateRangeStart || !tcFilter.dateRangeEnd) {
+            setTcError('Please select a date range preset first.');
             return;
         }
-        setLoading(true);
-        setFetchError('');
-        setNoRecords(false);
-        setReport(null);
+        setTcLoading(true); setTcError(''); setTcNoRecords(false); setTcReport(null);
         try {
             const params = new URLSearchParams();
-            params.set('DateRangeStart', filter.dateRangeStart);
-            params.set('DateRangeEnd', filter.dateRangeEnd);
-            if (filter.employeeId) params.set('EmployeeId', filter.employeeId);
-            if (filter.taskPriorityLevel) params.set('TaskPriorityLevel', filter.taskPriorityLevel);
-            if (filter.taskStatus) params.set('TaskStatus', filter.taskStatus);
-            if (filter.taskCategory) params.set('TaskCategory', filter.taskCategory);
+            params.set('DateRangeStart', tcFilter.dateRangeStart);
+            params.set('DateRangeEnd', tcFilter.dateRangeEnd);
+            if (tcFilter.employeeId) params.set('EmployeeId', tcFilter.employeeId);
+            if (tcFilter.taskPriorityLevel) params.set('TaskPriorityLevel', tcFilter.taskPriorityLevel);
+            if (tcFilter.taskStatus) params.set('TaskStatus', tcFilter.taskStatus);
+            if (tcFilter.taskCategory) params.set('TaskCategory', tcFilter.taskCategory);
 
             const res = await fetch(`/api/reporting/task-completion?${params}`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
             });
 
-            if (res.status === 400) {
-                setFetchError('Invalid date range selected.');
-                setLoading(false);
-                return;
-            }
-            if (!res.ok) {
-                setFetchError('Failed to generate report. Please try again.');
-                setLoading(false);
-                return;
-            }
+            if (res.status === 400) { setTcError('Invalid date range selected.'); setTcLoading(false); return; }
+            if (!res.ok) { setTcError('Failed to generate report. Please try again.'); setTcLoading(false); return; }
 
             const data = await res.json();
-            if (data.isSuccess && data.data) {
-                setReport(data.data);
-                setGeneratedAt(new Date().toLocaleString());
-            } else {
-                setNoRecords(true);
-            }
-        } catch {
-            setFetchError('Failed to generate report. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+            if (data.isSuccess && data.data) { setTcReport(data.data); setTcGeneratedAt(new Date().toLocaleString()); }
+            else { setTcNoRecords(true); }
+        } catch { setTcError('Failed to generate report. Please try again.'); }
+        finally { setTcLoading(false); }
     };
 
-    const handleReset = () => {
-        setFilter({ dateRangeStart: '', dateRangeEnd: '', employeeId: '', taskPriorityLevel: '', taskStatus: '', taskCategory: '' });
-        setReport(null);
-        setFetchError('');
-        setNoRecords(false);
-        setGeneratedAt('');
+    const handleTcReset = () => {
+        setTcFilter({ dateRangeStart: '', dateRangeEnd: '', employeeId: '', taskPriorityLevel: '', taskStatus: '', taskCategory: '' });
+        setTcReport(null); setTcError(''); setTcNoRecords(false); setTcGeneratedAt('');
     };
 
     const exportCSV = () => {
-        if (!report) return;
+        if (!tcReport) return;
         const rows: string[] = [];
         rows.push('Task Completion Report');
-        rows.push(`Generated,${generatedAt}`);
-        rows.push('');
-        rows.push('Summary');
-        rows.push(`Total Tasks Assigned,${report.totalTasksAssigned}`);
-        rows.push(`Total Tasks Completed,${report.totalTasksCompleted}`);
-        rows.push(`Total Tasks In Progress,${report.totalTasksInProgress}`);
-        rows.push(`Total Tasks Pending Review,${report.totalTasksPendingReview}`);
-        rows.push(`Total Overdue Tasks,${report.totalOverdueTasks}`);
-        rows.push(`Task Completion Rate,${report.taskCompletionRate}%`);
-        rows.push(`Avg Completion Time (Hours),${report.averageTaskCompletionTimeHours.toFixed(1)}`);
-        rows.push('');
-        rows.push('Employee Performance');
+        rows.push(`Generated,${tcGeneratedAt}`);
+        rows.push(''); rows.push('Summary');
+        rows.push(`Total Tasks Assigned,${tcReport.totalTasksAssigned}`);
+        rows.push(`Total Tasks Completed,${tcReport.totalTasksCompleted}`);
+        rows.push(`Total Tasks In Progress,${tcReport.totalTasksInProgress}`);
+        rows.push(`Total Tasks Pending Review,${tcReport.totalTasksPendingReview}`);
+        rows.push(`Total Overdue Tasks,${tcReport.totalOverdueTasks}`);
+        rows.push(`Task Completion Rate,${tcReport.taskCompletionRate}%`);
+        rows.push(`Avg Completion Time (Hours),${tcReport.averageTaskCompletionTimeHours.toFixed(1)}`);
+        rows.push(''); rows.push('Employee Performance');
         rows.push('Employee,Assigned,Completed,Completion Rate,Avg Time (Hours)');
-        for (const ep of report.employeePerformanceSummary) {
+        for (const ep of tcReport.employeePerformanceSummary) {
             rows.push(`${ep.employeeName},${ep.totalAssigned},${ep.totalCompleted},${ep.completionRate}%,${ep.averageCompletionTimeHours.toFixed(1)}`);
         }
         const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `task-completion-report-${filter.dateRangeStart}-to-${filter.dateRangeEnd}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+        a.download = `task-completion-report-${tcFilter.dateRangeStart}-to-${tcFilter.dateRangeEnd}.csv`;
+        a.click(); URL.revokeObjectURL(url);
         success('CSV exported successfully.');
     };
 
-    const statusChartData = report
+    const tcChartData = tcReport
         ? [
-            { name: 'Completed', value: report.totalTasksCompleted, fill: 'var(--status-active)' },
-            { name: 'In Progress', value: report.totalTasksInProgress, fill: 'var(--status-pending)' },
-            { name: 'Pending Review', value: report.totalTasksPendingReview, fill: 'var(--primary)' },
-            { name: 'Overdue', value: report.totalOverdueTasks, fill: 'var(--status-failed)' },
-        ].filter(d => d.value > 0)
-        : [];
+            { name: 'Completed', value: tcReport.totalTasksCompleted, fill: 'var(--status-active)' },
+            { name: 'In Progress', value: tcReport.totalTasksInProgress, fill: 'var(--status-pending)' },
+            { name: 'Pending Review', value: tcReport.totalTasksPendingReview, fill: 'var(--primary)' },
+            { name: 'Overdue', value: tcReport.totalOverdueTasks, fill: 'var(--status-failed)' },
+        ].filter(d => d.value > 0) : [];
+
+    // --- Operational Summary State ---
+    const [opFilter, setOpFilter] = useState<OperationalFilter>({
+        dateRangeStart: '', dateRangeEnd: '', departmentId: '', employeeId: '', reportFormat: 'PDF',
+    });
+    const [opReport, setOpReport] = useState<OperationalSummaryReport | null>(null);
+    const [opLoading, setOpLoading] = useState(false);
+    const [opError, setOpError] = useState('');
+    const [opNoRecords, setOpNoRecords] = useState(false);
+    const [opGeneratedAt, setOpGeneratedAt] = useState('');
+    const [departments, setDepartments] = useState<ReportFilterOption[]>([]);
+    const [employees, setEmployees] = useState<ReportFilterOption[]>([]);
+
+    useEffect(() => {
+        const fetchOptions = async () => {
+            try {
+                const res = await fetch('/api/reporting/filter-options', {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.isSuccess && data.data) {
+                        setDepartments(data.data.departments || []);
+                        setEmployees(data.data.employees || []);
+                    }
+                }
+            } catch { }
+        };
+        fetchOptions();
+    }, []);
+
+    const applyOpPreset = (months: number) => {
+        const end = new Date();
+        const start = new Date();
+        start.setMonth(start.getMonth() - months);
+        setOpFilter(p => ({
+            ...p,
+            dateRangeStart: start.toISOString().split('T')[0],
+            dateRangeEnd: end.toISOString().split('T')[0],
+        }));
+    };
+
+    const handleOpGenerate = async () => {
+        if (!opFilter.dateRangeStart || !opFilter.dateRangeEnd) {
+            setOpError('Please select a date range preset first.');
+            return;
+        }
+        setOpLoading(true); setOpError(''); setOpNoRecords(false); setOpReport(null);
+        try {
+            const params = new URLSearchParams();
+            params.set('DateRangeStart', opFilter.dateRangeStart);
+            params.set('DateRangeEnd', opFilter.dateRangeEnd);
+            if (opFilter.departmentId) params.set('DepartmentId', opFilter.departmentId);
+            if (opFilter.employeeId) params.set('EmployeeId', opFilter.employeeId);
+
+            const res = await fetch(`/api/reporting/operational-summary?${params}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+
+            if (res.status === 400) { setOpError('Invalid date range selected.'); setOpLoading(false); return; }
+            if (res.status === 404) { setOpNoRecords(true); setOpLoading(false); return; }
+            if (!res.ok) { setOpError('Failed to generate report. Please try again.'); setOpLoading(false); return; }
+
+            const data = await res.json();
+            if (data.isSuccess && data.data) { setOpReport(data.data); setOpGeneratedAt(new Date().toLocaleString()); }
+            else { setOpNoRecords(true); }
+        } catch { setOpError('Failed to generate report. Please try again.'); }
+        finally { setOpLoading(false); }
+    };
+
+    const handleOpReset = () => {
+        setOpFilter({ dateRangeStart: '', dateRangeEnd: '', departmentId: '', employeeId: '', reportFormat: 'PDF' });
+        setOpReport(null); setOpError(''); setOpNoRecords(false); setOpGeneratedAt('');
+    };
+
+    const handleOpDownload = async () => {
+        if (!opReport) return;
+        setOpLoading(true);
+        try {
+            const params = new URLSearchParams();
+            params.set('DateRangeStart', opFilter.dateRangeStart);
+            params.set('DateRangeEnd', opFilter.dateRangeEnd);
+            if (opFilter.departmentId) params.set('DepartmentId', opFilter.departmentId);
+            if (opFilter.employeeId) params.set('EmployeeId', opFilter.employeeId);
+            params.set('ReportFormat', opFilter.reportFormat);
+
+            const res = await fetch(`/api/reporting/operational-summary/download?${params}`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                error(errData?.message || 'Failed to download report.');
+                setOpLoading(false);
+                return;
+            }
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const ext = opFilter.reportFormat === 'EXCEL' ? 'xlsx' : 'pdf';
+            a.href = url;
+            a.download = `OperationalSummaryReport_${new Date().toISOString().slice(0, 10)}.${ext}`;
+            a.click(); URL.revokeObjectURL(url);
+            success('Report downloaded successfully.');
+        } catch { error('Failed to download report.'); }
+        finally { setOpLoading(false); }
+    };
 
     return (
         <div className="dashboard-content">
-            <div className="card report-filter-card">
-                <div className="card-header-layout">
-                    <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
-                </div>
-                <div className="report-filter-grid">
-                    <div className="field">
-                        <label>Date Range *</label>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {DATE_PRESETS.map(p => (
-                                <button
-                                    key={p.label}
-                                    type="button"
-                                    className={`filter-pill${filter.dateRangeStart && filter.dateRangeEnd && (() => {
-                                        const start = new Date(); start.setMonth(start.getMonth() - p.months);
-                                        return filter.dateRangeStart === start.toISOString().split('T')[0];
-                                    })() ? ' active' : ''}`}
-                                    onClick={() => applyPreset(p.months)}
-                                    style={{ fontSize: 12, padding: '6px 14px' }}
-                                >
-                                    {p.label}
-                                </button>
-                            ))}
-                        </div>
-                        {filter.dateRangeStart && filter.dateRangeEnd && (
-                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
-                                {filter.dateRangeStart} → {filter.dateRangeEnd}
-                            </span>
-                        )}
-                    </div>
-                    <div className="field">
-                        <label>Employee</label>
-                        <select className="report-select"
-                            value={filter.employeeId}
-                            onChange={e => setFilter(p => ({ ...p, employeeId: e.target.value }))}>
-                            <option value="">All Employees</option>
-                            {teamMembers.map(m => (
-                                <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Priority</label>
-                        <select className="report-select"
-                            value={filter.taskPriorityLevel}
-                            onChange={e => setFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
-                            <option value="">All Priorities</option>
-                            {PRIORITY_LEVELS.map(p => (
-                                <option key={p} value={p}>{p}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Status</label>
-                        <select className="report-select"
-                            value={filter.taskStatus}
-                            onChange={e => setFilter(p => ({ ...p, taskStatus: e.target.value }))}>
-                            <option value="">All Statuses</option>
-                            {TASK_STATUSES_FILTER.map(s => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="field">
-                        <label>Category</label>
-                        <select className="report-select"
-                            value={filter.taskCategory}
-                            onChange={e => setFilter(p => ({ ...p, taskCategory: e.target.value }))}>
-                            <option value="">All Categories</option>
-                            {TASK_CATEGORIES.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-                <div className="report-filter-actions">
-                    <button className="btn" onClick={handleReset}><RotateCcw size={14} /> Reset</button>
-                    <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
-                        {loading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
-                        {' '}{loading ? 'Generating...' : 'Generate Report'}
-                    </button>
-                </div>
+            <div className="report-subtabs">
+                <button className={`filter-pill${reportSubTab === 'task-completion' ? ' active' : ''}`}
+                    onClick={() => setReportSubTab('task-completion')}>
+                    <FileText size={14} /> Task Completion Report
+                </button>
+                <button className={`filter-pill${reportSubTab === 'operational-summary' ? ' active' : ''}`}
+                    onClick={() => setReportSubTab('operational-summary')}>
+                    <BarChart3 size={14} /> Operational Summary Report
+                </button>
             </div>
 
-            {fetchError && <div className="report-error-msg">{fetchError}</div>}
-            {noRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
-
-            {report && (
+            {reportSubTab === 'task-completion' && (
                 <>
-                    <div className="report-summary-grid">
-                        <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(report.totalTasksAssigned)} subtext="Total tasks" />
-                        <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(report.totalTasksCompleted)} subtext="Tasks finished" />
-                        <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(report.totalTasksInProgress)} subtext="Ongoing" />
-                        <StatCard icon={<Eye size={20} strokeWidth={2.3} />} variant="primary" label="PENDING REVIEW" value={String(report.totalTasksPendingReview)} subtext="Awaiting review" />
-                        <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(report.totalOverdueTasks)} subtext="Past deadline" />
-                        <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${report.taskCompletionRate}%`} subtext="Overall rate" />
-                        <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${report.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
+                    <div className="card report-filter-card">
+                        <div className="card-header-layout">
+                            <h3><FileText size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Task Completion Reports</h3>
+                        </div>
+                        <div className="report-filter-grid">
+                            <div className="field">
+                                <label>Date Range *</label>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {DATE_PRESETS.map(p => (
+                                        <button key={p.label} type="button"
+                                            className={`filter-pill${tcFilter.dateRangeStart && tcFilter.dateRangeEnd && (() => {
+                                                const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                                return tcFilter.dateRangeStart === start.toISOString().split('T')[0];
+                                            })() ? ' active' : ''}`}
+                                            onClick={() => applyTcPreset(p.months)}
+                                            style={{ fontSize: 12, padding: '6px 14px' }}>
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {tcFilter.dateRangeStart && tcFilter.dateRangeEnd && (
+                                    <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                                        {tcFilter.dateRangeStart} → {tcFilter.dateRangeEnd}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="field">
+                                <label>Employee</label>
+                                <select className="report-select"
+                                    value={tcFilter.employeeId}
+                                    onChange={e => setTcFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                                    <option value="">All Employees</option>
+                                    {teamMembers.map(m => (
+                                        <option key={m.accountId} value={m.accountId}>{m.employeeName}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Priority</label>
+                                <select className="report-select"
+                                    value={tcFilter.taskPriorityLevel}
+                                    onChange={e => setTcFilter(p => ({ ...p, taskPriorityLevel: e.target.value }))}>
+                                    <option value="">All Priorities</option>
+                                    {PRIORITY_LEVELS.map(p => (
+                                        <option key={p} value={p}>{p}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Status</label>
+                                <select className="report-select"
+                                    value={tcFilter.taskStatus}
+                                    onChange={e => setTcFilter(p => ({ ...p, taskStatus: e.target.value }))}>
+                                    <option value="">All Statuses</option>
+                                    {TASK_STATUSES_FILTER.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Category</label>
+                                <select className="report-select"
+                                    value={tcFilter.taskCategory}
+                                    onChange={e => setTcFilter(p => ({ ...p, taskCategory: e.target.value }))}>
+                                    <option value="">All Categories</option>
+                                    {TASK_CATEGORIES.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="report-filter-actions">
+                            <button className="btn" onClick={handleTcReset}><RotateCcw size={14} /> Reset</button>
+                            <button className="btn btn-primary" onClick={handleTcGenerate} disabled={tcLoading}>
+                                {tcLoading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                                {' '}{tcLoading ? 'Generating...' : 'Generate Report'}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="card">
-                        <DataTable
-                            title="Employee Performance Summary"
-                            headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
-                            loading={false}
-                            emptyMessage="No employee data for selected criteria."
-                            totalRecords={report.employeePerformanceSummary.length}
-                        >
-                            {report.employeePerformanceSummary.map(ep => (
-                                <tr key={ep.employeeName}>
-                                    <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
-                                    <td>{ep.totalAssigned}</td>
-                                    <td>{ep.totalCompleted}</td>
-                                    <td>{ep.completionRate}%</td>
-                                    <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
-                                </tr>
-                            ))}
-                        </DataTable>
+                    {tcError && <div className="report-error-msg">{tcError}</div>}
+                    {tcNoRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
+
+                    {tcReport && (
+                        <>
+                            <div className="report-summary-grid">
+                                <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="ASSIGNED" value={String(tcReport.totalTasksAssigned)} subtext="Total tasks" />
+                                <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(tcReport.totalTasksCompleted)} subtext="Tasks finished" />
+                                <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="IN PROGRESS" value={String(tcReport.totalTasksInProgress)} subtext="Ongoing" />
+                                <StatCard icon={<Eye size={20} strokeWidth={2.3} />} variant="primary" label="PENDING REVIEW" value={String(tcReport.totalTasksPendingReview)} subtext="Awaiting review" />
+                                <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(tcReport.totalOverdueTasks)} subtext="Past deadline" />
+                                <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${tcReport.taskCompletionRate}%`} subtext="Overall rate" />
+                                <StatCard icon={<Calendar size={20} strokeWidth={2.3} />} variant="warning" label="AVG TIME" value={`${tcReport.averageTaskCompletionTimeHours.toFixed(1)}h`} subtext="Per task" />
+                            </div>
+                            <div className="card">
+                                <DataTable title="Employee Performance Summary"
+                                    headers={['Employee', 'Assigned', 'Completed', 'Rate', 'Avg Time (h)']}
+                                    loading={false} emptyMessage="No employee data for selected criteria."
+                                    totalRecords={tcReport.employeePerformanceSummary.length}>
+                                    {tcReport.employeePerformanceSummary.map(ep => (
+                                        <tr key={ep.employeeName}>
+                                            <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                            <td>{ep.totalAssigned}</td>
+                                            <td>{ep.totalCompleted}</td>
+                                            <td>{ep.completionRate}%</td>
+                                            <td>{ep.averageCompletionTimeHours.toFixed(1)}</td>
+                                        </tr>
+                                    ))}
+                                </DataTable>
+                            </div>
+                            <div className="card">
+                                <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
+                                {tcChartData.length === 0 ? (
+                                    <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No status data available.</p></div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <BarChart data={tcChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </div>
+                            <div className="report-export-row">
+                                <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {tcGeneratedAt}</span>
+                                <button className="btn btn-primary" onClick={exportCSV}>
+                                    <Download size={14} /> Export CSV
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {reportSubTab === 'operational-summary' && (
+                <>
+                    <div className="card report-filter-card">
+                        <div className="card-header-layout">
+                            <h3><BarChart3 size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />Operational Summary Report</h3>
+                        </div>
+                        <div className="report-filter-grid">
+                            <div className="field">
+                                <label>Date Range *</label>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {DATE_PRESETS.map(p => (
+                                        <button key={p.label} type="button"
+                                            className={`filter-pill${opFilter.dateRangeStart && opFilter.dateRangeEnd && (() => {
+                                                const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                                return opFilter.dateRangeStart === start.toISOString().split('T')[0];
+                                            })() ? ' active' : ''}`}
+                                            onClick={() => applyOpPreset(p.months)}
+                                            style={{ fontSize: 12, padding: '6px 14px' }}>
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {opFilter.dateRangeStart && opFilter.dateRangeEnd && (
+                                    <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                                        {opFilter.dateRangeStart} → {opFilter.dateRangeEnd}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="field">
+                                <label>Department</label>
+                                <select className="report-select"
+                                    value={opFilter.departmentId}
+                                    onChange={e => setOpFilter(p => ({ ...p, departmentId: e.target.value }))}>
+                                    <option value="">All Departments</option>
+                                    {departments.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Employee</label>
+                                <select className="report-select"
+                                    value={opFilter.employeeId}
+                                    onChange={e => setOpFilter(p => ({ ...p, employeeId: e.target.value }))}>
+                                    <option value="">All Employees</option>
+                                    {employees.map(e => (
+                                        <option key={e.id} value={e.id}>{e.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="field">
+                                <label>Report Format</label>
+                                <select className="report-select"
+                                    value={opFilter.reportFormat}
+                                    onChange={e => setOpFilter(p => ({ ...p, reportFormat: e.target.value }))}>
+                                    <option value="PDF">PDF</option>
+                                    <option value="EXCEL">Excel</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="report-filter-actions">
+                            <button className="btn" onClick={handleOpReset}><RotateCcw size={14} /> Reset</button>
+                            <button className="btn btn-primary" onClick={handleOpGenerate} disabled={opLoading}>
+                                {opLoading ? <Loader2 size={14} className="spin" /> : <Filter size={14} />}
+                                {' '}{opLoading ? 'Generating...' : 'Generate Report'}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="card">
-                        <div className="card-header-layout"><h3>Task Status Distribution</h3></div>
-                        {statusChartData.length === 0 ? (
-                            <div className="report-empty-state" style={{ padding: '20px 0' }}><p>No status data available.</p></div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height={220}>
-                                <BarChart data={statusChartData} margin={{ top: 8, right: 8, left: -8, bottom: 4 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e9edf7" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-secondary)' }} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
+                    {opError && <div className="report-error-msg">{opError}</div>}
+                    {opNoRecords && <div className="report-empty-state"><FileText size={22} /><p>No records found for selected criteria.</p></div>}
 
-                    <div className="report-export-row">
-                        <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {generatedAt}</span>
-                        <button className="btn btn-primary" onClick={exportCSV}>
-                            <Download size={14} /> Export CSV
-                        </button>
-                    </div>
+                    {opReport && (
+                        <>
+                            <div className="report-summary-grid">
+                                <StatCard icon={<ClipboardList size={20} strokeWidth={2.3} />} variant="primary" label="TOTAL TASKS" value={String(opReport.totalTasks)} subtext="All tasks" />
+                                <StatCard icon={<CheckCircle2 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETED" value={String(opReport.completedTasks)} subtext="Tasks finished" />
+                                <StatCard icon={<Loader2 size={20} strokeWidth={2.3} />} variant="warning" label="PENDING" value={String(opReport.pendingTasks)} subtext="Not yet completed" />
+                                <StatCard icon={<AlertCircle size={20} strokeWidth={2.3} />} variant="danger" label="OVERDUE" value={String(opReport.overdueTasks)} subtext="Past deadline" />
+                                <StatCard icon={<BarChart3 size={20} strokeWidth={2.3} />} variant="success" label="COMPLETION RATE" value={`${opReport.taskCompletionRate.toFixed(1)}%`} subtext="Overall rate" />
+                            </div>
+
+                            <div className="card">
+                                <DataTable title="Employee Performance Summary"
+                                    headers={['Employee', 'Assigned', 'Completed', 'Overdue', 'Completion Rate']}
+                                    loading={false} emptyMessage="No employee data for selected criteria."
+                                    totalRecords={opReport.employeePerformanceSummary.length}>
+                                    {opReport.employeePerformanceSummary.map(ep => (
+                                        <tr key={ep.employeeName}>
+                                            <td style={{ fontWeight: 600 }}>{ep.employeeName}</td>
+                                            <td>{ep.assigned}</td>
+                                            <td>{ep.completed}</td>
+                                            <td>{ep.overdue}</td>
+                                            <td>{ep.completionRate.toFixed(1)}%</td>
+                                        </tr>
+                                    ))}
+                                </DataTable>
+                            </div>
+
+                            {opReport.workloadByCategory.length > 0 && (
+                                <div className="card">
+                                    <div className="card-header-layout"><h3>Workload by Category</h3></div>
+                                    <DataTable headers={['Category', 'Task Count', 'Percentage']}
+                                        loading={false} emptyMessage="No data."
+                                        totalRecords={opReport.workloadByCategory.length}>
+                                        {opReport.workloadByCategory.map(w => (
+                                            <tr key={w.categoryName}>
+                                                <td style={{ fontWeight: 600 }}>{w.categoryName}</td>
+                                                <td>{w.taskCount}</td>
+                                                <td>{w.percentage.toFixed(1)}%</td>
+                                            </tr>
+                                        ))}
+                                    </DataTable>
+                                </div>
+                            )}
+
+                            {opReport.workloadByDepartment.length > 0 && (
+                                <div className="card">
+                                    <div className="card-header-layout"><h3>Workload by Department</h3></div>
+                                    <DataTable headers={['Department', 'Task Count', 'Percentage']}
+                                        loading={false} emptyMessage="No data."
+                                        totalRecords={opReport.workloadByDepartment.length}>
+                                        {opReport.workloadByDepartment.map(w => (
+                                            <tr key={w.categoryName}>
+                                                <td style={{ fontWeight: 600 }}>{w.categoryName}</td>
+                                                <td>{w.taskCount}</td>
+                                                <td>{w.percentage.toFixed(1)}%</td>
+                                            </tr>
+                                        ))}
+                                    </DataTable>
+                                </div>
+                            )}
+
+                            {opReport.workloadByPriority.length > 0 && (
+                                <div className="card">
+                                    <div className="card-header-layout"><h3>Workload by Priority</h3></div>
+                                    <DataTable headers={['Priority', 'Task Count', 'Percentage']}
+                                        loading={false} emptyMessage="No data."
+                                        totalRecords={opReport.workloadByPriority.length}>
+                                        {opReport.workloadByPriority.map(w => (
+                                            <tr key={w.categoryName}>
+                                                <td style={{ fontWeight: 600 }}>{w.categoryName}</td>
+                                                <td>{w.taskCount}</td>
+                                                <td>{w.percentage.toFixed(1)}%</td>
+                                            </tr>
+                                        ))}
+                                    </DataTable>
+                                </div>
+                            )}
+
+                            <div className="report-export-row">
+                                <span className="report-generated-badge"><Calendar size={12} /> Report generated at: {opGeneratedAt}</span>
+                                <button className="btn btn-primary" onClick={handleOpDownload} disabled={opLoading}>
+                                    {opLoading ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+                                    {' '}{opLoading ? 'Preparing...' : `Download ${opFilter.reportFormat === 'EXCEL' ? 'Excel' : 'PDF'}`}
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </>
             )}
         </div>
@@ -3770,7 +4108,7 @@ export default function OpsAdminDashboard() {
 
             setTeamMembers(rawList.map(e => ({
                 accountId: e.accountId ?? e.AccountId ?? e.id,
-                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').trim(),
+                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').replace(/-\s*Recommended\s*$/i, '').trim(),
                 role: e.role ?? '',
                 presenceStatus: e.availabilityStatus ?? 'Active',
             })));
@@ -4173,7 +4511,7 @@ export default function OpsAdminDashboard() {
         reopen: 'Reopen Requests',
         templates: 'Task Templates',
         approvals: 'Approvals',
-        activity_logs: 'My Activity Logs',
+        activity_logs: 'Activity Logs',
     };
 
     // -- Fetch dashboard data when filters change --
@@ -4181,6 +4519,12 @@ export default function OpsAdminDashboard() {
         fetchDashboardData();
         fetchActivityLogs(1);
     }, [fetchDashboardData]);
+
+    // -- Polling fallback: refresh tasks periodically regardless of SignalR --
+    useEffect(() => {
+        const interval = setInterval(() => fetchTasks(), 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // -- SignalR: Auto-refresh dashboard when task data changes --
     useEffect(() => {

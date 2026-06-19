@@ -47,6 +47,7 @@ namespace OTMS.Service.Services
                 var context = scope.ServiceProvider.GetRequiredService<OTMSDbContext>();
                 var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
                 var activityLogService = scope.ServiceProvider.GetRequiredService<IActivityLogService>();
+                var dashboardNotificationService = scope.ServiceProvider.GetRequiredService<IDashboardNotificationService>();
 
                 var now = DateTime.UtcNow;
 
@@ -72,6 +73,9 @@ namespace OTMS.Service.Services
                             continue;
                         }
 
+                        // Generate unique task reference number
+                        var refNo = await GenerateTaskReferenceNumberAsync(context);
+
                         // Generate new Task
                         var newTask = new Entities.Models.Task
                         {
@@ -83,9 +87,10 @@ namespace OTMS.Service.Services
                             TaskStatus = template.AssignedEmployee.HasValue ? "Assigned" : "Draft",
                             AssignedTo = template.AssignedEmployee,
                             CreatedBy = template.CreatedBy,
+                            TaskReferenceNumber = refNo,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
-                        };
+                            };
 
                         await context.Tasks.AddAsync(newTask);
 
@@ -139,6 +144,9 @@ namespace OTMS.Service.Services
                             await notificationService.CreateTaskAssignedNotificationAsync(newTask);
                         }
 
+                        // Notify connected clients to refresh their dashboards and task lists
+                        await dashboardNotificationService.NotifyDashboardDataChangedAsync();
+
                         // Log Activity
                         await activityLogService.LogActivityAsync(
                             template.CreatedBy, 
@@ -179,6 +187,19 @@ namespace OTMS.Service.Services
                 }
             }
             return nextDate;
+        }
+
+        private static async System.Threading.Tasks.Task<string> GenerateTaskReferenceNumberAsync(Data.OTMSDbContext context)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            string refNo;
+            do
+            {
+                refNo = new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+            }
+            while (await context.Tasks.AnyAsync(t => t.TaskReferenceNumber == refNo));
+            return refNo;
         }
     }
 }
