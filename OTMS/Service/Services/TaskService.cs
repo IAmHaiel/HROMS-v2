@@ -840,7 +840,9 @@ namespace OTMS.Service.Services
                     t.DueAt,
                     t.TaskStatus,
                     t.TaskRemarks,
+                    t.TaskCategory,
                     t.AssignedTo,
+                    t.SupportingEvidenceUrl,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
                     AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
                     AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
@@ -865,7 +867,9 @@ namespace OTMS.Service.Services
                 DueAt = r.DueAt,
                 TaskStatus = r.TaskStatus,
                 TaskRemarks = r.TaskRemarks,
+                TaskCategory = r.TaskCategory,
                 AssignedTo = r.AssignedTo,
+                SupportingEvidenceUrl = r.SupportingEvidenceUrl,
                 AssignedEmployee = string.Join(" ", new[]
                     {r.AssigneeFirstName, r.AssigneeMiddleName, r.AssigneeLastName, r.AssigneeSuffix}
                     .Where(n => !string.IsNullOrEmpty(n))),
