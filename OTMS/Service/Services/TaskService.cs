@@ -580,42 +580,28 @@ $"{string.Join(" ", new[]
                 throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
-            // Intercept action and explicitly prevent status from changing to "Completed" for non-admins
-            if (request.TaskStatus == "Completed" && !isAdmin)
-            {
-                request.TaskStatus = "Pending Admin Review";
-            }
-
-            // FSM Validation
+            // FSM Validation — strict linear progression, no reversions
             bool isStatusChanged = task.TaskStatus != request.TaskStatus;
             if (isStatusChanged)
             {
                 bool isValidTransition = false;
                 string failureReason = "";
 
-                if (task.TaskStatus == "Assigned" && request.TaskStatus == "In Progress")
+                if (task.TaskStatus == "Draft" && request.TaskStatus == "Assigned")
                 {
                     isValidTransition = true;
                 }
-                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Pending Admin Review")
+                else if (task.TaskStatus == "Assigned" && request.TaskStatus == "In Progress")
                 {
-                    if (string.IsNullOrWhiteSpace(request.ProgressNotes))
-                    {
-                        throw new Exception("Completion notes are required to submit for review.");
-                    }
                     isValidTransition = true;
                 }
                 else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
                 {
                     isValidTransition = true;
                 }
-                else if (task.TaskStatus == "Done" && request.TaskStatus == "Completed" && isAdmin)
-                {
-                    isValidTransition = true;
-                }
                 else
                 {
-                    failureReason = $"Invalid transition from {task.TaskStatus} to {request.TaskStatus}.";
+                    failureReason = $"Invalid transition from {task.TaskStatus} to {request.TaskStatus}. Only forward progression is allowed.";
                 }
 
                 if (!isValidTransition)
@@ -672,15 +658,10 @@ $"{string.Join(" ", new[]
                 await notificationService
                     .CreateCompletedTaskUpdateNotificationAsync(task);
             }
-            else if (task.TaskStatus == "Pending Admin Review")
-            {
-                await notificationService
-                    .CreateTaskReviewRequestedNotificationAsync(task);
-            }
             else
             {
                 await notificationService
-                    .CreateEmployeeTaskUpdateNotificationAsync(task);
+                    .CreateTaskUpdateNotificationAsync(task);
             }
 
             await activityLogService.LogActivityAsync(
@@ -1416,9 +1397,9 @@ $"{string.Join(" ", new[]
 
             if (task == null) throw new Exception("Task not found.");
 
-            if (task.TaskStatus != "Pending Admin Review")
+            if (task.TaskStatus != "Done")
             {
-                string failureReason = $"Cannot review task. Task is not in 'Pending Admin Review' state. Current status: '{task.TaskStatus}'.";
+                string failureReason = $"Cannot review task. Task is not in 'Done' state. Current status: '{task.TaskStatus}'.";
                 await RecordTaskStatusAsync(taskId, task.TaskStatus, request.AdminDecision == "Approve & Close" ? "Completed" : "In Progress", loggedInAccountId, false, failureReason);
                 throw new Exception(failureReason);
             }
@@ -1428,7 +1409,7 @@ $"{string.Join(" ", new[]
                 task.TaskStatus = "Completed";
                 task.UpdatedAt = DateTime.UtcNow;
 
-                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "Completed", loggedInAccountId, true);
+                await RecordTaskStatusAsync(taskId, "Done", "Completed", loggedInAccountId, true);
                 await context.SaveChangesAsync();
 
                 await notificationService.CreateTaskApprovedAndClosedNotificationAsync(task);
@@ -1447,7 +1428,7 @@ $"{string.Join(" ", new[]
                     : $"{task.TaskRemarks}\n\n[Admin Rework Review]: {request.ReviewerRemarks}";
                 task.UpdatedAt = DateTime.UtcNow;
 
-                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "In Progress", loggedInAccountId, true);
+                await RecordTaskStatusAsync(taskId, "Done", "In Progress", loggedInAccountId, true);
                 await context.SaveChangesAsync();
 
                 await notificationService.CreateTaskReturnedForReworkNotificationAsync(task);
