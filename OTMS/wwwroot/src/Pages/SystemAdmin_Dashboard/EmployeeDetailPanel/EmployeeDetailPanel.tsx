@@ -539,77 +539,88 @@ export default function EmployeeDetailPanel({
             .finally(() => setLoadingLogs(false));
     }, [profile.employeeNumber]);
 
-    // Delete Employee
-    const handleDelete = () => {
+    // Password gate helpers
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
+    const [pendingAction, setPendingAction] = useState<{ type: 'archive' | 'toggle'; nextStatus?: string } | null>(null);
+
+    const showPasswordGate = (title: string, description: string, variant: 'danger' | 'warning' | 'info', action: { type: 'archive' | 'toggle'; nextStatus?: string }) => {
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setPendingAction(action);
         setConfirmModal({
             isOpen: true,
-            variant: 'danger',
-            title: 'Delete Employee',
-            description: `Are you sure you want to permanently delete ${profile.employeeName}? This action cannot be undone.`,
-            confirmLabel: 'Delete',
+            variant,
+            title,
+            description: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>{description}</p>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>Enter your password to confirm.</p>
+                    <div style={{ position: 'relative' }}>
+                        <input id="gate-pw-input" type={showGatePassword ? 'text' : 'password'} placeholder="Enter your current password" style={{ width: '100%', paddingRight: 40, boxSizing: 'border-box', height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 40px 0 12px', fontSize: 13, outline: 'none' }} autoFocus onChange={e => { setGatePassword(e.target.value); setGateError(''); }} onKeyDown={e => { if (e.key === 'Enter') document.getElementById('gate-confirm-btn')?.click(); }} />
+                        <button type="button" onClick={() => setShowGatePassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>{showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+                    </div>
+                    {gateError && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626' }}><AlertCircle size={12} />{gateError}</div>}
+                </div>
+            ),
+            confirmLabel: 'Verify & proceed',
             onConfirm: async () => {
-                setConfirmModal(CONFIRM_CLOSED);
-                setDeleting(true);
+                const pw = (document.getElementById('gate-pw-input') as HTMLInputElement)?.value ?? gatePassword;
+                if (!pw) { setGateError('Please enter your password.'); return; }
+                setGateLoading(true);
+                setGateError('');
                 try {
                     const token = localStorage.getItem('authToken');
-                    const res = await fetch('/api/systemadmin/delete-user', {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
+                    const adminId = localStorage.getItem('employeeId') ?? '';
+                    const verifyRes = await fetch('/api/authentication/verify-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ employeeID: adminId, password: pw }),
                     });
-                    if (!res.ok) throw new Error();
-                    success(`Successfully deleted ${profile.employeeName}.`);
-                    onEmployeeUpdated({ ...profile, accountStatus: '__deleted__' });
-                } catch {
-                    error('Failed to delete employee.');
-                } finally {
-                    setDeleting(false);
-                }
-            }
+                    if (!verifyRes.ok) { const err = await verifyRes.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password.'); }
+                    setConfirmModal(CONFIRM_CLOSED);
+                    if (action.type === 'archive') {
+                        setDeleting(true);
+                        try {
+                            const delRes = await fetch('/api/systemadmin/delete-user', {
+                                method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
+                            });
+                            if (!delRes.ok) throw new Error();
+                            success(`Successfully archived ${profile.employeeName}.`);
+                            onEmployeeUpdated({ ...profile, accountStatus: '__deleted__' });
+                        } catch { error('Failed to Archive Employee.'); } finally { setDeleting(false); }
+                    } else {
+                        const next = action.nextStatus!;
+                        const endpoint = next === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
+                        try {
+                            const statusRes = await fetch(endpoint, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ employeeNumber: profile.employeeNumber }) });
+                            if (!statusRes.ok) throw new Error();
+                            const updatedProfile = { ...profile, accountStatus: next };
+                            setProfile(updatedProfile);
+                            onEmployeeUpdated(updatedProfile);
+                            success(`Successfully ${next === 'Active' ? 'activated' : 'deactivated'} ${profile.employeeName}.`);
+                        } catch { error(`Failed to ${next === 'Active' ? 'activate' : 'deactivate'} employee.`); }
+                    }
+                } catch (err: any) { setGateError(err.message ?? 'Incorrect password.'); }
+                finally { setGateLoading(false); }
+            },
         });
+    };
+
+    // Archive Employee
+    const handleDelete = () => {
+        showPasswordGate('Archive Employee', `Are you sure you want to permanently archive ${profile.employeeName}? This action cannot be undone.`, 'danger', { type: 'archive' });
     };
 
     // Toggle status (Activate/Deactivate)
     const handleToggleStatus = () => {
         const isActive = ['Active', 'On Leave', 'Emergency Overriden'].includes(profile.accountStatus);
         const next = isActive ? 'Deactivated' : 'Active';
-        const actionText = next === 'Deactivated' ? 'deactivate' : 'activate';
-
-        setConfirmModal({
-            isOpen: true,
-            variant: 'warning',
-            title: `${next === 'Active' ? 'Activate' : 'Deactivate'} Employee`,
-            description: `Are you sure you want to ${actionText} ${profile.employeeName}?`,
-            confirmLabel: next === 'Active' ? 'Activate' : 'Deactivate',
-            onConfirm: async () => {
-                setConfirmModal(CONFIRM_CLOSED);
-                const endpoint =
-                    next === 'Active' ? '/api/systemadmin/activate-user' : '/api/systemadmin/deactivate-user';
-
-                try {
-                    const token = localStorage.getItem('authToken');
-                    const res = await fetch(endpoint, {
-                        method: 'PATCH',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({ employeeNumber: profile.employeeNumber }),
-                    });
-                    if (!res.ok) throw new Error();
-
-                    const updatedProfile = { ...profile, accountStatus: next };
-                    setProfile(updatedProfile);
-                    onEmployeeUpdated(updatedProfile);
-                    success(`Successfully ${next === 'Active' ? 'activated' : 'deactivated'} ${profile.employeeName}.`);
-                } catch {
-                    error(`Failed to ${actionText} employee.`);
-                }
-            }
-        });
+        showPasswordGate(`${next === 'Active' ? 'Activate' : 'Deactivate'} Employee`, `Are you sure you want to ${next === 'Deactivated' ? 'deactivate' : 'activate'} ${profile.employeeName}?`, 'warning', { type: 'toggle', nextStatus: next });
     };
 
     const completedCount = deliveries.filter(d => d.status?.toLowerCase() === 'delivered').length;
@@ -965,6 +976,7 @@ export default function EmployeeDetailPanel({
                 description={confirmModal.description}
                 confirmLabel={confirmModal.confirmLabel}
                 cancelLabel={confirmModal.cancelLabel}
+                isLoading={gateLoading}
                 onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
             />

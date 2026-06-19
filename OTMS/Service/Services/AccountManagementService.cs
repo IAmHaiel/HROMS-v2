@@ -1057,6 +1057,21 @@ namespace OTMS.Service.Services
             };
 
             context.StatutorySyncRecords.Add(syncRecord);
+
+            // Update bank and emergency contact info on ApplicantRecord
+            if (!string.IsNullOrEmpty(request.BankName) || !string.IsNullOrEmpty(request.EmergencyContactName))
+            {
+                var applicant = await context.ApplicantRecords
+                    .FirstOrDefaultAsync(ar => ar.EmailAddress == employee.Email);
+                if (applicant != null)
+                {
+                    if (!string.IsNullOrEmpty(request.BankName)) applicant.BankName = request.BankName;
+                    if (!string.IsNullOrEmpty(request.BankAccountNumber)) applicant.BankAccountNumber = request.BankAccountNumber;
+                    if (!string.IsNullOrEmpty(request.EmergencyContactName)) applicant.EmergencyContactName = request.EmergencyContactName;
+                    if (!string.IsNullOrEmpty(request.EmergencyContactNumber)) applicant.EmergencyContactMobileNumber = request.EmergencyContactNumber;
+                }
+            }
+
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(

@@ -1018,7 +1018,7 @@ export default function PublicApplicationPortal() {
                                 {submitLoading ? (
                                     <><div style={{ ...s.spinner, borderTopColor: 'white' }} />Submitting application...</>
                                 ) : (
-                                    'Submit Application ?'
+                                    'Submit Application'
                                 )}
                             </button>
 

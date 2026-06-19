@@ -18,5 +18,10 @@ namespace OTMS.Entities.DTOs.AccountManagement
 
         [Required]
         public string TinNumber { get; set; } = string.Empty;
+
+        public string? BankName { get; set; }
+        public string? BankAccountNumber { get; set; }
+        public string? EmergencyContactName { get; set; }
+        public string? EmergencyContactNumber { get; set; }
     }
 }

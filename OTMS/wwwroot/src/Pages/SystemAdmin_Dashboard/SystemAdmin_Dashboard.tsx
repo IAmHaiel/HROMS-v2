@@ -1106,15 +1106,15 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
         setConfirmModal({
             isOpen: true,
                 variant: 'danger',
-                title: 'Delete employee record?',
+                title: 'Archive employee account?',
             description: (
                 <>
                     This will permanently remove <strong>{displayName}</strong> and all associated
                     data. This action cannot be undone.
                 </>
             ),
-            notice: 'All leave records, tasks, and activity logs for this employee will also be deleted.',
-            confirmLabel: 'Delete employee',
+            notice: 'All leave records, tasks, and activity logs for this employee will also be archived.',
+            confirmLabel: 'Archive employee',
             onConfirm: async () => {
                 setSubmitting(true);
                 setApiError('');
@@ -1127,9 +1127,9 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
                     });
                     if (!res.ok) {
                         const err = await res.json().catch(() => ({}));
-                        throw new Error(err.message || 'Failed to delete employee. Please try again.');
+                        throw new Error(err.message || 'Failed to Archive employee. Please try again.');
                     }
-                    success(`${displayName} has been deleted.`);
+                    success(`${displayName} has been archived.`);
                     onUpdated({ ...employee, accountStatus: '__deleted__' });
                     onClose();
                 } catch (err: any) {
@@ -1626,7 +1626,7 @@ function DashboardTab({ employees, recentEmployees, activityLogs, loading, onSel
 
 // ─── Manage Employees Tab ─────────────────────────────────────────────────────
 
-type EmployeeSubTab = 'employees' | 'leave' | 'documents';
+type EmployeeSubTab = 'employees' | 'leave' | 'documents' | 'archived';
 
 interface ManageEmployeesTabProps {
     employees: RecentEmployee[];
@@ -1644,7 +1644,7 @@ interface ManageEmployeesTabProps {
     onLeavePageChange: (page: number, filters: LeaveFilters) => void;
     onLeaveConfirm: (id: number, action: 'approve' | 'decline', note: string) => void;
     onEditEmployee: (emp: RecentEmployee) => void;
-    onDeleteEmployee: (emp: RecentEmployee) => void;
+    onArchiveEmployee: (emp: RecentEmployee) => void;
     onViewEmployee: (emp: RecentEmployee) => void;
     onOpenDigital201: (emp: RecentEmployee) => void;
     contracts: EmploymentContract[];
@@ -1666,7 +1666,7 @@ function ManageEmployeesTab({
     empPage, empTotalPages, onEmpPageChange,
     leaveRequests, leaveLoading, leavePage, leaveTotalPages, leavePendingCount,
     onLeavePageChange, onLeaveConfirm,
-    onEditEmployee, onDeleteEmployee, onViewEmployee, onOpenDigital201,
+    onEditEmployee, onArchiveEmployee, onViewEmployee, onOpenDigital201,
     rolesList = SYSTEM_ROLES,
 }: ManageEmployeesTabProps) {
     const [subTab, setSubTab] = useState<EmployeeSubTab>('employees');
@@ -1746,7 +1746,7 @@ function ManageEmployeesTab({
                                         { label: 'View Details', icon: <Eye size={12} />, onClick: () => onViewEmployee(emp) },
                                         { label: 'Digital 201 File', icon: <FileText size={12} />, onClick: () => onOpenDigital201(emp) },
                                         { label: 'Edit', icon: <Pencil size={12} />, onClick: () => onEditEmployee(emp) },
-                                        { label: 'Delete', icon: <Trash2 size={12} />, onClick: () => onDeleteEmployee(emp), variant: 'danger' },
+                                        { label: 'Archive', icon: <Trash2 size={12} />, onClick: () => onArchiveEmployee(emp), variant: 'danger' },
                                     ]} />
                                 </td>
                             </tr>
@@ -2181,90 +2181,98 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
     ) || legacyName || 'System Admin';
     const displayContact = profileForm.contactNumber || employeeContact;
 
+    const avatarInitial = displayName.charAt(0).toUpperCase() || '?';
+
     return (
         <div className="dashboard-content">
             <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1.5fr' }}>
-                <div className="card">
-                    <div className="card-header-layout">
-                        <h3>My Profile</h3>
-                        {!editingProfile && (
-                            <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={requestEditProfile}>
-                                <Pencil size={12} /> Edit Profile
-                            </button>
+                {/* ── ID Card Profile ── */}
+                <div className="card" style={{ overflow: 'hidden' }}>
+                    <div style={{ background: 'linear-gradient(135deg, #4318ff 0%, #6a5cff 50%, #4318ff 100%)', padding: '28px 24px 20px', textAlign: 'center', marginBottom: 0 }}>
+                        <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 32, fontWeight: 800, color: '#fff' }}>{avatarInitial}</div>
+                        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>{displayName}</h2>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+                            <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '3px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: '0.04em' }}>SYSTEM ADMIN</span>
+                            <span style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '3px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>#{employeeId}</span>
+                        </div>
+                    </div>
+                    <div style={{ padding: '20px 24px 24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Personal Information</h3>
+                            {!editingProfile && (
+                                <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8 }} onClick={requestEditProfile}>
+                                    <Pencil size={11} /> Edit
+                                </button>
+                            )}
+                        </div>
+                        {editingProfile ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {profileError && <ErrorBanner message={profileError} />}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>First Name <span style={{ color: '#ef4444' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={{ ...(validationErrors['firstName'] ? { borderColor: '#ef4444' } : {}), height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} />{validationErrors['firstName'] && <span style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{validationErrors['firstName']}</span>}</div>
+                                    <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={{ ...(validationErrors['lastName'] ? { borderColor: '#ef4444' } : {}), height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} />{validationErrors['lastName'] && <span style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{validationErrors['lastName']}</span>}</div>
+                                    <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Middle Name <span style={{ fontSize: 9, color: '#94a3b8' }}>(opt)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} style={{ ...(validationErrors['middleName'] ? { borderColor: '#ef4444' } : {}), height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} /></div>
+                                    <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Suffix <span style={{ fontSize: 9, color: '#94a3b8' }}>(opt)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} style={{ height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} /></div>
+                                </div>
+                                <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Email <span style={{ color: '#ef4444' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" style={{ ...(validationErrors['email'] ? { borderColor: '#ef4444' } : {}), height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} />{validationErrors['email'] && <span style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{validationErrors['email']}</span>}</div>
+                                <div className="field"><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. 09170000000" style={{ ...(validationErrors['contactNumber'] ? { borderColor: '#ef4444' } : {}), height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} />{validationErrors['contactNumber'] && <span style={{ color: '#ef4444', fontSize: 11, marginTop: 2 }}>{validationErrors['contactNumber']}</span>}</div>
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                                    <button className="btn" style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8 }} onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button>
+                                    <button className="btn btn-primary" style={{ fontSize: 12, padding: '7px 16px', borderRadius: 8 }} onClick={handleProfileSave} disabled={profileSaving}>
+                                        {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
+                                {[
+                                    { icon: <Hash size={13} />, label: 'Employee ID', value: employeeId },
+                                    { icon: <UserCircle2 size={13} />, label: 'First Name', value: profileForm.firstName },
+                                    { icon: <UserCircle2 size={13} />, label: 'Last Name', value: profileForm.lastName },
+                                    { icon: <UserCircle2 size={13} />, label: 'Middle Name', value: profileForm.middleName || '—' },
+                                    { icon: <Mail size={13} />, label: 'Email', value: profileForm.email || '—' },
+                                    { icon: <Phone size={13} />, label: 'Contact', value: displayContact || '—' },
+                                ].map(({ icon, label, value }) => (
+                                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                                        <div style={{ color: '#64748b', flexShrink: 0, display: 'flex' }}>{icon}</div>
+                                        <div>
+                                            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+                                            <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600 }}>{value || '—'}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 16px', gap: 10 }}>
-                        <div className="avatar-circle large" style={{ width: 72, height: 72, fontSize: 28, background: 'linear-gradient(135deg, #4318ff, #6a5cff)', boxShadow: '0 8px 20px rgba(67,24,255,0.28)' }}>{displayName.charAt(0).toUpperCase()}</div>
-                        <div style={{ textAlign: 'center' }}>
-                            <h4 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</h4>
-                            <StatusBadge status="Active" />
-                        </div>
-                    </div>
-                    {editingProfile ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {profileError && <ErrorBanner message={profileError} />}
-                            <div className="field-row">
-                                <div className="field"><label>First Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.firstName} onChange={handleProfileChange('firstName')} placeholder="First name" maxLength={50} style={validationErrors['firstName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['firstName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['firstName']}</span>}</div>
-                                <div className="field"><label>Last Name <span style={{ color: 'var(--danger)' }}>*</span></label><input type="text" value={profileForm.lastName} onChange={handleProfileChange('lastName')} placeholder="Last name" maxLength={50} style={validationErrors['lastName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['lastName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['lastName']}</span>}</div>
-                            </div>
-                            <div className="field-row">
-                                <div className="field"><label>Middle Name <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.middleName} onChange={handleProfileChange('middleName')} placeholder="Middle name" maxLength={50} style={validationErrors['middleName'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['middleName'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['middleName']}</span>}</div>
-                                <div className="field"><label>Suffix <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>(optional)</span></label><input type="text" value={profileForm.suffix} onChange={handleProfileChange('suffix')} placeholder="Jr., Sr., III" maxLength={10} /></div>
-                            </div>
-                            <div className="field-row">
-                                <div className="field"><label>Email Address <span style={{ color: 'var(--danger)' }}>*</span></label><input type="email" value={profileForm.email} onChange={handleProfileChange('email')} placeholder="e.g. name@company.com" style={validationErrors['email'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['email'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['email']}</span>}</div>
-                                <div className="field"><label>Contact Number</label><input type="tel" value={profileForm.contactNumber} onChange={handleProfileChange('contactNumber')} placeholder="e.g. 09170000000" style={validationErrors['contactNumber'] ? { borderColor: 'var(--danger)' } : {}} />{validationErrors['contactNumber'] && <span style={{ color: 'var(--danger)', fontSize: 11, marginTop: 4 }}>{validationErrors['contactNumber']}</span>}</div>
-                            </div>
-                            <div className="detail-grid" style={{ marginTop: 4 }}>
-                                <div className="detail-item"><span className="detail-label">Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div>
-                                <div className="detail-item"><span className="detail-label">Role</span><span className="detail-value">System Admin</span></div>
-                            </div>
-                            <div className="modal-actions" style={{ padding: '4px 0 0' }}>
-                                <button className="btn" onClick={() => { setEditingProfile(false); setProfileError(''); setProfileForm({ firstName: storedFirstName, middleName: storedMiddleName, lastName: storedLastName, suffix: storedSuffix, contactNumber: employeeContact, email: storedEmail }); }} disabled={profileSaving}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handleProfileSave} disabled={profileSaving}>
-                                    {profileSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save Changes</>}
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="detail-grid" style={{ marginTop: 4 }}>
-                            <div className="detail-item"><span className="detail-label"><Hash size={11} style={{ display: 'inline', marginRight: 4 }} />Employee ID</span><span className="detail-value">{employeeId || '—'}</span></div>
-                            <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />First Name</span><span className="detail-value">{profileForm.firstName || '—'}</span></div>
-                            <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Last Name</span><span className="detail-value">{profileForm.lastName || '—'}</span></div>
-                            <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Middle Name</span><span className="detail-value">{profileForm.middleName || '—'}</span></div>
-                            {profileForm.suffix && <div className="detail-item"><span className="detail-label"><UserCircle2 size={11} style={{ display: 'inline', marginRight: 4 }} />Suffix</span><span className="detail-value">{profileForm.suffix}</span></div>}
-                            <div className="detail-item"><span className="detail-label"><Mail size={11} style={{ display: 'inline', marginRight: 4 }} />Email</span><span className="detail-value">{profileForm.email || '—'}</span></div>
-                            <div className="detail-item"><span className="detail-label"><Shield size={11} style={{ display: 'inline', marginRight: 4 }} />Role</span><span className="detail-value">System Admin</span></div>
-                            <div className="detail-item"><span className="detail-label"><Phone size={11} style={{ display: 'inline', marginRight: 4 }} />Contact</span><span className="detail-value">{displayContact || '—'}</span></div>
-                        </div>
-                    )}
                 </div>
+
+                {/* ── Security Settings ── */}
                 <div className="card">
                     <div className="card-header-layout">
-                        <h3>Security Settings</h3>
+                        <h3>Security</h3>
                         {!editingPassword && (
-                            <button className="btn btn-primary" style={{ fontSize: 12, padding: '6px 14px', width: 'fit-content', flexShrink: 0, marginLeft: 'auto' }} onClick={() => setEditingPassword(true)}>
+                            <button className="btn btn-primary btn-sm" onClick={() => setEditingPassword(true)}>
                                 <Lock size={12} /> Change Password
                             </button>
                         )}
                     </div>
                     {!editingPassword ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 0' }}>
-                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-success"><CheckCircle2 size={16} /></div><div className="system-info"><span className="system-name">Password</span><span className="system-detail">Last updated recently</span></div><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--status-active)', background: 'var(--status-active-bg)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Secure</span></div>
-                            <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-primary"><Shield size={16} /></div><div className="system-info"><span className="system-name">Role Permissions</span><span className="system-detail">Full system access granted</span></div><span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--status-new-bg)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Admin</span></div>
-                            <div style={{ height: 1, background: 'var(--border)' }} />
-                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-warning"><AlertCircle size={16} /></div><div className="system-info"><span className="system-name">Active Session</span><span className="system-detail">Logged in on this device</span></div><span style={{ fontSize: 12, fontWeight: 600, color: '#ffb547', background: 'rgba(255,181,71,0.15)', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Live</span></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
+                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-success"><CheckCircle2 size={16} /></div><div className="system-info"><span className="system-name">Password</span><span className="system-detail">Last updated recently</span></div><span style={{ fontSize: 11, fontWeight: 600, color: '#059669', background: 'rgba(5,150,105,0.1)', padding: '3px 10px', borderRadius: 999 }}>Secure</span></div>
+                            <div style={{ height: 1, background: '#e2e8f0' }} />
+                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-primary"><Shield size={16} /></div><div className="system-info"><span className="system-name">Role Permissions</span><span className="system-detail">Full system access granted</span></div><span style={{ fontSize: 11, fontWeight: 600, color: '#4318ff', background: 'rgba(67,24,255,0.1)', padding: '3px 10px', borderRadius: 999 }}>Admin</span></div>
+                            <div style={{ height: 1, background: '#e2e8f0' }} />
+                            <div className="system-status-item" style={{ cursor: 'default' }}><div className="system-icon bg-warning"><AlertCircle size={16} /></div><div className="system-info"><span className="system-name">Active Session</span><span className="system-detail">Logged in on this device</span></div><span style={{ fontSize: 11, fontWeight: 600, color: '#d97706', background: 'rgba(217,119,6,0.1)', padding: '3px 10px', borderRadius: 999 }}>Live</span></div>
                         </div>
                     ) : (
                         <div className="modal-form" style={{ padding: '4px 0 0' }}>
                             {pwError && <ErrorBanner message={pwError} />}
-                            <div className="field"><label>Current Password</label><div style={{ position: 'relative' }}><input type={showCurrent ? 'text' : 'password'} value={pwForm.current} onChange={handlePwChange('current')} placeholder="Enter current password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowCurrent(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
-                            <div className="field"><label>New Password</label><div style={{ position: 'relative' }}><input type={showNext ? 'text' : 'password'} value={pwForm.next} onChange={handlePwChange('next')} placeholder="At least 6 characters" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowNext(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showNext ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.next.length > 0 && <div style={{ marginTop: 6 }}><div style={{ display: 'flex', gap: 4 }}>{[1, 2, 3].map(level => <div key={level} style={{ flex: 1, height: 4, borderRadius: 2, background: pwForm.next.length >= level * 4 ? level === 1 ? 'var(--status-failed)' : level === 2 ? '#ffb547' : 'var(--status-active)' : '#e9edf7', transition: 'background 0.2s' }} />)}</div><span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 3, display: 'block' }}>{pwForm.next.length < 4 ? 'Weak' : pwForm.next.length < 8 ? 'Fair' : 'Strong'}</span></div>}</div>
-                            <div className="field"><label>Confirm New Password</label><div style={{ position: 'relative' }}><input type={showConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={handlePwChange('confirm')} placeholder="Re-enter new password" style={{ paddingRight: 40, width: '100%' }} /><button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }} tabIndex={-1}>{showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}</button></div>{pwForm.confirm.length > 0 && pwForm.next !== pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--danger)', marginTop: 3, display: 'block' }}>Passwords do not match</span>}{pwForm.confirm.length > 0 && pwForm.next === pwForm.confirm && <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>✓ Passwords match</span>}</div>
-                            <div className="modal-actions" style={{ padding: '4px 0 0' }}>
-                                <button className="btn" onClick={() => { setEditingPassword(false); setPwError(''); setPwForm({ current: '', next: '', confirm: '' }); }} disabled={pwSaving}>Cancel</button>
-                                <button className="btn btn-primary" onClick={handlePwSave} disabled={pwSaving}>
+                            <div className="field" style={{ marginBottom: 12 }}><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Current Password</label><div style={{ position: 'relative' }}><input type={showCurrent ? 'text' : 'password'} value={pwForm.current} onChange={handlePwChange('current')} placeholder="Enter current password" style={{ height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 40px 0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} /><button type="button" onClick={() => setShowCurrent(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>{showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
+                            <div className="field" style={{ marginBottom: 12 }}><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>New Password</label><div style={{ position: 'relative' }}><input type={showNext ? 'text' : 'password'} value={pwForm.next} onChange={handlePwChange('next')} placeholder="At least 6 characters" style={{ height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 40px 0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} /><button type="button" onClick={() => setShowNext(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>{showNext ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
+                            <div className="field" style={{ marginBottom: 12 }}><label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Confirm New Password</label><div style={{ position: 'relative' }}><input type={showConfirm ? 'text' : 'password'} value={pwForm.confirm} onChange={handlePwChange('confirm')} placeholder="Re-enter new password" style={{ height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 40px 0 12px', fontSize: 13, width: '100%', boxSizing: 'border-box' }} /><button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>{showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                                <button className="btn btn-sm" onClick={() => { setEditingPassword(false); setPwError(''); setPwForm({ current: '', next: '', confirm: '' }); }} disabled={pwSaving}>Cancel</button>
+                                <button className="btn btn-primary btn-sm" onClick={handlePwSave} disabled={pwSaving}>
                                     {pwSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Update Password</>}
                                 </button>
                             </div>
@@ -2283,7 +2291,7 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                         <div key={name} className="system-status-item">
                             <div className={`system-icon ${bg}`}><Icon size={16} /></div>
                             <div className="system-info"><span className="system-name">{name}</span><span className="system-detail">{detail}</span></div>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '4px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Full Access</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#2b3674', background: '#eef2ff', padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>Full Access</span>
                         </div>
                     ))}
                 </div>
@@ -2859,8 +2867,8 @@ export default function Dashboard() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<RecentEmployee | null>(null);
     const [empModalEditMode, setEmpModalEditMode] = useState(false);
-    const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<RecentEmployee | null>(null);
-    const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+    const [archiveConfirmEmp, setarchiveConfirmEmp] = useState<RecentEmployee | null>(null);
+    const [archiveSubmitting, setarchiveSubmitting] = useState(false);
     const [selectedPanelEmployee, setSelectedPanelEmployee] = useState<RecentEmployee | null>(null);
     const [detailPanelInitialSection, setDetailPanelInitialSection] = useState<'overview' | 'digital_201'>('overview');
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -3248,7 +3256,7 @@ export default function Dashboard() {
                             onLeavePageChange={fetchLeaveRequests}
                             onLeaveConfirm={handleLeaveConfirm}
                             onEditEmployee={emp => { setEmpModalEditMode(true); setSelectedEmployee(emp); }}
-                            onDeleteEmployee={emp => setDeleteConfirmEmp(emp)}
+                            onArchiveEmployee={emp => setarchiveConfirmEmp(emp)}
                             onViewEmployee={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('overview'); }}
                             onOpenDigital201={emp => { setSelectedPanelEmployee(emp); setDetailPanelInitialSection('digital_201'); }}
                             contracts={contracts}
@@ -3350,48 +3358,48 @@ export default function Dashboard() {
                 />
             )}
 
-            {/* ── Delete Employee Confirmation Modal ── */}
+            {/* ── Archive employee Confirmation Modal ── */}
             <ConfirmationModal
-                isOpen={!!deleteConfirmEmp}
+                isOpen={!!archiveConfirmEmp}
                 variant="danger"
-                title="Delete employee record?"
+                title="Archive employee account?"
                 description={
-                    deleteConfirmEmp ? (
+                    archiveConfirmEmp ? (
                         <>
-                            This will permanently remove <strong>{getEmployeeDisplayName(deleteConfirmEmp)}</strong> and all associated
+                            This will permanently remove <strong>{getEmployeeDisplayName(archiveConfirmEmp)}</strong> and all associated
                             data. This action cannot be undone.
                         </>
                     ) : null
                 }
-                notice="All leave records, tasks, and activity logs for this employee will also be deleted."
-                confirmLabel="Delete employee"
+                notice="All leave records, tasks, and activity logs for this employee will also be archived."
+                confirmLabel="Archive employee"
                 cancelLabel="Cancel"
-                isLoading={deleteSubmitting}
+                isLoading={archiveSubmitting}
                 onConfirm={async () => {
-                    if (!deleteConfirmEmp) return;
-                    setDeleteSubmitting(true);
+                    if (!archiveConfirmEmp) return;
+                    setarchiveSubmitting(true);
                     try {
                         const token = localStorage.getItem('authToken');
                         const res = await fetch('/api/systemadmin/delete-user', {
                             method: 'DELETE',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                            body: JSON.stringify({ employeeNumber: deleteConfirmEmp.employeeNumber }),
+                            body: JSON.stringify({ employeeNumber: archiveConfirmEmp.employeeNumber }),
                         });
                         if (!res.ok) {
                             const err = await res.json().catch(() => ({}));
-                            throw new Error(err.message || 'Failed to delete employee. Please try again.');
+                            throw new Error(err.message || 'Failed to Archive employee. Please try again.');
                         }
-                        success(`${getEmployeeDisplayName(deleteConfirmEmp)} has been deleted.`);
-                        setEmployees(prev => prev.filter(e => e.employeeNumber !== deleteConfirmEmp.employeeNumber));
-                        setRecentEmployees(prev => prev.filter(e => e.employeeNumber !== deleteConfirmEmp.employeeNumber));
+                        success(`${getEmployeeDisplayName(archiveConfirmEmp)} has been archived.`);
+                        setEmployees(prev => prev.filter(e => e.employeeNumber !== archiveConfirmEmp.employeeNumber));
+                        setRecentEmployees(prev => prev.filter(e => e.employeeNumber !== archiveConfirmEmp.employeeNumber));
                     } catch (err: any) {
-                        error(err.message ?? 'Failed to delete employee.');
+                        error(err.message ?? 'Failed to Archive employee.');
                     } finally {
-                        setDeleteSubmitting(false);
-                        setDeleteConfirmEmp(null);
+                        setarchiveSubmitting(false);
+                        setarchiveConfirmEmp(null);
                     }
                 }}
-                onCancel={() => setDeleteConfirmEmp(null)}
+                onCancel={() => setarchiveConfirmEmp(null)}
             />
 
             {/* ── Logout Confirmation Modal ── */}

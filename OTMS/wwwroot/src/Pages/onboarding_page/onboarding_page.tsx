@@ -6,7 +6,7 @@ import {
     User, Lock, Upload, FileText, Trash2, ShieldCheck, CreditCard, Phone, Mail
 } from 'lucide-react';
 
-type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'documents201' | 'done';
+type Step = 'welcome' | 'profile' | 'password' | 'documents' | 'done';
 
 interface UploadedFile {
     name: string;
@@ -218,6 +218,7 @@ export default function OnboardingPage() {
     const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
     const [pwSaving, setPwSaving] = useState(false);
     const [pwApiError, setPwApiError] = useState('');
+    const [completedCredentials, setCompletedCredentials] = useState<string>('');
     const [showNext, setShowNext] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -264,7 +265,7 @@ export default function OnboardingPage() {
     const [api201Error, setApi201Error] = useState('');
 
     const token = localStorage.getItem('authToken') ?? '';
-    const steps: Step[] = ['welcome', 'profile', 'password', 'documents', 'documents201', 'done'];
+    const steps: Step[] = ['welcome', 'profile', 'password', 'documents', 'done'];
     const stepIndex = steps.indexOf(step);
 
     // ── Helpers ──
@@ -489,112 +490,98 @@ export default function OnboardingPage() {
         setStep('documents');
     };
 
+    const handleFinalSubmit = async () => {
+        setSubmittingDocs(true);
+        setDocsApiError('');
+        const keys = Object.keys(fileObjects).filter(k => uploadedDocs[k]?.status !== 'done');
+        for (const key of keys) {
+            const file = fileObjects[key];
+            if (!file) continue;
+            setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'uploading' } }));
+            const formData = new FormData();
+            formData.append('token', onboardingToken ?? '');
+            formData.append('documentType', key);
+            formData.append('file', file);
+            try {
+                const res = await fetch('/api/onboarding/upload-document', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (!res.ok) throw new Error((data as any).message || 'Upload failed.');
+                setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'done' } }));
+            } catch (err: any) {
+                setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'error', error: err.message || 'Upload failed.' } }));
+                setDocsApiError('Some files failed to upload. You can retry or continue anyway.');
+                setSubmittingDocs(false);
+                return;
+            }
+        }
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/onboarding/complete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: onboardingToken,
+                    password: pw.next || null,
+                    firstName: profile.firstName || null,
+                    middleName: profile.middleName || null,
+                    lastName: profile.lastName || null,
+                    suffix: profile.suffix || null,
+                    contactNumber: profile.contactNumber || null,
+                }),
+            });
+            if (!res.ok) throw new Error('Failed to complete onboarding.');
+            const data = await res.json();
+            setCompletedCredentials((data as any).message || '');
+            setStep('done');
+        } catch (err: any) {
+            setDocsApiError(err.message ?? 'Something went wrong. Please try again.');
+        } finally { setSubmittingDocs(false); }
+    };
+
     const handleSubmitAndFinish = async () => {
         setSubmittingDocs(true);
         setDocsApiError('');
 
         const keys = Object.keys(fileObjects).filter(k => uploadedDocs[k]?.status !== 'done');
-        if (keys.length === 0) {
-            setSubmittingDocs(false);
-            setStep('documents201');
-            return;
-        }
-
-        let hasError = false;
-
         for (const key of keys) {
             const file = fileObjects[key];
             if (!file) continue;
-
             setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'uploading' } }));
-
             const formData = new FormData();
             formData.append('token', onboardingToken ?? '');
             formData.append('documentType', key);
             formData.append('file', file);
-
             try {
-                const res = await fetch('/api/onboarding/upload-document', {
-                    method: 'POST',
-                    body: formData,
-                });
+                const res = await fetch('/api/onboarding/upload-document', { method: 'POST', body: formData });
                 const data = await res.json();
-                if (!res.ok) {
-                    throw new Error((data as any).message || 'Upload failed.');
-                }
+                if (!res.ok) throw new Error((data as any).message || 'Upload failed.');
                 setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'done' } }));
             } catch (err: any) {
                 setUploadedDocs(prev => ({ ...prev, [key]: { ...prev[key], status: 'error', error: err.message || 'Upload failed.' } }));
-                hasError = true;
+                setDocsApiError('Some files failed to upload. You can retry or continue anyway.');
+                setSubmittingDocs(false);
+                return;
             }
         }
-
-        if (hasError) {
-            setDocsApiError('Some files failed to upload. You can retry or continue anyway.');
-            setSubmittingDocs(false);
-            return;
-        }
-
-        setSubmittingDocs(false);
-        setStep('documents201');
-    };
-
-    const [completedCredentials, setCompletedCredentials] = useState<string>('');
-
-    const handle201Submit = async () => {
-        const errs = validate201();
-        if (Object.keys(errs).length > 0) { setErrors201(errs); return; }
-        setSaving201(true); setApi201Error('');
         try {
-            if (onboardingToken) {
-                const relationshipValue = form201.emergencyRelationship === 'Others' ? `Others: ${relationshipCustom}` : form201.emergencyRelationship;
-                const bankValue = form201.bankName === 'Other' ? `Other: ${bankCustom}` : form201.bankName;
-                const res = await fetch('/api/onboarding/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        token: onboardingToken,
-                        password: pw.next || null,
-                        firstName: profile.firstName || null,
-                        middleName: profile.middleName || null,
-                        lastName: profile.lastName || null,
-                        suffix: profile.suffix || null,
-                        contactNumber: profile.contactNumber || null,
-                        sssNumber: form201.sss || null,
-                        philHealthNumber: form201.philhealth || null,
-                        pagIBIGNumber: form201.pagibig || null,
-                        tin: form201.tin || null,
-                        bankName: bankValue || null,
-                        bankAccountName: form201.bankAccountName || null,
-                        bankAccountNumber: form201.bankAccount || null,
-                        emergencyContactName: form201.emergencyName || null,
-                        emergencyContactRelationship: relationshipValue || null,
-                        emergencyContactMobileNumber: form201.emergencyNumber || null,
-                        motherFirstName: form201.motherFirstName || null,
-                        motherMiddleName: form201.motherMiddleName || null,
-                        motherLastName: form201.motherLastName || null,
-                        fatherFirstName: form201.fatherFirstName || null,
-                        fatherMiddleName: form201.fatherMiddleName || null,
-                        fatherLastName: form201.fatherLastName || null,
-                        educationLevel: form201.educationLevel || null,
-                        educationInstitution: form201.educationInstitution || null,
-                        educationDegree: form201.educationDegree || null,
-                        educationYearGraduated: form201.educationYear ? parseInt(form201.educationYear, 10) : null,
-                        educationIsCurrentlyEnrolled: form201.educationCurrentlyEnrolled,
-                    }),
-                });
-                const data = await res.json();
-                if (!res.ok) {
-                    throw new Error((data as any).message || 'Failed to complete onboarding.');
-                }
-                setCompletedCredentials((data as any).message || '');
-            }
+            const token = localStorage.getItem('authToken');
+            const res = await fetch('/api/onboarding/complete', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: onboardingToken,
+                    password: pw.next || null,
+                    firstName: profile.firstName || null,
+                    middleName: profile.middleName || null,
+                    lastName: profile.lastName || null,
+                    suffix: profile.suffix || null,
+                    contactNumber: profile.contactNumber || null,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error((data as any).message || 'Failed to complete onboarding.');
             setStep('done');
         } catch (err: any) {
-            const isNetworkDown = !err?.response || err?.response?.status >= 502;
-            setApi201Error(isNetworkDown ? 'System not available at the moment. Please try again later.' : (err.message ?? 'Something went wrong. Please try again.'));
-        }
-        finally { setSaving201(false); }
+            setDocsApiError(err.message ?? 'Something went wrong. Please try again.');
+        } finally { setSubmittingDocs(false); }
     };
 
     const pwStrength = pw.next.length === 0 ? 0 : pw.next.length < 6 ? 1 : pw.next.length < 10 ? 2 : 3;
@@ -693,8 +680,8 @@ export default function OnboardingPage() {
     };
 
     // ── Progress bar step labels ──
-    const progressLabels = ['Profile Setup', 'Set Password', 'Upload Documents', '201 File'];
-    const progressIndex = step === 'profile' ? 0 : step === 'password' ? 1 : step === 'documents' ? 2 : step === 'documents201' ? 3 : -1;
+    const progressLabels = ['Profile Setup', 'Set Password', 'Upload Documents'];
+    const progressIndex = step === 'profile' ? 0 : step === 'password' ? 1 : step === 'documents' ? 2 : -1;
 
     return (
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, var(--sidebar-bg) 0%, var(--primary-dark) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Montserrat', sans-serif", padding: '24px 16px' }}>
@@ -775,7 +762,7 @@ export default function OnboardingPage() {
                                     ))}
                                 </div>
                                 <div style={{ height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                                    <div style={{ height: '100%', borderRadius: 'var(--radius-full)', background: 'linear-gradient(90deg, var(--status-active), var(--primary))', width: step === 'profile' ? '25%' : step === 'password' ? '50%' : step === 'documents' ? '75%' : '100%', transition: 'width 0.4s ease' }} />
+                                    <div style={{ height: '100%', borderRadius: 'var(--radius-full)', background: 'linear-gradient(90deg, var(--status-active), var(--primary))', width: step === 'profile' ? '33%' : step === 'password' ? '66%' : step === 'documents' ? '100%' : '0%', transition: 'width 0.4s ease' }} />
                                 </div>
                             </div>
                         )}
@@ -798,7 +785,6 @@ export default function OnboardingPage() {
                                                 { icon: User, label: 'Set up your profile', desc: 'Add your name and contact details' },
                                                 { icon: Lock, label: 'Create a secure password', desc: 'Replace the temporary password sent to you' },
                                                 { icon: Upload, label: 'Upload onboarding documents', desc: 'Biodata, medical certificate, government ID' },
-                                                { icon: CreditCard, label: 'Submit your 201 File', desc: 'Government IDs, bank details, emergency contacts' },
                                             ].map(({ icon: Icon, label, desc }, i) => (
                                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                                                     <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'rgba(0,169,157,0.08)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -977,7 +963,7 @@ export default function OnboardingPage() {
                             )}
 
                             {/* ── 201 FILE FORM ── */}
-                            {step === 'documents201' && (
+                            {step === 'done' && (
                                 <div>
                                     <div style={{ padding: '28px 32px 20px', borderBottom: '1px solid var(--border)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -1382,7 +1368,7 @@ export default function OnboardingPage() {
                                         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                                             <BackButton to="documents" disabled={saving201} />
                                             <button
-                                                onClick={handle201Submit}
+                                                onClick={() => setStep('done')}
                                                 disabled={saving201}
                                                 style={{ flex: 1, height: 46, border: 'none', borderRadius: 'var(--radius-md)', background: saving201 ? 'rgba(0,169,157,0.45)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saving201 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'inherit', boxShadow: saving201 ? 'none' : 'var(--shadow-md)' }}
                                             >

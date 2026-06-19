@@ -24,7 +24,12 @@ import {
     Smartphone,
     Hash,
     Banknote,
-    PhoneCall
+    PhoneCall,
+    Pencil,
+    Save,
+    AlertCircle,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import './Digital201FileView.css';
 import { useToast } from '../../../components/Toast/Toast';
@@ -35,7 +40,7 @@ interface ConfirmModalState {
     isOpen: boolean;
     variant: 'neutral' | 'danger' | 'warning' | 'info' | 'success';
     title: string;
-    description: string;
+    description: React.ReactNode;
     notice?: string;
     confirmLabel?: string;
     cancelLabel?: string;
@@ -176,6 +181,20 @@ export default function Digital201FileView({
     // Sub-modal: Archive confirm
     const [archiveTarget, setArchiveTarget] = useState<EmployeeAttachment | null>(null);
     const [archiving, setArchiving] = useState(false);
+
+    // Compliance editing
+    const [editingCompliance, setEditingCompliance] = useState(false);
+    const [complianceForm, setComplianceForm] = useState({
+        sssNumber: '', philhealthNumber: '', pagibigNumber: '', tinNumber: '',
+        bankName: '', bankAccountNumber: '',
+        emergencyContactName: '', emergencyContactNumber: ''
+    });
+    const [complianceSaving, setComplianceSaving] = useState(false);
+    const [complianceError, setComplianceError] = useState('');
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
 
     // ── Fetch Data ────────────────────────────────────────────────────────────
     const fetch201File = async () => {
@@ -464,30 +483,116 @@ export default function Digital201FileView({
             {/* Compliance data section */}
             {activeTab === 'compliance' && data?.compliance && (
                 <div className="d201-compliance-section" style={{ marginBottom: 20, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                        <Shield size={16} color="#065f46" />
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>Bio-Data & Compliance (Encrypted at Rest)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Shield size={16} color="#065f46" />
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#065f46' }}>Bio-Data & Compliance (Encrypted at Rest)</span>
+                        </div>
+                        {!editingCompliance && (
+                            <button className="btn btn-primary btn-sm" onClick={() => { setComplianceForm({ sssNumber: data.compliance!.sssNumber, philhealthNumber: data.compliance!.philhealthNumber, pagibigNumber: data.compliance!.pagibigNumber, tinNumber: data.compliance!.tinNumber || '', bankName: data.compliance!.bankName, bankAccountNumber: data.compliance!.bankAccountNumber, emergencyContactName: data.compliance!.emergencyContactName, emergencyContactNumber: data.compliance!.emergencyContactNumber }); setEditingCompliance(true); }}>
+                                <Pencil size={11} /> Edit
+                            </button>
+                        )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        {[
-                            { icon: <Hash size={14} />, label: 'SSS Number', value: data.compliance.sssNumber },
-                            { icon: <Hash size={14} />, label: 'PhilHealth Number', value: data.compliance.philhealthNumber },
-                            { icon: <Hash size={14} />, label: 'Pag-IBIG Number', value: data.compliance.pagibigNumber },
-                            { icon: <Hash size={14} />, label: 'TIN', value: data.compliance.tinNumber || '—' },
-                            { icon: <Building2 size={14} />, label: 'Bank Name', value: data.compliance.bankName },
-                            { icon: <Banknote size={14} />, label: 'Bank Account', value: data.compliance.bankAccountNumber },
-                            { icon: <User size={14} />, label: 'Emergency Contact', value: data.compliance.emergencyContactName },
-                            { icon: <PhoneCall size={14} />, label: 'Emergency Number', value: data.compliance.emergencyContactNumber },
-                        ].map(({ icon, label, value }) => (
-                            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-                                <div style={{ color: '#64748b', flexShrink: 0 }}>{icon}</div>
-                                <div>
-                                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                                    <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600 }}>{value}</div>
-                                </div>
+                    {editingCompliance ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {complianceError && <div style={{ display: 'flex', gap: 8, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#dc2626' }}><AlertCircle size={14} /><span>{complianceError}</span></div>}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                {[
+                                    { key: 'sssNumber', label: 'SSS Number', placeholder: 'XX-XXXXXXX-X' },
+                                    { key: 'philhealthNumber', label: 'PhilHealth Number', placeholder: 'XX-XXXXXXXXX-X' },
+                                    { key: 'pagibigNumber', label: 'Pag-IBIG Number', placeholder: 'XXXX-XXXX-XXXX' },
+                                    { key: 'tinNumber', label: 'TIN', placeholder: 'XXX-XXX-XXX-XXX' },
+                                    { key: 'bankName', label: 'Bank Name', placeholder: 'e.g. BDO' },
+                                    { key: 'bankAccountNumber', label: 'Bank Account', placeholder: 'Account number' },
+                                    { key: 'emergencyContactName', label: 'Emergency Contact', placeholder: 'Full name' },
+                                    { key: 'emergencyContactNumber', label: 'Emergency Number', placeholder: '09XXXXXXXXX' },
+                                ].map(({ key, label, placeholder }) => (
+                                    <div key={key}>
+                                        <label style={{ fontSize: 11, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4, display: 'block' }}>{label}</label>
+                                        <input type="text" value={(complianceForm as any)[key]} onChange={e => setComplianceForm(f => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={{ height: 36, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 10px', fontSize: 13, width: '100%', boxSizing: 'border-box', outline: 'none' }} />
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                                <button className="btn btn-sm" onClick={() => setEditingCompliance(false)} disabled={complianceSaving}>Cancel</button>
+                                <button className="btn btn-primary btn-sm" onClick={async () => {
+                                    setGatePassword('');
+                                    setGateError('');
+                                    setShowGatePassword(false);
+                                    setConfirmModal({
+                                        isOpen: true,
+                                        variant: 'info',
+                                        title: 'Confirm your identity',
+                                        description: (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>Enter your password to save compliance changes.</p>
+                                                <div style={{ position: 'relative' }}>
+                                                    <input id="compliance-gate-pw" type={showGatePassword ? 'text' : 'password'} placeholder="Enter your current password" style={{ width: '100%', paddingRight: 40, boxSizing: 'border-box', height: 38, borderRadius: 8, border: '1.5px solid #e2e8f0', padding: '0 40px 0 12px', fontSize: 13, outline: 'none' }} autoFocus onChange={e => { setGatePassword(e.target.value); setGateError(''); }} onKeyDown={e => { if (e.key === 'Enter') document.getElementById('compliance-gate-confirm')?.click(); }} />
+                                                    <button type="button" onClick={() => setShowGatePassword(p => !p)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }} tabIndex={-1}>{showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}</button>
+                                                </div>
+                                                {gateError && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626' }}><AlertCircle size={12} />{gateError}</div>}
+                                            </div>
+                                        ),
+                                        confirmLabel: 'Verify & save',
+                                        onConfirm: async () => {
+                                            const pw = (document.getElementById('compliance-gate-pw') as HTMLInputElement)?.value ?? gatePassword;
+                                            if (!pw) { setGateError('Please enter your password.'); return; }
+                                            setGateLoading(true);
+                                            setGateError('');
+                                            try {
+                                                const token = localStorage.getItem('authToken');
+                                                const adminId = localStorage.getItem('employeeId') ?? '';
+                                                const verifyRes = await fetch('/api/authentication/verify-password', {
+                                                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                    body: JSON.stringify({ employeeID: adminId, password: pw }),
+                                                });
+                                                if (!verifyRes.ok) { const err = await verifyRes.json().catch(() => ({})); throw new Error(err.message || 'Incorrect password.'); }
+                                                setConfirmModal(CONFIRM_CLOSED);
+                                                setComplianceSaving(true);
+                                                setComplianceError('');
+                                                try {
+                                                    const saveRes = await fetch('/api/systemadmin/update-statutory-records', {
+                                                        method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                                                        body: JSON.stringify({ employeeNumber, sssNumber: complianceForm.sssNumber, philhealthNumber: complianceForm.philhealthNumber, pagibigNumber: complianceForm.pagibigNumber, tinNumber: complianceForm.tinNumber, bankName: complianceForm.bankName, bankAccountNumber: complianceForm.bankAccountNumber, emergencyContactName: complianceForm.emergencyContactName, emergencyContactNumber: complianceForm.emergencyContactNumber }),
+                                                    });
+                                                    if (!saveRes.ok) { const err = await saveRes.json().catch(() => ({})); throw new Error(err.message || 'Save failed.'); }
+                                                    const result = await saveRes.json();
+                                                    if (!result.isSuccess) throw new Error(result.message || 'Save failed.');
+                                                    setEditingCompliance(false);
+                                                    success('Compliance records updated successfully.');
+                                                    fetch201File();
+                                                } catch (err: any) { setComplianceError(err.message ?? 'Failed to save.'); } finally { setComplianceSaving(false); }
+                                            } catch (err: any) { setGateError(err.message ?? 'Incorrect password.'); } finally { setGateLoading(false); }
+                                        },
+                                    });
+                                }} disabled={complianceSaving}>
+                                    {complianceSaving ? <><Loader2 size={13} className="spin" /> Saving…</> : <><Save size={13} /> Save</>}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                            {[
+                                { icon: <Hash size={14} />, label: 'SSS Number', value: data.compliance.sssNumber },
+                                { icon: <Hash size={14} />, label: 'PhilHealth Number', value: data.compliance.philhealthNumber },
+                                { icon: <Hash size={14} />, label: 'Pag-IBIG Number', value: data.compliance.pagibigNumber },
+                                { icon: <Hash size={14} />, label: 'TIN', value: data.compliance.tinNumber || '—' },
+                                { icon: <Building2 size={14} />, label: 'Bank Name', value: data.compliance.bankName },
+                                { icon: <Banknote size={14} />, label: 'Bank Account', value: data.compliance.bankAccountNumber },
+                                { icon: <User size={14} />, label: 'Emergency Contact', value: data.compliance.emergencyContactName },
+                                { icon: <PhoneCall size={14} />, label: 'Emergency Number', value: data.compliance.emergencyContactNumber },
+                            ].map(({ icon, label, value }) => (
+                                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #f1f5f9' }}>
+                                    <div style={{ color: '#64748b', flexShrink: 0 }}>{icon}</div>
+                                    <div>
+                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                                        <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600 }}>{value}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -753,6 +858,7 @@ export default function Digital201FileView({
                 description={confirmModal.description}
                 confirmLabel={confirmModal.confirmLabel}
                 cancelLabel={confirmModal.cancelLabel}
+                isLoading={gateLoading}
                 onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
             />
