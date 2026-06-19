@@ -28,6 +28,7 @@ import {
     ChevronDown,
     ChevronUp,
     ChevronLeft,
+    MessageSquare,
     RefreshCw,
     LogOut,
     Mail,
@@ -50,6 +51,18 @@ import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/A
 import FormModal from '../../components/FormModal/FormModal';
 import EmptyState from '../../components/ui/EmptyState';
 import DataTable from '../../components/ui/DataTable';
+import TaskComments from '../../components/TaskComments/TaskComments';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const getAccountIdFromToken = (): string => {
+    try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return '';
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload?.nameidentifier || payload?.sub || '';
+    } catch { return ''; }
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,18 +80,22 @@ interface Task {
     progress: number;
     assignedBy: string;
     remarks?: string;
+    category?: string;
+    supportingEvidenceUrl?: string;
 }
 
 interface TaskResponseDTO {
     taskId: string;
     taskTitle: string;
     taskDescription?: string;
+    taskCategory?: string;
     priority: string;
     dueAt: string;
     taskStatus: string;
     assignedEmployee: string;
     createdByEmployee: string;
     createdAt: string;
+    supportingEvidenceUrl?: string;
 }
 
 interface UserProfile {
@@ -148,6 +165,8 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         status,
         progress: defaultProgress[status],
         assignedBy: dto.createdByEmployee,
+        category: dto.taskCategory,
+        supportingEvidenceUrl: dto.supportingEvidenceUrl,
     };
 };
 
@@ -246,6 +265,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
+    const [showComments, setShowComments] = useState(false);
+    const accountId = getAccountIdFromToken();
 
     return (
         <FormModal isOpen onClose={onClose} title={task.name} subtitle={sm.label} size="md"
@@ -272,10 +293,23 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
                     { label: 'Assigned by', value: task.assignedBy },
                     { label: 'Progress', value: `${task.progress}%` },
-                ].map(({ label, value, style }) => (
+                    ...(task.category ? [{ label: 'Category', value: task.category }] : []),
+                    { label: 'Document', value: task.supportingEvidenceUrl ?? '' },
+                ].map(({ label, value, style }: { label: string; value: string; style?: any }) => (
                     <div key={label}>
                         <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
-                        <p style={{ margin: '4px 0 0', fontSize: 14, ...style }}>{value}</p>
+                        {label === 'Document' ? (
+                            value ? (
+                                <a href={value} target="_blank" rel="noopener noreferrer"
+                                    style={{ marginTop: 4, fontSize: 13, color: 'var(--primary)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    <FileText size={13} /> {value.split('/').pop() || 'View'}
+                                </a>
+                            ) : (
+                                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>No document</p>
+                            )
+                        ) : (
+                            <p style={{ margin: '4px 0 0', fontSize: 14, ...(style || {}) }}>{value}</p>
+                        )}
                     </div>
                 ))}
             </div>
@@ -283,11 +317,27 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                 <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
             </div>
             {task.remarks && (
-                <div>
+                <div style={{ marginBottom: 12 }}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
                     <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
                 </div>
             )}
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setShowComments(v => !v)}
+                >
+                    <MessageSquare size={16} />
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>Comments</span>
+                    {showComments ? <ChevronUp size={14} style={{ marginLeft: 'auto' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto' }} />}
+                </div>
+                {showComments && (
+                    <div style={{ marginTop: 12, maxHeight: 320, overflowY: 'auto' }}>
+                        <TaskComments taskId={task.id} currentEmployeeId={accountId} />
+                    </div>
+                )}
+            </div>
         </FormModal>
     );
 };

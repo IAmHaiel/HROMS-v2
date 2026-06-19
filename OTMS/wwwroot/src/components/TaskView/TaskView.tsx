@@ -127,6 +127,7 @@ const TaskView: React.FC<TaskViewProps> = ({
     task, onEdit, onReopen, onClose, onApprove, onReject,
 }) => {
     const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
+    const [reopening, setReopening] = useState(false);
     const [reviewState, setReviewState] = useState<ReviewState>(
         task.taskStatus === 'Completed' ? 'approved' :
             task.taskStatus === 'Pending Admin Review' ? 'pending_review' : 'none'
@@ -178,8 +179,8 @@ const TaskView: React.FC<TaskViewProps> = ({
     };
 
     const handleReopen = () => {
-        setReviewState('none');
-        setLocalStatus('Pending');
+        if (reopening) return;
+        setReopening(true);
         setReviewHistory(prev => [...prev, {
             action: 'reopened', by: currentUser,
             at: new Date().toISOString(),
@@ -220,8 +221,9 @@ const TaskView: React.FC<TaskViewProps> = ({
                         <span className="tv-review-banner-sub">This task has been marked as complete.</span>
                     </div>
                 </div>
-                <button className="tv-btn tv-btn-ghost-sm" onClick={handleReopen}>
-                    <RotateCcw size={12} /> Reopen
+                <button className="tv-btn tv-btn-ghost-sm" onClick={handleReopen} disabled={reopening}
+                    style={reopening ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
+                    <RotateCcw size={12} /> {reopening ? 'Reopen Requested' : 'Reopen'}
                 </button>
             </div>
         );

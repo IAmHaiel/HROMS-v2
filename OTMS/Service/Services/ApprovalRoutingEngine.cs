@@ -63,15 +63,16 @@ namespace OTMS.Service.Services
             context.ApprovalRequests.Add(approvalRequest);
             await context.SaveChangesAsync();
 
+            var firstTier = matrix.Tiers.FirstOrDefault(t => t.TierLevel == 1);
+            approvalRequest.StatusTrackingText = firstTier != null
+                ? $"Pending {FormatRoleName(firstTier.ApproverRole)} Approval"
+                : "Pending Approval";
+            await context.SaveChangesAsync();
+
             var routeResult = await RouteToNextTierAsync(approvalRequest, matrix);
 
             if (routeResult.IsSuccess)
             {
-                var firstTier = matrix.Tiers.FirstOrDefault(t => t.TierLevel == 1);
-                approvalRequest.StatusTrackingText = firstTier != null
-                    ? $"Pending {FormatRoleName(firstTier.ApproverRole)} Approval"
-                    : "Pending Approval";
-                await context.SaveChangesAsync();
                 await NotifyTrackerUpdateAsync(approvalRequest);
             }
             if (!routeResult.IsSuccess)
@@ -907,6 +908,8 @@ namespace OTMS.Service.Services
             if (request.Status != "Pending")
                 return new ApiResponseDTO<ApprovalRequestResponseDTO> { IsSuccess = false, Message = "Only pending requests can be cancelled." };
 
+            var previousApproverId = request.CurrentApproverAccountId;
+
             request.Status = "Cancelled";
             request.StatusTrackingText = $"Cancelled by requester. Reason: {dto?.Reason ?? "No reason provided"}";
             request.UpdatedAt = DateTime.UtcNow;
@@ -916,6 +919,11 @@ namespace OTMS.Service.Services
 
             await activityLogService.LogActivityAsync(user.AccountId, ActivityTypes.ApprovalRequestCancelled,
                 $"Approval request {approvalRequestId} ({request.RequestType}) was cancelled by the requester.");
+
+            if (previousApproverId.HasValue)
+            {
+                await notificationService.DispatchApproverNotificationAsync(previousApproverId.Value, request);
+            }
 
             await NotifyTrackerUpdateAsync(request);
 

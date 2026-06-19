@@ -4273,9 +4273,12 @@ export default function OpsAdminDashboard() {
     // -- Reopen Task (direct admin override) --
     const handleReopenTask = async (taskId: string) => {
         try {
-            const res = await fetch(`/api/task/${taskId}/reopen`, {
-                method: 'PATCH',
+            const formData = new FormData();
+            formData.append('Reason', 'Admin reopen request');
+            const res = await fetch(`/api/task/${taskId}/reopen-request`, {
+                method: 'POST',
                 headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -4283,8 +4286,8 @@ export default function OpsAdminDashboard() {
             }
             await fetchTasks();
             await fetchDashboardData();
-            setViewingTask(null);
-            success('Task reopened.');
+            await fetchReopenRequests();
+            success('Reopen request submitted for review.');
         } catch (err: any) {
             error(err.message ?? 'Failed to reopen task.');
         }

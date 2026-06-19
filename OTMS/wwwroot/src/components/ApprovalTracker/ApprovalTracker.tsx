@@ -110,8 +110,8 @@ const ApprovalTracker: React.FC<ApprovalTrackerProps> = ({ tracker, compact }) =
                     const isPast = !!decision;
 
                     let status: 'pending' | 'approved' | 'rejected' | 'current' = 'pending';
-                    if (decision?.decision === 'Approve') status = 'approved';
-                    else if (decision?.decision === 'Reject') status = 'rejected';
+                    if (decision?.decision === 'Approved') status = 'approved';
+                    else if (decision?.decision === 'Rejected') status = 'rejected';
                     else if (isCurrent) status = 'current';
 
                     return (
@@ -134,7 +134,7 @@ const ApprovalTracker: React.FC<ApprovalTrackerProps> = ({ tracker, compact }) =
 
             {!compact && (
                 <div className="at-footer">
-                    <span className="at-footer-id">Request ID: {tracker.approvalRequestId.slice(0, 8)}...</span>
+                    <span className="at-footer-id">Step {tracker.currentTierLevel || 1} of {tracker.totalTierCount}</span>
                     <span className="at-footer-date">Submitted {fmtDateTime(tracker.createdAt)}</span>
                 </div>
             )}
