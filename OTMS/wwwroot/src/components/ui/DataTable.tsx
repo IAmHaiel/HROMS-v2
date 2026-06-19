@@ -210,7 +210,7 @@ export default function DataTable<T extends Record<string, any>>({
                     {tabs.map(({ key, label, icon, badge }) => (
                         <button key={key} onClick={() => onTabChange?.(key)} className={`table-card-tab-btn${activeTab === key ? ' active' : ''}`}>
                             {icon}<span>{label}</span>
-                            {badge !== undefined && typeof badge === 'number' && badge > 0 && <span className={`table-card-tab-badge${activeTab === key ? ' active' : ''}`}>{badge} pending</span>}
+                            {badge !== undefined && typeof badge === 'number' && badge > 0 && <span className={`table-card-tab-badge${activeTab === key ? ' active' : ''}`}>{badge}</span>}
                             {badge !== undefined && typeof badge === 'string' && badge !== '0' && badge !== '' && <span className={`table-card-tab-badge${activeTab === key ? ' active' : ''}`}>{badge}</span>}
                         </button>
                     ))}

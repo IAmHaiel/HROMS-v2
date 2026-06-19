@@ -20,7 +20,6 @@ namespace OTMS.Service.Services
     {
         public async Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO request)
         {
-            // Get Logged In User
             var accountIdClaim = httpContextAccessor
                 .HttpContext?
                 .User
@@ -34,13 +33,23 @@ namespace OTMS.Service.Services
 
             var creatorId = Guid.Parse(accountIdClaim);
 
-            // Check Assigned Employee
+            // Validate deadline is in the future
+            if (request.DueAt <= DateTime.UtcNow)
+            {
+                throw new Exception("Deadline must be a future date and time.");
+            }
+
+            // Validate assigned employee if provided
             Account? assignedAccount = null;
             if (request.AssignedTo.HasValue)
             {
+                if (request.AssignedTo.Value == creatorId)
+                {
+                    throw new Exception("You cannot assign a task to yourself.");
+                }
+
                 assignedAccount = await context.Accounts
                     .Include(a => a.Employee)
-                    .Include(a => a.ActivityLogs)
                     .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo.Value);
 
                 if (assignedAccount == null)
@@ -51,13 +60,6 @@ namespace OTMS.Service.Services
                 if (assignedAccount.AccountStatus == "On Leave")
                 {
                     throw new Exception("Cannot assign task to an employee who is on leave.");
-                }
-
-                var latestLog = assignedAccount.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
-                if (presenceStatus == "Offline")
-                {
-                    throw new Exception("Cannot assign task to an offline employee.");
                 }
             }
 
@@ -71,9 +73,11 @@ namespace OTMS.Service.Services
                 throw new Exception("Creator account not found.");
             }
 
-            // Check for duplicate or similar tasks using Jaccard Similarity (70% threshold)
+            // Check for duplicate tasks (only check recent 200 to avoid performance issues)
             var existingTasks = await context.Tasks
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted)
+                .OrderByDescending(t => t.CreatedAt)
+                .Take(200)
                 .Select(t => new { t.TaskId, t.TaskTitle, t.TaskDescription, t.TaskStatus })
                 .ToListAsync();
 
@@ -111,7 +115,29 @@ namespace OTMS.Service.Services
                     $"Admin proceeded with task creation despite duplicate warnings for '{request.TaskTitle}'.");
             }
 
+            // Upload supporting document if provided
+            string? supportingEvidenceUrl = null;
+            if (request.SupportingEvidence != null)
+            {
+                var allowedExts = new[] { ".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png" };
+                var ext = Path.GetExtension(request.SupportingEvidence.FileName).ToLowerInvariant();
+                if (!allowedExts.Contains(ext))
+                {
+                    throw new Exception("Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.");
+                }
 
+                try
+                {
+                    supportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
+                }
+                catch (Exception)
+                {
+                    throw new Exception("Failed to upload supporting document. Please try again.");
+                }
+            }
+
+            // Generate unique task reference number
+            var taskReferenceNumber = await GenerateTaskReferenceNumberAsync();
 
             // Create Task
             var task = new OTMS.Entities.Models.Task
@@ -119,15 +145,14 @@ namespace OTMS.Service.Services
                 TaskId = Guid.NewGuid(),
                 CreatedBy = creatorId,
                 AssignedTo = request.AssignedTo,
-
                 TaskTitle = request.TaskTitle,
                 TaskDescription = request.TaskDescription,
+                TaskReferenceNumber = taskReferenceNumber,
                 TaskCategory = request.TaskCategory,
                 Priority = request.Priority,
                 DueAt = request.DueAt,
-
                 TaskStatus = request.AssignedTo.HasValue ? "Assigned" : "Draft",
-
+                SupportingEvidenceUrl = supportingEvidenceUrl,
                 CreatedAt = DateTime.UtcNow,
                 Deleted = false
             };
@@ -141,58 +166,78 @@ namespace OTMS.Service.Services
                 await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", creatorId, true);
             }
 
-            await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskCreated,
-                $"{string.Join(" ", new[]
-                    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created the task {request.TaskTitle} at {DateTime.Now:hh:mm tt}");
+            var creatorName = string.Join(" ", new[]
+                {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-            if (request.AssignedTo.HasValue)
+            if (assignedAccount != null)
             {
-                // Integrate Notification
-                await notificationService
-                    .CreateTaskAssignedNotificationAsync(task);
+                var assigneeName = string.Join(" ", new[]
+                    {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-                if (request.RecommendedEmployeeId.HasValue)
+                await activityLogService.LogActivityAsync(
+                    creatorId,
+                    ActivityTypes.TaskCreated,
+                    $"{creatorName} created and assigned task reference {taskReferenceNumber} '{request.TaskTitle}' to {assigneeName}.");
+
+                // Send notification to assigned employee
+                await notificationService.CreateTaskAssignedNotificationAsync(task);
+            }
+            else
+            {
+                await activityLogService.LogActivityAsync(
+                    creatorId,
+                    ActivityTypes.TaskCreated,
+                    $"{creatorName} created task reference {taskReferenceNumber} '{request.TaskTitle}' as Draft.");
+
+                // Notify creator that the task was saved as Draft
+                await notificationService.CreateGeneralNotificationAsync(
+                    creatorId,
+                    "Task Created",
+                    $"Task ref#{taskReferenceNumber} '{request.TaskTitle}' was saved as Draft. Assign an employee to start the workflow.");
+            }
+
+            if (request.RecommendedEmployeeId.HasValue && assignedAccount != null)
+            {
+                if (request.AssignedTo == request.RecommendedEmployeeId.Value)
                 {
-                    if (request.AssignedTo == request.RecommendedEmployeeId.Value)
-                    {
-                        await activityLogService.LogActivityAsync(
-                            creatorId,
-                            "Task Assignment Recommendation",
-                            $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                        );
-                    }
-                    else
-                    {
-                        await activityLogService.LogActivityAsync(
-                            creatorId,
-                            "Task Assignment Recommendation",
-                            $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount!.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
-                        );
-                    }
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation accepted. Task assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
+                }
+                else
+                {
+                    await activityLogService.LogActivityAsync(
+                        creatorId,
+                        "Task Assignment Recommendation",
+                        $"Recommendation overridden. System recommended Employee ID {request.RecommendedEmployeeId.Value}, but task was assigned to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}."
+                    );
                 }
             }
+
+            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskResponseDTO
             {
                 TaskId = task.TaskId,
                 TaskTitle = task.TaskTitle,
                 TaskDescription = task.TaskDescription,
+                TaskCategory = task.TaskCategory,
+                TaskReferenceNumber = task.TaskReferenceNumber,
                 Priority = task.Priority,
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
-
-                AssignedEmployee = string.Join(" ", new[]
-                    {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                SupportingEvidenceUrl = task.SupportingEvidenceUrl,
+                AssignedEmployee = assignedAccount != null
+                    ? string.Join(" ", new[]
+                        {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))
+                    : "",
                 CreatedByEmployee = string.Join(" ", new[]
                     {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-
                 CreatedAt = task.CreatedAt,
                 IsDeleted = task.Deleted
             };
-
-            await dashboardNotificationService.NotifyDashboardDataChangedAsync();
         }
 
         public async Task<TaskResponseDTO> UpdateTaskAsync(Guid taskId, UpdateTaskDTO request)
@@ -236,12 +281,13 @@ namespace OTMS.Service.Services
                             throw new Exception("Cannot assign task to an employee who is on leave.");
                         }
 
-                        var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                        var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
-                        if (presenceStatus == "Offline")
-                        {
-                            throw new Exception("Cannot assign task to an offline employee.");
-                        }
+                        // FUTURE: Uncomment to restore offline-exclusion logic
+                        // var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                        // var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
+                        // if (presenceStatus == "Offline")
+                        // {
+                        //     throw new Exception("Cannot assign task to an offline employee.");
+                        // }
                     }
                 }
 
@@ -250,6 +296,23 @@ namespace OTMS.Service.Services
                     task.TaskStatus = "Assigned";
                     await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", loggedInAccountId, true);
                 }
+            }
+
+            // Upload supporting document if provided
+            if (request.SupportingEvidence != null)
+            {
+                var allowedExts = new[] { ".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png" };
+                var ext = Path.GetExtension(request.SupportingEvidence.FileName).ToLowerInvariant();
+                if (!allowedExts.Contains(ext))
+                {
+                    throw new Exception("Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.");
+                }
+                // Delete old file before uploading new one
+                if (!string.IsNullOrEmpty(task.SupportingEvidenceUrl))
+                {
+                    fileService.DeleteFile(task.SupportingEvidenceUrl);
+                }
+                task.SupportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
             // Update Fields
@@ -561,32 +624,36 @@ namespace OTMS.Service.Services
                 throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
-            // Intercept action and explicitly prevent status from changing to "Completed" for non-admins
-            if (request.TaskStatus == "Completed" && !isAdmin)
+            // Non-admin employees cannot directly mark as Completed or Done
+            if (!isAdmin && (request.TaskStatus == "Completed" || request.TaskStatus == "Done"))
             {
                 request.TaskStatus = "Pending Admin Review";
             }
 
-            // FSM Validation
+            // FSM Validation — strict linear progression, no reversions
             bool isStatusChanged = task.TaskStatus != request.TaskStatus;
             if (isStatusChanged)
             {
                 bool isValidTransition = false;
                 string failureReason = "";
 
-                if (task.TaskStatus == "Assigned" && request.TaskStatus == "In Progress")
+                if (task.TaskStatus == "Draft" && request.TaskStatus == "Assigned")
+                {
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "Assigned" && request.TaskStatus == "In Progress")
                 {
                     isValidTransition = true;
                 }
                 else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Pending Admin Review")
                 {
-                    if (string.IsNullOrWhiteSpace(request.ProgressNotes))
+                    if (!isAdmin && string.IsNullOrWhiteSpace(request.ProgressNotes))
                     {
                         throw new Exception("Completion notes are required to submit for review.");
                     }
                     isValidTransition = true;
                 }
-                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
+                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done" && isAdmin)
                 {
                     isValidTransition = true;
                 }
@@ -596,7 +663,7 @@ namespace OTMS.Service.Services
                 }
                 else
                 {
-                    failureReason = $"Invalid transition from {task.TaskStatus} to {request.TaskStatus}.";
+                    failureReason = $"Invalid transition from {task.TaskStatus} to {request.TaskStatus}. Only forward progression is allowed.";
                 }
 
                 if (!isValidTransition)
@@ -661,21 +728,24 @@ namespace OTMS.Service.Services
             else
             {
                 await notificationService
-                    .CreateEmployeeTaskUpdateNotificationAsync(task);
+                    .CreateTaskUpdateNotificationAsync(task);
             }
 
-            await activityLogService.LogActivityAsync(
-                task.AssignedTo.Value,
-                ActivityTypes.TaskUpdated,
-                $"{string.Join(" ", new[]
-                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
+            if (task.AssignedTo.HasValue && task.Assignee != null)
+            {
+                var assigneeName = string.Join(" ", new[]
+                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-            // Activity Log
-            await activityLogService.LogActivityAsync(
-                loggedInAccountId,
-                "Task Progress Update",
-                $"{string.Join(" ", new[]
-                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
+                await activityLogService.LogActivityAsync(
+                    task.AssignedTo.Value,
+                    ActivityTypes.TaskUpdated,
+                    $"{assigneeName} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
+
+                await activityLogService.LogActivityAsync(
+                    loggedInAccountId,
+                    "Task Progress Update",
+                    $"{assigneeName} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
+            }
 
             return new TaskResponseDTO
             {
@@ -742,25 +812,55 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var raw = await query
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.TaskReferenceNumber,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.TaskRemarks,
+                    t.AssignedTo,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    t.Deleted,
+                })
+                .ToListAsync();
 
-                    CreatedByEmployee = string.Join(" ", new[]
-                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt,
-                    IsDeleted = t.Deleted
-                }).ToListAsync();
+            var data = raw.Select(r => new TaskResponseDTO
+            {
+                TaskId = r.TaskId,
+                TaskTitle = r.TaskTitle,
+                TaskDescription = r.TaskDescription,
+                TaskReferenceNumber = r.TaskReferenceNumber,
+                Priority = r.Priority,
+                DueAt = r.DueAt,
+                TaskStatus = r.TaskStatus,
+                TaskRemarks = r.TaskRemarks,
+                AssignedTo = r.AssignedTo,
+                AssignedEmployee = string.Join(" ", new[]
+                    {r.AssigneeFirstName, r.AssigneeMiddleName, r.AssigneeLastName, r.AssigneeSuffix}
+                    .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                    {r.CreatorFirstName, r.CreatorMiddleName, r.CreatorLastName, r.CreatorSuffix}
+                    .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
+                IsDeleted = r.Deleted,
+            }).ToList();
 
             await LogSortActivity(loggedInAccountId, request);
 
@@ -792,34 +892,67 @@ namespace OTMS.Service.Services
 
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
-            var query = context.Tasks
-                .Include(t => t.Assignee)
-                    .ThenInclude(a => a.Employee)
-                .Include(t => t.Creator)
-                    .ThenInclude(c => c.Employee)
+            var baseQuery = context.Tasks
+                .IgnoreAutoIncludes()
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted);
 
-            query = ApplySorting(query, pagination);
+            baseQuery = ApplySorting(baseQuery, pagination);
 
-            var totalRecords = await query.CountAsync();
+            var totalRecords = await baseQuery.CountAsync();
 
-            var data = await query
+            var pagedTasks = await baseQuery
                 .Skip((pagination.PageNumber - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                        {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedByEmployee = string.Join(" ", new[]
-                        {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt
-                }).ToListAsync();
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.TaskCategory,
+                    t.TaskReferenceNumber,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.TaskRemarks,
+                    t.AssignedTo,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    t.Deleted,
+                    t.SupportingEvidenceUrl,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
+
+            var data = pagedTasks.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                TaskCategory = t.TaskCategory,
+                TaskReferenceNumber = t.TaskReferenceNumber,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                TaskRemarks = t.TaskRemarks,
+                AssignedTo = t.AssignedTo,
+                SupportingEvidenceUrl = t.SupportingEvidenceUrl,
+                UpdatedAt = t.UpdatedAt,
+                IsDeleted = t.Deleted,
+                AssignedEmployee = string.Join(" ", new[]
+                    { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }
+                        .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                    { t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix }
+                        .Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt
+            }).ToList();
 
             await LogSortActivity(loggedInAccountId, pagination);
 
@@ -902,7 +1035,10 @@ namespace OTMS.Service.Services
             // Save changes to database
             await context.SaveChangesAsync();
 
-            // Return a response indicating successful deletion
+            // Notify affected users about deletion
+            await notificationService.CreateTaskDeletedNotificationAsync(task);
+
+            // SignalR dashboard refresh
             await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskDeleteResponseDTO
@@ -964,10 +1100,6 @@ namespace OTMS.Service.Services
                 throw new Exception("Employee not found.");
 
             var query = context.Tasks
-                .Include(t => t.Assignee)
-                    .ThenInclude(a => a.Employee)
-                .Include(t => t.Creator)
-                    .ThenInclude(a => a.Employee)
                 .Where(t =>
                     (
                         t.AssignedTo == employee.Account.AccountId
@@ -979,25 +1111,55 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var pagedData = await query
                 .Skip((pagination.PageNumber - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[]
-                                    {t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.TaskReferenceNumber,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.TaskRemarks,
+                    t.AssignedTo,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    t.Deleted,
+                    t.SupportingEvidenceUrl,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
 
-                    CreatedByEmployee = string.Join(" ", new[]
-                                    {t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt,
-                    IsDeleted = t.Deleted
-                }).ToListAsync();
+            var data = pagedData.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                TaskReferenceNumber = t.TaskReferenceNumber,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                TaskRemarks = t.TaskRemarks,
+                AssignedTo = t.AssignedTo,
+                SupportingEvidenceUrl = t.SupportingEvidenceUrl,
+                UpdatedAt = t.UpdatedAt,
+                AssignedEmployee = string.Join(" ", new[]
+                                {t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix}.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[]
+                                {t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix}.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt,
+                IsDeleted = t.Deleted
+            }).ToList();
 
             return new ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>
             {
@@ -1050,12 +1212,16 @@ namespace OTMS.Service.Services
 
         public async Task<ApiResponseDTO<PaginationResponseDTO<AssignableEmployeeDTO>>> GetAssignableEmployeesAsync(PaginationDTO pagination, string? nameFilter)
         {
+            var currentAccountIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid? currentAccountId = !string.IsNullOrEmpty(currentAccountIdClaim) ? Guid.Parse(currentAccountIdClaim) : null;
+
             var query = context.Accounts
                 .Include(a => a.Employee)
-                .Include(a => a.ActivityLogs)
+                .Include(a => a.Role)
                 .Include(a => a.AssignedTasks)
-                .Where(a => a.Role != null && a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.View") && !a.Role.RolePermissions.Any(rp => rp.Permission.Name == "Permissions.Tasks.Manage"))
-                .Where(a => a.AccountStatus != "On Leave");
+                // FUTURE: add back .Include(a => a.ActivityLogs) when offline-exclusion is restored
+                .Where(a => a.Role != null && a.Role.Name != Roles.SystemAdmin && a.AccountStatus != "On Leave")
+                .Where(a => !currentAccountId.HasValue || a.AccountId != currentAccountId.Value);
 
             if (!string.IsNullOrEmpty(nameFilter))
             {
@@ -1073,13 +1239,10 @@ namespace OTMS.Service.Services
 
             foreach (var a in accounts)
             {
-                var latestLog = a.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
-
-                if (presenceStatus == "Offline")
-                {
-                    continue; // Exclude Offline
-                }
+                // FUTURE: Uncomment the block below to restore offline-exclusion logic
+                // var latestLog = a.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                // var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
+                // if (presenceStatus == "Offline") { continue; }
 
                 var activeTasks = a.AssignedTasks.Count(t => t.TaskStatus != "Completed" && t.TaskStatus != "Closed" && t.TaskStatus != "Cancelled" && !t.Deleted && !t.PermanentlyDeleted);
 
@@ -1142,8 +1305,6 @@ namespace OTMS.Service.Services
         public async Task<ApiResponseDTO<PaginationResponseDTO<TaskResponseDTO>>> SearchTasksAsync(TaskSearchDTO request)
         {
             var query = context.Tasks
-                .Include(t => t.Assignee).ThenInclude(a => a.Employee)
-                .Include(t => t.Creator).ThenInclude(c => c.Employee)
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted)
                 .AsQueryable();
 
@@ -1232,21 +1393,49 @@ namespace OTMS.Service.Services
 
             var totalRecords = await query.CountAsync();
 
-            var data = await query
+            var pagedData = await query
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(t => new TaskResponseDTO
+                .Select(t => new
                 {
-                    TaskId = t.TaskId,
-                    TaskTitle = t.TaskTitle,
-                    TaskDescription = t.TaskDescription,
-                    Priority = t.Priority,
-                    DueAt = t.DueAt,
-                    TaskStatus = t.TaskStatus,
-                    AssignedEmployee = string.Join(" ", new[] { t.Assignee.Employee.FirstName, t.Assignee.Employee.MiddleName, t.Assignee.Employee.LastName, t.Assignee.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedByEmployee = string.Join(" ", new[] { t.Creator.Employee.FirstName, t.Creator.Employee.MiddleName, t.Creator.Employee.LastName, t.Creator.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    CreatedAt = t.CreatedAt
-                }).ToListAsync();
+                    t.TaskId,
+                    t.TaskTitle,
+                    t.TaskDescription,
+                    t.TaskReferenceNumber,
+                    t.Priority,
+                    t.DueAt,
+                    t.TaskStatus,
+                    t.TaskRemarks,
+                    t.AssignedTo,
+                    t.CreatedAt,
+                    t.UpdatedAt,
+                    AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
+                    AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
+                    AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
+                    AssigneeSuffix = t.Assignee != null ? t.Assignee.Employee.Suffix : null,
+                    CreatorFirstName = t.Creator.Employee.FirstName,
+                    CreatorMiddleName = t.Creator.Employee.MiddleName,
+                    CreatorLastName = t.Creator.Employee.LastName,
+                    CreatorSuffix = t.Creator.Employee.Suffix,
+                })
+                .ToListAsync();
+
+            var data = pagedData.Select(t => new TaskResponseDTO
+            {
+                TaskId = t.TaskId,
+                TaskTitle = t.TaskTitle,
+                TaskDescription = t.TaskDescription,
+                TaskReferenceNumber = t.TaskReferenceNumber,
+                Priority = t.Priority,
+                DueAt = t.DueAt,
+                TaskStatus = t.TaskStatus,
+                TaskRemarks = t.TaskRemarks,
+                AssignedTo = t.AssignedTo,
+                UpdatedAt = t.UpdatedAt,
+                AssignedEmployee = string.Join(" ", new[] { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedByEmployee = string.Join(" ", new[] { t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                CreatedAt = t.CreatedAt
+            }).ToList();
 
             if (!data.Any())
             {
@@ -1364,28 +1553,43 @@ namespace OTMS.Service.Services
             }
 
             var requests = await context.TaskReopenRequests
-                .Include(r => r.Task)
-                .Include(r => r.RequestedBy)
-                    .ThenInclude(a => a.Employee)
                 .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new ReopenRequestListDTO
+                .Select(r => new
                 {
-                    RequestId = r.RequestId,
-                    TaskId = r.TaskId,
-                    TaskTitle = r.Task.TaskTitle,
-                    EmployeeName = string.Join(" ", new[] { r.RequestedBy.Employee.FirstName, r.RequestedBy.Employee.MiddleName, r.RequestedBy.Employee.LastName, r.RequestedBy.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n))),
-                    EmployeeId = r.RequestedBy.Employee.EmployeeNumber,
-                    Reason = r.Reason,
-                    SupportingEvidence = r.EvidenceUrl,
-                    CurrentStatus = r.Task.TaskStatus,
-                    Status = r.Status,
-                    SubmittedAt = r.CreatedAt,
-                    ReviewedAt = null,
-                    AdminRemarks = r.AdminRemarks
+                    r.RequestId,
+                    r.TaskId,
+                    r.Task.TaskTitle,
+                    EmpFirstName = r.RequestedBy.Employee.FirstName,
+                    EmpMiddleName = r.RequestedBy.Employee.MiddleName,
+                    EmpLastName = r.RequestedBy.Employee.LastName,
+                    EmpSuffix = r.RequestedBy.Employee.Suffix,
+                    r.RequestedBy.Employee.EmployeeNumber,
+                    r.Reason,
+                    r.EvidenceUrl,
+                    r.Task.TaskStatus,
+                    r.Status,
+                    r.CreatedAt,
+                    r.AdminRemarks
                 })
                 .ToListAsync();
 
-            return requests;
+            var result = requests.Select(r => new ReopenRequestListDTO
+            {
+                RequestId = r.RequestId,
+                TaskId = r.TaskId,
+                TaskTitle = r.TaskTitle,
+                EmployeeName = string.Join(" ", new[] { r.EmpFirstName, r.EmpMiddleName, r.EmpLastName, r.EmpSuffix }.Where(n => !string.IsNullOrEmpty(n))),
+                EmployeeId = r.EmployeeNumber,
+                Reason = r.Reason,
+                SupportingEvidence = r.EvidenceUrl,
+                CurrentStatus = r.TaskStatus,
+                Status = r.Status,
+                SubmittedAt = r.CreatedAt,
+                ReviewedAt = null,
+                AdminRemarks = r.AdminRemarks
+            }).ToList();
+
+            return result;
         }
 
         public async Task<TaskResponseDTO> OverrideCompletedTaskAsync(Guid taskId, AdminOverrideDTO request)
@@ -1481,6 +1685,19 @@ namespace OTMS.Service.Services
                 isSuccessful ? ActivityTypes.TaskStatusUpdated : ActivityTypes.TaskStatusUpdateFailed,
                 statusLogMsg
             );
+        }
+
+        private async Task<string> GenerateTaskReferenceNumberAsync()
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            string refNo;
+            do
+            {
+                refNo = new string(Enumerable.Range(0, 8).Select(_ => chars[random.Next(chars.Length)]).ToArray());
+            }
+            while (await context.Tasks.AnyAsync(t => t.TaskReferenceNumber == refNo));
+            return refNo;
         }
     }
 }

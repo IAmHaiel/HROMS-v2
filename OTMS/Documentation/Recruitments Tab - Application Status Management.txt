@@ -1,0 +1,55 @@
+Application Status Management - Recruitments Tab
+
+Input Fields:
+- New Status: radio group, required, single select from available transitions displayed as styled radio cards
+- Admin Remarks: textarea, max 500 characters, optional, with live character counter
+
+Status Transitions (Allowed):
+- Pending Review -> Interview Scheduled, Rejected
+- Interview Scheduled -> Job Offered, Rejected
+- Job Offered -> Rejected, Hired/Converted
+- Rejected -> (terminal, no further transitions)
+- Hired/Converted -> (terminal, no further transitions)
+
+API Endpoint: PUT /api/recruitment/status
+Request Body: { applicantRecordId: "guid", newStatus: "string", remarks: "string|null" }
+
+Success Response (200):
+- { "isSuccess": true, "message": "Applicant status updated to '{NewStatus}'.", "data": "applicantRecordId (guid)" }
+
+Error Responses (400):
+- Unauthorized: { "isSuccess": false, "message": "Unauthorized. Please log in again.", "data": null }
+- Applicant not found: { "isSuccess": false, "message": "Applicant not found.", "data": null }
+- Invalid status value: { "isSuccess": false, "message": "Invalid status '{NewStatus}'. Allowed values: Pending Review, Interview Scheduled, Job Offered, Rejected, Hired/Converted.", "data": null }
+- Invalid transition: { "isSuccess": false, "message": "Cannot transition from '{CurrentStatus}' to '{NewStatus}'. Allowed transitions: {list}.", "data": null }
+
+Side Effects on Success:
+- StatusHistory record created (old -> new, with remarks)
+- ApplicantRecord.Status updated
+- Activity log entry: "Updated applicant '{FullName}' status from '{old}' to '{new}'."
+- If new status is "Rejected" or previous was "Job Offered" -> all active onboarding tokens expired
+- If new status is "Job Offered" -> onboarding link generated and sent via email
+- In-app notification dispatched to System Admin: "Applicant '{FullName}' status changed from '{old}' to '{new}'."
+
+Frontend Toast Messages:
+- "Applicant status updated successfully." (success, non-interview status update)
+- "Interview scheduled and email notification sent successfully." (success, interview scheduling)
+- err.message or "Failed to update status." (error, API failure)
+- apiResult.message or "Failed to schedule interview." (error, schedule API failure)
+
+Frontend Inline Error Messages:
+- "Please select a new status." (modal validation, no status selected)
+- err.message || "Something went wrong." (catch block, API error)
+- "No further transitions available." (no valid transitions from current status)
+
+Files Involved:
+Backend:
+- Controllers/recruitmentController.cs
+- Service/Services/RecruitmentService.cs
+- Service/Interfaces/IRecruitmentService.cs
+- Entities/DTOs/Recruitment/UpdateApplicantStatusDTO.cs
+- Entities/Models/ApplicantStatusRecord.cs
+
+Frontend:
+- RecruitmentTab/RecruitmentTab.tsx (main tab, toasts, handleUpdateStatus, UpdateStatusModal inline)
+- RecruitmentTab/types.ts (RecruitmentStatus, StatusMeta, STATUS_TRANSITIONS)

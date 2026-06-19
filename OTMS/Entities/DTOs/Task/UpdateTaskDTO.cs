@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Http;
+
 namespace OTMS.Entities.DTOs.Task
 {
     public class UpdateTaskDTO
@@ -9,5 +11,6 @@ namespace OTMS.Entities.DTOs.Task
         public DateTime? DueAt { get; set; }
         public Guid? AssignedTo { get; set; }
         public string? TaskRemarks { get; set; }
+        public IFormFile? SupportingEvidence { get; set; }
     }
 }

@@ -129,7 +129,7 @@ const TaskView: React.FC<TaskViewProps> = ({
     const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
     const [reviewState, setReviewState] = useState<ReviewState>(
         task.taskStatus === 'Completed' ? 'approved' :
-            (task.taskStatus === 'In Progress' || task.taskStatus === 'Pending Admin Review') ? 'pending_review' : 'none'
+            task.taskStatus === 'Pending Admin Review' ? 'pending_review' : 'none'
     );
     const [reviewHistory, setReviewHistory] = useState<ReviewHistoryEntry[]>([]);
     const [showRejectModal, setShowRejectModal] = useState(false);
@@ -149,7 +149,7 @@ const TaskView: React.FC<TaskViewProps> = ({
     // ── Review actions ──
     const handleRequestReview = () => {
         setReviewState('pending_review');
-        setLocalStatus('In Progress');
+        setLocalStatus('Done');
         setReviewHistory(prev => [...prev, {
             action: 'submitted', by: task.assignedEmployee,
             at: new Date().toISOString(),
@@ -196,7 +196,7 @@ const TaskView: React.FC<TaskViewProps> = ({
                     <div>
                         <span className="tv-review-banner-title">Awaiting completion review</span>
                         <span className="tv-review-banner-sub">
-                            {task.assignedEmployee} marked this task as done. Review and approve or reject.
+                            {task.assignedEmployee} submitted this task for review. Review and approve or reject.
                         </span>
                     </div>
                 </div>

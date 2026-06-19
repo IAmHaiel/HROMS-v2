@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as signalR from '@microsoft/signalr';
 import {
     ClipboardList,
@@ -148,6 +148,8 @@ interface Task {
     taskId: string;
     taskTitle: string;
     taskDescription: string;
+    taskCategory?: string;
+    taskReferenceNumber?: string;
     priority: Priority;
     dueAt: string | null;
     taskStatus: TaskStatus;
@@ -156,18 +158,23 @@ interface Task {
     createdByEmployee: string;
     assignedTo: string;
     createdAt: string;
+    updatedAt?: string;
     deleted?: boolean;
     Deleted?: boolean;
+    supportingEvidenceUrl?: string;
 }
 
 // DTOs matching backend
 interface CreateTaskDTO {
     taskTitle: string;
     taskDescription: string;
-    priority: Priority;
-    dueAt: string | null;
-    assignedTo: string;      // accountId Guid
+    priority: string;
+    dueAt: string;
+    assignedTo?: string;
+    taskCategory?: string;
     recommendedEmployeeId?: string;
+    taskRemarks?: string;
+    supportingEvidence?: File;
     IsDuplicateAcknowledged?: boolean;
 }
 
@@ -177,6 +184,7 @@ interface UpdateTaskDTO {
     priority: Priority;
     dueAt: string | null;
     assignedTo: string;
+    taskCategory?: string;
     taskRemarks?: string;
 }
 
@@ -333,7 +341,7 @@ const NAV_GROUPS = [
 
 // --- Helpers ------------------------------------------------------------------
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Pending Admin Review' && !!t.dueAt && new Date(t.dueAt) < new Date();
+    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Done' && t.taskStatus !== 'Pending Admin Review' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
 const getInitials = (name: string): string => {
     if (!name) return 'OA';
@@ -358,11 +366,11 @@ const statusBadgeClass = (s: string): string =>
 const FSM_TRANSITIONS: Record<string, string[]> = {
     'Draft': ['Assigned'],
     'Assigned': ['In Progress'],
-    'In Progress': ['Done', 'Pending Admin Review'],
+    'In Progress': ['Pending Admin Review'],
     'Pending Admin Review': ['Completed', 'In Progress'],
     'Done': ['Completed'],
     'Completed': [],
-    'Pending': ['In Progress'],
+    'Pending': [],
     'Overdue': [],
 };
 
@@ -373,9 +381,24 @@ const priorityDotClass = (p: Priority): string =>
     ({ Critical: 'prio-dot critical', High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
 
 const fmtDate = (d: string): string => {
-    if (!d) return '�';
+    if (!d) return '—';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
+
+const fmtDateTime = (d: string): string => {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const statusToProgress = (s: string): number => ({
+    'Draft': 0,
+    'Assigned': 10,
+    'In Progress': 45,
+    'Pending Admin Review': 75,
+    'Done': 90,
+    'Completed': 100,
+    'Overdue': 45,
+}[s] ?? 0);
 
 // --- Sub-components -----------------------------------------------------------
 
@@ -414,11 +437,19 @@ interface TaskRowProps {
 const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = false }) => {
     const od = isEffectivelyOverdue(task);
     const effectiveStatus = od ? 'Overdue' : task.taskStatus;
+    const progress = statusToProgress(effectiveStatus);
+    const refDisplay = task.taskReferenceNumber || task.taskId.slice(0, 8).toUpperCase();
+
     return (
         <div className="task-item" onClick={() => onView(task.taskId)}>
             <div className="task-row-top">
                 <span className={priorityDotClass(task.priority)} />
-                <span className="task-name">{task.taskTitle}</span>
+                <span className="task-name">
+                    <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginRight: 6 }}>
+                        #{refDisplay}
+                    </span>
+                    {task.taskTitle}
+                </span>
                 <span className={statusBadgeClass(effectiveStatus)}>{effectiveStatus}</span>
                 {showEditBtn && onEdit && (
                     <ActionsDropdown
@@ -437,9 +468,13 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
                     />
                 )}
             </div>
+            <div style={{ margin: '6px 0 4px', height: 4, background: '#e8ecf4', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: progress >= 100 ? '#05cd99' : progress >= 75 ? '#4318ff' : progress >= 45 ? '#ffb547' : '#94a3b8', borderRadius: 2, transition: 'width 0.3s ease' }} />
+            </div>
             <div className="task-row-bottom">
                 <span className="task-assignee">{task.assignedEmployee || 'Unassigned'}</span>
-                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '�'}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', marginRight: 12 }}>{task.updatedAt ? fmtDateTime(task.updatedAt) : ''}</span>
+                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
             </div>
         </div>
     );
@@ -488,8 +523,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         dueAt: initial.dueAt ? initial.dueAt.substring(0, 16) : '',
         priority: initial.priority ?? '' as Priority,
         assignedTo: resolvedAssignedTo,
+        taskCategory: initial.taskCategory ?? '',
         taskRemarks: initial.taskRemarks ?? '',
     });
+    const [supportingEvidence, setSupportingEvidence] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState('');
@@ -498,7 +536,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const [recommendationAccepted, setRecommendationAccepted] = useState(true);
 
     useEffect(() => {
-        if (mode !== 'new') return;
         const fetchRecommendations = async () => {
             try {
                 const token = localStorage.getItem('authToken');
@@ -526,13 +563,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             workload: recommended.workload,
                             reason: recommended.recommendationReason,
                         });
-                        if (resolvedAssignedTo === '') {
-                            setForm(prev => ({ ...prev, assignedTo: recommended.accountId }));
-                        }
                     }
                 }
-            } catch (err) {
-                console.error('Failed to fetch smart routing recommendations:', err);
+            } catch {
             }
         };
         fetchRecommendations();
@@ -545,23 +578,23 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 const v = value.trim();
                 if (!v) return 'Task title is required.';
                 if (v.length < 3) return 'Title must be at least 3 characters.';
-                if (v.length > 100) return 'Title must not exceed 100 characters.';
+                if (v.length > 150) return 'Title must not exceed 150 characters.';
                 return '';
             }
             case 'taskDescription': {
                 const v = value.trim();
-                if (v.length > 500) return 'Description must not exceed 500 characters.';
+                if (!v) return 'Task description is required.';
+                if (v.length > 2000) return 'Description must not exceed 2,000 characters.';
                 return '';
             }
             case 'dueAt': {
-                if (!value) return 'Due date/time is required.';
+                if (!value) return 'Deadline is required.';
                 const selected = new Date(value);
                 const now = new Date();
-                if (selected < now) return 'Due date/time cannot be in the past.';
+                if (selected < now) return 'Deadline must be a future date and time.';
                 return '';
             }
             case 'assignedTo': {
-                if (!value) return 'Please assign the task to someone.';
                 return '';
             }
             case 'priority': {
@@ -577,7 +610,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     // -- Validate all fields on submit -------------------------------------
     const validateAll = (): boolean => {
         const newErrors: Record<string, string> = {};
-        (['taskTitle', 'taskDescription', 'dueAt', 'assignedTo', 'priority'] as const).forEach(key => {
+        (['taskTitle', 'taskDescription', 'dueAt', 'priority'] as const).forEach(key => {
             const msg = validateField(key, form[key] ?? '');
             if (msg) newErrors[key] = msg;
         });
@@ -598,21 +631,22 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const handleSave = () => {
         if (!validateAll()) return;
         setSubmitting(true);
-        onSave({
+        const payload: CreateTaskDTO = {
             taskTitle: form.taskTitle.trim(),
             taskDescription: form.taskDescription.trim(),
             priority: form.priority,
-            dueAt: form.dueAt || null,
-            assignedTo: form.assignedTo,
+            dueAt: form.dueAt || '',
+            assignedTo: form.assignedTo || undefined,
+            taskCategory: form.taskCategory.trim() || undefined,
             recommendedEmployeeId: recommendation?.accountId || undefined,
             taskRemarks: form.taskRemarks.trim() || undefined,
-        });
+        };
+        if (supportingEvidence) {
+            payload.supportingEvidence = supportingEvidence;
+        }
+        onSave(payload);
         if (mode === 'new' && showSuccess) {
-            if (recommendationAccepted) {
-                showSuccess('Recommendation accepted � Final assignment saved � Audit Log entry created.');
-            } else {
-                showSuccess('Recommendation overridden � Final assignment saved � Audit Log entry created.');
-            }
+            showSuccess('Task created successfully.');
         }
         setSubmitting(false);
     };
@@ -658,31 +692,31 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             onChange={set('taskTitle')}
                             placeholder="e.g. Route planning update"
                             className={errors.taskTitle ? 'input-error' : ''}
-                            maxLength={100}
+                            maxLength={150}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <FieldErr name="taskTitle" />
                             {!errors.taskTitle && form.taskTitle.trim().length >= 3 && (
-                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>? Looks good</span>
+                                <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3 }}>✓ Looks good</span>
                             )}
-                            <CharCount value={form.taskTitle} max={100} />
+                            <CharCount value={form.taskTitle} max={150} />
                         </div>
                     </div>
 
                     {/* -- Description -- */}
                     <div className="field">
-                        <label>Description</label>
+                        <label>Description <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span></label>
                         <textarea
                             value={form.taskDescription}
                             onChange={set('taskDescription')}
                             placeholder="Describe the task..."
                             rows={3}
                             className={errors.taskDescription ? 'input-error' : ''}
-                            maxLength={500}
+                            maxLength={2000}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <FieldErr name="taskDescription" />
-                            <CharCount value={form.taskDescription} max={500} />
+                            <CharCount value={form.taskDescription} max={2000} />
                         </div>
                     </div>
 
@@ -701,7 +735,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             <FieldErr name="dueAt" />
                             {!errors.dueAt && form.dueAt && (
                                 <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                    ? {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    ✓ {new Date(form.dueAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             )}
                             {!form.dueAt && !errors.dueAt && (
@@ -720,10 +754,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                 className={errors.priority ? 'input-error' : ''}
                             >
                                 <option value="">Select priority</option>
-                                <option value="Critical">? Critical</option>
-                                <option value="High">?? High</option>
-                                <option value="Medium">?? Medium</option>
-                                <option value="Low">?? Low</option>
+                                <option value="Critical">🔴 Critical</option>
+                                <option value="High">🟠 High</option>
+                                <option value="Medium">🟡 Medium</option>
+                                <option value="Low">🟢 Low</option>
                             </select>
                             <FieldErr name="priority" />
                             {!errors.priority && form.priority && (
@@ -731,17 +765,99 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     fontSize: 11, marginTop: 3, display: 'block',
                                     color: form.priority === 'Critical' ? '#7c1d1d' : form.priority === 'High' ? 'var(--status-failed)' : form.priority === 'Medium' ? 'var(--status-pending)' : 'var(--status-active)',
                                 }}>
-                                    {form.priority === 'Critical' && '?? Critical � requires immediate attention'}
-                                    {form.priority === 'High' && '? High priority � will be flagged for urgent attention'}
-                                    {form.priority === 'Medium' && '? Medium priority selected'}
-                                    {form.priority === 'Low' && '? Low priority selected'}
+                                    {form.priority === 'Critical' && '🔴 Critical — requires immediate attention'}
+                                    {form.priority === 'High' && '🟠 High priority — will be flagged for urgent attention'}
+                                    {form.priority === 'Medium' && '🟡 Medium priority selected'}
+                                    {form.priority === 'Low' && '🟢 Low priority selected'}
                                 </span>
                             )}
                         </div>
                     </div>
 
+                    {/* -- Task Category -- */}
+                    <div className="field">
+                        <label>Task Category <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                        <select
+                            value={form.taskCategory}
+                            onChange={set('taskCategory')}
+                        >
+                            <option value="">Select category</option>
+                            <option value="Operations">Operations</option>
+                            <option value="Logistics">Logistics</option>
+                            <option value="IT & Admin">IT & Admin</option>
+                            <option value="Customer Service">Customer Service</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    {/* -- Supporting Document -- */}
+                    <div className="field">
+                        <label>Supporting Document <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                        {initial.supportingEvidenceUrl && !supportingEvidence && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8, marginBottom: 8 }}>
+                                <span style={{ fontSize: 12, color: 'var(--primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {initial.supportingEvidenceUrl.split('/').pop()}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => window.open(initial.supportingEvidenceUrl, '_blank')}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', padding: 4, fontSize: 11, fontWeight: 600 }}
+                                >
+                                    View
+                                </button>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                                onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+                                        const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
+                                        if (!allowed.includes(ext)) {
+                                            setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
+                                            return;
+                                        }
+                                        if (file.size > 20 * 1024 * 1024) {
+                                            setFormError('File size must not exceed 20MB.');
+                                            return;
+                                        }
+                                        setFormError('');
+                                        setSupportingEvidence(file);
+                                    }
+                                }}
+                                style={{ flex: 1, fontSize: 13 }}
+                            />
+                            {supportingEvidence && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSupportingEvidence(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        {supportingEvidence ? (
+                            <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
+                                ✓ {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
+                            </span>
+                        ) : initial.supportingEvidenceUrl ? (
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, display: 'block' }}>
+                                Leave empty to keep current file. Select a new file above to replace it.
+                            </span>
+                        ) : null}
+                    </div>
+
                     {/* -- Smart Task Routing Recommendation -- */}
-                    {mode === 'new' && recommendation && (
+                    {recommendation && (
                         <div className="sr-section">
                             <div className="sr-header">
                                 <div className="sr-title-row">
@@ -812,7 +928,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     <div className="field">
                         <label>
                             {mode === 'new' ? 'Final Assigned Employee' : 'Assign To'}
-                            <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span>
                         </label>
                         <div
                             className={`assignee-select${errors.assignedTo ? ' input-error' : ''}`}
@@ -843,7 +958,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     className="assignee-option placeholder-opt"
                                     onClick={e => {
                                         setForm(prev => ({ ...prev, assignedTo: '' }));
-                                        setErrors(prev => ({ ...prev, assignedTo: 'Please assign the task to someone.' }));
+                                        setErrors(prev => ({ ...prev, assignedTo: '' }));
                                         setRecommendationAccepted(false);
                                         (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                     }}
@@ -875,7 +990,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                         <FieldErr name="assignedTo" />
                         {!errors.assignedTo && form.assignedTo && (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
-                                ? {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
+                                ✓ {teamMembers.find(m => m.accountId === form.assignedTo)?.employeeName} assigned
                             </span>
                         )}
                     </div>
@@ -940,9 +1055,11 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
     const nextStatus = (FSM_TRANSITIONS[task.taskStatus]?.[0] ?? '') as TaskStatus;
     const canTransition = !!nextStatus;
     const statusLabel: Record<string, string> = {
+        'Draft': 'Assign Task',
         'Assigned': 'Mark In Progress',
         'In Progress': 'Mark Done',
         'Done': 'Approve & Complete',
+        'Pending Admin Review': 'Review & Complete',
     };
 
     return (
@@ -998,18 +1115,18 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                    {canTransition && task.taskStatus !== 'Pending Admin Review' && (
-                        <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
-                            title={`Transition to ${nextStatus}`}>
-                            {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
-                        </button>
-                    )}
-                    {task.taskStatus === 'Pending Admin Review' && (
-                        <button className="btn btn-primary" onClick={onReview}
-                            title="Review task submission">
-                            <Eye size={13} /> Review Task
-                        </button>
-                    )}
+                {canTransition && task.taskStatus !== 'Pending Admin Review' && (
+                    <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
+                        title={`Transition to ${nextStatus}`}>
+                        {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
+                    </button>
+                )}
+                {task.taskStatus === 'Pending Admin Review' && (
+                    <button className="btn btn-primary" onClick={onReview}
+                        title="Review task submission">
+                        <Eye size={13} /> Review Task
+                    </button>
+                )}
                     {task.taskStatus === 'Completed' && (
                         <button className="btn btn-primary" onClick={() => onAdminOverride(task.taskId)}
                             title="Admin override for completed task">
@@ -1257,6 +1374,7 @@ const DashboardTab: React.FC<{
     const workloads = td?.employeeWorkloadDistribution ?? [];
     const taskDist = td?.taskAssignmentDistribution ?? {};
     const pendingReview = taskDist['Pending Admin Review'] ?? 0;
+    const done = taskDist['Done'] ?? 0;
 
     const statusChartData = [
         { name: 'Active', value: active, color: 'var(--status-pending)' },
@@ -1294,10 +1412,12 @@ const DashboardTab: React.FC<{
                     </div>
                     <div className="stats-row">
                         {[
+                            { label: 'TOTAL', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: `${total} task${total !== 1 ? 's' : ''}` },
                             { label: 'ACTIVE', value: active, icon: <Loader2 size={20} strokeWidth={2.3} />, variant: 'warning' as const, subtext: 'In Progress / Assigned' },
+                            { label: 'DONE', value: done, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: 'Awaiting completion' },
                             { label: 'COMPLETED', value: completed, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success' as const, subtext: `${pct}% completion rate` },
-                            { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
                             { label: 'PENDING REVIEW', value: pendingReview, icon: <Eye size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: 'Awaiting admin' },
+                            { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
                         ].map(s => (
                             <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                         ))}
@@ -1325,7 +1445,7 @@ const DashboardTab: React.FC<{
                                     {completed} of {total} tasks completed
                                 </p>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                    {overdue > 0 ? `${overdue} overdue � ` : ''}
+                                    {overdue > 0 ? `${overdue} overdue — ` : ''}
                                     {pendingReview > 0 ? `${pendingReview} pending review` : 'No pending reviews'}
                                 </span>
                             </div>
@@ -1474,13 +1594,12 @@ const DashboardTab: React.FC<{
 
 // --- Tasks Tab ----------------------------------------------------------------
 
-const TASK_STATUS_FILTERS = ['Pending', 'In Progress', 'Done', 'Completed', 'Overdue'];
+const TASK_STATUS_FILTERS = ['Draft', 'Assigned', 'In Progress', 'Pending Admin Review', 'Done', 'Completed', 'Overdue'];
 
 const PRIORITY_WEIGHTS: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
 const TasksTab: React.FC<{
     tasks: Task[];
-    allTasks: Task[];
     binTasks: Task[];
     teamMembers: TeamMember[];
     loading: boolean;
@@ -1491,7 +1610,7 @@ const TasksTab: React.FC<{
     onRestore: (taskId: string) => void;
     onEmptyBin: () => void;
     onNewTask: () => void;
-}> = ({ tasks, allTasks, binTasks, teamMembers, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
+}> = ({ tasks, binTasks, teamMembers, loading, searchQuery, setSearchQuery, onView, onEdit, onRestore, onEmptyBin, onNewTask }) => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPriority, setFilterPriority] = useState('');
     const [filterEmployee, setFilterEmployee] = useState('');
@@ -1543,7 +1662,7 @@ const TasksTab: React.FC<{
         <div className="dashboard-content">
             <DataTable
                 tabs={[
-                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.length },
+                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.filter(t => t.taskStatus !== 'Completed' && t.taskStatus !== 'Done').length || undefined },
                     { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, badge: deletedTasks.length },
                 ]}
                 activeTab={subTab}
@@ -1608,57 +1727,54 @@ const TasksTab: React.FC<{
                         onClick: onEmptyBin
                     } : undefined
                 )}
-                headers={subTab === 'bin' ? ['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE', 'ACTIONS'] : undefined}
+                headers={['TASK', 'ASSIGNEE', 'PRIORITY', 'DUE DATE'].concat(subTab === 'bin' ? ['ACTIONS'] : [])}
                 loading={loading}
                 emptyIcon={subTab === 'bin' ? <Trash2 size={24} /> : <Package size={20} />}
                 emptyMessage={subTab === 'bin' ? 'Bin is empty' : 'No matching task records found.'}
             >
                 {searchError && (
-                    <div style={{ padding: '8px 20px 0' }}>
+                    <tr><td colSpan={subTab === 'bin' ? 5 : 4} style={{ padding: '8px 20px 0', border: 'none' }}>
                         <span style={{ fontSize: 12, color: 'var(--status-failed)' }}>{searchError}</span>
-                    </div>
+                    </td></tr>
                 )}
-                {subTab === 'active' ? (
-                    <div style={{ padding: '0 20px 20px' }}>
-                        {sorted.map(t => (
-                            <TaskRow key={t.taskId} task={t} onView={onView} onEdit={onEdit} showEditBtn />
-                        ))}
-                    </div>
-                ) : (
-                    deletedTasks.map(t => (
-                        <tr key={t.taskId} style={{ opacity: 0.75 }}>
-                            <td>
-                                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
-                                    {t.taskTitle}
+                {subTab === 'active' && sorted.length > 0 && sorted.map(t => (
+                    <tr key={t.taskId}><td colSpan={4} style={{ padding: 0, border: 'none' }}>
+                        <TaskRow task={t} onView={onView} onEdit={onEdit} showEditBtn />
+                    </td></tr>
+                ))}
+                {subTab !== 'active' && deletedTasks.map((t, binIdx) => (
+                    <tr key={t.taskId ?? binIdx} style={{ opacity: 0.75 }}>
+                        <td>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', textDecoration: 'line-through', textDecorationColor: 'var(--text-secondary)' }}>
+                                {t.taskTitle}
+                            </div>
+                            {t.taskDescription && (
+                                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.taskDescription}
                                 </div>
-                                {t.taskDescription && (
-                                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {t.taskDescription}
-                                    </div>
-                                )}
-                            </td>
-                            <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                                {t.assignedEmployee || '�'}
-                            </td>
-                            <td><PrioBadge p={t.priority} /></td>
-                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                {t.dueAt ? fmtDate(t.dueAt) : '�'}
-                            </td>
-                            <td>
-                                <ActionsDropdown
-                                    actions={[
-                                        {
-                                            label: 'Restore',
-                                            icon: <CheckCircle2 size={12} />,
-                                            onClick: () => onRestore(t.taskId),
-                                            variant: 'success'
-                                        }
-                                    ]}
-                                />
-                            </td>
-                        </tr>
-                    ))
-                )}
+                            )}
+                        </td>
+                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                            {t.assignedEmployee || '—'}
+                        </td>
+                        <td><PrioBadge p={t.priority} /></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            {t.dueAt ? fmtDate(t.dueAt) : '—'}
+                        </td>
+                        <td>
+                            <ActionsDropdown
+                                actions={[
+                                    {
+                                        label: 'Restore',
+                                        icon: <CheckCircle2 size={12} />,
+                                        onClick: () => onRestore(t.taskId),
+                                        variant: 'success'
+                                    }
+                                ]}
+                            />
+                        </td>
+                    </tr>
+                ))}
             </DataTable>
         </div>
     );
@@ -3481,9 +3597,10 @@ export default function OpsAdminDashboard() {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: any[] = await res.json();
+            const jsonRes = await res.json();
+            const rawList: any[] = Array.isArray(jsonRes) ? jsonRes : (Array.isArray(jsonRes?.data?.data) ? jsonRes.data.data : (Array.isArray(jsonRes?.data) ? jsonRes.data : []));
 
-            const normalized: Task[] = data.map(t => ({
+            const normalized: Task[] = rawList.map(t => ({
                 ...t,
                 deleted: deletedTaskIds.has(t.taskId),
             }));
@@ -3581,19 +3698,18 @@ export default function OpsAdminDashboard() {
     // -- Fetch Team Members (for assignee dropdown) --
     const fetchTeamMembers = async () => {
         try {
-            const res = await fetch('/api/systemadmin/assignable-employees', {
+            const res = await fetch('/api/task/assignable-employees?pageNumber=1&pageSize=100', {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const data: any[] = await res.json();
+            const body = await res.json();
+            const rawList: any[] = Array.isArray(body) ? body : (Array.isArray(body?.data?.data) ? body.data.data : (Array.isArray(body?.data) ? body.data : []));
 
-            console.log('Team members raw:', data); // ? ADD THIS to inspect shape
-
-            setTeamMembers(data.map(e => ({
-                accountId: e.accountId ?? e.AccountId ?? e.id,       // try variants
-                employeeName: e.employeeName ?? e.EmployeeName ?? e.name,
-                role: e.role ?? e.Role ?? '',
-                presenceStatus: e.presenceStatus ?? 'Offline',
+            setTeamMembers(rawList.map(e => ({
+                accountId: e.accountId ?? e.AccountId ?? e.id,
+                employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').trim(),
+                role: e.role ?? '',
+                presenceStatus: e.availabilityStatus ?? 'Active',
             })));
         } catch {
             setTeamMembers([]);
@@ -3684,13 +3800,20 @@ export default function OpsAdminDashboard() {
     // -- Create Task --
     const handleNewTask = async (data: CreateTaskDTO) => {
         try {
+            const formData = new FormData();
+            formData.append('taskTitle', data.taskTitle);
+            formData.append('taskDescription', data.taskDescription);
+            formData.append('priority', data.priority);
+            formData.append('dueAt', new Date(data.dueAt).toISOString());
+            if (data.assignedTo) formData.append('assignedTo', data.assignedTo);
+            if (data.taskCategory) formData.append('taskCategory', data.taskCategory);
+            if (data.recommendedEmployeeId) formData.append('recommendedEmployeeId', data.recommendedEmployeeId);
+            if (data.supportingEvidence) formData.append('supportingEvidence', data.supportingEvidence);
+
             const res = await fetch('/api/task/create-task', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token()}`,
-                },
-                body: JSON.stringify(data),
+                headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (res.status === 409) {
                 const errBody = await res.json().catch(() => ({}));
@@ -3716,13 +3839,20 @@ export default function OpsAdminDashboard() {
     // -- Update Task --
     const handleEditTask = async (taskId: string, data: UpdateTaskDTO) => {
         try {
+            const formData = new FormData();
+            formData.append('TaskTitle', data.taskTitle);
+            formData.append('TaskDescription', data.taskDescription);
+            formData.append('Priority', data.priority);
+            if (data.dueAt) formData.append('DueAt', new Date(data.dueAt).toISOString());
+            if (data.assignedTo) formData.append('AssignedTo', data.assignedTo);
+            if (data.taskCategory) formData.append('TaskCategory', data.taskCategory);
+            if (data.taskRemarks) formData.append('TaskRemarks', data.taskRemarks);
+            const dto = data as any;
+            if (dto.supportingEvidence) formData.append('SupportingEvidence', dto.supportingEvidence);
             const res = await fetch(`/api/task/update-task/${taskId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token()}`,
-                },
-                body: JSON.stringify(data),
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -3986,6 +4116,7 @@ export default function OpsAdminDashboard() {
 
         connection.on('DashboardDataChanged', () => {
             fetchDashboardData();
+            window.dispatchEvent(new CustomEvent('opencode-notification-update'));
         });
 
         connection.start().then(() => {
@@ -4083,7 +4214,6 @@ export default function OpsAdminDashboard() {
                 {activeTab === 'tasks' && (
                     <TasksTab
                         tasks={tasks}
-                        allTasks={allTasks}
                         binTasks={binTasks}
                         teamMembers={teamMembers}
                         loading={loadingTasks}
@@ -4125,6 +4255,7 @@ export default function OpsAdminDashboard() {
             {/* -- Modals -- */}
             {showNew && (
                 <TaskModal
+                    key="new-task"
                     mode="new"
                     teamMembers={teamMembers}
                     tasks={tasks}
@@ -4135,6 +4266,7 @@ export default function OpsAdminDashboard() {
             )}
             {editingTask && (
                 <TaskModal
+                    key={`edit-${editingTask.taskId}`}
                     mode="edit"
                     initial={editingTask}
                     teamMembers={teamMembers}

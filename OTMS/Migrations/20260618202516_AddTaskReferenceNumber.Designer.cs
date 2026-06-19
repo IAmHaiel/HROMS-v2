@@ -12,8 +12,8 @@ using OTMS.Data;
 namespace OTMS.Migrations
 {
     [DbContext(typeof(OTMSDbContext))]
-    [Migration("20260618160543_FinalSchemaUpdate")]
-    partial class FinalSchemaUpdate
+    [Migration("20260618202516_AddTaskReferenceNumber")]
+    partial class AddTaskReferenceNumber
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1315,14 +1315,25 @@ namespace OTMS.Migrations
                     b.Property<string>("ProgressNotes")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("TaskCategory")
+                    b.Property<string>("SupportingEvidenceUrl")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TaskCategory")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("TaskDescription")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("TaskReferenceNumber")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
 
                     b.Property<string>("TaskRemarks")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("TaskStatus")
                         .IsRequired()
@@ -1333,7 +1344,8 @@ namespace OTMS.Migrations
 
                     b.Property<string>("TaskTitle")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");

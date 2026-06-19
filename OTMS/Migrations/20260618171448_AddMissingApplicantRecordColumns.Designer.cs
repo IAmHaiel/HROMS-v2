@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OTMS.Data;
 
@@ -11,9 +12,11 @@ using OTMS.Data;
 namespace OTMS.Migrations
 {
     [DbContext(typeof(OTMSDbContext))]
-    partial class OTMSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260618171448_AddMissingApplicantRecordColumns")]
+    partial class AddMissingApplicantRecordColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -73,7 +76,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("Accounts", (string)null);
+                    b.ToTable("Accounts");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ActivityLog", b =>
@@ -99,7 +102,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.ToTable("ActivityLogs", (string)null);
+                    b.ToTable("ActivityLogs");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.AdminOverrideRecord", b =>
@@ -136,7 +139,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("AdminOverrideRecords", (string)null);
+                    b.ToTable("AdminOverrideRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Announcement", b =>
@@ -173,7 +176,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("CreatorAccountId");
 
-                    b.ToTable("Announcements", (string)null);
+                    b.ToTable("Announcements");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApplicantRecord", b =>
@@ -375,7 +378,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("JobPositionId");
 
-                    b.ToTable("ApplicantRecords", (string)null);
+                    b.ToTable("ApplicantRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApplicantStatusRecord", b =>
@@ -410,7 +413,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("UpdatedById");
 
-                    b.ToTable("ApplicantStatusRecords", (string)null);
+                    b.ToTable("ApplicantStatusRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApprovalDecision", b =>
@@ -446,7 +449,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("ApproverAccountId");
 
-                    b.ToTable("ApprovalDecisions", (string)null);
+                    b.ToTable("ApprovalDecisions");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApprovalRequest", b =>
@@ -504,7 +507,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("RequesterAccountId");
 
-                    b.ToTable("ApprovalRequests", (string)null);
+                    b.ToTable("ApprovalRequests");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApprovalRoutingMatrix", b =>
@@ -529,7 +532,7 @@ namespace OTMS.Migrations
 
                     b.HasKey("RoutingMatrixId");
 
-                    b.ToTable("ApprovalRoutingMatrices", (string)null);
+                    b.ToTable("ApprovalRoutingMatrices");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.ApprovalTier", b =>
@@ -563,7 +566,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("RoutingMatrixId");
 
-                    b.ToTable("ApprovalTiers", (string)null);
+                    b.ToTable("ApprovalTiers");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.AssetAllocation", b =>
@@ -600,7 +603,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("AssetAllocations", (string)null);
+                    b.ToTable("AssetAllocations");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Department", b =>
@@ -640,7 +643,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("HeadEmployeeId");
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.EmailQueueRecord", b =>
@@ -676,7 +679,7 @@ namespace OTMS.Migrations
 
                     b.HasKey("EmailQueueRecordId");
 
-                    b.ToTable("EmailQueueRecords", (string)null);
+                    b.ToTable("EmailQueueRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.EmergencyOverrideRequest", b =>
@@ -725,7 +728,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("RequestedById");
 
-                    b.ToTable("EmergencyOverrideRequests", (string)null);
+                    b.ToTable("EmergencyOverrideRequests");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Employee", b =>
@@ -806,7 +809,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("JobPositionId");
 
-                    b.ToTable("Employees", (string)null);
+                    b.ToTable("Employees");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Employee201FileData", b =>
@@ -860,7 +863,7 @@ namespace OTMS.Migrations
                     b.HasIndex("EmployeeId")
                         .IsUnique();
 
-                    b.ToTable("Employee201FileDatas", (string)null);
+                    b.ToTable("Employee201FileDatas");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.EmployeeAttachment", b =>
@@ -917,7 +920,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("EmployeeAttachments", (string)null);
+                    b.ToTable("EmployeeAttachments");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.InterviewSchedule", b =>
@@ -951,7 +954,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("ApplicantRecordId");
 
-                    b.ToTable("InterviewSchedules", (string)null);
+                    b.ToTable("InterviewSchedules");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.JobPosition", b =>
@@ -1004,7 +1007,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("ReportsToId");
 
-                    b.ToTable("JobPositions", (string)null);
+                    b.ToTable("JobPositions");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.LeaveRequest", b =>
@@ -1056,7 +1059,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("Approved_By");
 
-                    b.ToTable("LeaveRequests", (string)null);
+                    b.ToTable("LeaveRequests");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Notification", b =>
@@ -1096,7 +1099,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.NotificationAuditLog", b =>
@@ -1139,7 +1142,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("RecipientAccountId");
 
-                    b.ToTable("NotificationAuditLogs", (string)null);
+                    b.ToTable("NotificationAuditLogs");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.OnboardingToken", b =>
@@ -1177,7 +1180,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("CreatedByAccountId");
 
-                    b.ToTable("OnboardingTokens", (string)null);
+                    b.ToTable("OnboardingTokens");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Permission", b =>
@@ -1196,7 +1199,7 @@ namespace OTMS.Migrations
 
                     b.HasKey("PermissionId");
 
-                    b.ToTable("Permissions", (string)null);
+                    b.ToTable("Permissions");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Role", b =>
@@ -1224,7 +1227,7 @@ namespace OTMS.Migrations
 
                     b.HasKey("RoleId");
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.RolePermission", b =>
@@ -1239,7 +1242,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("PermissionId");
 
-                    b.ToTable("RolePermissions", (string)null);
+                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.StatutorySyncRecord", b =>
@@ -1272,7 +1275,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("EmployeeId");
 
-                    b.ToTable("StatutorySyncRecords", (string)null);
+                    b.ToTable("StatutorySyncRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Task", b =>
@@ -1312,25 +1315,14 @@ namespace OTMS.Migrations
                     b.Property<string>("ProgressNotes")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("SupportingEvidenceUrl")
+                    b.Property<string>("TaskCategory")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("TaskCategory")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("TaskDescription")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("TaskReferenceNumber")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("nvarchar(8)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaskRemarks")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaskStatus")
                         .IsRequired()
@@ -1341,8 +1333,7 @@ namespace OTMS.Migrations
 
                     b.Property<string>("TaskTitle")
                         .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1357,7 +1348,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("TaskTemplateId");
 
-                    b.ToTable("Tasks", (string)null);
+                    b.ToTable("Tasks");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.TaskComment", b =>
@@ -1391,7 +1382,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("TaskComments", (string)null);
+                    b.ToTable("TaskComments");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.TaskReopenRequest", b =>
@@ -1434,7 +1425,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("TaskId1");
 
-                    b.ToTable("TaskReopenRequests", (string)null);
+                    b.ToTable("TaskReopenRequests");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.TaskStatusRecord", b =>
@@ -1472,7 +1463,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("UpdatedBy");
 
-                    b.ToTable("TaskStatusRecords", (string)null);
+                    b.ToTable("TaskStatusRecords");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.TaskTemplate", b =>
@@ -1530,7 +1521,7 @@ namespace OTMS.Migrations
 
                     b.HasIndex("CreatedBy");
 
-                    b.ToTable("TaskTemplates", (string)null);
+                    b.ToTable("TaskTemplates");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.Account", b =>

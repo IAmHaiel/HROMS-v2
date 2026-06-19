@@ -444,7 +444,11 @@ export default function EmployeeDetailPanel({
             cache: 'no-store'
         })
             .then(res => (res.ok ? res.json() : []))
-            .then(data => setActivityLogs(Array.isArray(data) ? data : []))
+            .then(data => setActivityLogs(Array.isArray(data) ? data.map((log: any) => ({
+                id: log.activityLogId,
+                description: log.description,
+                timestamp: log.createdAt,
+            })) : []))
             .catch(() => setActivityLogs([]))
             .finally(() => setLoadingLogs(false));
     }, [profile.employeeNumber]);

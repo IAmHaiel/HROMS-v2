@@ -93,11 +93,6 @@ namespace OTMS.Service.Services
 
             if (role == null) throw new KeyNotFoundException("Role not found.");
 
-            if (role.IsSystemDefined)
-            {
-                throw new InvalidOperationException("System defined roles cannot be modified.");
-            }
-
             role.Description = request.Description ?? role.Description;
 
             // Update permissions

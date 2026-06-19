@@ -25,7 +25,7 @@ namespace OTMS.Controllers
         [Authorize(Policy = "Permissions.Tasks.Manage")]
         [HttpPost("create-task")]
         public async Task<ActionResult<TaskResponseDTO>> CreateTask(
-            CreateTaskDTO request)
+            [FromForm] CreateTaskDTO request)
         {
             try
             {
@@ -55,8 +55,8 @@ namespace OTMS.Controllers
         /// Updates an existing task's details. Only authenticated users can update tasks, and only if they have the "OperationsAdmin" role.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
-        [HttpPut("update-task/{taskId}")]
-        public async Task<ActionResult<TaskResponseDTO>> UpdateTask(Guid taskId, UpdateTaskDTO request)
+        [HttpPost("update-task/{taskId}")]
+        public async Task<ActionResult<TaskResponseDTO>> UpdateTask(Guid taskId, [FromForm] UpdateTaskDTO request)
         {
             try
             {
@@ -216,7 +216,7 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("my-tasks")]
-        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks(PaginationDTO request)
+        public async Task<ActionResult<PaginationResponseDTO<TaskResponseDTO>>> GetMyTasks([FromQuery] PaginationDTO request)
         {
             try
             {
@@ -345,7 +345,7 @@ namespace OTMS.Controllers
 
         [Authorize(Policy = "Permissions.Tasks.View")]
         [HttpGet("bin-records/{employeeId}")]
-        public async Task<IActionResult> BinRecords(string employeeId, PaginationDTO pagination)
+        public async Task<IActionResult> BinRecords(string employeeId, [FromQuery] PaginationDTO pagination)
         {
             try
             {
