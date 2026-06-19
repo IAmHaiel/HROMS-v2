@@ -231,6 +231,8 @@ namespace OTMS.Service.Services
         }
         public async System.Threading.Tasks.Task CreateDeadlineNotificationAsync(Entities.Models.Task task)
         {
+            if (!task.AssignedTo.HasValue) return;
+
             var notification = new Notification
             {
                 NotificationId = Guid.NewGuid(),
