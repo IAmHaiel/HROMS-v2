@@ -202,6 +202,7 @@ interface DuplicateWarningDTO {
 
 interface ReopenRequest {
     requestId: string;
+    referenceNumber?: string;
     taskId: string;
     taskTitle: string;
     employeeName: string;
@@ -1482,6 +1483,21 @@ const DashboardTab: React.FC<{
                                 <h3>Employee Workload Distribution</h3>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workloads.length} employees</span>
                             </div>
+                            {workloadChartData.length === 0 ? (
+                                <EmptyState title="No workload data available." />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={Math.max(200, workloads.length * 36)}>
+                                    <BarChart data={workloadChartData} margin={{ left: -10, right: 10, top: 0, bottom: 0 }} barCategoryGap="20%">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                        <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                        <Bar dataKey="Total" fill="var(--primary)" radius={[3, 3, 0, 0]} name="Total" />
+                                        <Bar dataKey="Completed" fill="var(--status-active)" radius={[3, 3, 0, 0]} name="Completed" />
+                                        <Bar dataKey="Overdue" fill="var(--status-failed)" radius={[3, 3, 0, 0]} name="Overdue" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
 
                         <div className="card">
@@ -1529,12 +1545,23 @@ const DashboardTab: React.FC<{
                         title="Workload Summary per Employee"
                         filterElements={
                             <>
-                                <input type="date" value={filters.dateStart}
-                                    onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })}
-                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
-                                <input type="date" value={filters.dateEnd}
-                                    onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })}
-                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                                {[{ label: '1 Month', months: 1 }, { label: '3 Months', months: 3 }, { label: '6 Months', months: 6 }, { label: '12 Months', months: 12 }].map(p => {
+                                    const isActive = filters.dateStart && filters.dateEnd && (() => {
+                                        const end = new Date(); const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                        return filters.dateStart === start.toISOString().split('T')[0];
+                                    })();
+                                    return (
+                                        <span key={p.label} className={`filter-pill${isActive ? ' active' : ''}`}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                const end = new Date(); const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                                onFilterChange({ ...filters, dateStart: start.toISOString().split('T')[0], dateEnd: end.toISOString().split('T')[0] });
+                                            }}
+                                            style={{ fontSize: 12, padding: '6px 12px', height: 38, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                                            {p.label}
+                                        </span>
+                                    );
+                                })}
                                 <select value={filters.employeeId}
                                     onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}>
                                     <option value="">All Employees</option>
@@ -2164,21 +2191,30 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
     const [fetchError, setFetchError] = useState('');
     const [noRecords, setNoRecords] = useState(false);
     const [generatedAt, setGeneratedAt] = useState('');
-    const [errors, setErrors] = useState<{ dateRangeStart?: string; dateRangeEnd?: string }>({});
 
-    const validate = (): boolean => {
-        const e: { dateRangeStart?: string; dateRangeEnd?: string } = {};
-        if (!filter.dateRangeStart) e.dateRangeStart = 'Date range start is required.';
-        if (!filter.dateRangeEnd) e.dateRangeEnd = 'Date range end is required.';
-        if (filter.dateRangeStart && filter.dateRangeEnd && filter.dateRangeEnd < filter.dateRangeStart) {
-            e.dateRangeEnd = 'End date must not be earlier than start date.';
-        }
-        setErrors(e);
-        return Object.keys(e).length === 0;
+    const DATE_PRESETS = [
+        { label: '1 Month', months: 1 },
+        { label: '3 Months', months: 3 },
+        { label: '6 Months', months: 6 },
+        { label: '12 Months', months: 12 },
+    ] as const;
+
+    const applyPreset = (months: number) => {
+        const end = new Date();
+        const start = new Date();
+        start.setMonth(start.getMonth() - months);
+        setFilter(p => ({
+            ...p,
+            dateRangeStart: start.toISOString().split('T')[0],
+            dateRangeEnd: end.toISOString().split('T')[0],
+        }));
     };
 
     const handleGenerate = async () => {
-        if (!validate()) return;
+        if (!filter.dateRangeStart || !filter.dateRangeEnd) {
+            setFetchError('Please select a date range preset first.');
+            return;
+        }
         setLoading(true);
         setFetchError('');
         setNoRecords(false);
@@ -2226,7 +2262,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         setReport(null);
         setFetchError('');
         setNoRecords(false);
-        setErrors({});
         setGeneratedAt('');
     };
 
@@ -2260,12 +2295,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         success('CSV exported successfully.');
     };
 
-    const selectClass = (field: keyof typeof errors) =>
-        errors[field] ? 'report-select report-select-error' : 'report-select';
-
-    const inputClass = (field: keyof typeof errors) =>
-        errors[field] ? 'report-input report-input-error' : 'report-input';
-
     const statusChartData = report
         ? [
             { name: 'Completed', value: report.totalTasksCompleted, fill: 'var(--status-active)' },
@@ -2283,18 +2312,28 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                 </div>
                 <div className="report-filter-grid">
                     <div className="field">
-                        <label>Date Start *</label>
-                        <input type="date" className={inputClass('dateRangeStart')}
-                            value={filter.dateRangeStart}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
-                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Date End *</label>
-                        <input type="date" className={inputClass('dateRangeEnd')}
-                            value={filter.dateRangeEnd}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
-                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
+                        <label>Date Range *</label>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {DATE_PRESETS.map(p => (
+                                <button
+                                    key={p.label}
+                                    type="button"
+                                    className={`filter-pill${filter.dateRangeStart && filter.dateRangeEnd && (() => {
+                                        const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                        return filter.dateRangeStart === start.toISOString().split('T')[0];
+                                    })() ? ' active' : ''}`}
+                                    onClick={() => applyPreset(p.months)}
+                                    style={{ fontSize: 12, padding: '6px 14px' }}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                        {filter.dateRangeStart && filter.dateRangeEnd && (
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                                {filter.dateRangeStart} → {filter.dateRangeEnd}
+                            </span>
+                        )}
                     </div>
                     <div className="field">
                         <label>Employee</label>
@@ -3275,8 +3314,8 @@ const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onAp
         >
             <div className="reopen-info-grid">
                 <div className="reopen-info-item">
-                    <span className="reopen-info-label">Request ID</span>
-                    <span className="reopen-info-value">{request.requestId}</span>
+                    <span className="reopen-info-label">Request Ref</span>
+                    <span className="reopen-info-value" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{request.referenceNumber || request.requestId.slice(0, 8).toUpperCase()}</span>
                 </div>
                 <div className="reopen-info-item">
                     <span className="reopen-info-label">Task ID</span>
@@ -3387,7 +3426,7 @@ const ReopenTab: React.FC<{
                 >
                     {pending.map(r => (
                         <tr key={r.requestId}>
-                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>{r.referenceNumber || r.requestId.slice(0, 8).toUpperCase()}</td>
                             <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                             <td style={{ fontSize: 13 }}>{r.employeeName}</td>
                             <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.reason}</td>
@@ -3413,7 +3452,7 @@ const ReopenTab: React.FC<{
                     >
                         {history.map(r => (
                             <tr key={r.requestId}>
-                                <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                                <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>{r.referenceNumber || r.requestId.slice(0, 8).toUpperCase()}</td>
                                 <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                                 <td style={{ fontSize: 13 }}>{r.employeeName}</td>
                                 <td><StatusBadge status={r.status} size="sm" /></td>
@@ -3677,6 +3716,7 @@ export default function OpsAdminDashboard() {
             });
             success('Task restored successfully.');
             await fetchTasks();
+            await fetchDashboardData();
             await fetchBinRecords();
         } catch (err: any) {
             error(err.message ?? 'Failed to restore task.');
@@ -3765,6 +3805,7 @@ export default function OpsAdminDashboard() {
             const data: any[] = await res.json();
             setReopenRequests(data.map((r: any) => ({
                 requestId: r.requestId,
+                referenceNumber: r.referenceNumber,
                 taskId: r.taskId,
                 taskTitle: r.taskTitle,
                 employeeName: r.employeeName,
@@ -3852,6 +3893,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to create task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setShowNew(false);
             success('Task created successfully.');
         } catch (err: any) {
@@ -3882,6 +3924,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to update task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setEditingTask(null);
             success('Task updated successfully.');
         } catch (err: any) {
@@ -3901,6 +3944,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to reopen task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setViewingTask(null);
             success('Task reopened.');
         } catch (err: any) {
@@ -3929,6 +3973,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to update task status.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setViewingTask(null);
             success('Task status updated successfully.');
         } catch (err: any) {
@@ -3955,6 +4000,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to process review decision.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             success(
                 adminDecision === 'Approve & Close'
                     ? 'Task officially closed and recorded.'
@@ -4017,6 +4063,7 @@ export default function OpsAdminDashboard() {
                     : r
             ));
             await fetchTasks();
+            await fetchDashboardData();
             setReviewingRequest(null);
             success('Reopening request approved � Task reopened � Task history preserved � Audit Log entry generated.');
         } catch (err: any) {
@@ -4047,6 +4094,7 @@ export default function OpsAdminDashboard() {
                     ? { ...r, status: 'Rejected', adminRemarks, reviewedAt: new Date().toISOString() }
                     : r
             ));
+            await fetchDashboardData();
             setReviewingRequest(null);
             success('Reopening request rejected � Original task preserved � Audit Log entry generated.');
         } catch (err: any) {
@@ -4085,6 +4133,8 @@ export default function OpsAdminDashboard() {
                     setDetailTask(null);
                     success('Task deleted successfully.');
 
+                    await fetchTasks();
+                    await fetchDashboardData();
                     await fetchBinRecords();
 
                 } catch (err: any) {
@@ -4140,6 +4190,7 @@ export default function OpsAdminDashboard() {
 
         connection.on('DashboardDataChanged', () => {
             fetchDashboardData();
+            fetchTasks();
             window.dispatchEvent(new CustomEvent('opencode-notification-update'));
         });
 
@@ -4175,7 +4226,12 @@ export default function OpsAdminDashboard() {
                                     <div
                                         key={tab}
                                         className={`nav-item${isActive ? ' nav-item-active' : ''}`}
-                                        onClick={() => setActiveTab(tab)}
+                                        onClick={() => {
+                                            if (activeTab === tab) return;
+                                            setViewingTask(null); setEditingTask(null); setDetailTask(null);
+                                            setOverrideTask(null); setReviewTask(null); setReviewingRequest(null);
+                                            setActiveTab(tab);
+                                        }}
                                     >
                                         <Icon size={18} />
                                         <span className="nav-item-label">{label}</span>

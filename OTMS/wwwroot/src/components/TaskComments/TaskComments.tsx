@@ -11,6 +11,7 @@ interface CommentDTO {
     taskCommentId: string;
     taskId: string;
     employeeId: string;
+    accountId?: string;
     authorName: string;
     message: string;
     attachmentUrl?: string;
@@ -35,11 +36,24 @@ const authHeader = (): HeadersInit => ({
     Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
 });
 
+const getCurrentAccountId = (): string => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return '';
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload[
+            'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'
+        ] ?? payload.sub ?? payload.nameid ?? '';
+    } catch { return ''; }
+};
+
 const TaskComments: React.FC<TaskCommentsProps> = ({
     taskId,
-    currentEmployeeId,
+    currentEmployeeId: _propId,
     apiBase = '/api/taskComment',
 }) => {
+    const currentUserId = getCurrentAccountId();
+    const currentEmployeeId = currentUserId || _propId;
     const [comments, setComments] = useState<CommentDTO[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -58,17 +72,14 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
         try {
             const res = await fetch(`${apiBase}/task/${taskId}`, { headers: authHeader() });
             if (res.status === 404) {
-                const errBody = await res.json().catch(() => ({}));
-                if (errBody.message === 'Task not found.') {
-                    setError('Task not found.');
-                }
                 setComments([]);
                 return;
             }
             if (!res.ok) throw new Error('Failed to load comments.');
             const json = await res.json();
             setComments(json.data ?? []);
-        } catch {
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load comments.');
             setComments([]);
         } finally {
             setLoading(false);
@@ -179,7 +190,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
     };
 
     const isOwnComment = (c: CommentDTO) =>
-        c.employeeId === currentEmployeeId || c.employeeId.toUpperCase() === currentEmployeeId.toUpperCase();
+        c.accountId === currentUserId || c.accountId?.toUpperCase() === currentUserId.toUpperCase();
 
     return (
         <div className="tc-container">
