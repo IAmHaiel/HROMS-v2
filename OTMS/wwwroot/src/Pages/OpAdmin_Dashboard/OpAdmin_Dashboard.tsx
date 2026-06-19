@@ -1480,6 +1480,21 @@ const DashboardTab: React.FC<{
                                 <h3>Employee Workload Distribution</h3>
                                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{workloads.length} employees</span>
                             </div>
+                            {workloadChartData.length === 0 ? (
+                                <EmptyState title="No workload data available." />
+                            ) : (
+                                <ResponsiveContainer width="100%" height={Math.max(200, workloads.length * 36)}>
+                                    <BarChart data={workloadChartData} margin={{ left: -10, right: 10, top: 0, bottom: 0 }} barCategoryGap="20%">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                        <YAxis tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 12 }} />
+                                        <Bar dataKey="Total" fill="var(--primary)" radius={[3, 3, 0, 0]} name="Total" />
+                                        <Bar dataKey="Completed" fill="var(--status-active)" radius={[3, 3, 0, 0]} name="Completed" />
+                                        <Bar dataKey="Overdue" fill="var(--status-failed)" radius={[3, 3, 0, 0]} name="Overdue" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
                         </div>
 
                         <div className="card">
@@ -1527,12 +1542,23 @@ const DashboardTab: React.FC<{
                         title="Workload Summary per Employee"
                         filterElements={
                             <>
-                                <input type="date" value={filters.dateStart}
-                                    onChange={e => onFilterChange({ ...filters, dateStart: e.target.value })}
-                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
-                                <input type="date" value={filters.dateEnd}
-                                    onChange={e => onFilterChange({ ...filters, dateEnd: e.target.value })}
-                                    style={{ height: 38, width: 145, fontSize: '0.82rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--border)', padding: '0 10px', background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none' }} />
+                                {[{ label: '1 Month', months: 1 }, { label: '3 Months', months: 3 }, { label: '6 Months', months: 6 }, { label: '12 Months', months: 12 }].map(p => {
+                                    const isActive = filters.dateStart && filters.dateEnd && (() => {
+                                        const end = new Date(); const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                        return filters.dateStart === start.toISOString().split('T')[0];
+                                    })();
+                                    return (
+                                        <span key={p.label} className={`filter-pill${isActive ? ' active' : ''}`}
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                const end = new Date(); const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                                onFilterChange({ ...filters, dateStart: start.toISOString().split('T')[0], dateEnd: end.toISOString().split('T')[0] });
+                                            }}
+                                            style={{ fontSize: 12, padding: '6px 12px', height: 38, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                                            {p.label}
+                                        </span>
+                                    );
+                                })}
                                 <select value={filters.employeeId}
                                     onChange={e => onFilterChange({ ...filters, employeeId: e.target.value })}>
                                     <option value="">All Employees</option>
