@@ -166,6 +166,10 @@ namespace OTMS.Service.Services
                 .Include(t => t.Assignee)
                     .ThenInclude(a => a.Employee)
                         .ThenInclude(e => e.Department)
+                .Include(t => t.Assignee)
+                    .ThenInclude(a => a.Employee)
+                        .ThenInclude(e => e.JobPosition)
+                            .ThenInclude(jp => jp.Department)
                 .Where(t => !t.Deleted && !t.PermanentlyDeleted)
                 .AsQueryable();
 
@@ -231,7 +235,9 @@ namespace OTMS.Service.Services
                 });
             }
 
-            var deptGroups = tasks.GroupBy(t => t.Assignee?.Employee?.Department?.Name ?? "Unassigned");
+            var deptGroups = tasks.GroupBy(t => t.Assignee?.Employee?.Department?.Name
+                ?? t.Assignee?.Employee?.JobPosition?.Department?.Name
+                ?? "Unassigned");
             foreach (var group in deptGroups)
             {
                 report.WorkloadByDepartment.Add(new WorkloadDistributionDTO
