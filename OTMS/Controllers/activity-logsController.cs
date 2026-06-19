@@ -62,6 +62,28 @@ namespace OTMS.Controllers
             }
         }
         /// <summary>
+        /// Get paginated activity logs for the currently authenticated user.
+        /// </summary>
+        [Authorize]
+        [HttpGet("my-logs")]
+        public async Task<IActionResult> GetMyActivityLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                var accountIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(accountIdClaim) || !Guid.TryParse(accountIdClaim, out var accountId))
+                    return Unauthorized(new { message = "Invalid user token." });
+
+                var logs = await activityLogService.GetMyActivityLogsPagedAsync(accountId, page, pageSize);
+                return Ok(logs);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Get activity logs for a specific employee.
         /// </summary>
         [Authorize(Policy = "Permissions.SystemAdmin.FullAccess")]

@@ -13,5 +13,7 @@ namespace OTMS.Service.Interfaces
 
         // [Code Addition] Fetch activity logs based on the employee number (used in employee details).
         Task<IEnumerable<object>> GetEmployeeActivityLogsAsync(string employeeNumber);
+
+        Task<object> GetMyActivityLogsPagedAsync(Guid accountId, int page = 1, int pageSize = 20);
     }
 }

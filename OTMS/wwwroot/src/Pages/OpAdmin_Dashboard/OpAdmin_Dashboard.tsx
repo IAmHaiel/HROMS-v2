@@ -39,6 +39,7 @@ import {
     ToggleLeft,
     Copy,
     Clock,
+    Activity,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import './OpAdmin_Dashboard.css';
@@ -135,7 +136,8 @@ type NavTab =
     | 'profile'
     | 'reopen'
     | 'templates'
-    | 'approvals';
+    | 'approvals'
+    | 'activity_logs';
 
 interface TeamMember {
     accountId: string;
@@ -335,6 +337,7 @@ const NAV_GROUPS = [
         items: [
             { tab: 'profile' as NavTab, icon: UserCircle2, label: 'Profile' },
             { tab: 'leave' as NavTab, icon: CalendarDays, label: 'Leave Requests' },
+            { tab: 'activity_logs' as NavTab, icon: Activity, label: 'Activity Logs' },
         ],
     },
 ];
@@ -3532,6 +3535,29 @@ export default function OpsAdminDashboard() {
     const [dashboardDepartments, setDashboardDepartments] = useState<DepartmentFilterOption[]>([]);
     const [dashboardFilters, setDashboardFilters] = useState({ dateStart: '', dateEnd: '', employeeId: '', departmentId: '', taskStatus: '' });
 
+    // -- Activity Logs --
+    const [activityLogs, setActivityLogs] = useState<any[]>([]);
+    const [activityLogPage, setActivityLogPage] = useState(1);
+    const [activityLogTotalPages, setActivityLogTotalPages] = useState(1);
+    const ACTIVITY_LOG_PAGE_SIZE = 15;
+
+    const fetchActivityLogs = (page: number) => {
+        const t = token();
+        if (!t) return;
+        fetch(`/api/activity-logs/my-logs?page=${page}&pageSize=${ACTIVITY_LOG_PAGE_SIZE}`, { headers: { Authorization: `Bearer ${t}` }, cache: 'no-store' })
+            .then(res => { if (!res.ok) return null; return res.json(); })
+            .then(data => {
+                if (data && Array.isArray(data.data)) {
+                    setActivityLogs(data.data);
+                    setActivityLogPage(data.pageNumber || page);
+                    setActivityLogTotalPages(data.totalPages || 1);
+                } else {
+                    setActivityLogs([]);
+                }
+            })
+            .catch(() => setActivityLogs([]));
+    };
+
     const fetchDashboardData = useCallback(async () => {
         setDashboardLoading(true);
         setDashboardError(null);
@@ -4102,6 +4128,7 @@ export default function OpsAdminDashboard() {
     // -- Fetch dashboard data when filters change --
     useEffect(() => {
         fetchDashboardData();
+        fetchActivityLogs(1);
     }, [fetchDashboardData]);
 
     // -- SignalR: Auto-refresh dashboard when task data changes --
@@ -4246,6 +4273,41 @@ export default function OpsAdminDashboard() {
                         requests={reopenRequests}
                         onReview={req => setReviewingRequest(req)}
                     />
+                )}
+                {activeTab === 'activity_logs' && (
+                    <div className="dashboard-content">
+                        <DataTable
+                            title="My Activity Logs"
+                            headers={['Date & Time', 'Activity Type', 'Description']}
+                            loading={false}
+                            emptyMessage="No activity logs found."
+                            emptyIcon={<Activity size={24} />}
+                            totalRecords={activityLogs.length}
+                            currentPage={activityLogPage}
+                            totalPages={activityLogTotalPages}
+                            onPageChange={p => fetchActivityLogs(p)}
+                        >
+                            {activityLogs.map((log: any) => (
+                                <tr key={log.activityLogId}>
+                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                        {new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td>
+                                        <span style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
+                                            background: log.activityType === 'Login' ? 'var(--status-active-bg)' :
+                                                log.activityType === 'Logout' ? 'var(--status-pending-bg)' : 'var(--status-new-bg)',
+                                            color: log.activityType === 'Login' ? 'var(--status-active)' :
+                                                log.activityType === 'Logout' ? 'var(--status-pending)' : 'var(--status-new)',
+                                        }}>
+                                            {log.activityType}
+                                        </span>
+                                    </td>
+                                    <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{log.description}</td>
+                                </tr>
+                            ))}
+                        </DataTable>
+                    </div>
                 )}
             </main>
 

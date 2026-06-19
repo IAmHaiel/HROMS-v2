@@ -31,6 +31,7 @@ import {
     RefreshCw,
     LogOut,
     Mail,
+    Activity,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -48,12 +49,13 @@ import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digi
 import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import FormModal from '../../components/FormModal/FormModal';
 import EmptyState from '../../components/ui/EmptyState';
+import DataTable from '../../components/ui/DataTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
 type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'pending-review' | 'done' | 'completed' | 'overdue';
-type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
+type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201' | 'activity_logs';
 
 interface Task {
     id: string;
@@ -227,6 +229,7 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
             { tab: 'digital_201', icon: FileText, label: 'Digital 201 File' },
             { tab: 'leave', icon: CalendarDays, label: 'Leave' },
             { tab: 'profile', icon: UserCircle2, label: 'Profile' },
+            { tab: 'activity_logs', icon: Activity, label: 'Activity Logs' },
         ],
     },
 ];
@@ -1479,6 +1482,29 @@ export default function EmployeeDashboard() {
         accountStatus: 'Active',
     });
 
+    // -- Activity Logs --
+    const [activityLogs, setActivityLogs] = useState<any[]>([]);
+    const [activityLogPage, setActivityLogPage] = useState(1);
+    const [activityLogTotalPages, setActivityLogTotalPages] = useState(1);
+    const ACTIVITY_LOG_PAGE_SIZE = 15;
+
+    const fetchActivityLogs = (page: number) => {
+        const t = localStorage.getItem('authToken');
+        if (!t) return;
+        fetch(`/api/activity-logs/my-logs?page=${page}&pageSize=${ACTIVITY_LOG_PAGE_SIZE}`, { headers: { Authorization: `Bearer ${t}` }, cache: 'no-store' })
+            .then(res => { if (!res.ok) return null; return res.json(); })
+            .then(data => {
+                if (data && Array.isArray(data.data)) {
+                    setActivityLogs(data.data);
+                    setActivityLogPage(data.pageNumber || page);
+                    setActivityLogTotalPages(data.totalPages || 1);
+                } else {
+                    setActivityLogs([]);
+                }
+            })
+            .catch(() => setActivityLogs([]));
+    };
+
     const handleLogout = async () => {
         const token = localStorage.getItem('authToken');
         if (token) {
@@ -1566,6 +1592,7 @@ export default function EmployeeDashboard() {
 
         fetchTasks();
         fetchLeaveRecords();
+        fetchActivityLogs(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -1717,6 +1744,41 @@ export default function EmployeeDashboard() {
                             employeeNumber={user.employeeId}
                             readOnly={false}
                         />
+                    </div>
+                )}
+                {activeTab === 'activity_logs' && (
+                    <div className="dashboard-content" style={{ padding: '0 28px 28px' }}>
+                        <DataTable
+                            title="My Activity Logs"
+                            headers={['Date & Time', 'Activity Type', 'Description']}
+                            loading={false}
+                            emptyMessage="No activity logs found."
+                            emptyIcon={<Activity size={24} />}
+                            totalRecords={activityLogs.length}
+                            currentPage={activityLogPage}
+                            totalPages={activityLogTotalPages}
+                            onPageChange={p => fetchActivityLogs(p)}
+                        >
+                            {activityLogs.map((log: any) => (
+                                <tr key={log.activityLogId}>
+                                    <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                        {new Date(log.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td>
+                                        <span style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
+                                            background: log.activityType === 'Login' ? 'var(--status-active-bg)' :
+                                                log.activityType === 'Logout' ? 'var(--status-pending-bg)' : 'var(--status-new-bg)',
+                                            color: log.activityType === 'Login' ? 'var(--status-active)' :
+                                                log.activityType === 'Logout' ? 'var(--status-pending)' : 'var(--status-new)',
+                                        }}>
+                                            {log.activityType}
+                                        </span>
+                                    </td>
+                                    <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{log.description}</td>
+                                </tr>
+                            ))}
+                        </DataTable>
                     </div>
                 )}
             </main>

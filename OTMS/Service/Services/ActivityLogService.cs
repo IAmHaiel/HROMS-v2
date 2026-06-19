@@ -168,6 +168,44 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<object> GetMyActivityLogsPagedAsync(Guid accountId, int page = 1, int pageSize = 20)
+        {
+            var totalRecords = await context.ActivityLogs
+                .CountAsync(al => al.AccountId == accountId);
+            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
+            var logs = await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .Where(al => al.AccountId == accountId)
+                .OrderByDescending(al => al.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+
+            return new
+            {
+                IsSuccess = true,
+                Message = "Activity logs retrieved successfully.",
+                Data = logs,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
+        }
+
         // [Code Addition] Dedicated method to fetch activity logs for a specific employee number, primarily utilized by EmployeeDetailPanel.
         public async Task<IEnumerable<object>> GetEmployeeActivityLogsAsync(string employeeNumber)
         {

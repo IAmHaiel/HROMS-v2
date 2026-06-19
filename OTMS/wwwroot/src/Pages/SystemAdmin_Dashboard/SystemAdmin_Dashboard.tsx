@@ -197,7 +197,6 @@ interface EmploymentContract {
 interface ConfirmModalState {
     isOpen: boolean;
     variant: 'danger' | 'warning' | 'info' | 'success' | 'neutral';
-    icon?: string;
     title: string;
     description: React.ReactNode;
     notice?: string;
@@ -429,7 +428,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     const [successData, setSuccessData] = useState<{ employeeNumber: string } | null>(null);
     const [empNumLoading, setEmpNumLoading] = useState(true);
     const [empNumError, setEmpNumError] = useState('');
-        const [departments, setDepartments] = useState<DepartmentResponseDTO[]>([]);
+    const [departments, setDepartments] = useState<DepartmentResponseDTO[]>([]);
     const [jobPositions, setJobPositions] = useState<JobPositionResponseDTO[]>([]);
     const [availableRoles, setAvailableRoles] = useState<string[]>(['Systems Admin', 'Operations Admin', 'Coordinator', 'Encoder']);
     const [loadingOrg, setLoadingOrg] = useState(true);
@@ -441,29 +440,29 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
             try {
                 const token = localStorage.getItem('authToken');
                 const headers = { 'Authorization': `Bearer ${token}` };
-                
+
                 const [dRes, pRes, rRes] = await Promise.all([
                     fetch('/api/organization/departments', { headers }),
                     fetch('/api/organization/job-positions', { headers }),
                     fetch('/api/roles', { headers })
                 ]);
-                
+
                 if (dRes.ok && pRes.ok && rRes.ok) {
                     const deptsData = await dRes.json();
                     const posData = await pRes.json();
                     const rolesData = await rRes.json();
-                    
+
                     const rawDepts = Array.isArray(deptsData) ? deptsData : deptsData.data ?? deptsData.$values ?? [];
                     const rawPos = Array.isArray(posData) ? posData : posData.data ?? posData.$values ?? [];
                     const rawRoles = Array.isArray(rolesData) ? rolesData : rolesData.data ?? rolesData.$values ?? [];
-                    
+
                     setDepartments(rawDepts.map((d: any) => ({
                         departmentId: d.departmentId ?? d.DepartmentId,
                         name: d.name ?? d.Name,
                         isActive: d.isActive ?? d.IsActive ?? ((d.status ?? d.Status) === 'Active'),
                         status: d.status ?? d.Status ?? 'Active'
                     })).filter((d: any) => d.status === 'Active' || d.isActive !== false));
-                    
+
                     setJobPositions(rawPos.map((p: any) => ({
                         jobPositionId: p.jobPositionId ?? p.JobPositionId,
                         name: p.name ?? p.Name,
@@ -514,7 +513,7 @@ function AddEmployeeModal({ onClose, onSuccess }: AddEmployeeModalProps) {
     }, []);
 
     // Derive available positions based on selected department
-    const availablePositions = form.departmentId 
+    const availablePositions = form.departmentId
         ? jobPositions.filter(p => p.departmentId === form.departmentId)
         : [];
 
@@ -901,7 +900,6 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             setConfirmModal({
                 isOpen: true,
                 variant: 'warning',
-                icon: 'ti-alert-triangle',
                 title: 'Discard unsaved changes?',
                 description: (
                     <>
@@ -1018,9 +1016,6 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             variant: form.accountStatus !== employee.accountStatus
                 ? (form.accountStatus === 'Active' ? 'success' : 'warning')
                 : 'info',
-            icon: form.accountStatus !== employee.accountStatus
-                ? (form.accountStatus === 'Active' ? 'ti-user-check' : 'ti-user-off')
-                : 'ti-lock',
             title: form.accountStatus !== employee.accountStatus
                 ? `${form.accountStatus === 'Active' ? 'Activate' : 'Deactivate'} employee account?`
                 : 'Confirm your identity',
@@ -1102,9 +1097,8 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
     const handleDelete = () => {
         setConfirmModal({
             isOpen: true,
-            variant: 'danger',
-            icon: 'ti-trash',
-            title: 'Delete employee record?',
+                variant: 'danger',
+                title: 'Delete employee record?',
             description: (
                 <>
                     This will permanently remove <strong>{displayName}</strong> and all associated
@@ -1260,12 +1254,11 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             <ConfirmationModal
                 isOpen={confirmModal.isOpen}
                 variant={confirmModal.variant}
-                icon={confirmModal.icon}
                 title={confirmModal.title}
                 description={confirmModal.description}
                 notice={confirmModal.notice}
                 confirmLabel={confirmModal.confirmLabel}
-                isLoading={submitting}
+                isLoading={submitting || gateLoading}
                 onConfirm={confirmModal.onConfirm}
                 onCancel={() => setConfirmModal(CONFIRM_CLOSED)}
             />
@@ -2010,7 +2003,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
         setConfirmModal({
             isOpen: true,
             variant: 'success',
-            icon: 'ti-lock',
             title: 'Confirm your identity',
             description: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2133,7 +2125,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
         setConfirmModal({
             isOpen: true,
             variant: 'warning',
-            icon: 'ti-lock',
             title: 'Change your password?',
             description: 'You are about to update your login password. You will continue to be logged in after the change.',
             notice: 'Make sure you remember the new password before confirming.',
@@ -2142,7 +2133,7 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                 setPwSaving(true);
                 try {
                     const token = localStorage.getItem('authToken');
-                    const res = await fetch('/api/systemadmin/change-password', {
+                    const res = await fetch('/api/profile/change-password', {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
@@ -2158,7 +2149,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     setConfirmModal({
                         isOpen: true,
                         variant: 'success',
-                        icon: 'ti-check',
                         title: 'Password updated',
                         description: 'Your password has been changed successfully. Use your new password the next time you log in.',
                         confirmLabel: 'Got it',
@@ -2295,7 +2285,6 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
             <ConfirmationModal
                 isOpen={confirmModal.isOpen}
                 variant={confirmModal.variant}
-                icon={confirmModal.icon}
                 title={confirmModal.title}
                 description={confirmModal.description}
                 notice={confirmModal.notice}
@@ -2348,7 +2337,6 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
         setConfirmModal({
             isOpen: true,
             variant: isApprove ? 'success' : 'danger',
-            icon: isApprove ? 'ti-shield-check' : 'ti-shield-off',
             title: isApprove ? 'Approve emergency override?' : 'Reject override request?',
             description: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2497,7 +2485,6 @@ function EmergencyOverridesTab({ overrides, loading, overridePage, overrideTotal
             <ConfirmationModal
                 isOpen={confirmModal.isOpen}
                 variant={confirmModal.variant}
-                icon={confirmModal.icon}
                 title={confirmModal.title}
                 description={confirmModal.description}
                 notice={confirmModal.notice}
@@ -2756,8 +2743,8 @@ const GovernmentRecordsTab: React.FC = () => {
                                     <div className="field" key={field}>
                                         <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
                                             {field === 'sssNumber' ? 'SSS Number' :
-                                             field === 'philhealthNumber' ? 'PhilHealth Number' :
-                                             field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
+                                                field === 'philhealthNumber' ? 'PhilHealth Number' :
+                                                    field === 'pagibigNumber' ? 'Pag-IBIG Number' : 'TIN'} *
                                         </label>
                                         {editMode ? (
                                             <>
@@ -3302,10 +3289,10 @@ export default function Dashboard() {
                             emptyIcon={<Activity size={24} />}
                             totalRecords={activityLogs.length}
                             currentPage={activityLogPage}
-                            totalPages={Math.max(1, Math.ceil(activityLogs.length / ACTIVITY_LOG_PAGE_SIZE))}
-                            onPageChange={setActivityLogPage}
+                            totalPages={activityLogTotalPages}
+                            onPageChange={p => fetchActivityLogs(p)}
                         >
-                            {activityLogs.slice((activityLogPage - 1) * ACTIVITY_LOG_PAGE_SIZE, activityLogPage * ACTIVITY_LOG_PAGE_SIZE).map(log => {
+                            {activityLogs.map(log => {
                                 const empName = [log.firstName, log.middleName, log.lastName, log.suffix].filter(Boolean).join(' ');
                                 return (
                                     <tr key={log.activityLogId}>
@@ -3317,10 +3304,10 @@ export default function Dashboard() {
                                                 display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 999, fontSize: '0.72rem', fontWeight: 600,
                                                 background: log.activityType === 'Login' ? 'var(--status-active-bg)' :
                                                     log.activityType === 'Logout' ? 'var(--status-pending-bg)' :
-                                                    'var(--status-new-bg)',
+                                                        'var(--status-new-bg)',
                                                 color: log.activityType === 'Login' ? 'var(--status-active)' :
                                                     log.activityType === 'Logout' ? 'var(--status-pending)' :
-                                                    'var(--status-new)',
+                                                        'var(--status-new)',
                                             }}>
                                                 {log.activityType}
                                             </span>
@@ -3357,7 +3344,6 @@ export default function Dashboard() {
             <ConfirmationModal
                 isOpen={!!deleteConfirmEmp}
                 variant="danger"
-                icon="ti-trash"
                 title="Delete employee record?"
                 description={
                     deleteConfirmEmp ? (
@@ -3402,7 +3388,6 @@ export default function Dashboard() {
             <ConfirmationModal
                 isOpen={logoutConfirm}
                 variant="neutral"
-                icon="ti-logout"
                 title="Log out of OTMS?"
                 description="You will be signed out of your current session. Any unsaved changes will be lost."
                 confirmLabel="Log out"
