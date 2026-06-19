@@ -423,6 +423,17 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Users.View")]
         [ProducesResponseType(typeof(ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>), 200)]
+        [HttpGet("documents")]
+        public async Task<IActionResult> GetAllEmployeeDocuments([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] string? documentType, [FromQuery] bool? isArchived)
+        {
+            var result = await accountManagementService.GetAllEmployeeDocuments(request, search, documentType, isArchived);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
         [HttpGet("contracts")]
         public async Task<IActionResult> GetAllEmploymentContracts([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] bool? isArchived)
         {
