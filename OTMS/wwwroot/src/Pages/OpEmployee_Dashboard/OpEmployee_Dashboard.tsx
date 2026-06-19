@@ -52,7 +52,7 @@ import EmptyState from '../../components/ui/EmptyState';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Priority = 'high' | 'medium' | 'low';
-type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'done' | 'completed' | 'overdue';
+type TaskStatus = 'pending' | 'assigned' | 'in-progress' | 'pending-review' | 'done' | 'completed' | 'overdue';
 type NavTab = 'dashboard' | 'my-tasks' | 'leave' | 'profile' | 'digital_201';
 
 interface Task {
@@ -131,11 +131,11 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
     };
     const statusMap: Record<string, TaskStatus> = {
         Draft: 'pending', Pending: 'pending', Assigned: 'assigned',
-        'In Progress': 'in-progress', Done: 'done', Completed: 'completed',
+        'In Progress': 'in-progress', 'Pending Admin Review': 'pending-review', Done: 'done', Completed: 'completed',
     };
     const status: TaskStatus = statusMap[dto.taskStatus] ?? 'pending';
     const defaultProgress: Record<TaskStatus, number> = {
-        pending: 0, assigned: 0, 'in-progress': 50, done: 90, completed: 100, overdue: 0,
+        pending: 0, assigned: 0, 'in-progress': 50, 'pending-review': 90, done: 90, completed: 100, overdue: 0,
     };
     return {
         id: dto.taskId,
@@ -159,7 +159,7 @@ const fmtDate = (d: string): string => {
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.status !== 'completed' && t.status !== 'done' && t.status !== 'assigned' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
+    t.status !== 'completed' && t.status !== 'done' && t.status !== 'pending-review' && t.status !== 'assigned' && !!t.deadline && new Date(t.deadline + 'T00:00:00') < new Date();
 
 const effectiveStatus = (t: Task): TaskStatus =>
     isEffectivelyOverdue(t) ? 'overdue' : t.status;
@@ -182,6 +182,7 @@ const statusMeta: Record<string, { label: string; cls: string; icon: React.React
     pending: { label: 'Pending', cls: 'badge-blue', icon: <Clock size={11} /> },
     assigned: { label: 'Assigned', cls: 'badge-purple', icon: <Clock size={11} /> },
     'in-progress': { label: 'In Progress', cls: 'badge-amber', icon: <Loader2 size={11} /> },
+    'pending-review': { label: 'Pending Review', cls: 'badge-purple', icon: <Eye size={11} /> },
     done: { label: 'Done', cls: 'badge-blue', icon: <CheckCircle2 size={11} /> },
     completed: { label: 'Completed', cls: 'badge-green', icon: <CheckCircle2 size={11} /> },
     overdue: { label: 'Overdue', cls: 'badge-red', icon: <AlertCircle size={11} /> },
@@ -190,10 +191,9 @@ const statusMeta: Record<string, { label: string; cls: string; icon: React.React
 const FSM_EMPLOYEE_TRANSITIONS: Record<string, TaskStatus[]> = {
     pending: ['in-progress'],
     assigned: ['in-progress'],
-    'in-progress': ['done'],
+    'in-progress': ['pending-review'],
     done: [],
     completed: [],
-    overdue: [],
 };
 
 const priorityMeta: Record<Priority, { cls: string; bar: string }> = {
@@ -314,7 +314,7 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
         }
         setFsmError('');
         setStatus(s);
-        if (s === 'done') setProgress(100);
+        if (s === 'pending-review') setProgress(100);
         if (s === 'in-progress' && progress === 0) setProgress(25);
     };
 
@@ -1571,7 +1571,7 @@ export default function EmployeeDashboard() {
 
     const toBackendStatus = (status: TaskStatus): string => ({
         pending: 'Pending', assigned: 'Assigned', 'in-progress': 'In Progress',
-        done: 'Done', completed: 'Completed', overdue: 'In Progress',
+        'pending-review': 'Pending Admin Review', done: 'Done', completed: 'Completed', overdue: 'In Progress',
     }[status] ?? 'Assigned');
 
     const handleSaveProgress = async (

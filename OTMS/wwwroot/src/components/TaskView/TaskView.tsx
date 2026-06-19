@@ -129,7 +129,7 @@ const TaskView: React.FC<TaskViewProps> = ({
     const [activeTab, setActiveTab] = useState<'details' | 'comments'>('details');
     const [reviewState, setReviewState] = useState<ReviewState>(
         task.taskStatus === 'Completed' ? 'approved' :
-            task.taskStatus === 'Done' ? 'pending_review' : 'none'
+            task.taskStatus === 'Pending Admin Review' ? 'pending_review' : 'none'
     );
     const [reviewHistory, setReviewHistory] = useState<ReviewHistoryEntry[]>([]);
     const [showRejectModal, setShowRejectModal] = useState(false);

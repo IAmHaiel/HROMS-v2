@@ -624,6 +624,12 @@ namespace OTMS.Service.Services
                 throw new Exception("This task is completed and immutable. To make any changes, an Admin permission is required, or you must reopen the task first.");
             }
 
+            // Non-admin employees cannot directly mark as Completed or Done
+            if (!isAdmin && (request.TaskStatus == "Completed" || request.TaskStatus == "Done"))
+            {
+                request.TaskStatus = "Pending Admin Review";
+            }
+
             // FSM Validation — strict linear progression, no reversions
             bool isStatusChanged = task.TaskStatus != request.TaskStatus;
             if (isStatusChanged)
@@ -639,7 +645,19 @@ namespace OTMS.Service.Services
                 {
                     isValidTransition = true;
                 }
-                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done")
+                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Pending Admin Review")
+                {
+                    if (!isAdmin && string.IsNullOrWhiteSpace(request.ProgressNotes))
+                    {
+                        throw new Exception("Completion notes are required to submit for review.");
+                    }
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "In Progress" && request.TaskStatus == "Done" && isAdmin)
+                {
+                    isValidTransition = true;
+                }
+                else if (task.TaskStatus == "Done" && request.TaskStatus == "Completed" && isAdmin)
                 {
                     isValidTransition = true;
                 }
@@ -702,24 +720,32 @@ namespace OTMS.Service.Services
                 await notificationService
                     .CreateCompletedTaskUpdateNotificationAsync(task);
             }
+            else if (task.TaskStatus == "Pending Admin Review")
+            {
+                await notificationService
+                    .CreateTaskReviewRequestedNotificationAsync(task);
+            }
             else
             {
                 await notificationService
                     .CreateTaskUpdateNotificationAsync(task);
             }
 
-            await activityLogService.LogActivityAsync(
-                task.AssignedTo.Value,
-                ActivityTypes.TaskUpdated,
-                $"{string.Join(" ", new[]
-                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
+            if (task.AssignedTo.HasValue && task.Assignee != null)
+            {
+                var assigneeName = string.Join(" ", new[]
+                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-            // Activity Log
-            await activityLogService.LogActivityAsync(
-                loggedInAccountId,
-                "Task Progress Update",
-                $"{string.Join(" ", new[]
-                    {task.Assignee.Employee.FirstName, task.Assignee.Employee.MiddleName, task.Assignee.Employee.LastName, task.Assignee.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
+                await activityLogService.LogActivityAsync(
+                    task.AssignedTo.Value,
+                    ActivityTypes.TaskUpdated,
+                    $"{assigneeName} updated the Task '{task.TaskTitle}' Progress at {DateTime.Now:hh:mm tt}");
+
+                await activityLogService.LogActivityAsync(
+                    loggedInAccountId,
+                    "Task Progress Update",
+                    $"{assigneeName} updated task '{task.TaskTitle}' to '{task.TaskStatus}'.");
+            }
 
             return new TaskResponseDTO
             {
@@ -1450,9 +1476,9 @@ namespace OTMS.Service.Services
 
             if (task == null) throw new Exception("Task not found.");
 
-            if (task.TaskStatus != "Done")
+            if (task.TaskStatus != "Pending Admin Review")
             {
-                string failureReason = $"Cannot review task. Task is not in 'Done' state. Current status: '{task.TaskStatus}'.";
+                string failureReason = $"Cannot review task. Task is not in 'Pending Admin Review' state. Current status: '{task.TaskStatus}'.";
                 await RecordTaskStatusAsync(taskId, task.TaskStatus, request.AdminDecision == "Approve & Close" ? "Completed" : "In Progress", loggedInAccountId, false, failureReason);
                 throw new Exception(failureReason);
             }
@@ -1462,7 +1488,7 @@ namespace OTMS.Service.Services
                 task.TaskStatus = "Completed";
                 task.UpdatedAt = DateTime.UtcNow;
 
-                await RecordTaskStatusAsync(taskId, "Done", "Completed", loggedInAccountId, true);
+                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "Completed", loggedInAccountId, true);
                 await context.SaveChangesAsync();
 
                 await notificationService.CreateTaskApprovedAndClosedNotificationAsync(task);
@@ -1481,7 +1507,7 @@ namespace OTMS.Service.Services
                     : $"{task.TaskRemarks}\n\n[Admin Rework Review]: {request.ReviewerRemarks}";
                 task.UpdatedAt = DateTime.UtcNow;
 
-                await RecordTaskStatusAsync(taskId, "Done", "In Progress", loggedInAccountId, true);
+                await RecordTaskStatusAsync(taskId, "Pending Admin Review", "In Progress", loggedInAccountId, true);
                 await context.SaveChangesAsync();
 
                 await notificationService.CreateTaskReturnedForReworkNotificationAsync(task);

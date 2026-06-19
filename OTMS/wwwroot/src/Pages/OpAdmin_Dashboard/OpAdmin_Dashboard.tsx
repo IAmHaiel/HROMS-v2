@@ -340,7 +340,7 @@ const NAV_GROUPS = [
 
 // --- Helpers ------------------------------------------------------------------
 const isEffectivelyOverdue = (t: Task): boolean =>
-    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Done' && !!t.dueAt && new Date(t.dueAt) < new Date();
+    t.taskStatus !== 'Completed' && t.taskStatus !== 'Draft' && t.taskStatus !== 'Done' && t.taskStatus !== 'Pending Admin Review' && !!t.dueAt && new Date(t.dueAt) < new Date();
 
 const getInitials = (name: string): string => {
     if (!name) return 'OA';
@@ -355,6 +355,7 @@ const statusBadgeClass = (s: string): string =>
     'Assigned': 'badge badge-purple',
     'Pending': 'badge badge-blue',
     'In Progress': 'badge badge-amber',
+    'Pending Admin Review': 'badge badge-purple',
     'Done': 'badge badge-blue',
     'Completed': 'badge badge-green',
     'Overdue': 'badge badge-red'
@@ -364,7 +365,8 @@ const statusBadgeClass = (s: string): string =>
 const FSM_TRANSITIONS: Record<string, string[]> = {
     'Draft': ['Assigned'],
     'Assigned': ['In Progress'],
-    'In Progress': ['Done'],
+    'In Progress': ['Pending Admin Review'],
+    'Pending Admin Review': ['Completed', 'In Progress'],
     'Done': ['Completed'],
     'Completed': [],
     'Pending': [],
@@ -1029,6 +1031,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
         'Assigned': 'Mark In Progress',
         'In Progress': 'Mark Done',
         'Done': 'Approve & Complete',
+        'Pending Admin Review': 'Review & Complete',
     };
 
     return (
@@ -1084,16 +1087,16 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                {canTransition && task.taskStatus !== 'Done' && (
+                {canTransition && task.taskStatus !== 'Pending Admin Review' && (
                     <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
                         title={`Transition to ${nextStatus}`}>
                         {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
                     </button>
                 )}
-                {task.taskStatus === 'Done' && (
+                {task.taskStatus === 'Pending Admin Review' && (
                     <button className="btn btn-primary" onClick={onReview}
-                        title="Review and complete task">
-                        <Eye size={13} /> Review & Complete
+                        title="Review task submission">
+                        <Eye size={13} /> Review Task
                     </button>
                 )}
                     {task.taskStatus === 'Completed' && (
@@ -1560,7 +1563,7 @@ const DashboardTab: React.FC<{
 
 // --- Tasks Tab ----------------------------------------------------------------
 
-const TASK_STATUS_FILTERS = ['Draft', 'Assigned', 'In Progress', 'Done', 'Completed', 'Overdue'];
+const TASK_STATUS_FILTERS = ['Draft', 'Assigned', 'In Progress', 'Pending Admin Review', 'Done', 'Completed', 'Overdue'];
 
 const PRIORITY_WEIGHTS: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
