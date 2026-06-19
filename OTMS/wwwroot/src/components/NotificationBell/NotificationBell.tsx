@@ -99,7 +99,7 @@ export default function NotificationBell({ apiEndpoint }: NotificationBellProps)
 
     useEffect(() => {
         fetchNotifs(1);
-        const interval = setInterval(() => fetchNotifs(notifPage), 30000);
+        const interval = setInterval(() => fetchNotifs(notifPage), 5000);
         return () => clearInterval(interval);
     }, [apiEndpoint]);
 

@@ -188,6 +188,12 @@ namespace OTMS.Service.Services
                     creatorId,
                     ActivityTypes.TaskCreated,
                     $"{creatorName} created task reference {taskReferenceNumber} '{request.TaskTitle}' as Draft.");
+
+                // Notify creator that the task was saved as Draft
+                await notificationService.CreateGeneralNotificationAsync(
+                    creatorId,
+                    "Task Created",
+                    $"Task ref#{taskReferenceNumber} '{request.TaskTitle}' was saved as Draft. Assign an employee to start the workflow.");
             }
 
             if (request.RecommendedEmployeeId.HasValue && assignedAccount != null)
@@ -999,7 +1005,10 @@ namespace OTMS.Service.Services
             // Save changes to database
             await context.SaveChangesAsync();
 
-            // Return a response indicating successful deletion
+            // Notify affected users about deletion
+            await notificationService.CreateTaskDeletedNotificationAsync(task);
+
+            // SignalR dashboard refresh
             await dashboardNotificationService.NotifyDashboardDataChangedAsync();
 
             return new TaskDeleteResponseDTO

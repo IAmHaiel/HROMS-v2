@@ -4082,6 +4082,7 @@ export default function OpsAdminDashboard() {
 
         connection.on('DashboardDataChanged', () => {
             fetchDashboardData();
+            window.dispatchEvent(new CustomEvent('opencode-notification-update'));
         });
 
         connection.start().then(() => {

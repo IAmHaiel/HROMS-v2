@@ -369,6 +369,38 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
         }
 
+        public async System.Threading.Tasks.Task CreateTaskDeletedNotificationAsync(Entities.Models.Task task)
+        {
+            var creatorNotification = new Notification
+            {
+                NotificationId = Guid.NewGuid(),
+                EmployeeId = task.CreatedBy,
+                TaskId = task.TaskId,
+                NotificationType = "Task Deleted",
+                Message = $"Task ref#{task.TaskReferenceNumber} '{task.TaskTitle}' was deleted.",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.Notifications.AddAsync(creatorNotification);
+
+            if (task.AssignedTo.HasValue)
+            {
+                var assigneeNotification = new Notification
+                {
+                    NotificationId = Guid.NewGuid(),
+                    EmployeeId = task.AssignedTo.Value,
+                    TaskId = task.TaskId,
+                    NotificationType = "Task Deleted",
+                    Message = $"Task ref#{task.TaskReferenceNumber} '{task.TaskTitle}' assigned to you was deleted by an administrator.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await context.Notifications.AddAsync(assigneeNotification);
+            }
+
+            await context.SaveChangesAsync();
+        }
 
         public async System.Threading.Tasks.Task<PaginationResponseDTO<NotificationResponseDTO>> GetMyNotificationsAsync(PaginationDTO request)
         {
