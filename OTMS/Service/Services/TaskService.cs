@@ -280,6 +280,11 @@ $"{string.Join(" ", new[]
                 {
                     throw new Exception("Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.");
                 }
+                // Delete old file before uploading new one
+                if (!string.IsNullOrEmpty(task.SupportingEvidenceUrl))
+                {
+                    fileService.DeleteFile(task.SupportingEvidenceUrl);
+                }
                 task.SupportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
             }
 
