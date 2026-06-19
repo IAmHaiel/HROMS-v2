@@ -324,8 +324,6 @@ namespace OTMS.Service.Services
             task.AssignedTo = request.AssignedTo;
             task.TaskRemarks = request.TaskRemarks;
 
-            task.UpdatedAt = DateTime.UtcNow;
-
             await context.SaveChangesAsync();
 
             // Reload assignee if changed
