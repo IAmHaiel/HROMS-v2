@@ -1577,13 +1577,13 @@ export default function EmployeeDashboard() {
     const handleSaveProgress = async (
         id: string, status: TaskStatus, progress: number, remarks: string
     ): Promise<void> => {
+        const formData = new FormData();
+        formData.append('TaskStatus', toBackendStatus(status));
+        if (remarks.trim()) formData.append('TaskRemarks', remarks.trim());
         const res = await fetch(`/api/task/${id}/progress`, {
             method: 'PATCH',
-            headers: authHeader(),
-            body: JSON.stringify({
-                TaskStatus: toBackendStatus(status),
-                TaskRemarks: remarks.trim() || undefined,
-            }),
+            headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+            body: formData,
         });
         if (res.status === 401) { handleLogout(); return; }
         if (!res.ok) {

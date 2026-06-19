@@ -196,7 +196,7 @@ const TaskView: React.FC<TaskViewProps> = ({
                     <div>
                         <span className="tv-review-banner-title">Awaiting completion review</span>
                         <span className="tv-review-banner-sub">
-                            {task.assignedEmployee} marked this task as done. Review and approve or reject.
+                            {task.assignedEmployee} submitted this task for review. Review and approve or reject.
                         </span>
                     </div>
                 </div>
