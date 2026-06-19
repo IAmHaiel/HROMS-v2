@@ -1638,7 +1638,7 @@ const TasksTab: React.FC<{
         <div className="dashboard-content">
             <DataTable
                 tabs={[
-                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.length },
+                    { key: 'active', label: 'Active Tasks', icon: <Package size={14} />, badge: tasks.filter(t => t.taskStatus !== 'Completed' && t.taskStatus !== 'Done').length || undefined },
                     { key: 'bin', label: 'Bin', icon: <Trash2 size={14} />, badge: deletedTasks.length },
                 ]}
                 activeTab={subTab}
