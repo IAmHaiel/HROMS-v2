@@ -187,8 +187,14 @@ export default function Login() {
             success('Login successful! Welcome back.');
 
             if (!data.isPasswordChanged) {
-                updateStatus('Please complete your profile.', 'info');
-                setTimeout(() => navigate('/onboarding?fresh=true'), 800);
+                const isSeededSysAdmin = employeeId.trim() === '0000';
+                if (isSeededSysAdmin) {
+                    updateStatus('Please set your password.', 'info');
+                    setTimeout(() => navigate('/set-password'), 800);
+                } else {
+                    updateStatus('Please complete your profile.', 'info');
+                    setTimeout(() => navigate('/onboarding?fresh=true'), 800);
+                }
                 return;
             }
 

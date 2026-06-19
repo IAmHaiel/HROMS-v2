@@ -47,26 +47,17 @@ namespace OTMS.Service.Services
             }
 
             var existingActive = await context.OnboardingTokens
-                .FirstOrDefaultAsync(ot => ot.ApplicantRecordId == applicantRecordId && ot.Status == "Active");
+                .Where(ot => ot.ApplicantRecordId == applicantRecordId && ot.Status == "Active")
+                .ToListAsync();
 
-            if (existingActive != null)
+            foreach (var t in existingActive)
             {
-                var frontendBaseUrl = configuration["FrontendBaseUrl"] ?? "http://localhost:5173";
-                var existingUrl = $"{frontendBaseUrl}/onboarding?token={existingActive.OnboardingTokenId}";
+                t.Status = "Expired";
+            }
 
-                return new ApiResponseDTO<OnboardingLinkResponseDTO>
-                {
-                    IsSuccess = true,
-                    Message = "An active onboarding link already exists.",
-                    Data = new OnboardingLinkResponseDTO
-                    {
-                        ApplicantRecordId = applicantRecordId,
-                        OnboardingUrl = existingUrl,
-                        TokenStatus = existingActive.Status,
-                        ExpiresAt = existingActive.ExpiresAt,
-                        CreatedAt = existingActive.CreatedAt
-                    }
-                };
+            if (existingActive.Count != 0)
+            {
+                await context.SaveChangesAsync();
             }
 
             var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(TokenByteLength))
@@ -353,6 +344,8 @@ namespace OTMS.Service.Services
                 if (employee.Account != null)
                 {
                     employee.Account.IsPasswordChanged = true;
+                    employee.Account.AccountStatus = "Active";
+                    employee.IsEmailVerified = true;
                     if (!string.IsNullOrEmpty(password))
                     {
                         employee.Account.PasswordHash = new PasswordHasher<Account>().HashPassword(employee.Account, password);

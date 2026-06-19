@@ -22,6 +22,9 @@ import {
     Mail,
     FileText,
     Download,
+    Eye,
+    EyeOff,
+    Lock,
 } from 'lucide-react';
 import './EmployeeDetailPanel.css';
 import { useToast } from '../../../components/Toast/Toast';
@@ -33,7 +36,7 @@ interface ConfirmModalState {
     isOpen: boolean;
     variant: 'neutral' | 'danger' | 'warning' | 'info' | 'success';
     title: string;
-    description: string;
+    description: React.ReactNode;
     notice?: string;
     confirmLabel?: string;
     cancelLabel?: string;
@@ -152,6 +155,10 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
     const [apiError, setApiError] = useState('');
     const { success, error } = useToast();
     const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
 
     const initialValues = {
         employeeName: profile.employeeName,
@@ -171,23 +178,7 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
         setApiError('');
     };
 
-    const executeSave = async (skipStatusConfirm = false) => {
-        if (form.accountStatus !== profile.accountStatus && !skipStatusConfirm) {
-            const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
-            setConfirmModal({
-                isOpen: true,
-                variant: 'warning',
-                title: `${form.accountStatus === 'Active' ? 'Activate' : 'Deactivate'} Account`,
-                description: `Are you sure you want to ${actionText} ${profile.employeeName}?`,
-                confirmLabel: form.accountStatus === 'Active' ? 'Activate' : 'Deactivate',
-                onConfirm: () => {
-                    setConfirmModal(CONFIRM_CLOSED);
-                    executeSave(true);
-                }
-            });
-            return;
-        }
-
+    const doSave = async () => {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('authToken');
@@ -291,6 +282,7 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
             setApiError(err.message ?? 'Something went wrong.');
         } finally {
             setSubmitting(false);
+            setConfirmModal(CONFIRM_CLOSED);
         }
     };
 
@@ -299,7 +291,97 @@ function EditProfileModal({ profile, onClose, onSaved, rolesList }: EditModalPro
             setApiError('Full name is required.');
             return;
         }
-        executeSave();
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setConfirmModal({
+            isOpen: true,
+            variant: form.accountStatus !== profile.accountStatus
+                ? (form.accountStatus === 'Active' ? 'success' : 'warning')
+                : 'info',
+            title: form.accountStatus !== profile.accountStatus
+                ? `${form.accountStatus === 'Active' ? 'Activate' : 'Deactivate'} Account`
+                : 'Confirm your identity',
+            description: form.accountStatus !== profile.accountStatus
+                ? `You are about to ${form.accountStatus === 'Active' ? 'activate' : 'deactivate'} ${profile.employeeName}. Enter your password to confirm.`
+                : 'Enter your password to save these changes.',
+            confirmLabel: form.accountStatus !== profile.accountStatus
+                ? (form.accountStatus === 'Active' ? 'Activate account' : 'Deactivate account')
+                : 'Verify & save',
+            onConfirm: () => {
+                setConfirmModal(CONFIRM_CLOSED);
+                setGatePassword('');
+                setGateError('');
+                setShowGatePassword(false);
+                setConfirmModal({
+                    isOpen: true,
+                    variant: 'info',
+                    title: 'Confirm your identity',
+                    description: (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                                Enter your password to confirm these changes.
+                            </p>
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    id="gate-pw-input"
+                                    type={showGatePassword ? 'text' : 'password'}
+                                    placeholder="Enter your current password"
+                                    style={{ width: '100%', paddingRight: 40, boxSizing: 'border-box' }}
+                                    autoFocus
+                                    onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') {
+                                            const btn = document.getElementById('gate-confirm-btn');
+                                            btn?.click();
+                                        }
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGatePassword(p => !p)}
+                                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}
+                                    tabIndex={-1}
+                                >
+                                    {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                                </button>
+                            </div>
+                            {gateError && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-danger)' }}>
+                                    <AlertCircle size={12} />{gateError}
+                                </div>
+                            )}
+                        </div>
+                    ),
+                    confirmLabel: gateLoading ? 'Verifying…' : 'Verify & save',
+                    onConfirm: async () => {
+                        const pw = (document.getElementById('gate-pw-input') as HTMLInputElement)?.value ?? gatePassword;
+                        if (!pw) { setGateError('Please enter your password.'); return; }
+                        setGateLoading(true);
+                        setGateError('');
+                        try {
+                            const token = localStorage.getItem('authToken');
+                            const adminId = localStorage.getItem('employeeId') ?? '';
+                            const res = await fetch('/api/authentication/verify-password', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                body: JSON.stringify({ employeeID: adminId, password: pw }),
+                            });
+                            if (!res.ok) {
+                                const err = await res.json().catch(() => ({}));
+                                throw new Error(err.message || 'Incorrect password. Please try again.');
+                            }
+                            setConfirmModal(CONFIRM_CLOSED);
+                            await doSave();
+                        } catch (err: any) {
+                            setGateError(err.message ?? 'Incorrect password. Please try again.');
+                        } finally {
+                            setGateLoading(false);
+                        }
+                    },
+                });
+            },
+        });
     };
 
     const infoCard = {

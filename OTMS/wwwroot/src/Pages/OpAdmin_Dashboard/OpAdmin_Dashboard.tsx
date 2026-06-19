@@ -2552,21 +2552,18 @@ function ProfileTab() {
     const performSave = async () => {
         setProfileSaving(true);
         try {
-            const res = await fetch(
-                `/api/profile/update-profile?employeeNumber=${encodeURIComponent(employeeId)}`,
-                {
-                    method: 'PUT',
-                    headers: authHeader(),
-                    body: JSON.stringify({
-                        employeeNumber: employeeId,
-                        firstName: profileForm.firstName.trim(),
-                        middleName: profileForm.middleName.trim(),
-                        lastName: profileForm.lastName.trim(),
-                        contactNumber: profileForm.contactNumber.trim(),
-                        email: profileForm.email.trim(),
-                    }),
-                }
-            );
+            const token = localStorage.getItem('authToken') ?? '';
+            const fd = new FormData();
+            fd.append('firstName', profileForm.firstName.trim());
+            fd.append('middleName', profileForm.middleName.trim());
+            fd.append('lastName', profileForm.lastName.trim());
+            fd.append('contactNumber', profileForm.contactNumber.trim());
+            fd.append('email', profileForm.email.trim());
+            const res = await fetch('/api/profile/update-profile', {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd,
+            });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error((err as any).message || 'Profile update failed.');
