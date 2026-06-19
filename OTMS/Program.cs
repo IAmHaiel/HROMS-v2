@@ -152,6 +152,8 @@ builder.Services.AddMailKit(config =>
     });
 });
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var app = builder.Build();
 
 // Seed the database

@@ -193,7 +193,7 @@ namespace OTMS.Service.Services
             {
                 TotalTasks = tasks.Count,
                 CompletedTasks = tasks.Count(t => t.TaskStatus == "Completed"),
-                PendingTasks = tasks.Count(t => t.TaskStatus != "Completed" && t.TaskStatus != "Done"),
+                PendingTasks = tasks.Count(t => t.TaskStatus != "Completed"),
                 OverdueTasks = tasks.Count(t => t.DueAt.HasValue && t.DueAt.Value < DateTime.UtcNow && t.TaskStatus != "Completed")
             };
 
