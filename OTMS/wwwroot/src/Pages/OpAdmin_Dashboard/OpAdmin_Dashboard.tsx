@@ -200,6 +200,7 @@ interface DuplicateWarningDTO {
 
 interface ReopenRequest {
     requestId: string;
+    referenceNumber?: string;
     taskId: string;
     taskTitle: string;
     employeeName: string;
@@ -3287,8 +3288,8 @@ const ReopenApprovalModal: React.FC<ReopenApprovalModalProps> = ({ request, onAp
         >
             <div className="reopen-info-grid">
                 <div className="reopen-info-item">
-                    <span className="reopen-info-label">Request ID</span>
-                    <span className="reopen-info-value">{request.requestId}</span>
+                    <span className="reopen-info-label">Request Ref</span>
+                    <span className="reopen-info-value" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{request.referenceNumber || request.requestId.slice(0, 8).toUpperCase()}</span>
                 </div>
                 <div className="reopen-info-item">
                     <span className="reopen-info-label">Task ID</span>
@@ -3399,7 +3400,7 @@ const ReopenTab: React.FC<{
                 >
                     {pending.map(r => (
                         <tr key={r.requestId}>
-                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>{r.referenceNumber || r.requestId.slice(0, 8).toUpperCase()}</td>
                             <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                             <td style={{ fontSize: 13 }}>{r.employeeName}</td>
                             <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{r.reason}</td>
@@ -3425,7 +3426,7 @@ const ReopenTab: React.FC<{
                     >
                         {history.map(r => (
                             <tr key={r.requestId}>
-                                <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>{r.requestId}</td>
+                                <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>{r.referenceNumber || r.requestId.slice(0, 8).toUpperCase()}</td>
                                 <td><div style={{ fontWeight: 600, fontSize: 13 }}>{r.taskTitle}</div></td>
                                 <td style={{ fontSize: 13 }}>{r.employeeName}</td>
                                 <td><StatusBadge status={r.status} size="sm" /></td>
@@ -3666,6 +3667,7 @@ export default function OpsAdminDashboard() {
             });
             success('Task restored successfully.');
             await fetchTasks();
+            await fetchDashboardData();
             await fetchBinRecords();
         } catch (err: any) {
             error(err.message ?? 'Failed to restore task.');
@@ -3754,6 +3756,7 @@ export default function OpsAdminDashboard() {
             const data: any[] = await res.json();
             setReopenRequests(data.map((r: any) => ({
                 requestId: r.requestId,
+                referenceNumber: r.referenceNumber,
                 taskId: r.taskId,
                 taskTitle: r.taskTitle,
                 employeeName: r.employeeName,
@@ -3841,6 +3844,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to create task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setShowNew(false);
             success('Task created successfully.');
         } catch (err: any) {
@@ -3871,6 +3875,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to update task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setEditingTask(null);
             success('Task updated successfully.');
         } catch (err: any) {
@@ -3890,6 +3895,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to reopen task.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setViewingTask(null);
             success('Task reopened.');
         } catch (err: any) {
@@ -3918,6 +3924,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to update task status.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             setViewingTask(null);
             success('Task status updated successfully.');
         } catch (err: any) {
@@ -3944,6 +3951,7 @@ export default function OpsAdminDashboard() {
                 throw new Error(err.message || 'Failed to process review decision.');
             }
             await fetchTasks();
+            await fetchDashboardData();
             success(
                 adminDecision === 'Approve & Close'
                     ? 'Task officially closed and recorded.'
@@ -4006,6 +4014,7 @@ export default function OpsAdminDashboard() {
                     : r
             ));
             await fetchTasks();
+            await fetchDashboardData();
             setReviewingRequest(null);
             success('Reopening request approved � Task reopened � Task history preserved � Audit Log entry generated.');
         } catch (err: any) {
@@ -4036,6 +4045,7 @@ export default function OpsAdminDashboard() {
                     ? { ...r, status: 'Rejected', adminRemarks, reviewedAt: new Date().toISOString() }
                     : r
             ));
+            await fetchDashboardData();
             setReviewingRequest(null);
             success('Reopening request rejected � Original task preserved � Audit Log entry generated.');
         } catch (err: any) {
@@ -4074,6 +4084,8 @@ export default function OpsAdminDashboard() {
                     setDetailTask(null);
                     success('Task deleted successfully.');
 
+                    await fetchTasks();
+                    await fetchDashboardData();
                     await fetchBinRecords();
 
                 } catch (err: any) {
@@ -4128,6 +4140,7 @@ export default function OpsAdminDashboard() {
 
         connection.on('DashboardDataChanged', () => {
             fetchDashboardData();
+            fetchTasks();
             window.dispatchEvent(new CustomEvent('opencode-notification-update'));
         });
 
@@ -4163,7 +4176,12 @@ export default function OpsAdminDashboard() {
                                     <div
                                         key={tab}
                                         className={`nav-item${isActive ? ' nav-item-active' : ''}`}
-                                        onClick={() => setActiveTab(tab)}
+                                        onClick={() => {
+                                            if (activeTab === tab) return;
+                                            setViewingTask(null); setEditingTask(null); setDetailTask(null);
+                                            setOverrideTask(null); setReviewTask(null); setReviewingRequest(null);
+                                            setActiveTab(tab);
+                                        }}
                                     >
                                         <Icon size={18} />
                                         <span className="nav-item-label">{label}</span>

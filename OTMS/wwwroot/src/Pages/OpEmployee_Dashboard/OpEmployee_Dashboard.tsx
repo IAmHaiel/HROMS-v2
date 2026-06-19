@@ -29,6 +29,7 @@ import {
     ChevronUp,
     ChevronLeft,
     RefreshCw,
+    RotateCcw,
     LogOut,
     Mail,
 } from 'lucide-react';
@@ -236,10 +237,11 @@ const NAV_GROUPS: { label: string; items: { tab: NavTab; icon: React.FC<any>; la
 interface TaskDetailProps {
     task: Task;
     onUpdate: () => void;
+    onReopen: () => void;
     onClose: () => void;
 }
 
-const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
+const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClose }) => {
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
@@ -252,6 +254,11 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     {task.status !== 'completed' && task.status !== 'done' && (
                         <button className="btn btn-primary" onClick={onUpdate}>
                             <Pencil size={13} /> Update Progress
+                        </button>
+                    )}
+                    {(task.status === 'completed' || task.status === 'done') && (
+                        <button className="btn btn-primary" onClick={onReopen} style={{ background: '#b45309', borderColor: '#b45309' }}>
+                            <RotateCcw size={13} /> Request Reopening
                         </button>
                     )}
                 </div>
@@ -411,6 +418,68 @@ const ProgressModal: React.FC<ProgressModalProps> = ({ task, onSave, onClose }) 
                     />
                     <div className="leave-char-count">{remarks.length} / 300</div>
                 </div>
+        </FormModal>
+    );
+};
+
+// ─── Reopen Request Modal ─────────────────────────────────────────────────────
+
+interface ReopenRequestModalProps {
+    task: Task;
+    onSave: (taskId: string, reason: string, evidence: File | null) => Promise<void>;
+    onClose: () => void;
+}
+
+const ReopenRequestModal: React.FC<ReopenRequestModalProps> = ({ task, onSave, onClose }) => {
+    const [reason, setReason] = useState('');
+    const [evidence, setEvidence] = useState<File | null>(null);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSave = async () => {
+        if (!reason.trim()) { setError('Reopening reason is required.'); return; }
+        if (reason.trim().length > 500) { setError('Reason must not exceed 500 characters.'); return; }
+        setSaving(true); setError('');
+        try {
+            await onSave(task.id, reason.trim(), evidence);
+            onClose();
+        } catch (err: any) {
+            setError(err.message ?? 'Failed to submit reopen request.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <FormModal isOpen onClose={onClose} title="Request Task Reopening" subtitle={task.name} size="sm"
+            footer={
+                <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'flex-end' }}>
+                    <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                        {saving ? <><Loader2 size={13} className="spin" /> Submitting.</> : <><RotateCcw size={13} /> Submit Request</>}
+                    </button>
+                </div>
+            }
+        >
+            <div className="field">
+                <label>Reopening Reason <span style={{ color: 'red' }}>*</span></label>
+                <textarea className="leave-reason-textarea" rows={4} maxLength={500}
+                    placeholder="Explain why this task needs to be reopened…"
+                    value={reason} onChange={e => { setReason(e.target.value); setError(''); }} />
+                <div className="leave-char-count">{reason.length} / 500</div>
+                {error && <span style={{ fontSize: 11, color: 'var(--status-failed)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}><AlertCircle size={11} />{error}</span>}
+            </div>
+            <div className="field" style={{ marginTop: 12 }}>
+                <label>Supporting Evidence <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
+                <input type="file" accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) setEvidence(f); }}
+                    style={{ fontSize: 13, marginTop: 4 }} />
+                {evidence && (
+                    <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
+                        {evidence.name} ({(evidence.size / 1024).toFixed(0)} KB)
+                    </span>
+                )}
+            </div>
         </FormModal>
     );
 };
@@ -1466,6 +1535,7 @@ export default function EmployeeDashboard() {
     const [tasksError, setTasksError] = useState('');
     const [viewingId, setViewingId] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [reopeningId, setReopeningId] = useState<string | null>(null);
     const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
     const [leaveLoading, setLeaveLoading] = useState(false);
     const [loadingUser, setLoadingUser] = useState(true);
@@ -1598,6 +1668,23 @@ export default function EmployeeDashboard() {
         } : t));
     };
 
+    const handleSubmitReopenRequest = async (taskId: string, reason: string, evidence: File | null) => {
+        const formData = new FormData();
+        formData.append('Reason', reason);
+        if (evidence) formData.append('SupportingEvidence', evidence);
+        const res = await fetch(`/api/task/${taskId}/reopen-request`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}` },
+            body: formData,
+        });
+        if (res.status === 401) { handleLogout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err as any).message || 'Failed to submit reopen request.');
+        }
+        setReopeningId(null);
+    };
+
     const viewingTask = viewingId != null ? tasks.find(t => t.id === viewingId) ?? null : null;
     const updatingTask = updatingId != null ? tasks.find(t => t.id === updatingId) ?? null : null;
     const pendingLeaveCount = leaveRecords.filter(r => r.status === 'Pending').length;
@@ -1726,7 +1813,15 @@ export default function EmployeeDashboard() {
                 <TaskDetail
                     task={viewingTask}
                     onUpdate={() => { setUpdatingId(viewingTask.id); setViewingId(null); }}
+                    onReopen={() => { setReopeningId(viewingTask.id); setViewingId(null); }}
                     onClose={() => setViewingId(null)}
+                />
+            )}
+            {reopeningId && tasks.find(t => t.id === reopeningId) && (
+                <ReopenRequestModal
+                    task={tasks.find(t => t.id === reopeningId)!}
+                    onSave={handleSubmitReopenRequest}
+                    onClose={() => setReopeningId(null)}
                 />
             )}
             {updatingTask && (

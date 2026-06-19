@@ -3,6 +3,7 @@ namespace OTMS.Entities.DTOs.Task
     public class ReopenRequestListDTO
     {
         public Guid RequestId { get; set; }
+        public string ReferenceNumber { get; set; } = string.Empty;
         public Guid TaskId { get; set; }
         public string TaskTitle { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
