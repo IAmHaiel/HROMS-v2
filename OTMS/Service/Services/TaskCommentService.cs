@@ -151,11 +151,6 @@ namespace OTMS.Service.Services
                 .OrderBy(c => c.CreatedAt)
                 .ToListAsync();
 
-            if (!comments.Any())
-            {
-                throw new Exception("No comments available.");
-            }
-
             var authorIds = comments.Select(c => c.EmployeeId).Distinct().ToList();
             var authors = await context.Accounts
                 .Include(a => a.Employee)
