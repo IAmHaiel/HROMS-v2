@@ -190,10 +190,10 @@ const PendingApprovalsTab: React.FC = () => {
                                 </div>
                             </div>
                             <div className="field">
-                                <label>Remarks {decision === 'Reject' ? <span style={{ color: 'var(--danger)' }}>* (Required for rejection)</span> : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>}</label>
+                                <label>Remarks {decision === 'Rejected' ? <span style={{ color: 'var(--danger)' }}>* (Required for rejection)</span> : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>}</label>
                                 <textarea className="report-input" rows={3} maxLength={500} value={remarks}
                                     onChange={e => setRemarks(e.target.value)}
-                                    placeholder={decision === 'Reject' ? 'Provide reason for rejection...' : 'Optional remarks...'} />
+                                    placeholder={decision === 'Rejected' ? 'Provide reason for rejection...' : 'Optional remarks...'} />
                                 <div style={{ fontSize: 11, marginTop: 3, textAlign: 'right', color: 'var(--text-muted)' }}>{remarks.length}/500</div>
                             </div>
                         </div>

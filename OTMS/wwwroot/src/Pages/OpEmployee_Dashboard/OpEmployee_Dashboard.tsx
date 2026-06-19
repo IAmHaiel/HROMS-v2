@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { HubConnectionBuilder, HubConnection } from '@microsoft/signalr';
 import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -570,6 +571,32 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ tasks, user, onView, onUpda
     };
 
     useEffect(() => { fetchRecentTrackers(); }, []);
+
+    const trackerConnectionRef = useRef<HubConnection | null>(null);
+
+    useEffect(() => {
+        const accountId = localStorage.getItem('employeeId');
+        if (!accountId) return;
+
+        const conn = new HubConnectionBuilder()
+            .withUrl('/hubs/workflow')
+            .withAutomaticReconnect()
+            .build();
+
+        conn.on('TrackerUpdated', () => {
+            fetchRecentTrackers();
+        });
+
+        conn.start().then(() => {
+            conn.invoke('JoinUserGroup', accountId).catch(() => {});
+        }).catch(() => {});
+
+        trackerConnectionRef.current = conn;
+
+        return () => {
+            conn.stop().catch(() => {});
+        };
+    }, []);
 
     return (
         <div className="tab-content">
