@@ -2161,21 +2161,30 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
     const [fetchError, setFetchError] = useState('');
     const [noRecords, setNoRecords] = useState(false);
     const [generatedAt, setGeneratedAt] = useState('');
-    const [errors, setErrors] = useState<{ dateRangeStart?: string; dateRangeEnd?: string }>({});
 
-    const validate = (): boolean => {
-        const e: { dateRangeStart?: string; dateRangeEnd?: string } = {};
-        if (!filter.dateRangeStart) e.dateRangeStart = 'Date range start is required.';
-        if (!filter.dateRangeEnd) e.dateRangeEnd = 'Date range end is required.';
-        if (filter.dateRangeStart && filter.dateRangeEnd && filter.dateRangeEnd < filter.dateRangeStart) {
-            e.dateRangeEnd = 'End date must not be earlier than start date.';
-        }
-        setErrors(e);
-        return Object.keys(e).length === 0;
+    const DATE_PRESETS = [
+        { label: '1 Month', months: 1 },
+        { label: '3 Months', months: 3 },
+        { label: '6 Months', months: 6 },
+        { label: '12 Months', months: 12 },
+    ] as const;
+
+    const applyPreset = (months: number) => {
+        const end = new Date();
+        const start = new Date();
+        start.setMonth(start.getMonth() - months);
+        setFilter(p => ({
+            ...p,
+            dateRangeStart: start.toISOString().split('T')[0],
+            dateRangeEnd: end.toISOString().split('T')[0],
+        }));
     };
 
     const handleGenerate = async () => {
-        if (!validate()) return;
+        if (!filter.dateRangeStart || !filter.dateRangeEnd) {
+            setFetchError('Please select a date range preset first.');
+            return;
+        }
         setLoading(true);
         setFetchError('');
         setNoRecords(false);
@@ -2223,7 +2232,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         setReport(null);
         setFetchError('');
         setNoRecords(false);
-        setErrors({});
         setGeneratedAt('');
     };
 
@@ -2257,12 +2265,6 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
         success('CSV exported successfully.');
     };
 
-    const selectClass = (field: keyof typeof errors) =>
-        errors[field] ? 'report-select report-select-error' : 'report-select';
-
-    const inputClass = (field: keyof typeof errors) =>
-        errors[field] ? 'report-input report-input-error' : 'report-input';
-
     const statusChartData = report
         ? [
             { name: 'Completed', value: report.totalTasksCompleted, fill: 'var(--status-active)' },
@@ -2280,18 +2282,28 @@ const ReportsTab: React.FC<{ teamMembers: TeamMember[] }> = ({ teamMembers }) =>
                 </div>
                 <div className="report-filter-grid">
                     <div className="field">
-                        <label>Date Start *</label>
-                        <input type="date" className={inputClass('dateRangeStart')}
-                            value={filter.dateRangeStart}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeStart: e.target.value }))} />
-                        {errors.dateRangeStart && <span className="report-field-error">{errors.dateRangeStart}</span>}
-                    </div>
-                    <div className="field">
-                        <label>Date End *</label>
-                        <input type="date" className={inputClass('dateRangeEnd')}
-                            value={filter.dateRangeEnd}
-                            onChange={e => setFilter(p => ({ ...p, dateRangeEnd: e.target.value }))} />
-                        {errors.dateRangeEnd && <span className="report-field-error">{errors.dateRangeEnd}</span>}
+                        <label>Date Range *</label>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {DATE_PRESETS.map(p => (
+                                <button
+                                    key={p.label}
+                                    type="button"
+                                    className={`filter-pill${filter.dateRangeStart && filter.dateRangeEnd && (() => {
+                                        const start = new Date(); start.setMonth(start.getMonth() - p.months);
+                                        return filter.dateRangeStart === start.toISOString().split('T')[0];
+                                    })() ? ' active' : ''}`}
+                                    onClick={() => applyPreset(p.months)}
+                                    style={{ fontSize: 12, padding: '6px 14px' }}
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                        {filter.dateRangeStart && filter.dateRangeEnd && (
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, display: 'block' }}>
+                                {filter.dateRangeStart} → {filter.dateRangeEnd}
+                            </span>
+                        )}
                     </div>
                     <div className="field">
                         <label>Employee</label>
