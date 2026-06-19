@@ -32,6 +32,7 @@ import {
     RotateCcw,
     LogOut,
     Mail,
+    MessageCircle,
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
@@ -48,6 +49,7 @@ import StatCard from '../../components/StatCard/StatCard';
 import Digital201FileView from '../SystemAdmin_Dashboard/Digital201FileView/Digital201FileView';
 import ApprovalTracker, { TrackerData } from '../../components/ApprovalTracker/ApprovalTracker';
 import FormModal from '../../components/FormModal/FormModal';
+import TaskComments from '../../components/TaskComments/TaskComments';
 import EmptyState from '../../components/ui/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,6 +67,10 @@ interface Task {
     status: TaskStatus;
     progress: number;
     assignedBy: string;
+    taskCategory?: string;
+    taskReferenceNumber?: string;
+    supportingEvidenceUrl?: string;
+    updatedAt?: string;
     remarks?: string;
 }
 
@@ -72,12 +78,16 @@ interface TaskResponseDTO {
     taskId: string;
     taskTitle: string;
     taskDescription?: string;
+    taskCategory?: string;
+    taskReferenceNumber?: string;
     priority: string;
     dueAt: string;
     taskStatus: string;
     assignedEmployee: string;
     createdByEmployee: string;
     createdAt: string;
+    updatedAt?: string;
+    supportingEvidenceUrl?: string;
 }
 
 interface UserProfile {
@@ -147,6 +157,10 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         status,
         progress: defaultProgress[status],
         assignedBy: dto.createdByEmployee,
+        taskCategory: dto.taskCategory,
+        taskReferenceNumber: dto.taskReferenceNumber,
+        supportingEvidenceUrl: dto.supportingEvidenceUrl,
+        updatedAt: dto.updatedAt,
     };
 };
 
@@ -157,6 +171,11 @@ const fmtDate = (d: string): string => {
     return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
         month: 'short', day: 'numeric', year: 'numeric',
     });
+};
+
+const fmtDateTime = (d: string): string => {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
 const isEffectivelyOverdue = (t: Task): boolean =>
@@ -245,6 +264,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClo
     const es = effectiveStatus(task);
     const sm = statusMeta[es];
     const pm = priorityMeta[task.priority];
+    const [showComments, setShowComments] = useState(false);
+
+    const refDisplay = task.taskReferenceNumber || task.id.slice(0, 8).toUpperCase();
 
     return (
         <FormModal isOpen onClose={onClose} title={task.name} subtitle={sm.label} size="md"
@@ -264,6 +286,11 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClo
                 </div>
             }
         >
+            <div style={{ marginBottom: 10 }}>
+                <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', fontFamily: 'monospace' }}>
+                    #{refDisplay}
+                </span>
+            </div>
             {task.description && (
                 <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Description</label>
@@ -276,6 +303,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClo
                     { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
                     { label: 'Assigned by', value: task.assignedBy },
                     { label: 'Progress', value: `${task.progress}%` },
+                    ...(task.taskCategory ? [{ label: 'Category', value: task.taskCategory }] : []),
+                    ...(task.updatedAt ? [{ label: 'Last Updated', value: fmtDateTime(task.updatedAt) }] : []),
                 ].map(({ label, value, style }) => (
                     <div key={label}>
                         <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</label>
@@ -286,12 +315,38 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onReopen, onClo
             <div className="tc-bar" style={{ height: 8, marginBottom: 12 }}>
                 <div className={`tc-fill ${pm.bar}`} style={{ width: `${task.progress}%` }} />
             </div>
+            {task.supportingEvidenceUrl && (
+                <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Supporting Document</label>
+                    <div style={{ marginTop: 4 }}>
+                        <a href={task.supportingEvidenceUrl} target="_blank" rel="noopener noreferrer"
+                            style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <FileText size={14} /> View Attachment
+                        </a>
+                    </div>
+                </div>
+            )}
             {task.remarks && (
-                <div>
+                <div style={{ marginBottom: 12 }}>
                     <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Remarks</label>
                     <p style={{ margin: '4px 0 0', fontSize: 14 }}>{task.remarks}</p>
                 </div>
             )}
+
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
+                <button
+                    className="btn btn-sm"
+                    onClick={() => setShowComments(v => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                >
+                    <MessageCircle size={14} /> {showComments ? 'Hide Comments' : 'Show Comments'}
+                </button>
+                {showComments && (
+                    <div style={{ marginTop: 8, maxHeight: 300, overflowY: 'auto' }}>
+                        <TaskComments taskId={task.id} currentEmployeeId="" />
+                    </div>
+                )}
+            </div>
         </FormModal>
     );
 };

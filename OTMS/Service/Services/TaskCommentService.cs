@@ -43,10 +43,16 @@ namespace OTMS.Service.Services
                 attachmentUrl = await fileService.UploadFileAsync(request.Attachment, "task_comments");
             }
 
+            var currentAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == loggedInAccountId);
+            if (currentAccount == null)
+                throw new UnauthorizedAccessException("Account not found.");
+
             var comment = new TaskComment
             {
                 TaskCommentId = Guid.NewGuid(),
-                EmployeeId = loggedInAccountId,
+                EmployeeId = currentAccount.EmployeeId,
                 TaskId = request.TaskId,
                 Message = request.Message,
                 AttachmentUrl = attachmentUrl,
@@ -56,8 +62,6 @@ namespace OTMS.Service.Services
             await context.TaskComments.AddAsync(comment);
             await context.SaveChangesAsync();
 
-            var author = await context.Accounts.Include(a => a.Employee).FirstOrDefaultAsync(a => a.AccountId == loggedInAccountId);
-
             await activityLogService.LogActivityAsync(loggedInAccountId, ActivityTypes.TaskCommentAdded, $"Added a comment to task '{task.TaskTitle}'.");
 
             return new TaskCommentResponseDTO
@@ -65,7 +69,10 @@ namespace OTMS.Service.Services
                 TaskCommentId = comment.TaskCommentId,
                 TaskId = comment.TaskId,
                 EmployeeId = comment.EmployeeId,
-                AuthorName = author != null ? string.Join(" ", new[] { author.Employee.FirstName, author.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))) : "Unknown User",
+                AccountId = currentAccount.AccountId,
+                AuthorName = currentAccount?.Employee != null
+                    ? string.Join(" ", new[] { currentAccount.Employee.FirstName, currentAccount.Employee.MiddleName, currentAccount.Employee.LastName, currentAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))
+                    : "Unknown User",
                 Message = comment.Message,
                 AttachmentUrl = comment.AttachmentUrl,
                 CreatedAt = comment.CreatedAt,
@@ -79,6 +86,11 @@ namespace OTMS.Service.Services
             if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
+            var currentAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == loggedInAccountId);
+            if (currentAccount == null) throw new UnauthorizedAccessException("Account not found.");
+
             var comment = await context.TaskComments
                 .Include(c => c.Employee)
                 .Include(c => c.Task)
@@ -86,7 +98,7 @@ namespace OTMS.Service.Services
 
             if (comment == null) throw new Exception("Comment not found.");
 
-            if (comment.EmployeeId != loggedInAccountId)
+            if (comment.EmployeeId != currentAccount.EmployeeId)
             {
                 throw new UnauthorizedAccessException("Unauthorized comment modification. You can only edit your own comments.");
             }
@@ -98,14 +110,13 @@ namespace OTMS.Service.Services
 
             await activityLogService.LogActivityAsync(loggedInAccountId, ActivityTypes.TaskCommentUpdated, $"Updated a comment on task '{comment.Task.TaskTitle}'.");
 
-            var authorAccount = await context.Accounts.Include(a => a.Employee).FirstOrDefaultAsync(a => a.AccountId == comment.EmployeeId);
-
             return new TaskCommentResponseDTO
             {
                 TaskCommentId = comment.TaskCommentId,
                 TaskId = comment.TaskId,
                 EmployeeId = comment.EmployeeId,
-                AuthorName = authorAccount != null ? string.Join(" ", new[] { authorAccount.Employee.FirstName, authorAccount.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))) : "Unknown User",
+                AccountId = currentAccount.AccountId,
+                AuthorName = string.Join(" ", new[] { currentAccount.Employee.FirstName, currentAccount.Employee.LastName }.Where(n => !string.IsNullOrEmpty(n))),
                 Message = comment.Message,
                 AttachmentUrl = comment.AttachmentUrl,
                 CreatedAt = comment.CreatedAt,
@@ -119,13 +130,18 @@ namespace OTMS.Service.Services
             if (string.IsNullOrEmpty(accountIdClaim)) throw new UnauthorizedAccessException("Invalid user session.");
             var loggedInAccountId = Guid.Parse(accountIdClaim);
 
+            var currentAccount = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == loggedInAccountId);
+            if (currentAccount == null) throw new UnauthorizedAccessException("Account not found.");
+
             var comment = await context.TaskComments
                 .Include(c => c.Task)
                 .FirstOrDefaultAsync(c => c.TaskCommentId == commentId);
 
             if (comment == null) throw new Exception("Comment not found.");
 
-            if (comment.EmployeeId != loggedInAccountId)
+            if (comment.EmployeeId != currentAccount.EmployeeId)
             {
                 throw new UnauthorizedAccessException("Unauthorized comment modification. You can only delete your own comments.");
             }
@@ -147,22 +163,20 @@ namespace OTMS.Service.Services
 
             var comments = await context.TaskComments
                 .Include(c => c.Employee)
+                    .ThenInclude(e => e.Account)
                 .Where(c => c.TaskId == taskId)
                 .OrderBy(c => c.CreatedAt)
                 .ToListAsync();
-
-            var authorIds = comments.Select(c => c.EmployeeId).Distinct().ToList();
-            var authors = await context.Accounts
-                .Include(a => a.Employee)
-                .Where(a => authorIds.Contains(a.AccountId))
-                .ToDictionaryAsync(a => a.AccountId, a => a.Employee);
 
             return comments.Select(c => new TaskCommentResponseDTO
             {
                 TaskCommentId = c.TaskCommentId,
                 TaskId = c.TaskId,
                 EmployeeId = c.EmployeeId,
-                AuthorName = authors.ContainsKey(c.EmployeeId) ? string.Join(" ", new[] { authors[c.EmployeeId].FirstName, authors[c.EmployeeId].LastName }.Where(n => !string.IsNullOrEmpty(n))) : "Unknown User",
+                AccountId = c.Employee?.Account?.AccountId ?? Guid.Empty,
+                AuthorName = c.Employee != null
+                    ? string.Join(" ", new[] { c.Employee.FirstName, c.Employee.MiddleName, c.Employee.LastName, c.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))
+                    : "Unknown User",
                 Message = c.Message,
                 AttachmentUrl = c.AttachmentUrl,
                 CreatedAt = c.CreatedAt,

@@ -11,6 +11,7 @@ interface CommentDTO {
     taskCommentId: string;
     taskId: string;
     employeeId: string;
+    accountId?: string;
     authorName: string;
     message: string;
     attachmentUrl?: string;
@@ -189,7 +190,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
     };
 
     const isOwnComment = (c: CommentDTO) =>
-        c.employeeId === currentEmployeeId || c.employeeId.toUpperCase() === currentEmployeeId.toUpperCase();
+        c.accountId === currentUserId || c.accountId?.toUpperCase() === currentUserId.toUpperCase();
 
     return (
         <div className="tc-container">
