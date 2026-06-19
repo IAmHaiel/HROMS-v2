@@ -32,11 +32,7 @@ import {
     RotateCcw,
     LogOut,
     Mail,
-<<<<<<< HEAD
     MessageCircle,
-=======
-    Activity,
->>>>>>> merge-frontend-refactor-backend-fix
 } from 'lucide-react';
 import './OpEmployee_Dashboard.css';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
