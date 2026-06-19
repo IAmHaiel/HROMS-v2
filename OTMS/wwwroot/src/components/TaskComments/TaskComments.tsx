@@ -23,6 +23,7 @@ interface TaskCommentsProps {
     taskId: string;
     currentEmployeeId: string;
     apiBase?: string;
+    taskReferenceNumber?: string;
 }
 
 const fmtDateTime = (d: string): string => {
@@ -51,6 +52,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
     taskId,
     currentEmployeeId: _propId,
     apiBase = '/api/taskComment',
+    taskReferenceNumber,
 }) => {
     const currentUserId = getCurrentAccountId();
     const currentEmployeeId = currentUserId || _propId;
@@ -198,7 +200,7 @@ const TaskComments: React.FC<TaskCommentsProps> = ({
                 <span className="tc-title">Comments</span>
                 <span className="tc-count">{comments.length}</span>
                 <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                    Task ID: {taskId.slice(0, 8)}...
+                    {taskReferenceNumber ? `#${taskReferenceNumber}` : `Task: ${taskId.slice(0, 8)}...`}
                 </span>
             </div>
 

@@ -82,6 +82,7 @@ interface Task {
     remarks?: string;
     category?: string;
     supportingEvidenceUrl?: string;
+    referenceNumber?: string;
 }
 
 interface TaskResponseDTO {
@@ -96,6 +97,7 @@ interface TaskResponseDTO {
     createdByEmployee: string;
     createdAt: string;
     supportingEvidenceUrl?: string;
+    taskReferenceNumber?: string;
 }
 
 interface UserProfile {
@@ -167,6 +169,7 @@ const dtoToTask = (dto: TaskResponseDTO): Task => {
         assignedBy: dto.createdByEmployee,
         category: dto.taskCategory,
         supportingEvidenceUrl: dto.supportingEvidenceUrl,
+        referenceNumber: dto.taskReferenceNumber,
     };
 };
 
@@ -293,6 +296,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                     { label: 'Priority', value: task.priority, style: { textTransform: 'capitalize' as const } },
                     { label: 'Assigned by', value: task.assignedBy },
                     { label: 'Progress', value: `${task.progress}%` },
+                    ...(task.referenceNumber ? [{ label: 'Ref #', value: task.referenceNumber }] : []),
                     ...(task.category ? [{ label: 'Category', value: task.category }] : []),
                     { label: 'Document', value: task.supportingEvidenceUrl ?? '' },
                 ].map(({ label, value, style }: { label: string; value: string; style?: any }) => (
@@ -334,7 +338,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onUpdate, onClose }) => {
                 </div>
                 {showComments && (
                     <div style={{ marginTop: 12, maxHeight: 320, overflowY: 'auto' }}>
-                        <TaskComments taskId={task.id} currentEmployeeId={accountId} />
+                        <TaskComments taskId={task.id} currentEmployeeId={accountId} taskReferenceNumber={task.referenceNumber} />
                     </div>
                 )}
             </div>
