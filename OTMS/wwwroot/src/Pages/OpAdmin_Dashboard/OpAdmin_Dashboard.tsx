@@ -421,9 +421,25 @@ const Avatar: React.FC<{ member: TeamMember; size?: 'sm' | 'md' }> = ({ member, 
     </div>
 );
 
-const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => (
-    <StatusBadge status={p} size="sm" />
-);
+const PRIO_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+    Critical: { label: 'Critical', color: '#7c1d1d', bg: '#fef2f2', border: '#fecaca', icon: '🔴' },
+    High: { label: 'High', color: '#b91c1c', bg: '#fff7ed', border: '#fed7aa', icon: '🟠' },
+    Medium: { label: 'Medium', color: '#92400e', bg: '#fffbeb', border: '#fde68a', icon: '🟡' },
+    Low: { label: 'Low', color: '#065f46', bg: '#f0fdf4', border: '#bbf7d0', icon: '🟢' },
+};
+
+const PrioBadge: React.FC<{ p: Priority }> = ({ p }) => {
+    const m = PRIO_META[p] ?? PRIO_META.Medium;
+    return (
+        <span style={{
+            fontSize: '0.65rem', padding: '1px 8px', borderRadius: 999, fontWeight: 700,
+            color: m.color, background: m.bg, border: `1px solid ${m.border}`,
+            display: 'inline-flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+        }}>
+            {m.icon} {m.label}
+        </span>
+    );
+};
 
 const ProgressBar: React.FC<{ pct: number; cls: string }> = ({ pct, cls }) => (
     <div className="progress-bar">
