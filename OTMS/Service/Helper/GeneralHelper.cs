@@ -18,8 +18,8 @@
                 throw new Exception("Contact Number must be exactly 11 digits and start with 09.");
             }
 
-            // Philippines Contact Number Format: 09XX XXX XXXX
-            return $"{contactNumber[..4]} {contactNumber.Substring(4, 3)} {contactNumber.Substring(7, 4)}";
+            // Return raw digits — formatting is a display-layer concern
+            return contactNumber;
         }
     }
 }

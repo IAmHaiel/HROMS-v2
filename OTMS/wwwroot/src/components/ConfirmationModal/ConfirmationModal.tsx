@@ -99,7 +99,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     </div>
                     <div className="cm-header-text">
                         <p className="cm-title" id="cm-title">{title}</p>
-                        <p className="cm-desc" id="cm-desc">{description}</p>
+                        <div className="cm-desc" id="cm-desc">{description}</div>
                     </div>
                 </div>
 

@@ -33,6 +33,10 @@ import PublicApplicationPortal from './Pages/public_application_portal/public_ap
 function PasswordChangedGuard() {
     const isPasswordChanged = localStorage.getItem('isPasswordChanged') === 'true';
     if (!isPasswordChanged) {
+        const employeeId = localStorage.getItem('employeeId');
+        if (employeeId === '0000') {
+            return <Navigate to="/set-password" replace />;
+        }
         return <Navigate to="/onboarding" replace />;
     }
     return <Outlet />;

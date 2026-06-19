@@ -78,6 +78,25 @@
     line-height: 1.65;
 }
 
+.cm-desc input[type="text"],
+.cm-desc input[type="password"] {
+    height: 42px;
+    border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border);
+    padding: 0 40px 0 14px;
+    font-size: 13px;
+    color: var(--text-primary);
+    background: var(--bg-card);
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.18s ease;
+}
+
+.cm-desc input[type="text"]:focus,
+.cm-desc input[type="password"]:focus {
+    border-color: var(--primary);
+}
+
 /* ── Notice callout ──────────────────────────────────────── */
 .cm-notice {
     display: flex;

@@ -338,22 +338,19 @@ namespace OTMS.Service.Services
 
             try
             {
-                // Sending email with verification link + onboarding link
+                // Sending email with verification link + onboarding link (no password — employee sets it during onboarding)
                 await emailService.SendAsync(
                     employee.Email,
                     "Complete Your Account Setup",
                     $"""
                     Welcome to the Operational Management System.
 
-                    Your login credentials are:
-
-                    Employee Number: {employee.EmployeeNumber}
-                    Password: {GeneratedPassword}
+                    Your Employee Number is: {employee.EmployeeNumber}
 
                     Step 1: Verify your account by clicking the link below:
                     {verificationLink}
 
-                    Step 2: After verification, complete your profile and submit required documents:
+                    Step 2: After verification, set up your profile and create your password:
                     {onboardingLink}
 
                     Please complete both steps to activate your account.

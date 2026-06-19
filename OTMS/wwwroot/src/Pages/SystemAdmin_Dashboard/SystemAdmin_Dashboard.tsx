@@ -877,6 +877,10 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
     const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(CONFIRM_CLOSED);
     const { success, error } = useToast();
     const displayName = getEmployeeDisplayName(employee);
+    const [gatePassword, setGatePassword] = useState('');
+    const [gateError, setGateError] = useState('');
+    const [gateLoading, setGateLoading] = useState(false);
+    const [showGatePassword, setShowGatePassword] = useState(false);
 
     // Track whether the form has unsaved changes compared to when editing started
     const isDirty = isEditing && initialFormRef.current !== null &&
@@ -928,7 +932,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
         setApiError('');
     };
 
-    // ── Save (with status-change confirmation) ────────────────────────────────
+    // ── Save (always guarded by password verification) ──────────────────────
     const handleSave = async () => {
         const doSave = async () => {
             setSubmitting(true);
@@ -986,7 +990,7 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
                     middleName: form.middleName.trim(),
                     lastName: form.lastName.trim(),
                     suffix: form.suffix.trim(),
-                    employeeName: builtName,
+                    employeeName: editDisplayName,
                     contactNumber: form.contactNumber,
                     role: toBackendRole(form.role),
                     accountStatus: form.accountStatus,
@@ -1005,30 +1009,93 @@ function EmployeeDetailModal({ employee, onClose, onUpdated, initialEditMode = f
             }
         };
 
-        // If status changed, show confirmation first
-        if (form.accountStatus !== employee.accountStatus) {
-            const actionText = form.accountStatus === 'Active' ? 'activate' : 'deactivate';
-            const isActivating = form.accountStatus === 'Active';
-            setConfirmModal({
-                isOpen: true,
-                variant: isActivating ? 'success' : 'warning',
-                icon: isActivating ? 'ti-user-check' : 'ti-user-off',
-                title: `${isActivating ? 'Activate' : 'Deactivate'} employee account?`,
-                description: (
-                    <>
-                        You are about to <strong>{actionText}</strong> the account of{' '}
-                        <strong>{displayName}</strong>. This will{' '}
-                        {isActivating
-                            ? 'restore their access to the system.'
-                            : 'revoke their access until reactivated.'}
-                    </>
-                ),
-                confirmLabel: isActivating ? 'Activate account' : 'Deactivate account',
-                onConfirm: doSave,
-            });
-        } else {
-            await doSave();
-        }
+        // Always verify the admin's password before any save
+        setGatePassword('');
+        setGateError('');
+        setShowGatePassword(false);
+        setConfirmModal({
+            isOpen: true,
+            variant: form.accountStatus !== employee.accountStatus
+                ? (form.accountStatus === 'Active' ? 'success' : 'warning')
+                : 'info',
+            icon: form.accountStatus !== employee.accountStatus
+                ? (form.accountStatus === 'Active' ? 'ti-user-check' : 'ti-user-off')
+                : 'ti-lock',
+            title: form.accountStatus !== employee.accountStatus
+                ? `${form.accountStatus === 'Active' ? 'Activate' : 'Deactivate'} employee account?`
+                : 'Confirm your identity',
+            description: (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {form.accountStatus !== employee.accountStatus && (
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                            You are about to <strong>{form.accountStatus === 'Active' ? 'activate' : 'deactivate'}</strong> the account of{' '}
+                            <strong>{displayName}</strong>.{' '}
+                            {form.accountStatus === 'Active'
+                                ? 'This will restore their access to the system.'
+                                : 'This will revoke their access until reactivated.'}
+                        </p>
+                    )}
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                        Enter your password to confirm these changes.
+                    </p>
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            id="gate-pw-input"
+                            type={showGatePassword ? 'text' : 'password'}
+                            placeholder="Enter your current password"
+                            style={{ width: '100%', paddingRight: 40, boxSizing: 'border-box' }}
+                            autoFocus
+                            onChange={e => { setGatePassword(e.target.value); setGateError(''); }}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    const btn = document.getElementById('gate-confirm-btn');
+                                    btn?.click();
+                                }
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowGatePassword(p => !p)}
+                            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center' }}
+                            tabIndex={-1}
+                        >
+                            {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                    </div>
+                    {gateError && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-danger)' }}>
+                            <AlertCircle size={12} />{gateError}
+                        </div>
+                    )}
+                </div>
+            ),
+            notice: 'For security, your identity must be verified before saving any changes.',
+            confirmLabel: 'Verify & save',
+            onConfirm: async () => {
+                const pw = (document.getElementById('gate-pw-input') as HTMLInputElement)?.value ?? gatePassword;
+                if (!pw) { setGateError('Please enter your password.'); return; }
+                setGateLoading(true);
+                setGateError('');
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const adminId = localStorage.getItem('employeeId') ?? '';
+                    const res = await fetch('/api/authentication/verify-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ employeeID: adminId, password: pw }),
+                    });
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.message || 'Incorrect password. Please try again.');
+                    }
+                    await doSave();
+                } catch (err: any) {
+                    setGateError(err.message ?? 'Incorrect password. Please try again.');
+                } finally {
+                    setGateLoading(false);
+                }
+            },
+        });
     };
 
     // ── Delete ────────────────────────────────────────────────────────────────
@@ -2005,22 +2072,18 @@ function ProfileTab({ onProfileUpdate }: { onProfileUpdate?: (fullName: string) 
                     }
                     // Verified — now save
                     setProfileSaving(true);
-                    const saveRes = await fetch(
-                        `/api/systemadmin/update-user?employeeNumber=${encodeURIComponent(employeeId)}`,
-                        {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                            body: JSON.stringify({
-                                employeeNumber: employeeId,
-                                firstName: profileForm.firstName.trim(),
-                                middleName: profileForm.middleName.trim(),
-                                lastName: profileForm.lastName.trim(),
-                                suffix: profileForm.suffix.trim(),
-                                contactNumber: profileForm.contactNumber.trim(),
-                                email: profileForm.email.trim(),
-                            }),
-                        }
-                    );
+                    const fd = new FormData();
+                    fd.append('firstName', profileForm.firstName.trim());
+                    fd.append('middleName', profileForm.middleName.trim());
+                    fd.append('lastName', profileForm.lastName.trim());
+                    fd.append('suffix', profileForm.suffix.trim());
+                    fd.append('contactNumber', profileForm.contactNumber.trim());
+                    fd.append('email', profileForm.email.trim());
+                    const saveRes = await fetch('/api/profile/update-profile', {
+                        method: 'PUT',
+                        headers: { Authorization: `Bearer ${token}` },
+                        body: fd,
+                    });
                     if (!saveRes.ok) {
                         const err = await saveRes.json().catch(() => ({}));
                         throw new Error(err.message || 'Profile update failed.');
