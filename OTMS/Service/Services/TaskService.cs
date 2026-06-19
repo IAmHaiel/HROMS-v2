@@ -275,12 +275,13 @@ namespace OTMS.Service.Services
                             throw new Exception("Cannot assign task to an employee who is on leave.");
                         }
 
-                        var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
-                        var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
-                        if (presenceStatus == "Offline")
-                        {
-                            throw new Exception("Cannot assign task to an offline employee.");
-                        }
+                        // FUTURE: Uncomment to restore offline-exclusion logic
+                        // var newAssigneeLog = newAssignee.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                        // var presenceStatus = newAssigneeLog?.ActivityType == "Login" ? "Online" : "Offline";
+                        // if (presenceStatus == "Offline")
+                        // {
+                        //     throw new Exception("Cannot assign task to an offline employee.");
+                        // }
                     }
                 }
 
@@ -1177,6 +1178,7 @@ namespace OTMS.Service.Services
                 .Include(a => a.Employee)
                 .Include(a => a.Role)
                 .Include(a => a.AssignedTasks)
+                // FUTURE: add back .Include(a => a.ActivityLogs) when offline-exclusion is restored
                 .Where(a => a.Role != null && a.Role.Name != Roles.SystemAdmin && a.AccountStatus != "On Leave")
                 .Where(a => !currentAccountId.HasValue || a.AccountId != currentAccountId.Value);
 
@@ -1196,6 +1198,11 @@ namespace OTMS.Service.Services
 
             foreach (var a in accounts)
             {
+                // FUTURE: Uncomment the block below to restore offline-exclusion logic
+                // var latestLog = a.ActivityLogs.OrderByDescending(al => al.CreatedAt).FirstOrDefault();
+                // var presenceStatus = latestLog?.ActivityType == "Login" ? "Online" : "Offline";
+                // if (presenceStatus == "Offline") { continue; }
+
                 var activeTasks = a.AssignedTasks.Count(t => t.TaskStatus != "Completed" && t.TaskStatus != "Closed" && t.TaskStatus != "Cancelled" && !t.Deleted && !t.PermanentlyDeleted);
 
                 var fullName = string.Join(" ", new[] { a.Employee.FirstName, a.Employee.MiddleName, a.Employee.LastName, a.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)));

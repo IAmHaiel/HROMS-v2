@@ -506,7 +506,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     const [recommendationAccepted, setRecommendationAccepted] = useState(true);
 
     useEffect(() => {
-        if (mode !== 'new') return;
         const fetchRecommendations = async () => {
             try {
                 const token = localStorage.getItem('authToken');
@@ -828,7 +827,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     </div>
 
                     {/* -- Smart Task Routing Recommendation -- */}
-                    {mode === 'new' && recommendation && (
+                    {recommendation && (
                         <div className="sr-section">
                             <div className="sr-header">
                                 <div className="sr-title-row">
