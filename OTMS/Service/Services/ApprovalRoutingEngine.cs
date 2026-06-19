@@ -187,6 +187,7 @@ namespace OTMS.Service.Services
 
                 context.ApprovalDecisions.Add(rejection);
                 approvalRequest.Status = "Rejected";
+                approvalRequest.CurrentApproverAccountId = null;
                 approvalRequest.StatusTrackingText = $"Rejected by {FormatRoleName(currentTier.ApproverRole)}";
                 approvalRequest.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
@@ -411,6 +412,10 @@ namespace OTMS.Service.Services
             if (nextTierLevel == 1)
             {
                 approverAccountId = await ResolveSupervisorAsync(approvalRequest.RequesterAccountId);
+                if (approverAccountId == null || approverAccountId.Value == Guid.Empty)
+                {
+                    approverAccountId = await ResolveRoleApproverAsync(nextTier.ApproverRole, nextTier.FallbackApproverRole);
+                }
             }
             else
             {
@@ -434,8 +439,9 @@ namespace OTMS.Service.Services
                 .Include(a => a.Employee)
                 .FirstOrDefaultAsync(a => a.AccountId == approverAccountId);
 
+            var routingActor = (await GetLoggedInAccountAsync())?.AccountId ?? approvalRequest.RequesterAccountId;
             await activityLogService.LogActivityAsync(
-                approvalRequest.RequesterAccountId,
+                routingActor,
                 ActivityTypes.ApprovalRequestRouted,
                 $"{approvalRequest.RequestType} request routed to Tier {nextTierLevel}: {GetEmployeeName(approver)}."
             );
@@ -528,6 +534,25 @@ namespace OTMS.Service.Services
 
             var account = leaveRequest.Account;
             account.AccountStatus = "On Leave";
+
+            // Deduct leave balance
+            if (account.Employee != null)
+            {
+                var days = (leaveRequest.End_Date - leaveRequest.Start_Date).Days + 1;
+                if (days < 1) days = 1;
+
+                var balance = await context.LeaveBalances
+                    .FirstOrDefaultAsync(lb => lb.EmployeeId == account.Employee.EmployeeId
+                        && lb.LeaveType == leaveRequest.Leave_Type);
+
+                if (balance != null)
+                {
+                    balance.UsedDays += days;
+                    balance.RemainingDays = balance.TotalDays - balance.UsedDays;
+                    balance.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
             await context.SaveChangesAsync();
 
             await activityLogService.LogActivityAsync(

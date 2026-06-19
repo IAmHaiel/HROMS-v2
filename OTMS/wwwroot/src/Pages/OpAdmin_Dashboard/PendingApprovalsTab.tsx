@@ -25,7 +25,7 @@ const PendingApprovalsTab: React.FC = () => {
     const [pending, setPending] = useState<PendingApprovalItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedRequest, setSelectedRequest] = useState<TrackerData | null>(null);
-    const [decision, setDecision] = useState<'Approve' | 'Reject' | ''>('');
+    const [decision, setDecision] = useState<'Approved' | 'Rejected' | ''>('');
     const [remarks, setRemarks] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [showDecision, setShowDecision] = useState(false);
@@ -85,7 +85,7 @@ const PendingApprovalsTab: React.FC = () => {
 
     const handleSubmitDecision = async () => {
         if (!decision) { showError('Please select a decision.'); return; }
-        if (decision === 'Reject' && !remarks.trim()) { showError('Remarks are mandatory when rejecting a request.'); return; }
+        if (decision === 'Rejected' && !remarks.trim()) { showError('Remarks are mandatory when rejecting a request.'); return; }
         if (!selectedRequest) return;
         setSubmitting(true);
         try {
@@ -97,7 +97,7 @@ const PendingApprovalsTab: React.FC = () => {
             if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || 'Failed to process decision.'); }
             setShowDecision(false);
             setSelectedRequest(null);
-            const msg = decision === 'Approve'
+            const msg = decision === 'Approved'
                 ? (selectedRequest.currentTierLevel >= selectedRequest.totalTierCount
                     ? 'Request fully approved and processed.'
                     : 'Request approved and routed to the next level.')
@@ -172,19 +172,19 @@ const PendingApprovalsTab: React.FC = () => {
                             <div className="field">
                                 <label>Decision <span style={{ color: 'var(--danger)' }}>*</span></label>
                                 <div style={{ display: 'flex', gap: 10 }}>
-                                    {(['Approve', 'Reject'] as const).map(opt => (
+                                    {(['Approved', 'Rejected'] as const).map(opt => (
                                         <button key={opt}
                                             className={`filter-pill${decision === opt ? ' active' : ''}`}
                                             onClick={() => { setDecision(opt); }}
                                             style={{
                                                 flex: 1, justifyContent: 'center', padding: '10px 14px',
-                                                background: decision === opt && opt === 'Approve' ? '#05cd99' :
-                                                    decision === opt && opt === 'Reject' ? '#ee5d50' : undefined,
+                                                background: decision === opt && opt === 'Approved' ? '#05cd99' :
+                                                    decision === opt && opt === 'Rejected' ? '#ee5d50' : undefined,
                                                 color: decision === opt ? '#fff' : undefined,
                                                 borderColor: decision === opt ? 'transparent' : undefined,
                                             }}>
-                                            {opt === 'Approve' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                                            {opt}
+                                            {opt === 'Approved' ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+                                            {opt === 'Approved' ? 'Approve' : 'Reject'}
                                         </button>
                                     ))}
                                 </div>

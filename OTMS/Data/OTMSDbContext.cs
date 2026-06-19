@@ -39,6 +39,7 @@ namespace OTMS.Data
         public DbSet<Employee201FileData> Employee201FileDatas { get; set; }
         public DbSet<StatutorySyncRecord> StatutorySyncRecords { get; set; }
         public DbSet<AssetAllocation> AssetAllocations { get; set; }
+        public DbSet<LeaveBalance> LeaveBalances { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -69,6 +70,23 @@ namespace OTMS.Data
                 .WithMany()
                 .HasForeignKey(a => a.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Employee-LeaveBalance one-to-many relationship
+            modelBuilder.Entity<LeaveBalance>()
+                .HasOne(lb => lb.Employee)
+                .WithMany()
+                .HasForeignKey(lb => lb.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LeaveBalance>()
+                .Property(lb => lb.TotalDays)
+                .HasColumnType("decimal(18,1)");
+            modelBuilder.Entity<LeaveBalance>()
+                .Property(lb => lb.UsedDays)
+                .HasColumnType("decimal(18,1)");
+            modelBuilder.Entity<LeaveBalance>()
+                .Property(lb => lb.RemainingDays)
+                .HasColumnType("decimal(18,1)");
 
             // Department Relationships
             modelBuilder.Entity<Department>()

@@ -72,6 +72,13 @@ namespace OTMS.Service.Services
                     SourceEntityId = leaveRequest.LeaveId
                 });
 
+            if (!approvalResult.IsSuccess)
+            {
+                context.LeaveRequests.Remove(leaveRequest);
+                await context.SaveChangesAsync();
+                throw new ArgumentException(approvalResult.Message ?? "Failed to submit leave request for approval.");
+            }
+
             // Send Notification
             await notificationService.CreateLeaveRequestNotificationAsync(leaveRequest);
 
@@ -330,6 +337,14 @@ namespace OTMS.Service.Services
                 .FirstOrDefaultAsync(lr => lr.LeaveId == leaveId);
 
             if (leaveRequest == null)
+                return false;
+
+            // Guard against bypassing the multi-tier approval engine
+            var hasActiveApprovalRequest = await context.ApprovalRequests
+                .AnyAsync(ar => ar.SourceEntityId == leaveId
+                    && ar.SourceEntityType == "LeaveRequest"
+                    && ar.Status == "Pending");
+            if (hasActiveApprovalRequest)
                 return false;
 
             // Get the Account

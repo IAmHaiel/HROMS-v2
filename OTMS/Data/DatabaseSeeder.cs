@@ -396,6 +396,32 @@ namespace OTMS.Data
 
             if (employeesMissingDept.Count > 0)
                 await context.SaveChangesAsync();
+
+            // Seed default leave balances for employees missing them
+            var employeesWithNoBalance = await context.Employees
+                .Where(e => !context.LeaveBalances.Any(lb => lb.EmployeeId == e.EmployeeId))
+                .ToListAsync();
+
+            var leaveTypes = new[] { "Vacation", "Sick", "Personal" };
+            foreach (var emp in employeesWithNoBalance)
+            {
+                foreach (var lt in leaveTypes)
+                {
+                    context.LeaveBalances.Add(new LeaveBalance
+                    {
+                        LeaveBalanceId = Guid.NewGuid(),
+                        EmployeeId = emp.EmployeeId,
+                        LeaveType = lt,
+                        TotalDays = 15,
+                        UsedDays = 0,
+                        RemainingDays = 15,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                }
+            }
+
+            if (employeesWithNoBalance.Count > 0)
+                await context.SaveChangesAsync();
         }
     }
 }

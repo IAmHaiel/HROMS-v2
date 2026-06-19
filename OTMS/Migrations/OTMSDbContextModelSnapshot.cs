@@ -1007,6 +1007,38 @@ namespace OTMS.Migrations
                     b.ToTable("JobPositions");
                 });
 
+            modelBuilder.Entity("OTMS.Entities.Models.LeaveBalance", b =>
+                {
+                    b.Property<Guid>("LeaveBalanceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LeaveType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("RemainingDays")
+                        .HasColumnType("decimal(18,1)");
+
+                    b.Property<decimal>("TotalDays")
+                        .HasColumnType("decimal(18,1)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("UsedDays")
+                        .HasColumnType("decimal(18,1)");
+
+                    b.HasKey("LeaveBalanceId");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("LeaveBalances");
+                });
+
             modelBuilder.Entity("OTMS.Entities.Models.LeaveRequest", b =>
                 {
                     b.Property<Guid>("LeaveId")
@@ -1787,6 +1819,17 @@ namespace OTMS.Migrations
                     b.Navigation("Department");
 
                     b.Navigation("ReportsTo");
+                });
+
+            modelBuilder.Entity("OTMS.Entities.Models.LeaveBalance", b =>
+                {
+                    b.HasOne("OTMS.Entities.Models.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("OTMS.Entities.Models.LeaveRequest", b =>
