@@ -4511,6 +4511,7 @@ export default function OpsAdminDashboard() {
         reopen: 'Reopen Requests',
         templates: 'Task Templates',
         approvals: 'Approvals',
+        activity_logs: 'Activity Logs',
     };
 
     // -- Fetch dashboard data when filters change --
