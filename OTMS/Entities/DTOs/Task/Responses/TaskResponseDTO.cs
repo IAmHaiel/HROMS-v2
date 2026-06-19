@@ -14,6 +14,7 @@
         public string CreatedByEmployee { get; set; } = string.Empty;
         public Guid? AssignedTo { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public bool IsDeleted { get; set; }
         public string? TaskRemarks { get; set; }
         public string? SupportingEvidenceUrl { get; set; }

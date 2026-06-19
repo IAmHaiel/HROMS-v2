@@ -835,6 +835,7 @@ namespace OTMS.Service.Services
                     CreatorLastName = t.Creator.Employee.LastName,
                     CreatorSuffix = t.Creator.Employee.Suffix,
                     t.CreatedAt,
+                    t.UpdatedAt,
                     t.Deleted,
                 })
                 .ToListAsync();
@@ -857,6 +858,7 @@ namespace OTMS.Service.Services
                     {r.CreatorFirstName, r.CreatorMiddleName, r.CreatorLastName, r.CreatorSuffix}
                     .Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt,
                 IsDeleted = r.Deleted,
             }).ToList();
 
@@ -914,6 +916,7 @@ namespace OTMS.Service.Services
                     t.TaskRemarks,
                     t.AssignedTo,
                     t.CreatedAt,
+                    t.UpdatedAt,
                     t.Deleted,
                     t.SupportingEvidenceUrl,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
@@ -940,6 +943,7 @@ namespace OTMS.Service.Services
                 TaskRemarks = t.TaskRemarks,
                 AssignedTo = t.AssignedTo,
                 SupportingEvidenceUrl = t.SupportingEvidenceUrl,
+                UpdatedAt = t.UpdatedAt,
                 IsDeleted = t.Deleted,
                 AssignedEmployee = string.Join(" ", new[]
                     { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }
@@ -1122,6 +1126,7 @@ namespace OTMS.Service.Services
                     t.TaskRemarks,
                     t.AssignedTo,
                     t.CreatedAt,
+                    t.UpdatedAt,
                     t.Deleted,
                     t.SupportingEvidenceUrl,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
@@ -1147,6 +1152,7 @@ namespace OTMS.Service.Services
                 TaskRemarks = t.TaskRemarks,
                 AssignedTo = t.AssignedTo,
                 SupportingEvidenceUrl = t.SupportingEvidenceUrl,
+                UpdatedAt = t.UpdatedAt,
                 AssignedEmployee = string.Join(" ", new[]
                                 {t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedByEmployee = string.Join(" ", new[]
@@ -1402,6 +1408,7 @@ namespace OTMS.Service.Services
                     t.TaskRemarks,
                     t.AssignedTo,
                     t.CreatedAt,
+                    t.UpdatedAt,
                     AssigneeFirstName = t.Assignee != null ? t.Assignee.Employee.FirstName : null,
                     AssigneeMiddleName = t.Assignee != null ? t.Assignee.Employee.MiddleName : null,
                     AssigneeLastName = t.Assignee != null ? t.Assignee.Employee.LastName : null,
@@ -1424,6 +1431,7 @@ namespace OTMS.Service.Services
                 TaskStatus = t.TaskStatus,
                 TaskRemarks = t.TaskRemarks,
                 AssignedTo = t.AssignedTo,
+                UpdatedAt = t.UpdatedAt,
                 AssignedEmployee = string.Join(" ", new[] { t.AssigneeFirstName, t.AssigneeMiddleName, t.AssigneeLastName, t.AssigneeSuffix }.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedByEmployee = string.Join(" ", new[] { t.CreatorFirstName, t.CreatorMiddleName, t.CreatorLastName, t.CreatorSuffix }.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = t.CreatedAt

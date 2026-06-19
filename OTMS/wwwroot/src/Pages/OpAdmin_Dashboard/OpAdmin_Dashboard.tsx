@@ -158,6 +158,7 @@ interface Task {
     createdByEmployee: string;
     assignedTo: string;
     createdAt: string;
+    updatedAt?: string;
     deleted?: boolean;
     Deleted?: boolean;
     supportingEvidenceUrl?: string;
@@ -380,9 +381,24 @@ const priorityDotClass = (p: Priority): string =>
     ({ Critical: 'prio-dot critical', High: 'prio-dot high', Medium: 'prio-dot medium', Low: 'prio-dot low' }[p]);
 
 const fmtDate = (d: string): string => {
-    if (!d) return '�';
+    if (!d) return '—';
     return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
+
+const fmtDateTime = (d: string): string => {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+};
+
+const statusToProgress = (s: string): number => ({
+    'Draft': 0,
+    'Assigned': 10,
+    'In Progress': 45,
+    'Pending Admin Review': 75,
+    'Done': 90,
+    'Completed': 100,
+    'Overdue': 45,
+}[s] ?? 0);
 
 // --- Sub-components -----------------------------------------------------------
 
@@ -421,11 +437,19 @@ interface TaskRowProps {
 const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = false }) => {
     const od = isEffectivelyOverdue(task);
     const effectiveStatus = od ? 'Overdue' : task.taskStatus;
+    const progress = statusToProgress(effectiveStatus);
+    const refDisplay = task.taskReferenceNumber || task.taskId.slice(0, 8).toUpperCase();
+
     return (
         <div className="task-item" onClick={() => onView(task.taskId)}>
             <div className="task-row-top">
                 <span className={priorityDotClass(task.priority)} />
-                <span className="task-name">{task.taskTitle}</span>
+                <span className="task-name">
+                    <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, letterSpacing: '0.05em', marginRight: 6 }}>
+                        #{refDisplay}
+                    </span>
+                    {task.taskTitle}
+                </span>
                 <span className={statusBadgeClass(effectiveStatus)}>{effectiveStatus}</span>
                 {showEditBtn && onEdit && (
                     <ActionsDropdown
@@ -444,9 +468,13 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, onView, onEdit, showEditBtn = f
                     />
                 )}
             </div>
+            <div style={{ margin: '6px 0 4px', height: 4, background: '#e8ecf4', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: progress >= 100 ? '#05cd99' : progress >= 75 ? '#4318ff' : progress >= 45 ? '#ffb547' : '#94a3b8', borderRadius: 2, transition: 'width 0.3s ease' }} />
+            </div>
             <div className="task-row-bottom">
                 <span className="task-assignee">{task.assignedEmployee || 'Unassigned'}</span>
-                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '�'}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8', marginRight: 12 }}>{task.updatedAt ? fmtDateTime(task.updatedAt) : ''}</span>
+                <span className={`task-due${od ? ' overdue' : ''}`}>{task.dueAt ? fmtDate(task.dueAt) : '—'}</span>
             </div>
         </div>
     );
@@ -1346,6 +1374,7 @@ const DashboardTab: React.FC<{
     const workloads = td?.employeeWorkloadDistribution ?? [];
     const taskDist = td?.taskAssignmentDistribution ?? {};
     const pendingReview = taskDist['Pending Admin Review'] ?? 0;
+    const done = taskDist['Done'] ?? 0;
 
     const statusChartData = [
         { name: 'Active', value: active, color: 'var(--status-pending)' },
@@ -1383,10 +1412,12 @@ const DashboardTab: React.FC<{
                     </div>
                     <div className="stats-row">
                         {[
+                            { label: 'TOTAL', value: total, icon: <ClipboardList size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: `${total} task${total !== 1 ? 's' : ''}` },
                             { label: 'ACTIVE', value: active, icon: <Loader2 size={20} strokeWidth={2.3} />, variant: 'warning' as const, subtext: 'In Progress / Assigned' },
+                            { label: 'DONE', value: done, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: 'Awaiting completion' },
                             { label: 'COMPLETED', value: completed, icon: <CheckCircle2 size={20} strokeWidth={2.3} />, variant: 'success' as const, subtext: `${pct}% completion rate` },
-                            { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
                             { label: 'PENDING REVIEW', value: pendingReview, icon: <Eye size={20} strokeWidth={2.3} />, variant: 'primary' as const, subtext: 'Awaiting admin' },
+                            { label: 'OVERDUE', value: overdue, icon: <AlertCircle size={20} strokeWidth={2.3} />, variant: 'danger' as const, subtext: 'Past deadline' },
                         ].map(s => (
                             <StatCard key={s.label} icon={s.icon} variant={s.variant} label={s.label} value={s.value} subtext={s.subtext} />
                         ))}
