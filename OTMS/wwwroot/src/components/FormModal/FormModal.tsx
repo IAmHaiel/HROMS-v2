@@ -162,7 +162,6 @@ const FormModal: React.FC<FormModalProps> = ({
             <ConfirmationModal
                 isOpen={showConfirm}
                 variant="warning"
-                icon="ti-alert-triangle"
                 title="Discard changes?"
                 description="You have unsaved changes. Are you sure you want to cancel?"
                 confirmLabel="Discard"

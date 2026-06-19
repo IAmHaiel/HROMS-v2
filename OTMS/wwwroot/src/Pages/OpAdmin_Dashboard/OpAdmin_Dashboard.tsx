@@ -1174,18 +1174,18 @@ const ViewModal: React.FC<ViewModalProps> = ({ task, onEdit, onReopen, onStatusC
 
                 {/* Actions */}
                 <div className="view-modal-actions">
-                {canTransition && task.taskStatus !== 'Pending Admin Review' && (
-                    <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
-                        title={`Transition to ${nextStatus}`}>
-                        {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
-                    </button>
-                )}
-                {task.taskStatus === 'Pending Admin Review' && (
-                    <button className="btn btn-primary" onClick={onReview}
-                        title="Review task submission">
-                        <Eye size={13} /> Review Task
-                    </button>
-                )}
+                    {canTransition && task.taskStatus !== 'Pending Admin Review' && (
+                        <button className="btn btn-primary" onClick={() => onStatusChange(task.taskId, nextStatus)}
+                            title={`Transition to ${nextStatus}`}>
+                            {statusLabel[task.taskStatus] ?? `Move to ${nextStatus}`}
+                        </button>
+                    )}
+                    {task.taskStatus === 'Pending Admin Review' && (
+                        <button className="btn btn-primary" onClick={onReview}
+                            title="Review task submission">
+                            <Eye size={13} /> Review Task
+                        </button>
+                    )}
                     {task.taskStatus === 'Completed' && (
                         <button className="btn btn-primary" onClick={() => onAdminOverride(task.taskId)}
                             title="Admin override for completed task">
@@ -4511,7 +4511,6 @@ export default function OpsAdminDashboard() {
         reopen: 'Reopen Requests',
         templates: 'Task Templates',
         approvals: 'Approvals',
-        activity_logs: 'Activity Logs',
     };
 
     // -- Fetch dashboard data when filters change --

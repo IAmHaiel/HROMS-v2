@@ -1843,7 +1843,7 @@ export default function RoleManagementTab() {
 
             {/* ─── Confirmation Modal ───────────────────────────────────────── */}
             <ConfirmationModal
-                isOpen={confirmModal.isOpen} variant={confirmModal.variant} icon={confirmModal.icon}
+                isOpen={confirmModal.isOpen} variant={confirmModal.variant}
                 title={confirmModal.title} description={confirmModal.description}
                 notice={confirmModal.notice} confirmLabel={confirmModal.confirmLabel}
                 isLoading={actionLoading} onConfirm={confirmModal.onConfirm}

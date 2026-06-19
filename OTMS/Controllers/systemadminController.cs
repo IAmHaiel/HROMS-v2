@@ -324,24 +324,11 @@ namespace OTMS.Controllers
         /// <summary>
         /// Upload a document to an employee's Digital 201 File.
         /// </summary>
-        [Authorize]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
         [HttpPost("documents/upload")]
         public async Task<IActionResult> UploadEmployeeDocument([Required][FromQuery] string employeeNumber, [FromForm] UploadEmployeeDocumentDTO request, [FromServices] IActivityLogService activityLogService)
         {
-            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(claimProfile))
-            {
-                return Forbid();
-            }
-
-            var isOwnFile = await context.Employees
-                .AnyAsync(e => e.Account.AccountId.ToString() == claimProfile && e.EmployeeNumber == employeeNumber);
-
-            if (!isOwnFile)
-            {
-                return Forbid();
-            }
 
             var result = await accountManagementService.UploadEmployeeDocument(employeeNumber, request);
             if (!result.IsSuccess)
@@ -361,25 +348,11 @@ namespace OTMS.Controllers
         /// <summary>
         /// Update a document in an employee's Digital 201 File.
         /// </summary>
-        [Authorize]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [ProducesResponseType(typeof(ApiResponseDTO<EmployeeAttachmentDTO>), 200)]
         [HttpPut("documents/{attachmentId}")]
         public async Task<IActionResult> UpdateEmployeeDocument([FromRoute] Guid attachmentId, [FromForm] UpdateEmployeeDocumentDTO request)
         {
-            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(claimProfile))
-            {
-                return Forbid();
-            }
-
-            var isOwner = await context.EmployeeAttachments
-                .AnyAsync(ea => ea.EmployeeAttachmentId == attachmentId && ea.Employee.Account.AccountId.ToString() == claimProfile);
-
-            if (!isOwner)
-            {
-                return Forbid();
-            }
-
             var result = await accountManagementService.UpdateEmployeeDocument(attachmentId, request);
             if (!result.IsSuccess)
             {
@@ -391,25 +364,11 @@ namespace OTMS.Controllers
         /// <summary>
         /// Archive a document in an employee's Digital 201 File.
         /// </summary>
-        [Authorize]
+        [Authorize(Policy = "Permissions.Users.Manage")]
         [ProducesResponseType(typeof(ApiResponseDTO<object>), 200)]
         [HttpPatch("documents/{attachmentId}/archive")]
         public async Task<IActionResult> ArchiveEmployeeDocument([FromRoute] Guid attachmentId)
         {
-            var claimProfile = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(claimProfile))
-            {
-                return Forbid();
-            }
-
-            var isOwner = await context.EmployeeAttachments
-                .AnyAsync(ea => ea.EmployeeAttachmentId == attachmentId && ea.Employee.Account.AccountId.ToString() == claimProfile);
-
-            if (!isOwner)
-            {
-                return Forbid();
-            }
-
             var result = await accountManagementService.ArchiveEmployeeDocument(attachmentId);
             if (!result.IsSuccess)
             {
@@ -423,6 +382,17 @@ namespace OTMS.Controllers
         /// </summary>
         [Authorize(Policy = "Permissions.Users.View")]
         [ProducesResponseType(typeof(ApiResponseDTO<PaginationResponseDTO<EmploymentContractResponseDTO>>), 200)]
+        [HttpGet("documents")]
+        public async Task<IActionResult> GetAllEmployeeDocuments([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] string? documentType, [FromQuery] bool? isArchived)
+        {
+            var result = await accountManagementService.GetAllEmployeeDocuments(request, search, documentType, isArchived);
+            if (!result.IsSuccess)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
         [HttpGet("contracts")]
         public async Task<IActionResult> GetAllEmploymentContracts([FromQuery] PaginationDTO request, [FromQuery] string? search, [FromQuery] bool? isArchived)
         {

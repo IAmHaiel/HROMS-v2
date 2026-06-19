@@ -4,13 +4,12 @@ import {
   Search, Plus, Edit, Trash2, Eye, Download, RefreshCw,
   ChevronLeft, ChevronRight, MapPin, Star, Zap, Shield
 } from 'lucide-react';
-import StatusBadge from '../../components/ui/StatusBadge';
-import RoleBadge from '../../components/ui/RoleBadge';
-import StatCard from '../../components/ui/StatCard';
-import FormModal from '../../components/FormModal/FormModal';
-import DataTable from '../../components/ui/DataTable';
-import EmptyState from '../../components/ui/EmptyState';
-import ProgressStepper from '../../components/ui/ProgressStepper';
+import StatusBadge from './src/components/ui/StatusBadge';
+import RoleBadge from './src/components/ui/RoleBadge';
+import StatCard from './src/components/StatCard/StatCard';
+import FormModal from './src/components/FormModal/FormModal';
+import DataTable from './src/components/ui/DataTable';
+import EmptyState from './src/components/ui/EmptyState';
 import './DesignSystem.css';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -49,12 +48,6 @@ const sampleOrders = [
   { id: 'WB-001', recipient: 'John Santos', status: 'In Transit', driver: 'Miguel R.' },
   { id: 'WB-002', recipient: 'Maria Cruz',  status: 'Delivered',  driver: 'Carlo M.'  },
   { id: 'WB-003', recipient: 'Ana Reyes',   status: 'Pending',    driver: '—'          },
-];
-
-const stepperSteps = [
-  { label: 'Pending',    subLabel: 'Order created' },
-  { label: 'In Transit', subLabel: 'Driver assigned' },
-  { label: 'Delivered',  subLabel: 'Completed' },
 ];
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -325,10 +318,10 @@ export default function DesignSystem() {
 
         <Group label="StatCard Component">
           <div className="ds-statcard-grid">
-            <StatCard icon={<Truck size={20} />}   iconColor="#00A99D" label="Total Deliveries" value={142} subtitle="+12% this week"  subtitleColor="var(--status-active)"  accentColor="#00A99D" />
-            <StatCard icon={<Package size={20} />}  iconColor="#0284C7" label="In Transit"       value={38}  subtitle="5 need attention" subtitleColor="var(--status-transit)" accentColor="#0284C7" />
-            <StatCard icon={<Users size={20} />}    iconColor="#4F46E5" label="Active Drivers"   value={12}  subtitle="All online"       subtitleColor="var(--status-active)"  accentColor="#4F46E5" />
-            <StatCard icon={<AlertCircle size={20} />} iconColor="#DC2626" label="Failed"        value={3}   subtitle="Needs review"     subtitleColor="var(--status-failed)"  accentColor="#DC2626" />
+            <StatCard icon={<Truck size={20} />}      label="Total Deliveries" value={142} subtext="+12% this week"  variant="success" />
+            <StatCard icon={<Package size={20} />}     label="In Transit"       value={38}  subtext="5 need attention" variant="warning" />
+            <StatCard icon={<Users size={20} />}       label="Active Drivers"   value={12}  subtext="All online"       variant="primary" />
+            <StatCard icon={<AlertCircle size={20} />} label="Failed"           value={3}   subtext="Needs review"     variant="danger" />
           </div>
         </Group>
       </Section>
@@ -475,28 +468,15 @@ export default function DesignSystem() {
       {/* ── 11. EmptyState ───────────────────────────────────────────── */}
       <Section title="11. EmptyState Component">
         <EmptyState
-          icon={Package}
+          icon={<Package size={24} />}
           title="No deliveries found"
           description="There are no active delivery orders matching your filters."
           action={<button className="btn btn-primary btn-sm"><Plus size={14} />Create Order</button>}
         />
       </Section>
 
-      {/* ── 12. ProgressStepper ──────────────────────────────────────── */}
-      <Section title="12. ProgressStepper Component">
-        <Group label="Step 0 — Pending (active)">
-          <div style={{ width: '100%' }}><ProgressStepper steps={stepperSteps} currentStep={0} /></div>
-        </Group>
-        <Group label="Step 1 — In Transit (active, Pending complete)">
-          <div style={{ width: '100%' }}><ProgressStepper steps={stepperSteps} currentStep={1} /></div>
-        </Group>
-        <Group label="Step 2 — Delivered (active, all prior complete)">
-          <div style={{ width: '100%' }}><ProgressStepper steps={stepperSteps} currentStep={2} /></div>
-        </Group>
-      </Section>
-
-      {/* ── 13. Animations ───────────────────────────────────────────── */}
-      <Section title="13. Animation Classes">
+      {/* ── 12. Animations ───────────────────────────────────────────── */}
+      <Section title="12. Animation Classes">
         <Group label="Available Classes">
           <div className="ds-anim-item animate-fade-in card">
             <Zap size={16} /><span className="text-sm">.animate-fade-in — fadeIn 0.3s (slides up 8px)</span>
@@ -519,7 +499,7 @@ export default function DesignSystem() {
       </Section>
 
       {/* ── 14. Driver Cell & Avatar Patterns ────────────────────────── */}
-      <Section title="14. Utility Patterns">
+      <Section title="13. Utility Patterns">
         <Group label="Driver Cell (.driver-cell)">
           {[
             { name: 'Miguel Reyes', color: '#00A99D' },

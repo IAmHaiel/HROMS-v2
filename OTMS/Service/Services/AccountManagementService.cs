@@ -905,6 +905,78 @@ namespace OTMS.Service.Services
             };
         }
 
+        public async Task<ApiResponseDTO<PaginationResponseDTO<EmployeeAttachmentDTO>>> GetAllEmployeeDocuments(PaginationDTO request, string? search, string? documentType, bool? isArchived)
+        {
+            var query = context.EmployeeAttachments
+                .Include(ea => ea.Employee)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(documentType))
+            {
+                query = query.Where(ea => ea.DocumentType == documentType);
+            }
+
+            if (isArchived.HasValue)
+            {
+                query = query.Where(ea => ea.IsArchived == isArchived.Value);
+            }
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var lowerSearch = search.ToLower();
+                query = query.Where(ea =>
+                    ea.FileName.ToLower().Contains(lowerSearch) ||
+                    ea.DocumentTitle.ToLower().Contains(lowerSearch) ||
+                    ea.Employee.FirstName.ToLower().Contains(lowerSearch) ||
+                    ea.Employee.LastName.ToLower().Contains(lowerSearch) ||
+                    ea.Employee.EmployeeNumber.ToLower().Contains(lowerSearch));
+            }
+
+            var totalRecords = await query.CountAsync();
+
+            var records = await query
+                .OrderByDescending(ea => ea.UploadedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var data = records.Select(ea => new EmployeeAttachmentDTO
+            {
+                EmployeeAttachmentId = ea.EmployeeAttachmentId,
+                FileName = ea.FileName,
+                FileUrl = ea.FilePath,
+                ContentType = ea.ContentType,
+                FileSize = ea.FileSize,
+                Version = ea.Version,
+                DocumentType = ea.DocumentType,
+                IsArchived = ea.IsArchived,
+                DocumentTitle = ea.DocumentTitle,
+                IssueDate = ea.IssueDate,
+                ExpiryDate = ea.ExpiryDate,
+                Remarks = ea.Remarks,
+                EmployeeNumber = ea.Employee.EmployeeNumber,
+                EmployeeName = string.Join(" ", new[] { ea.Employee.FirstName, ea.Employee.MiddleName, ea.Employee.LastName, ea.Employee.Suffix }.Where(s => !string.IsNullOrWhiteSpace(s))),
+                FirstName = ea.Employee.FirstName ?? "",
+                LastName = ea.Employee.LastName ?? ""
+            }).ToList();
+
+            return new ApiResponseDTO<PaginationResponseDTO<EmployeeAttachmentDTO>>
+            {
+                IsSuccess = true,
+                Message = "Documents retrieved successfully.",
+                Data = new PaginationResponseDTO<EmployeeAttachmentDTO>
+                {
+                    IsSuccess = true,
+                    Message = "Documents retrieved successfully.",
+                    Data = data,
+                    PageNumber = request.PageNumber,
+                    PageSize = request.PageSize,
+                    TotalRecords = totalRecords,
+                    TotalPages = (int)Math.Ceiling(totalRecords / (double)request.PageSize)
+                }
+            };
+        }
+
         private static readonly Regex SssRegex = new(@"^\d{2}-\d{7}-\d{1}$");
         private static readonly Regex PhilhealthRegex = new(@"^\d{2}-\d{9}-\d{1}$");
         private static readonly Regex PagibigRegex = new(@"^\d{4}-\d{4}-\d{4}$");

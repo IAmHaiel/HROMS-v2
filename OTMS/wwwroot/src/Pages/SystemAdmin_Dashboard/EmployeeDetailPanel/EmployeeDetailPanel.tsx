@@ -25,12 +25,14 @@ import {
     Eye,
     EyeOff,
     Lock,
+    Activity,
 } from 'lucide-react';
 import './EmployeeDetailPanel.css';
 import { useToast } from '../../../components/Toast/Toast';
 import FormModal from '../../../components/FormModal/FormModal';
 import Digital201FileView from './../Digital201FileView/Digital201FileView';
 import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
+import DataTable from '../../../components/ui/DataTable';
 
 interface ConfirmModalState {
     isOpen: boolean;
@@ -485,6 +487,8 @@ export default function EmployeeDetailPanel({
     const [profile, setProfile] = useState<RecentEmployee>(employee);
     const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+    const [activityLogPage, setActivityLogPage] = useState(1);
+    const activityLogPageSize = 10;
 
     const [loadingDeliveries, setLoadingDeliveries] = useState(true);
     const [loadingLogs, setLoadingLogs] = useState(true);
@@ -893,28 +897,28 @@ export default function EmployeeDetailPanel({
                                 <Loader2 size={22} className="spin" />
                                 <p>Loading logs…</p>
                             </div>
-                        ) : activityLogs.length === 0 ? (
-                            <div className="ed-empty">
-                                <ClipboardList size={24} />
-                                <p>No activity logs found</p>
-                            </div>
                         ) : (
-                            <div className="ed-log-timeline">
-                                {activityLogs.map((log, idx) => (
-                                    <div key={log.id} className="ed-timeline-item">
-                                        <div className="ed-timeline-line">
-                                            <div className="ed-timeline-dot" />
-                                            {idx < activityLogs.length - 1 && <div className="ed-timeline-connector" />}
-                                        </div>
-                                        <div className="ed-timeline-content">
-                                            <p className="ed-timeline-desc">{log.description}</p>
-                                            <span className="ed-timeline-time">
-                                                <Calendar size={11} /> {fmtDateTime(log.timestamp)}
-                                            </span>
-                                        </div>
-                                    </div>
+                            <DataTable
+                                headers={['Date & Time', 'Description']}
+                                loading={false}
+                                emptyMessage="No activity logs found"
+                                emptyIcon={<Activity size={24} />}
+                                totalRecords={activityLogs.length}
+                                currentPage={activityLogPage}
+                                totalPages={Math.max(1, Math.ceil(activityLogs.length / activityLogPageSize))}
+                                onPageChange={p => setActivityLogPage(p)}
+                            >
+                                {activityLogs
+                                    .slice((activityLogPage - 1) * activityLogPageSize, activityLogPage * activityLogPageSize)
+                                    .map(log => (
+                                    <tr key={log.id}>
+                                        <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                                            {fmtDateTime(log.timestamp)}
+                                        </td>
+                                        <td style={{ fontSize: 13, color: 'var(--text-primary)' }}>{log.description}</td>
+                                    </tr>
                                 ))}
-                            </div>
+                            </DataTable>
                         )}
                     </div>
                 )}

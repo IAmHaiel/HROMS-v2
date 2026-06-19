@@ -44,7 +44,6 @@ const NOTICE_ICONS: Record<ConfirmationVariant, React.ReactNode> = {
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     isOpen,
     variant = "neutral",
-    icon,
     title,
     description,
     notice,
