@@ -33,31 +33,34 @@ namespace OTMS.Service.Services
 
             var creatorId = Guid.Parse(accountIdClaim);
 
-            // Prevent self-assignment
-            if (request.AssignedTo == creatorId)
-            {
-                throw new Exception("You cannot assign a task to yourself.");
-            }
-
             // Validate deadline is in the future
             if (request.DueAt <= DateTime.UtcNow)
             {
                 throw new Exception("Deadline must be a future date and time.");
             }
 
-            // Validate assigned employee exists and is active
-            var assignedAccount = await context.Accounts
-                .Include(a => a.Employee)
-                .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo);
-
-            if (assignedAccount == null)
+            // Validate assigned employee if provided
+            Account? assignedAccount = null;
+            if (request.AssignedTo.HasValue)
             {
-                throw new Exception("Assigned employee not found.");
-            }
+                if (request.AssignedTo.Value == creatorId)
+                {
+                    throw new Exception("You cannot assign a task to yourself.");
+                }
 
-            if (assignedAccount.AccountStatus == "On Leave")
-            {
-                throw new Exception("Cannot assign task to an employee who is on leave.");
+                assignedAccount = await context.Accounts
+                    .Include(a => a.Employee)
+                    .FirstOrDefaultAsync(a => a.AccountId == request.AssignedTo.Value);
+
+                if (assignedAccount == null)
+                {
+                    throw new Exception("Assigned employee not found.");
+                }
+
+                if (assignedAccount.AccountStatus == "On Leave")
+                {
+                    throw new Exception("Cannot assign task to an employee who is on leave.");
+                }
             }
 
             // Get Creator
@@ -148,7 +151,7 @@ namespace OTMS.Service.Services
                 TaskCategory = request.TaskCategory,
                 Priority = request.Priority,
                 DueAt = request.DueAt,
-                TaskStatus = request.AssignedTo != Guid.Empty ? "Assigned" : "Draft",
+                TaskStatus = request.AssignedTo.HasValue ? "Assigned" : "Draft",
                 SupportingEvidenceUrl = supportingEvidenceUrl,
                 CreatedAt = DateTime.UtcNow,
                 Deleted = false
@@ -158,21 +161,36 @@ namespace OTMS.Service.Services
             await context.SaveChangesAsync();
 
             await RecordTaskStatusAsync(task.TaskId, "None", "Draft", creatorId, true);
-            if (request.AssignedTo != Guid.Empty)
+            if (request.AssignedTo.HasValue)
             {
                 await RecordTaskStatusAsync(task.TaskId, "Draft", "Assigned", creatorId, true);
             }
 
-            await activityLogService.LogActivityAsync(
-                creatorId,
-                ActivityTypes.TaskCreated,
-$"{string.Join(" ", new[]
-    {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} created and assigned task reference {taskReferenceNumber} '{request.TaskTitle}' to {string.Join(" ", new[] { assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix }.Where(n => !string.IsNullOrEmpty(n)))}.");
+            var creatorName = string.Join(" ", new[]
+                {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-            // Send notification to assigned employee
-            await notificationService.CreateTaskAssignedNotificationAsync(task);
+            if (assignedAccount != null)
+            {
+                var assigneeName = string.Join(" ", new[]
+                    {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)));
 
-            if (request.RecommendedEmployeeId.HasValue)
+                await activityLogService.LogActivityAsync(
+                    creatorId,
+                    ActivityTypes.TaskCreated,
+                    $"{creatorName} created and assigned task reference {taskReferenceNumber} '{request.TaskTitle}' to {assigneeName}.");
+
+                // Send notification to assigned employee
+                await notificationService.CreateTaskAssignedNotificationAsync(task);
+            }
+            else
+            {
+                await activityLogService.LogActivityAsync(
+                    creatorId,
+                    ActivityTypes.TaskCreated,
+                    $"{creatorName} created task reference {taskReferenceNumber} '{request.TaskTitle}' as Draft.");
+            }
+
+            if (request.RecommendedEmployeeId.HasValue && assignedAccount != null)
             {
                 if (request.AssignedTo == request.RecommendedEmployeeId.Value)
                 {
@@ -205,8 +223,10 @@ $"{string.Join(" ", new[]
                 DueAt = task.DueAt,
                 TaskStatus = task.TaskStatus,
                 SupportingEvidenceUrl = task.SupportingEvidenceUrl,
-                AssignedEmployee = string.Join(" ", new[]
-                    {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
+                AssignedEmployee = assignedAccount != null
+                    ? string.Join(" ", new[]
+                        {assignedAccount.Employee.FirstName, assignedAccount.Employee.MiddleName, assignedAccount.Employee.LastName, assignedAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))
+                    : "",
                 CreatedByEmployee = string.Join(" ", new[]
                     {creatorAccount.Employee.FirstName, creatorAccount.Employee.MiddleName, creatorAccount.Employee.LastName, creatorAccount.Employee.Suffix}.Where(n => !string.IsNullOrEmpty(n))),
                 CreatedAt = task.CreatedAt,

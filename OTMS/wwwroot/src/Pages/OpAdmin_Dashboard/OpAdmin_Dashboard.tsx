@@ -169,7 +169,7 @@ interface CreateTaskDTO {
     taskDescription: string;
     priority: string;
     dueAt: string;
-    assignedTo: string;
+    assignedTo?: string;
     taskCategory?: string;
     recommendedEmployeeId?: string;
     taskRemarks?: string;
@@ -534,9 +534,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                             workload: recommended.workload,
                             reason: recommended.recommendationReason,
                         });
-                        if (resolvedAssignedTo === '') {
-                            setForm(prev => ({ ...prev, assignedTo: recommended.accountId }));
-                        }
                     }
                 }
             } catch {
@@ -569,7 +566,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                 return '';
             }
             case 'assignedTo': {
-                if (!value) return 'Assigned employee is required.';
                 return '';
             }
             case 'priority': {
@@ -585,7 +581,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
     // -- Validate all fields on submit -------------------------------------
     const validateAll = (): boolean => {
         const newErrors: Record<string, string> = {};
-        (['taskTitle', 'taskDescription', 'dueAt', 'assignedTo', 'priority'] as const).forEach(key => {
+        (['taskTitle', 'taskDescription', 'dueAt', 'priority'] as const).forEach(key => {
             const msg = validateField(key, form[key] ?? '');
             if (msg) newErrors[key] = msg;
         });
@@ -611,7 +607,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
             taskDescription: form.taskDescription.trim(),
             priority: form.priority,
             dueAt: form.dueAt || '',
-            assignedTo: form.assignedTo,
+            assignedTo: form.assignedTo || undefined,
             taskCategory: form.taskCategory.trim() || undefined,
             recommendedEmployeeId: recommendation?.accountId || undefined,
             taskRemarks: form.taskRemarks.trim() || undefined,
@@ -621,11 +617,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
         }
         onSave(payload);
         if (mode === 'new' && showSuccess) {
-            if (recommendationAccepted) {
-                showSuccess('Task created and assigned successfully.');
-            } else {
-                showSuccess('Task created and assigned successfully.');
-            }
+            showSuccess('Task created successfully.');
         }
         setSubmitting(false);
     };
@@ -907,7 +899,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     <div className="field">
                         <label>
                             {mode === 'new' ? 'Final Assigned Employee' : 'Assign To'}
-                            <span style={{ color: 'var(--status-failed, #ee5d50)' }}>*</span>
                         </label>
                         <div
                             className={`assignee-select${errors.assignedTo ? ' input-error' : ''}`}
@@ -938,7 +929,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     className="assignee-option placeholder-opt"
                                     onClick={e => {
                                         setForm(prev => ({ ...prev, assignedTo: '' }));
-                                        setErrors(prev => ({ ...prev, assignedTo: 'Please assign the task to someone.' }));
+                                        setErrors(prev => ({ ...prev, assignedTo: '' }));
                                         setRecommendationAccepted(false);
                                         (e.currentTarget.closest('.assignee-options') as HTMLElement).style.display = 'none';
                                     }}
@@ -3573,8 +3564,8 @@ export default function OpsAdminDashboard() {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const json = await res.json();
-            const rawList: any[] = Array.isArray(json) ? json : (Array.isArray(json?.data?.data) ? json.data.data : (Array.isArray(json?.data) ? json.data : []));
+            const jsonRes = await res.json();
+            const rawList: any[] = Array.isArray(jsonRes) ? jsonRes : (Array.isArray(jsonRes?.data?.data) ? jsonRes.data.data : (Array.isArray(jsonRes?.data) ? jsonRes.data : []));
 
             const normalized: Task[] = rawList.map(t => ({
                 ...t,
@@ -3674,18 +3665,17 @@ export default function OpsAdminDashboard() {
     // -- Fetch Team Members (for assignee dropdown) --
     const fetchTeamMembers = async () => {
         try {
-            const res = await fetch('/api/task/assignable-employees?pageSize=100', {
+            const res = await fetch('/api/task/assignable-employees?pageNumber=1&pageSize=100', {
                 headers: { Authorization: `Bearer ${token()}` },
             });
             if (!res.ok) throw new Error();
-            const json = await res.json();
-            const rawList = json.data?.data ?? json.data ?? json ?? [];
-            const data: any[] = Array.isArray(rawList) ? rawList : [];
+            const body = await res.json();
+            const rawList: any[] = Array.isArray(body) ? body : (Array.isArray(body?.data?.data) ? body.data.data : (Array.isArray(body?.data) ? body.data : []));
 
-            setTeamMembers(data.map(e => ({
+            setTeamMembers(rawList.map(e => ({
                 accountId: e.accountId ?? e.AccountId ?? e.id,
                 employeeName: (e.displayName ?? e.employeeName ?? e.EmployeeName ?? e.name ?? '').replace(/\(.*?\)/g, '').trim(),
-                role: e.role ?? e.Role ?? '',
+                role: e.role ?? '',
                 presenceStatus: e.availabilityStatus ?? 'Active',
             })));
         } catch {
@@ -3782,7 +3772,7 @@ export default function OpsAdminDashboard() {
             formData.append('taskDescription', data.taskDescription);
             formData.append('priority', data.priority);
             formData.append('dueAt', new Date(data.dueAt).toISOString());
-            formData.append('assignedTo', data.assignedTo);
+            if (data.assignedTo) formData.append('assignedTo', data.assignedTo);
             if (data.taskCategory) formData.append('taskCategory', data.taskCategory);
             if (data.recommendedEmployeeId) formData.append('recommendedEmployeeId', data.recommendedEmployeeId);
             if (data.supportingEvidence) formData.append('supportingEvidence', data.supportingEvidence);
@@ -3821,7 +3811,7 @@ export default function OpsAdminDashboard() {
             formData.append('TaskDescription', data.taskDescription);
             formData.append('Priority', data.priority);
             if (data.dueAt) formData.append('DueAt', new Date(data.dueAt).toISOString());
-            formData.append('AssignedTo', data.assignedTo);
+            if (data.assignedTo) formData.append('AssignedTo', data.assignedTo);
             if (data.taskCategory) formData.append('TaskCategory', data.taskCategory);
             if (data.taskRemarks) formData.append('TaskRemarks', data.taskRemarks);
             const dto = data as any;

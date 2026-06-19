@@ -6,8 +6,7 @@ namespace OTMS.Entities.DTOs.Task
 {
     public class CreateTaskDTO
     {
-        [Required(ErrorMessage = "Assigned employee is required.")]
-        public Guid AssignedTo { get; set; }
+        public Guid? AssignedTo { get; set; }
 
         [Required(ErrorMessage = "Task title is required.")]
         [MaxLength(150, ErrorMessage = "Task title must not exceed 150 characters.")]
