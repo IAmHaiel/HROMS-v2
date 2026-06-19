@@ -955,7 +955,9 @@ namespace OTMS.Service.Services
                 ExpiryDate = ea.ExpiryDate,
                 Remarks = ea.Remarks,
                 EmployeeNumber = ea.Employee.EmployeeNumber,
-                EmployeeName = string.Join(" ", new[] { ea.Employee.FirstName, ea.Employee.MiddleName, ea.Employee.LastName, ea.Employee.Suffix }.Where(s => !string.IsNullOrWhiteSpace(s)))
+                EmployeeName = string.Join(" ", new[] { ea.Employee.FirstName, ea.Employee.MiddleName, ea.Employee.LastName, ea.Employee.Suffix }.Where(s => !string.IsNullOrWhiteSpace(s))),
+                FirstName = ea.Employee.FirstName ?? "",
+                LastName = ea.Employee.LastName ?? ""
             }).ToList();
 
             return new ApiResponseDTO<PaginationResponseDTO<EmployeeAttachmentDTO>>
