@@ -271,6 +271,18 @@ $"{string.Join(" ", new[]
                 }
             }
 
+            // Upload supporting document if provided
+            if (request.SupportingEvidence != null)
+            {
+                var allowedExts = new[] { ".pdf", ".docx", ".xlsx", ".jpg", ".jpeg", ".png" };
+                var ext = Path.GetExtension(request.SupportingEvidence.FileName).ToLowerInvariant();
+                if (!allowedExts.Contains(ext))
+                {
+                    throw new Exception("Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.");
+                }
+                task.SupportingEvidenceUrl = await fileService.UploadFileAsync(request.SupportingEvidence, "task_evidence");
+            }
+
             // Update Fields
             task.TaskTitle = request.TaskTitle;
             task.TaskDescription = request.TaskDescription;

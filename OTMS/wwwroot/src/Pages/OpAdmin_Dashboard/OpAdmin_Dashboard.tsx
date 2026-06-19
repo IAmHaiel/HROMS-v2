@@ -773,8 +773,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                     {/* -- Supporting Document -- */}
                     <div className="field">
                         <label>Supporting Document <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
-                        {initial.supportingEvidenceUrl && !supportingEvidence ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8 }}>
+                        {initial.supportingEvidenceUrl && !supportingEvidence && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: '8px 12px', background: 'rgba(67,24,255,0.04)', border: '1px solid rgba(67,24,255,0.15)', borderRadius: 8, marginBottom: 8 }}>
                                 <span style={{ fontSize: 12, color: 'var(--primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {initial.supportingEvidenceUrl.split('/').pop()}
                                 </span>
@@ -786,51 +786,53 @@ const TaskModal: React.FC<TaskModalProps> = ({ mode, initial = {}, teamMembers, 
                                     View
                                 </button>
                             </div>
-                        ) : null}
-                        {(!initial.supportingEvidenceUrl || supportingEvidence) && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
-                                    onChange={e => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-                                            const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
-                                            if (!allowed.includes(ext)) {
-                                                setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
-                                                return;
-                                            }
-                                            if (file.size > 20 * 1024 * 1024) {
-                                                setFormError('File size must not exceed 20MB.');
-                                                return;
-                                            }
-                                            setFormError('');
-                                            setSupportingEvidence(file);
-                                        }
-                                    }}
-                                    style={{ flex: 1, fontSize: 13 }}
-                                />
-                                {supportingEvidence && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSupportingEvidence(null);
-                                            if (fileInputRef.current) fileInputRef.current.value = '';
-                                        }}
-                                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                )}
-                            </div>
                         )}
-                        {supportingEvidence && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf,.docx,.xlsx,.jpg,.jpeg,.png"
+                                onChange={e => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+                                        const allowed = ['pdf', 'docx', 'xlsx', 'jpg', 'jpeg', 'png'];
+                                        if (!allowed.includes(ext)) {
+                                            setFormError('Invalid file format. Allowed: PDF, DOCX, XLSX, JPG, PNG.');
+                                            return;
+                                        }
+                                        if (file.size > 20 * 1024 * 1024) {
+                                            setFormError('File size must not exceed 20MB.');
+                                            return;
+                                        }
+                                        setFormError('');
+                                        setSupportingEvidence(file);
+                                    }
+                                }}
+                                style={{ flex: 1, fontSize: 13 }}
+                            />
+                            {supportingEvidence && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSupportingEvidence(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = '';
+                                    }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ee5d50', padding: 4 }}
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        {supportingEvidence ? (
                             <span style={{ fontSize: 11, color: 'var(--status-active)', marginTop: 3, display: 'block' }}>
                                 ✓ {supportingEvidence.name} ({(supportingEvidence.size / 1024 / 1024).toFixed(1)} MB)
                             </span>
-                        )}
+                        ) : initial.supportingEvidenceUrl ? (
+                            <span style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, display: 'block' }}>
+                                Leave empty to keep current file. Select a new file above to replace it.
+                            </span>
+                        ) : null}
                     </div>
 
                     {/* -- Smart Task Routing Recommendation -- */}
@@ -3814,13 +3816,20 @@ export default function OpsAdminDashboard() {
     // -- Update Task --
     const handleEditTask = async (taskId: string, data: UpdateTaskDTO) => {
         try {
+            const formData = new FormData();
+            formData.append('TaskTitle', data.taskTitle);
+            formData.append('TaskDescription', data.taskDescription);
+            formData.append('Priority', data.priority);
+            if (data.dueAt) formData.append('DueAt', new Date(data.dueAt).toISOString());
+            formData.append('AssignedTo', data.assignedTo);
+            if (data.taskCategory) formData.append('TaskCategory', data.taskCategory);
+            if (data.taskRemarks) formData.append('TaskRemarks', data.taskRemarks);
+            const dto = data as any;
+            if (dto.supportingEvidence) formData.append('SupportingEvidence', dto.supportingEvidence);
             const res = await fetch(`/api/task/update-task/${taskId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token()}`,
-                },
-                body: JSON.stringify(data),
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token()}` },
+                body: formData,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));

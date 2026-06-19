@@ -55,8 +55,8 @@ namespace OTMS.Controllers
         /// Updates an existing task's details. Only authenticated users can update tasks, and only if they have the "OperationsAdmin" role.
         /// </summary>
         [Authorize(Policy = "Permissions.Tasks.Manage")]
-        [HttpPut("update-task/{taskId}")]
-        public async Task<ActionResult<TaskResponseDTO>> UpdateTask(Guid taskId, UpdateTaskDTO request)
+        [HttpPost("update-task/{taskId}")]
+        public async Task<ActionResult<TaskResponseDTO>> UpdateTask(Guid taskId, [FromForm] UpdateTaskDTO request)
         {
             try
             {
