@@ -1,0 +1,717 @@
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client;
+using Microsoft.IdentityModel.Tokens;
+using NETCore.MailKit.Core;
+using OTMS.Common;
+using OTMS.Common.Constraints;
+using OTMS.Data;
+using OTMS.Entities.DTOs;
+using OTMS.Entities.DTOs.ActivityLogs.Responses;
+using OTMS.Entities.DTOs.PasswordVerification;
+using OTMS.Entities.DTOs.PasswordVerification.Response;
+using OTMS.Entities.DTOs.ResetPassword;
+using OTMS.Entities.Models;
+using OTMS.Service.Helper;
+using OTMS.Service.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace OTMS.Service.Services
+{
+    public class AuthService(IActivityLogService activityLogService, IConfiguration configuration, OTMSDbContext context, INotificationService notificationService, IEmailService emailService, IHttpContextAccessor httpContextAccessor, IFileService fileService) : IAuthService
+    {
+        static int MaxFailedLoginAttempts = 3;
+        static string? GeneratedPassword = String.Empty;
+
+        public async Task<TokenResponseDTO?> LoginAsync(
+            EmployeeLoginDTO request
+        )
+        {
+
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+                .FirstOrDefaultAsync(
+                    u => u.EmployeeNumber == request.EmployeeNumber
+                );
+
+            var accountStatus = employee?.Account?.AccountStatus;
+            var accountFailedAttempts = employee?.Account?.FailedLoginAttempts;
+
+
+
+            if (employee is null || employee.Account is null || string.IsNullOrEmpty(employee.Account.PasswordHash))
+            {
+                return null;
+            }
+
+            var isSystemAdmin = employee.Account.Role?.Name == "SystemAdmin";
+            if (!employee.IsEmailVerified && !isSystemAdmin)
+            {
+                throw new Exception(
+                    "Please verify your email before logging in. If you haven't received the verification email, please check your spam folder or contact support."
+                );
+            }
+
+            if (accountStatus is null || accountStatus == "Deactivated" || accountStatus == "Locked" || accountFailedAttempts == MaxFailedLoginAttempts)
+            {
+                return null;
+            }
+
+            if (accountStatus == "On Leave")
+            {
+                var activeLeave = await context.LeaveRequests
+                    .FirstOrDefaultAsync(lr =>
+                        lr.AccountId == employee.Account.AccountId &&
+                        lr.Approval_Status == "Approved");
+
+                await activityLogService.LogActivityAsync(
+                employee.Account.AccountId,
+                ActivityTypes.AccessDenied,
+                $"On Leave Employee {string.Join(" ", new[]
+                    {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} tried to log in at {DateTime.Now:hh:mm tt}. Access Denied.");
+
+                var overrideToken = CreateToken(employee);
+
+                throw new OnLeaveException(
+                    employee.Account?.AccountId ?? Guid.Empty
+                    , activeLeave?.LeaveId ?? Guid.Empty
+                    , string.Join(" ", new[]
+                        {
+                            employee.FirstName ?? string.Empty,
+                            employee.MiddleName ?? string.Empty,
+                            employee.LastName ?? string.Empty,
+                            employee.Suffix ?? string.Empty
+                        }.Where(x => !string.IsNullOrWhiteSpace(x)))
+                    , overrideToken);
+            }
+
+            var verificationResult =
+                new PasswordHasher<Account>()
+                    .VerifyHashedPassword(
+                        employee.Account,
+                        employee.Account.PasswordHash,
+                        request.Password
+                    );
+
+            // If the Password is incorrect, return null to indicate failed login
+            if (verificationResult == PasswordVerificationResult.Failed)
+            {
+                if (employee.Account.Role.Name != "SystemAdmin")
+                {
+                    employee.Account.FailedLoginAttempts++;
+
+                    if (employee.Account.FailedLoginAttempts >= MaxFailedLoginAttempts)
+                        employee.Account.AccountStatus = "Locked";
+
+                    context.Accounts.Update(employee.Account);
+                    await context.SaveChangesAsync();
+                }
+                return null;
+            }
+            
+            if (employee.Account.AccountStatus == "Deactivated" || employee.Account.AccountStatus == "Locked")
+            {
+                return null;
+            }
+
+            if (accountStatus == "Emergency Overriden")
+            {
+                // Save Login Activity
+                await activityLogService.LogActivityAsync(
+                    employee.Account.AccountId,
+                    ActivityTypes.Login,
+                    $"[Emergency Overriden] {string.Join(" ", new[]
+                        {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
+                    );
+
+                employee.Account.FailedLoginAttempts = 0;
+                await context.SaveChangesAsync();
+
+                // Check Task Deadlines
+                await notificationService.CheckTaskDeadlinesAsync();
+
+                return await CreateTokenResponse(employee);
+            }
+
+            // Save Login Activity
+            await activityLogService.LogActivityAsync(
+                employee.Account.AccountId,
+                ActivityTypes.Login,
+                $"{string.Join(" ", new[]
+                    {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} timed in at {DateTime.Now:hh:mm tt}"
+                );
+
+            employee.Account.FailedLoginAttempts = 0;
+            await context.SaveChangesAsync();
+
+            // Check Task Deadlines
+            await notificationService.CheckTaskDeadlinesAsync();
+
+            return await CreateTokenResponse(employee);
+        }
+
+        public async Task<TokenResponseDTO?> RefreshTokensAsync(
+            RefreshTokenRequestDTO request
+        )
+        {
+            var user = await ValidateRefreshTokenAsync(
+                request.AccountId,
+                request.RefreshToken
+            );
+
+            if (user is null)
+            {
+                return null;
+            }
+
+            ActivityLogResponseDTO activity = new ActivityLogResponseDTO();
+
+            return await CreateTokenResponse(user);
+        }
+
+        public async Task<EmployeeRegisterResponseDTO?> RegisterAsync(EmployeeRegisterDTO request)
+        {
+            if (string.IsNullOrWhiteSpace(request.EmployeeNumber))
+                return null;
+
+            request.EmployeeNumber = request.EmployeeNumber.ToUpper().Trim();
+
+            var exists = await context.Employees.AnyAsync(u => u.EmployeeNumber == request.EmployeeNumber);
+            if (exists)
+                throw new Exception("Employee Number already exists.");
+
+            var emailExists = await context.Employees.AnyAsync(e => e.Email == request.Email);
+            if (emailExists)
+                throw new Exception("Email already exists.");
+
+            string generatedUserPassword;
+            try
+            {
+                generatedUserPassword = PasswordGenerator.Generate(); // one password only
+
+                if (generatedUserPassword.Length < PasswordLength.MinimumLength ||
+                    generatedUserPassword.Length > PasswordLength.MaximumLength)
+                    throw new Exception("Generated password must be at least 15 to 64 characters long.");
+            }
+            catch (Exception ex)
+            {
+                var currentUserIdStrForFail = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (Guid.TryParse(currentUserIdStrForFail, out Guid currentUserIdForFail) && currentUserIdForFail != Guid.Empty)
+                {
+                    await activityLogService.LogActivityAsync(
+                        currentUserIdForFail,
+                        "PasswordGenerationFailed",
+                        $"Failed to generate password for Employee {request.EmployeeNumber}. Error: {ex.Message}"
+                    );
+                }
+                throw;
+            }
+
+            GeneratedPassword = generatedUserPassword; // assign to static variable for email use
+
+            var employee = new Employee
+            {
+                EmployeeId = Guid.NewGuid(),
+                EmployeeNumber = request.EmployeeNumber,
+                FirstName = string.Empty,
+                MiddleName = null,
+                LastName = string.Empty,
+                Suffix = null,
+                ContactNumber = string.Empty,
+                CreatedAt = DateTime.UtcNow,
+
+                Email = request.Email.Trim(),
+                IsEmailVerified = false,
+                DepartmentId = request.DepartmentId,
+                JobPositionId = request.JobPositionId,
+                EmploymentStatus = request.EmploymentStatus,
+
+                // Based on OWASP "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/04-Authentication_Testing/09-Testing_for_Weak_Password_Change_or_Reset_Functionalities"
+                /*
+                    1. Cryptographically Secure Pseudo-Random Number Generator (CSPRNG) is included in .NET's RandomNumberGenerator class, which provides a secure way to generate random data.
+
+                    2. 16 Bytes = 32 hex digits/characters long.
+
+                    3. 1 hour is recommended to minimize the window of opportunity for attackers while still giving users enough time to verify their email.
+                 */
+                EmailVerificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+                EmailVerificationTokenExpiry = DateTime.UtcNow.AddHours(1)
+            };
+
+            var targetRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == request.Role.Trim());
+            if (targetRole == null) throw new InvalidOperationException($"Role {request.Role} does not exist.");
+
+            var account = new Account
+            {
+                AccountId = Guid.NewGuid(),
+                EmployeeId = employee.EmployeeId,
+                RoleId = targetRole.RoleId,
+                Role = targetRole,
+                AccountStatus = "Pending Verification",
+                CreatedAt = DateTime.UtcNow,
+                IsPasswordChanged = false
+            };
+
+            account.PasswordHash = new PasswordHasher<Account>().HashPassword(account, generatedUserPassword);
+            employee.Account = account;
+
+            context.Employees.Add(employee);
+            context.Accounts.Add(account);
+
+            if (request.Attachments != null && request.Attachments.Any())
+            {
+                foreach (var file in request.Attachments)
+                {
+                    var attachment = await fileService.SaveFileAsync(file, employee.EmployeeId);
+                    employee.Attachments.Add(attachment);
+                }
+            }
+
+            // Extract the AccountId of the user creating this account (e.g., SystemAdmin1)
+            var currentUserIdStr = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid.TryParse(currentUserIdStr, out Guid currentUserId);
+
+            // Create ApplicantRecord for onboarding
+            var applicantRecord = new ApplicantRecord
+            {
+                ApplicantRecordId = Guid.NewGuid(),
+                FullName = employee.Email,
+                FirstName = string.Empty,
+                LastName = string.Empty,
+                EmailAddress = employee.Email,
+                ContactNumber = string.Empty,
+                JobPositionId = employee.JobPositionId ?? Guid.Empty,
+                Status = "Pending Onboarding",
+                CreatedAt = DateTime.UtcNow,
+                ReferenceNumber = $"EMP-{employee.EmployeeNumber}"
+            };
+            context.ApplicantRecords.Add(applicantRecord);
+
+            // Generate onboarding token
+            var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
+                .Replace('+', '-')
+                .Replace('/', '_')
+                .Replace("=", "");
+            var tokenHash = ComputeSha256Hash(rawToken);
+            var onboardingToken = new OnboardingToken
+            {
+                OnboardingTokenId = Guid.NewGuid(),
+                ApplicantRecordId = applicantRecord.ApplicantRecordId,
+                TokenHash = tokenHash,
+                Status = "Active",
+                ExpiresAt = DateTime.UtcNow.AddHours(72),
+                CreatedAt = DateTime.UtcNow,
+                CreatedByAccountId = currentUserId != Guid.Empty ? currentUserId : account.AccountId
+            };
+            context.OnboardingTokens.Add(onboardingToken);
+
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                var innerMsg = ex.InnerException?.Message ?? ex.Message;
+                throw new InvalidOperationException($"Failed to save account data: {innerMsg}");
+            }
+
+            // Save Account Created Activity under the creator's account if available, fallback to the newly created account
+            await activityLogService.LogActivityAsync(
+                currentUserId != Guid.Empty ? currentUserId : account.AccountId,
+                ActivityTypes.AccountCreated,
+                $"Account for {employee.EmployeeNumber} ({account.Role?.Name}) has been created."
+            );
+
+            var verificationLink =
+                $"{configuration["FrontendBaseUrl"]}/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
+            var onboardingLink =
+                $"{configuration["FrontendBaseUrl"]}/onboarding?token={rawToken}";
+
+            try
+            {
+                // Sending email with verification link + onboarding link (no password — employee sets it during onboarding)
+                await emailService.SendAsync(
+                    employee.Email,
+                    "Complete Your Account Setup",
+                    $"""
+                    Welcome to the Operational Management System.
+
+                    Your Employee Number is: {employee.EmployeeNumber}
+
+                    Step 1: Verify your account by clicking the link below:
+                    {verificationLink}
+
+                    Step 2: After verification, set up your profile and create your password:
+                    {onboardingLink}
+
+                    Please complete both steps to activate your account.
+                    """
+                );
+            }
+            catch (Exception ex)
+            {
+                await activityLogService.LogActivityAsync(
+                    currentUserId != Guid.Empty ? currentUserId : account.AccountId,
+                    "EmailFailed",
+                    $"Failed email transmission for Employee {employee.EmployeeNumber}. Error: {ex.Message}"
+                );
+                throw;
+            }
+
+            return new EmployeeRegisterResponseDTO
+            {
+                EmployeeNumber = employee.EmployeeNumber,
+                Role = account.Role?.Name ?? string.Empty,
+                GeneratedPassword = generatedUserPassword
+            };
+        }
+
+        public async System.Threading.Tasks.Task ResendVerificationAsync(string employeeNumber)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+
+            if (employee == null)
+            {
+                throw new KeyNotFoundException("Employee not found.");
+            }
+
+            employee.EmailVerificationToken =
+            Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+            employee.EmailVerificationTokenExpiry =
+                DateTime.UtcNow.AddHours(1);
+
+            await context.SaveChangesAsync();
+
+            var verificationLink =
+                $"{configuration["ApiBaseUrl"]}/api/authentication/verify-email" +
+                $"?token={employee.EmailVerificationToken}";
+
+            await emailService.SendAsync(
+                employee.Email,
+                    "Verify your Operational Management System Account",
+                    $"""
+                    Welcome to the Operational Management System.
+
+                    Your login credentials are:
+
+                    Employee Number: {employee.EmployeeNumber}
+                    Password: {GeneratedPassword}
+
+                    Please verify your account by clicking the link below:
+
+                    {verificationLink}
+
+                    After verifying your account, we recommend changing your password immediately after logging in.
+                    """
+            );
+        }
+
+        public async Task<PasswordVerificationResponseDTO> VerifyPasswordAsync(PasswordVerificationDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.EmployeeNumber == request.EmployeeID);
+
+            if (employee == null || employee.Account == null)
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Employee or account not found."
+                };
+
+            var verificationResult = new PasswordHasher<Account>()
+                .VerifyHashedPassword(
+                    employee.Account
+                    , employee.Account.PasswordHash
+                    , request.Password);
+
+            if (verificationResult == PasswordVerificationResult.Success)
+                {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = true,
+                    Message = "Password is correct."
+                };
+            }
+            else
+            {
+                return new PasswordVerificationResponseDTO
+                {
+                    isSuccess = false,
+                    Message = "Incorrect password."
+                };
+            }
+        }
+
+        // ─── Helper Methods ────────────────────────────────────────────────
+
+        private static string ContactNumberFormatter(string contactNumber)
+        {
+            if (string.IsNullOrEmpty(contactNumber))
+            {
+                return contactNumber;
+            }
+
+            // Ensuring only digits
+            contactNumber = new string(contactNumber.Where(char.IsDigit).ToArray());
+
+            // Validate the length
+            if (contactNumber.Length != 11 || !contactNumber.StartsWith("09"))
+            {
+                throw new Exception("Contact Number must be exactly 11 digits and start with 09.");
+            }
+
+            // Philippines Contact Number Format: 09XX XXX XXXX
+            return $"{contactNumber[..4]} {contactNumber.Substring(4, 3)} {contactNumber.Substring(7, 4)}";
+        }
+
+        private async Task<TokenResponseDTO> CreateTokenResponse(Employee employee)
+        {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
+            return new TokenResponseDTO
+            {
+                AccessToken = CreateToken(employee),
+                EmployeeNumber = employee.EmployeeNumber,
+                RefreshToken = await GenerateAndSaveRefreshTokenAsync(employee),
+                Role = employee.Account.Role?.Name ?? string.Empty,
+                FirstName = employee.FirstName ?? string.Empty,
+                MiddleName = employee.MiddleName ?? null,
+                LastName = employee.LastName ?? string.Empty,
+                Suffix = employee.Suffix ?? null,
+                ContactNumber = employee.ContactNumber ?? string.Empty,
+                Email = employee.Email ?? string.Empty,
+                IsPasswordChanged = employee.Account.IsPasswordChanged
+            };
+        }
+
+        private async Task<string> GenerateAndSaveRefreshTokenAsync(
+            Employee employee
+        )
+        {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
+            var refreshToken = GenerateRefreshToken();
+
+            employee.Account.RefreshToken = refreshToken;
+            employee.Account.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            await context.SaveChangesAsync();
+
+            return refreshToken;
+        }
+
+        private string GenerateRefreshToken()
+        {
+            var randomNumber = new byte[32];
+
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+
+            return Convert.ToBase64String(randomNumber);
+        }
+
+        public string CreateToken(Employee employee)
+        {
+
+            if (employee.Account is null)
+            {
+                throw new InvalidOperationException(
+                    "Employee does not have an associated account."
+                );
+            }
+
+            var claims = new List<Claim>
+            {
+                new Claim(
+                    ClaimTypes.Name,
+                    employee.EmployeeNumber
+                ),
+                new Claim(
+                    ClaimTypes.NameIdentifier,
+                    employee.Account.AccountId.ToString()
+                ),
+                new Claim(
+                    ClaimTypes.Role,
+                    (employee.Account.Role?.Name ?? string.Empty).Replace(" ", "")
+                )
+            };
+
+            // Add dynamic permission claims
+            if (employee.Account.Role != null && employee.Account.Role.RolePermissions != null)
+            {
+                foreach (var rp in employee.Account.Role.RolePermissions)
+                {
+                    if (rp.Permission != null)
+                    {
+                        claims.Add(new Claim("Permission", rp.Permission.Name));
+                    }
+                }
+            }
+
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    configuration.GetValue<string>(
+                        "AppSettings:Token"
+                    )!
+                )
+            );
+
+            var creds = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha512
+            );
+
+            var tokenDescriptor = new JwtSecurityToken(
+                issuer: configuration.GetValue<string>(
+                    "AppSettings:Issuer"
+                ),
+                audience: configuration.GetValue<string>(
+                    "AppSettings:Audience"
+                ),
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(1),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler()
+                .WriteToken(tokenDescriptor);
+        }
+
+        private async Task<Employee?> ValidateRefreshTokenAsync(
+            Guid userId,
+            string refreshToken
+        )
+        {
+            var user = await context.Employees
+                .Include(e => e.Account)
+                    .ThenInclude(a => a.Role)
+                        .ThenInclude(r => r.RolePermissions)
+                            .ThenInclude(rp => rp.Permission)
+                .FirstOrDefaultAsync(e => e.Account != null && e.Account.AccountId == userId);
+
+            if (user is null || user.Account is null)
+            {
+                return null;
+            }
+
+            if (
+                user is null ||
+                user.Account.RefreshToken != refreshToken ||
+                user.Account.RefreshTokenExpiryTime <= DateTime.UtcNow
+            )
+            {
+                return null;
+            }
+
+            return user;
+        }
+
+        public async Task<ApiResponseDTO<object>> ForgotPasswordAsync(ForgotPasswordDTO request)
+        {
+            var employee = await context.Employees
+                .Include(e => e.Account)
+                .FirstOrDefaultAsync(e => e.Email == request.Email);
+
+            if (employee == null || employee.Account == null)
+                throw new Exception("Employee or Account is not Found.");
+
+            var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+            employee.Account.PasswordResetToken = token;
+            employee.Account.PasswordResetTokenExpiryTime = DateTime.UtcNow.AddMinutes(15); // Based on https://www.authgear.com/post/authentication-security-password-reset-best-practices-and-more/#:~:text=How%20long%20should%20a%20password,immediately%20after%20a%20successful%20reset.
+            
+            await context.SaveChangesAsync();
+
+            var resetLink = $"{configuration["FrontendBaseUrl"]}/reset-password?token={token}";
+
+            await emailService.SendAsync(
+                        employee.Email,
+                            "Change Password for Operational Management System Account",
+                            $"""
+                            Welcome {string.Join(" ", new[]
+                                {employee.FirstName, employee.MiddleName, employee.LastName, employee.Suffix}.Where(n => !string.IsNullOrEmpty(n)))} to the Operational Management System.
+
+                            Please click the link below to reset your password, the link last 15 minutes:
+
+                            {resetLink}
+                            """
+                );
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password reset link has been sent to your email.",
+                Data = null
+            };
+        }
+
+        public async Task<ApiResponseDTO<object>> ResetPasswordAsync(ResetPasswordDTO request)
+        {
+
+            var account = await context.Accounts
+                .FirstOrDefaultAsync(a =>
+                    a.PasswordResetToken == request.Token
+                    && a.PasswordResetTokenExpiryTime > DateTime.UtcNow);
+
+            if (account == null)
+                throw new Exception("Invalid or expired password reset token.");
+
+            if(request.NewPassword.Length < PasswordLength.MinimumLength ||
+                request.NewPassword.Length > PasswordLength.MaximumLength)
+                throw new Exception("New password must be at least 15 to 64 characters long.");
+
+            var passwordHasher = new PasswordHasher<Account>();
+            account.PasswordHash = passwordHasher.HashPassword(account, request.NewPassword);
+
+            account.PasswordResetToken = null;
+            account.PasswordResetTokenExpiryTime = null;
+
+            await context.SaveChangesAsync();
+
+            await activityLogService.LogActivityAsync(
+                account.AccountId,
+                "PasswordReset",
+                $"Password reset activity recorded for Employee ID {account.EmployeeId}."
+            );
+
+            return new ApiResponseDTO<object>
+            {
+                IsSuccess = true,
+                Message = "Password has been reset successfully.",
+                Data = null
+            };
+
+        }
+
+        private static string ComputeSha256Hash(string raw)
+        {
+            var bytes = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+    }
+}

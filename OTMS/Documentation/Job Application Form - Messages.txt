@@ -1,0 +1,106 @@
+═══════════════════════════════════════════════════════════════════
+  JOB APPLICATION FORM — MESSAGES & SYSTEM OUTPUTS
+═══════════════════════════════════════════════════════════════════
+
+
+SUCCESS / COMPLETION
+────────────────────
+  Heading:     Application Submitted!
+  Body:        Thank you for applying to Speedex Courier. Your
+               application has been received and is currently
+               under review.
+  Status:      Pending Review
+
+  Post-submission info:
+               A verification email has been sent to your Google
+               account. Please check your inbox and click the
+               verification link to activate your application.
+               Our recruitment team will then review it and
+               reach out within 3–5 business days. Check your
+               spam folder if you don't see the email.
+
+  Buttons:     Submit Another Application
+               Back to Login
+
+
+FIELD-LEVEL VALIDATION ERRORS
+─────────────────────────────
+
+  Field                       Error Message(s)
+  ─────                       ────────────────
+  First Name                  "First name is required."
+                              "Maximum 50 characters reached."
+
+  Last Name                   "Last name is required."
+
+  Middle Name                 "Middle name must not exceed 50 characters."
+
+  Suffix                      "Suffix must not exceed 50 characters."
+
+  Gender                      "Gender is required."
+                              "Gender must not exceed 50 characters."
+
+  Civil Status                "Civil status is required."
+
+  Contact Number              "Contact number is required."
+                              "Enter a valid 11-digit contact number."
+
+  Residential Address         "Current address is required."
+                              "Address must not exceed 256 characters."
+
+  Permanent Address           "Permanent address is required."
+
+  Birth Month                 "Birth month is required."
+
+  Birth Day                   "Birth day is required."
+
+  Birth Year                  "Birth year is required."
+                              "Enter a valid year (1900-{currentYear})."
+
+  Age                         "Enter a valid age (1-150)."
+                              "You must be at least 18 years old to apply."
+
+  Nationality                 "Nationality is required."
+
+  Citizenship                 "Citizenship is required."
+
+  Highest Ed. Attainment      "Highest educational attainment is required."
+                              "Must not exceed 128 characters."
+
+  Institution                 "Institution is required."
+                              "Must not exceed 128 characters."
+
+  Year Graduated              "Year graduated is required."
+                              "Year must be exactly 4 digits."
+                              "Year must be 1900 or later."
+                              "Year cannot be in the future."
+
+  Position                    "Please select a position."
+
+  Resume                      "Please upload your Resume/CV."
+                              "Invalid file format. Please upload a PDF or DOCX."
+                              "File exceeds 5MB. Please upload a smaller file."
+
+
+SYSTEM / UI TEXT
+────────────────
+  "All fields marked * are required"
+  "Submitting application…"                      (loading state)
+  "Submit Application →"
+  "By submitting, you confirm the information provided is
+   accurate. Your application status will be Pending Review
+   until assessed by our team."
+  "Pre-filled from your Gmail account"
+  "Via Google"                                   (badge on email field)
+  "Authenticated" / "Verified via Google"
+  "What happens next?"
+  "No positions available"                       (when list is empty)
+  "Google Sign-In is not available. Please try
+   again later."
+
+
+API ERROR
+─────────
+  Backend's message field from the error response, or fallback:
+  "An error occurred. Please try again."
+═══════════════════════════════════════════════════════════════════

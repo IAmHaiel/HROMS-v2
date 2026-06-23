@@ -1,0 +1,123 @@
+Onboarding Page — Employee Onboarding and 201 File Submission
+
+Flow:
+
+1. Applicant clicks the secure onboarding link in their email.
+2. System validates the URL token (checks if it exists, is active, and is not expired).
+3. System grants access and displays the Welcome screen.
+4. System pre-fills applicant profile data (First Name, Middle Name, Last Name, Suffix, Contact Number) from the ApplicantRecord.
+5. Applicant reviews/updates their Profile Information and proceeds.
+6. Applicant sets a strong password (min 15 characters, max 64).
+7. Applicant uploads required documents:
+   - Biodata / Resume (PDF or DOCX, max 10MB)
+   - Medical Certificate (PDF, JPG, PNG, max 10MB)
+   - Government-issued ID (PDF, max 10MB) — Required
+   - NBI / Police Clearance (PDF, JPG, PNG, max 10MB)
+   - PSA Birth Certificate (PDF, JPG, PNG, max 10MB)
+   - BIR Form 2316 (PDF, JPG, PNG, max 10MB) — Optional
+   - Educational Documents (PDF, max 10MB) — Optional
+8. System uploads each file to the server via multipart/form-data and saves to wwwroot/uploads/resumes/ or wwwroot/uploads/applicant-docs/.
+9. Applicant fills out the Official Employee 201 File Form.
+10. System validates all 201 File data formats on the client side (PH government ID structures, bank details, emergency contact).
+11. Applicant submits the 201 File Form along with the password to complete onboarding.
+12. System validates the token again, creates the Employee and Account records, saves all 201 File data to the ApplicantRecord, and marks the token as Used.
+13. System displays the onboarding success page with the assigned Employee Number.
+14. System sends a welcome email to the applicant with their Employee Number and login URL.
+
+Token Validation:
+- URL Token (String Validation, System Checked — SHA256 hashed lookup)
+- Status must be "Active" — rejects if "Used" or "Expired"
+- Expiration: 72 hours from creation
+
+Profile Information:
+- First Name (Text Input, Pre-filled from ApplicantRecord, Required, max 50)
+- Middle Name (Text Input, Pre-filled from ApplicantRecord, Optional, max 50)
+- Last Name (Text Input, Pre-filled from ApplicantRecord, Required, max 50)
+- Suffix (Text Input, Pre-filled from ApplicantRecord, Optional, max 10)
+- Contact Number (Text Input, Pre-filled from ApplicantRecord, Optional, max 11 digits)
+
+Password Setup:
+- Password (Password Input, Required, min 15 characters, max 64, with strength indicator: Weak/Fair/Strong)
+- Confirm Password (Password Input, Required, max 64, must match)
+
+Required Document Uploads (max 10MB each):
+- Biodata / Resume (PDF or DOCX only)
+- Medical Certificate (PDF, JPG, or PNG)
+- Government-issued ID (PDF only)
+- NBI / Police Clearance (PDF, JPG, or PNG)
+- PSA Birth Certificate (PDF, JPG, or PNG)
+
+Optional Document Uploads:
+- BIR Form 2316 (PDF, JPG, or PNG, max 10MB)
+- Educational Documents (PDF only, max 10MB)
+
+Official Employee 201 File Form:
+- SSS Number (Text Input, Required, max 12 chars, Format: XX-XXXXXXX-X, auto-formatted as typed)
+- PhilHealth Number (Text Input, Required, max 14 chars, Format: XX-XXXXXXXXX-X, auto-formatted as typed)
+- Pag-IBIG Number (Text Input, Required, max 14 chars, Format: XXXX-XXXX-XXXX, auto-formatted as typed)
+- TIN (Text Input, Optional, max 15 chars, Format: XXX-XXX-XXX-XXX)
+- Bank Account Name (Text Input, Required, max 50, must match applicant full name)
+- Bank Account Number (Text Input, Required, max 35, letters/numbers/dashes only, no spaces)
+- Bank Name (Dropdown Input, Required — 16 bank options including "Other" with custom text field, max 128 for custom)
+- Emergency Contact Name (Text Input, Required, max 80)
+- Emergency Contact Relationship (Dropdown Input, Required — includes "Others" with custom text field, max 50 for custom)
+- Emergency Contact Number (Text Input, Required, max 11 digits, 11-digit format starting with 09)
+- Mother's First Name (Text Input, Optional, max 50)
+- Mother's Middle Name (Text Input, Optional, max 50)
+- Mother's Maiden Last Name (Text Input, Optional, max 50)
+- Father's First Name (Text Input, Optional, max 50)
+- Father's Middle Name (Text Input, Optional, max 50)
+- Father's Last Name (Text Input, Optional, max 50)
+
+Success Messages:
+- "Onboarding completed successfully. Your Employee Number is {employeeNumber}." (API response)
+- Welcome email sent: "Your Employee Account Has Been Created" with Employee Number and Login URL
+- Onboarding progress bar shows "Profile Setup" -> "Set Password" -> "Upload Documents" -> "201 File" -> Done screen
+
+Error Messages:
+- "Token is required."
+- "Invalid or expired link."
+- "This link has already been used."
+- "This link has expired."
+- "SSS Number is required."
+- "PhilHealth Number is required."
+- "Pag-IBIG Number is required."
+- "Invalid SSS format detected. (Format: XX-XXXXXXX-X)"
+- "Invalid PhilHealth format detected. (Format: XX-XXXXXXXXX-X)"
+- "Invalid Pag-IBIG format detected. (Format: XXXX-XXXX-XXXX)"
+- "Invalid TIN format detected. (Format: XXX-XXX-XXX-XXX)"
+- "Invalid contact number format. Must be 11 digits starting with 09."
+- "Bank account name is required."
+- "Bank account name must match your full name."
+- "Bank account name must not exceed 50 characters."
+- "Bank account number is required."
+- "Only letters, numbers, and dashes allowed for bank account number."
+- "Must not exceed 35 characters." (bank account number)
+- "Bank name is required."
+- "Emergency contact name is required."
+- "Must be at least 2 characters." (emergency contact name)
+- "Emergency contact number is required."
+- "Must be 11 digits starting with 09." (emergency contact number)
+- "Password is required."
+- "Password must be at least 15 characters."
+- "Please confirm your password."
+- "Passwords do not match."
+- "Default role '{role}' not found. Please contact system administrator."
+- "Some files failed to upload. You can retry or continue anyway."
+- "Failed to complete onboarding." (with detail message)
+- "File size exceeds 10MB limit."
+- "Upload a PDF or DOCX." (biodata) / "Upload a PDF." (govId, education) / "Upload a PDF or image." (all others)
+
+System Output:
+- All document files saved to wwwroot/uploads/resumes/ or wwwroot/uploads/applicant-docs/ with GUID-prefixed filenames
+- ApplicantRecord updated with file paths (ResumeFilePath, MedicalClearanceFilePath, NBIClearanceFilePath, PSABirthCertificateFilePath, BIRForm2316FilePath)
+- ApplicantRecord updated with all 201 File data (SSS, PhilHealth, Pag-IBIG, TIN, Bank Name, Bank Account Name, Bank Account Number, Emergency Contact Name/Relationship/Number, Mother First/Middle/Last Name, Father First/Middle/Last Name)
+- Employee record created with Employee Number, applicant personal data, job position, and department
+- Account record created with role "Encoder" and the password hash
+- Applicant status updated to "Hired/Converted"
+- StatusHistory record added: old status -> "Hired/Converted" with remarks "Automated account conversion upon onboarding completion."
+- Onboarding URL token flagged as "Used" with UsedAt timestamp
+- Activity log entry: "Employee {number} account provisioned and credentials sent to {email}."
+- Activity log entry: "Applicant '{name}' completed onboarding. Status updated to Hired/Converted."
+- Welcome email dispatched to applicant email via SMTP
+- Default role: "Encoder" (configurable via appsettings.json DefaultNewHireRole)

@@ -1,0 +1,258 @@
+using Microsoft.EntityFrameworkCore;
+using OTMS.Data;
+using OTMS.Entities.DTOs.ActivityLogs.Responses;
+using OTMS.Entities.Models;
+using OTMS.Service.Interfaces;
+
+namespace OTMS.Service.Services
+{
+    public class ActivityLogService(OTMSDbContext context) : IActivityLogService
+    {
+        public async Task<string> GetOnlineActivityAsync(Guid employeeId)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .Include(a => a.ActivityLogs)
+                .FirstOrDefaultAsync(a => a.Employee.EmployeeId == employeeId);
+
+            if (account is null || account.Employee is null)
+            {
+                throw new Exception("Employee not found.");
+            }
+
+            var latestActivity = account.ActivityLogs
+                .OrderByDescending(al => al.CreatedAt)
+                .FirstOrDefault();
+
+            if (latestActivity is null)
+            {
+                return "Offline";
+            }
+
+            return latestActivity.ActivityType switch
+            {
+                "Login" => "Online",
+                "Logout" => "Offline",
+                _ => "Offline"
+            };
+        }
+
+        public async Task<PresenceResponseDTO> GetPresenceAsync(Guid employeeId)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .Include(a => a.ActivityLogs)
+                .FirstOrDefaultAsync(a => a.Employee.EmployeeId == employeeId);
+
+            if (account is null || account.Employee is null)
+            {
+                throw new Exception("Employee not found.");
+            }
+            
+            var lastActivity = account.ActivityLogs
+                .OrderByDescending(al => al.CreatedAt)
+                .FirstOrDefault();
+
+            DateTime? lastSeen = lastActivity?.CreatedAt;
+
+            bool isOnline =
+                lastSeen.HasValue &&
+                lastSeen.Value >= DateTime.UtcNow.AddMinutes(-5); // Consider online if last activity was within the last 5 minutes
+
+            return new PresenceResponseDTO
+            {
+                accountId = account.AccountId,
+
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
+                presenceStatus = isOnline ? "Online" : "Offline",
+                lastSeen = lastSeen
+            };
+        }
+
+        public async Task<ActivityLogResponseDTO> LogActivityAsync(Guid AccountId, string ActivityType, string Description)
+        {
+            var account = await context.Accounts
+                .Include(a => a.Employee)
+                .FirstOrDefaultAsync(a => a.AccountId == AccountId);
+
+            if (account == null)
+                throw new Exception("Account not found.");
+
+            var activityLog = new ActivityLog
+            {
+                ActivityLogId = Guid.NewGuid(),
+                AccountId = AccountId,
+                ActivityType = ActivityType,
+                Description = Description,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await context.ActivityLogs.AddAsync(activityLog);
+            await context.SaveChangesAsync();
+
+            return new ActivityLogResponseDTO
+            {
+                ActivityLogId = activityLog.ActivityLogId,
+                AccountId = AccountId,
+                
+                FirstName = account.Employee.FirstName,
+                MiddleName = account.Employee.MiddleName,
+                LastName = account.Employee.LastName,
+                Suffix = account.Employee.Suffix,
+
+                ActivityType = activityLog.ActivityType,
+                Description = activityLog.Description,
+                CreatedAt = activityLog.CreatedAt
+            };
+        }
+
+        public async Task<IEnumerable<object>> GetRecentActivityLogsAsync(int count = 50)
+        {
+            return await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .OrderByDescending(al => al.CreatedAt)
+                .Take(count)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+        }
+
+        public async Task<object> GetRecentActivityLogsPagedAsync(int page = 1, int pageSize = 20, string? search = null, string? employeeId = null, string? activityType = null, string? dateFrom = null, string? dateTo = null)
+        {
+            var query = context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(activityType))
+                query = query.Where(al => al.ActivityType == activityType);
+
+            if (!string.IsNullOrWhiteSpace(employeeId))
+                query = query.Where(al => al.Account.Employee.EmployeeNumber == employeeId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var q = search.ToLower();
+                query = query.Where(al => al.Description.ToLower().Contains(q)
+                    || al.ActivityType.ToLower().Contains(q)
+                    || (al.Account.Employee.FirstName + " " + al.Account.Employee.LastName).ToLower().Contains(q));
+            }
+
+            if (!string.IsNullOrWhiteSpace(dateFrom) && DateTime.TryParse(dateFrom, out var fromDate))
+                query = query.Where(al => al.CreatedAt >= fromDate.ToUniversalTime());
+
+            if (!string.IsNullOrWhiteSpace(dateTo) && DateTime.TryParse(dateTo, out var toDate))
+                query = query.Where(al => al.CreatedAt <= toDate.ToUniversalTime().AddDays(1));
+
+            var totalRecords = await query.CountAsync();
+            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
+            var logs = await query
+                .OrderByDescending(al => al.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+
+            return new
+            {
+                IsSuccess = true,
+                Message = "Activity logs retrieved successfully.",
+                Data = logs,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
+        }
+
+        public async Task<object> GetMyActivityLogsPagedAsync(Guid accountId, int page = 1, int pageSize = 20)
+        {
+            var totalRecords = await context.ActivityLogs
+                .CountAsync(al => al.AccountId == accountId);
+            var totalPages = (int)System.Math.Ceiling(totalRecords / (double)pageSize);
+            var logs = await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .Where(al => al.AccountId == accountId)
+                .OrderByDescending(al => al.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+
+            return new
+            {
+                IsSuccess = true,
+                Message = "Activity logs retrieved successfully.",
+                Data = logs,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalRecords = totalRecords,
+                TotalPages = totalPages
+            };
+        }
+
+        // [Code Addition] Dedicated method to fetch activity logs for a specific employee number, primarily utilized by EmployeeDetailPanel.
+        public async Task<IEnumerable<object>> GetEmployeeActivityLogsAsync(string employeeNumber)
+        {
+            var employee = await context.Employees.Include(e => e.Account).FirstOrDefaultAsync(e => e.EmployeeNumber == employeeNumber);
+            if (employee == null || employee.Account == null) return new List<object>();
+
+            return await context.ActivityLogs
+                .Include(al => al.Account)
+                    .ThenInclude(a => a.Employee)
+                .Where(al => al.AccountId == employee.Account.AccountId)
+                .OrderByDescending(al => al.CreatedAt)
+                .Select(al => new
+                {
+                    activityLogId = al.ActivityLogId,
+                    activityType = al.ActivityType,
+                    description = al.Description,
+                    accountId = al.AccountId,
+                    firstName = al.Account.Employee.FirstName,
+                    middleName = al.Account.Employee.MiddleName != null ? al.Account.Employee.MiddleName : "",
+                    lastName = al.Account.Employee.LastName,
+                    suffix = al.Account.Employee.Suffix != null ? al.Account.Employee.Suffix : "",
+                    createdAt = System.DateTime.SpecifyKind(al.CreatedAt, System.DateTimeKind.Utc)
+                })
+                .ToListAsync();
+        }
+    }
+}
