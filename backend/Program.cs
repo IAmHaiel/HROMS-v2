@@ -20,6 +20,8 @@ using OTMS.Service.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.UseWebRoot(Path.Combine(Directory.GetCurrentDirectory(), "..", "frontend"));
+
 // Add services to the container.
 
 builder.Services.AddControllers()
@@ -184,6 +186,6 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<OTMS.Hubs.WorkflowHub>("/hubs/workflow");
 
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("dist/index.html");
 
 app.Run();

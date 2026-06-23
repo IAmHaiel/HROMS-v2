@@ -7,7 +7,7 @@ import { dirname, resolve } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-    root: resolve(__dirname, "wwwroot"),
+    root: ".",
     base: "./",
     plugins: [react()],
     build: {
@@ -33,7 +33,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: "jsdom",
-        setupFiles: resolve(__dirname, "wwwroot/src/test/setup.ts"),
+        setupFiles: resolve(__dirname, "src/test/setup.ts"),
         css: true,
     }
 });
